@@ -1,34 +1,33 @@
 # OASIS_START
-# DO NOT EDIT (digest: a46dc4ee23013e7e5a125ed29c9d0567)
+# DO NOT EDIT (digest: 484795e80eb6f99ab78af0e1a9ee4826)
 version = "0.1.0"
-description = "distributed integration engine for opam packages"
+description = "Distributed dataflow engine"
 requires = "irmin.unix lwt uuidm fmt nocrypto uri jsont.jsonm hex bytes"
-archive(byte) = "ciso.cma"
-archive(byte, plugin) = "ciso.cma"
-archive(native) = "ciso.cmxa"
-archive(native, plugin) = "ciso.cmxs"
-exists_if = "ciso.cma"
+archive(byte) = "datakit.cma"
+archive(byte, plugin) = "datakit.cma"
+archive(native) = "datakit.cmxa"
+archive(native, plugin) = "datakit.cmxs"
+exists_if = "datakit.cma"
 package "worker" (
  version = "0.1.0"
- description = "distributed integration engine for opam packages"
- requires =
- "ciso irmin.unix opam-lib.client ocamlgraph threads cstruct.unix rresult"
- archive(byte) = "ciso-worker.cma"
- archive(byte, plugin) = "ciso-worker.cma"
- archive(native) = "ciso-worker.cmxa"
- archive(native, plugin) = "ciso-worker.cmxs"
- exists_if = "ciso-worker.cma"
+ description = "Distributed dataflow engine"
+ requires = "datakit irmin.unix threads cstruct.unix rresult ocamlgraph"
+ archive(byte) = "datakit-worker.cma"
+ archive(byte, plugin) = "datakit-worker.cma"
+ archive(native) = "datakit-worker.cmxa"
+ archive(native, plugin) = "datakit-worker.cmxs"
+ exists_if = "datakit-worker.cma"
 )
 
 package "github" (
  version = "0.1.0"
- description = "distributed integration engine for opam packages"
- requires = "ciso ciso.worker github.unix lwt"
- archive(byte) = "ciso-github.cma"
- archive(byte, plugin) = "ciso-github.cma"
- archive(native) = "ciso-github.cmxa"
- archive(native, plugin) = "ciso-github.cmxs"
- exists_if = "ciso-github.cma"
+ description = "Distributed dataflow engine"
+ requires = "datakit datakit.worker github.unix lwt"
+ archive(byte) = "datakit-github.cma"
+ archive(byte, plugin) = "datakit-github.cma"
+ archive(native) = "datakit-github.cmxa"
+ archive(native, plugin) = "datakit-github.cmxs"
+ exists_if = "datakit-github.cma"
 )
 # OASIS_STOP
 

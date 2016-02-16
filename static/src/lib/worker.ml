@@ -20,7 +20,7 @@ type id = [`Worker] Id.t
 
 type kind = [`Job|`Task]
 
-type t = { id: id; kind: [`Job|`Task]; host: Host.t; }
+type t = { id: id; kind: [`Job|`Task] }
 
 let equal x y = Id.equal x.id y.id
 let compare x y = Id.compare x.id y.id
@@ -34,30 +34,23 @@ let pp ppf t =
   let block = [
     "id    ", mk Id.pp t.id;
     "kind  ", mk pp_kind t.kind;
-    "host  ", [Host.short t.host];
   ] in
   Gol.show_block ppf block
 
 let json =
   let o = Jsont.objc ~kind:"worker" () in
   let id = Jsont.(mem o "id" Id.json) in
-  let host = Jsont.(mem o "host" Host.json) in
   let kind = Jsont.(mem o "kind" @@ enum ["job",`Job; "task",`Task]) in
   let c = Jsont.obj ~seal:true o in
   let dec o =
-    let get x = Jsont.get x o in
-    `Ok { kind = get kind; id = get id; host = get host } in
-  let enc t =
-    Jsont.(new_obj c [memv id t.id; memv kind t.kind; memv host t.host])
+    let get x = Jsont.get x o in `Ok { kind = get kind; id = get id }
   in
+  let enc t = Jsont.(new_obj c [memv id t.id; memv kind t.kind]) in
   Jsont.view (dec, enc) c
 
-let create kind host =
-  let id = Id.uuid `Worker in
-  { id; kind; host }
+let create kind = let id = Id.uuid `Worker in { id; kind }
 
 let id t = t.id
-let host t = t.host
 let kind t = t.kind
 
 type status = [

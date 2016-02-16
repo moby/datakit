@@ -1,16 +1,18 @@
 # OASIS_START
-# DO NOT EDIT (digest: a58b8d40584faefecedee00f29234d66)
+# DO NOT EDIT (digest: 80616b99c1802da0a71d559b35265933)
 Id
 Task
 Job
-Object
-Package
-Host
-Switch
+Cmd
+Source
 Worker
 Store
 Scheduler
 Version
+Url
+Exec
+GitSource
+Flow
 worker/Task_worker
 worker/Job_worker
 # OASIS_STOP

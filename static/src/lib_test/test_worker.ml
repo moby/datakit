@@ -17,8 +17,7 @@
 open Lwt.Infix
 include Test_common
 
-let opam_root = "/tmp/ciso-tests-opam"
-let host = Job.host jr1
+let cache_root = "/tmp/datakit-tests"
 
 let check_task s sched msg expected =
   let testable =

@@ -16,17 +16,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** Build jobs.
-
-    Jobs are for a given {{!module:Switch}switch} version and
-    {{!module:Host}host} configurations. Jobs have pre-requisites:
-    these are {{!module:Object}objects} which needs to be built and be
-    put into the {{!module:Worker}worker} context before the job could
-    start.
-
-    Completed jobs produce output {{!module:Object}object(s)} which
-    will be consummed by other jobs.
-*)
+(** Build jobs. *)
 
 type id = [`Job] Id.t
 (** The type for job identifiers. Job identifiers are deterministic,
@@ -38,36 +28,28 @@ type id = [`Job] Id.t
 type t
 (** The type for job values. *)
 
-val create: ?inputs:id list -> Host.t -> Switch.t -> Package.meta list -> t
-(** [create h c pkgs] is the job of building the list of packages
-    [pkgs] using the OCaml compiler switch [c] on a worker having [h]
-    as host configuration.
-
-    The job will be able to access the outputs objects created by the
-    (optional) [inputs] jobs. *)
+val create: ?inputs: id list -> Cmd.t -> t
+(** [create ?inputs cmd] is the job of running the command [cmd] once
+    the given [inputs] are ready. *)
 
 val id: t -> id
 (** [id t] id [t]'s deterministic identifier. It is obtained by hasing
     a stable representation of [t]'s components. *)
 
-val switch: t -> Switch.t
-(** [switch t] is [t]'s switch. *)
-
-val host: t -> Host.t
-(** [host t] is [t]'s host. *)
+val cmd: t -> Cmd.t
+(** [cmd t] is [t]'s command to run. *)
 
 val inputs: t -> id list
 (** [input t] are [t]'s job inputs. *)
-
-val packages: t -> Package.meta list
-(** [packages t] are the package metadata that [t] needs to know
-    about. *)
 
 val equal: t -> t -> bool
 (** [equal] is the job equality. *)
 
 val compare: t -> t -> int
 (** [compare] compares jobs. *)
+
+val hash: t -> int
+(** [hash] hashes jobs. *)
 
 val json: t Jsont.codec
 (** [json] is the JSON codec for jobs. *)
@@ -91,8 +73,3 @@ val json_status: status Jsont.codec
 
 val pp_status: status Fmt.t
 (** [pp_status] formats jobs {!status}. *)
-
-val task_status: status list -> Task.status
-(** [task_status s] is the status summary of s. If all status are
-    [`Success] then it is a [`Success]. If all status are [`Failed]
-    then it is also [`Failed]. Otherwise it is [`Pending]. *)

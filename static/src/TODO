@@ -1,0 +1,61 @@
+??? delegates -> need to read the CIEL paper again.
+
+### user-defined tasks
+
+Should be opam-oriented.
+
+/task/:id/value {
+  user: "GitHub name"
+  date:
+  query:
+  kind: [user|GH|...]
+}
+
+/task/:id/status
+/task/:id/jobs/:id
+
+The GitHub watches should resolve in creating new task in there.
+
+The tasks are translated into jobs by the 'solver' worker.
+
+### jobs with input/outputs
+
+Should be opam-agnostic
+
+/jobs/:id/value {
+  inputs: [:ids]
+  env: [..]
+  cmd: [
+    [opam switch <comp>] (or untar compiler?)
+    ([untar x_1 in dir/] ||
+     ...
+     [untar x_n in dir/] )
+    [opam intall-one pkg.version]
+  ]
+  host: `uname -a`
+  kind: [delegate | action]
+} -- id is hash of the value
+
+/jobs/:id/outputs {
+  stdout : "http://.." + SHA + sign
+  stderr : "http://.."
+  archive: "http://.."
+}
+
+/jobs/:id/status
+/jobs/:id/tasks/:id
+
+
+### worker
+
+/worker/:id/value {
+  host:
+  name:
+  ip:
+}
+
+### scheduler
+
+/scheduler/pending
+/scheduler/running
+/scheduler/

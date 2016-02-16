@@ -21,24 +21,27 @@ open Lwt.Infix
 let section = ref "worker"
 let debug fmt = Gol.debug ~section:!section fmt
 
+let default_cache = "/tmp/docker/datakit/cache"
+
 type t = {
   worker   : Worker.t;                           (* the worker configuration. *)
   store    : Store.t;                                     (* the Irmin store. *)
-  opam_root: string;                          (* the OPAM root of the worker. *)
+  cache    : string;                       (* the location of the local cache *)
   tick     : float;                  (* how often do the worker need to tick. *)
   mutable heartbeat: int option;
   mutable stop: unit -> unit Lwt.t;                    (* stop the scheduler. *)
 }
 
-let opam t s = Opam.create ~root:t.opam_root s
-let store t = t.store
-let opam_root t = t.opam_root
-let worker t = t.worker
+type common_callback = t -> Worker.status -> unit Lwt.t
 
-let create ~tick ~store ~opam_root worker =
+let store t = t.store
+let worker t = t.worker
+let cache t = t.cache
+
+let create ~tick ~store ~cache worker =
   let stop () = Lwt.return_unit in
   let heartbeat = None in
-  { worker; store; opam_root; tick; stop; heartbeat; }
+  { worker; store; tick; cache; stop; heartbeat; }
 
 let pids = ref []
 let add_to_kill pid = pids := pid :: !pids
@@ -79,10 +82,9 @@ let heartbeat_loop t =
     add_to_kill pid;
     Lwt.return_unit
 
-let start fn ?host ?(tick=5.) ~opam_root ~kind store =
-  let host = match host with None -> Host.detect () | Some h -> h in
-  let w = Worker.create kind host in
-  let t = create ~tick ~store ~opam_root w in
+let start fn ?(tick=5.) ?(cache=default_cache) ~kind store =
+  let w = Worker.create kind in
+  let t = create ~tick ~store ~cache w in
   Store.Worker.add t.store w >>= fun () ->
   heartbeat_loop t >>= fun () ->
   execution_loop t fn >|= fun cancel ->

@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 7aaeb7b6938fa5a2fc2a6389bddce196)
+# DO NOT EDIT (digest: 136bca2b0ec8f6aa2a616ab027449820)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
@@ -14,8 +14,8 @@ true: annot, bin_annot
 ".git": not_hygienic
 "_darcs": -traverse
 "_darcs": not_hygienic
-# Library ciso
-"lib/ciso.cmxs": use_ciso
+# Library datakit
+"lib/datakit.cmxs": use_datakit
 <lib/*.ml{,i,y}>: pkg_bytes
 <lib/*.ml{,i,y}>: pkg_fmt
 <lib/*.ml{,i,y}>: pkg_hex
@@ -25,8 +25,8 @@ true: annot, bin_annot
 <lib/*.ml{,i,y}>: pkg_nocrypto
 <lib/*.ml{,i,y}>: pkg_uri
 <lib/*.ml{,i,y}>: pkg_uuidm
-# Library ciso-worker
-"lib/worker/ciso-worker.cmxs": use_ciso-worker
+# Library datakit-worker
+"lib/worker/datakit-worker.cmxs": use_datakit-worker
 <lib/worker/*.ml{,i,y}>: pkg_bytes
 <lib/worker/*.ml{,i,y}>: pkg_cstruct.unix
 <lib/worker/*.ml{,i,y}>: pkg_fmt
@@ -36,13 +36,12 @@ true: annot, bin_annot
 <lib/worker/*.ml{,i,y}>: pkg_lwt
 <lib/worker/*.ml{,i,y}>: pkg_nocrypto
 <lib/worker/*.ml{,i,y}>: pkg_ocamlgraph
-<lib/worker/*.ml{,i,y}>: pkg_opam-lib.client
 <lib/worker/*.ml{,i,y}>: pkg_rresult
 <lib/worker/*.ml{,i,y}>: pkg_threads
 <lib/worker/*.ml{,i,y}>: pkg_uri
 <lib/worker/*.ml{,i,y}>: pkg_uuidm
-<lib/worker/*.ml{,i,y}>: use_ciso
-# Executable test_ciso
+<lib/worker/*.ml{,i,y}>: use_datakit
+# Executable test_datakit
 <lib_test/test.{native,byte}>: pkg_alcotest
 <lib_test/test.{native,byte}>: pkg_bytes
 <lib_test/test.{native,byte}>: pkg_cstruct.unix
@@ -53,13 +52,12 @@ true: annot, bin_annot
 <lib_test/test.{native,byte}>: pkg_lwt
 <lib_test/test.{native,byte}>: pkg_nocrypto
 <lib_test/test.{native,byte}>: pkg_ocamlgraph
-<lib_test/test.{native,byte}>: pkg_opam-lib.client
 <lib_test/test.{native,byte}>: pkg_rresult
 <lib_test/test.{native,byte}>: pkg_threads
 <lib_test/test.{native,byte}>: pkg_uri
 <lib_test/test.{native,byte}>: pkg_uuidm
-<lib_test/test.{native,byte}>: use_ciso
-<lib_test/test.{native,byte}>: use_ciso-worker
+<lib_test/test.{native,byte}>: use_datakit
+<lib_test/test.{native,byte}>: use_datakit-worker
 <lib_test/*.ml{,i,y}>: pkg_alcotest
 <lib_test/*.ml{,i,y}>: pkg_bytes
 <lib_test/*.ml{,i,y}>: pkg_cstruct.unix
@@ -70,97 +68,94 @@ true: annot, bin_annot
 <lib_test/*.ml{,i,y}>: pkg_lwt
 <lib_test/*.ml{,i,y}>: pkg_nocrypto
 <lib_test/*.ml{,i,y}>: pkg_ocamlgraph
-<lib_test/*.ml{,i,y}>: pkg_opam-lib.client
 <lib_test/*.ml{,i,y}>: pkg_rresult
 <lib_test/*.ml{,i,y}>: pkg_threads
 <lib_test/*.ml{,i,y}>: pkg_uri
 <lib_test/*.ml{,i,y}>: pkg_uuidm
-<lib_test/*.ml{,i,y}>: use_ciso
-<lib_test/*.ml{,i,y}>: use_ciso-worker
-# Executable ciso-show
-<bin/ciso_show.{native,byte}>: pkg_bytes
-<bin/ciso_show.{native,byte}>: pkg_cmdliner
-<bin/ciso_show.{native,byte}>: pkg_fmt
-<bin/ciso_show.{native,byte}>: pkg_hex
-<bin/ciso_show.{native,byte}>: pkg_irmin.unix
-<bin/ciso_show.{native,byte}>: pkg_jsont.jsonm
-<bin/ciso_show.{native,byte}>: pkg_lwt
-<bin/ciso_show.{native,byte}>: pkg_nocrypto
-<bin/ciso_show.{native,byte}>: pkg_uri
-<bin/ciso_show.{native,byte}>: pkg_uuidm
-<bin/ciso_show.{native,byte}>: use_ciso
-# Executable ciso-work
-<bin/ciso_work.{native,byte}>: pkg_bytes
-<bin/ciso_work.{native,byte}>: pkg_cmdliner
-<bin/ciso_work.{native,byte}>: pkg_cstruct.unix
-<bin/ciso_work.{native,byte}>: pkg_fmt
-<bin/ciso_work.{native,byte}>: pkg_hex
-<bin/ciso_work.{native,byte}>: pkg_irmin.unix
-<bin/ciso_work.{native,byte}>: pkg_jsont.jsonm
-<bin/ciso_work.{native,byte}>: pkg_lwt
-<bin/ciso_work.{native,byte}>: pkg_nocrypto
-<bin/ciso_work.{native,byte}>: pkg_ocamlgraph
-<bin/ciso_work.{native,byte}>: pkg_opam-lib.client
-<bin/ciso_work.{native,byte}>: pkg_rresult
-<bin/ciso_work.{native,byte}>: pkg_threads
-<bin/ciso_work.{native,byte}>: pkg_uri
-<bin/ciso_work.{native,byte}>: pkg_uuidm
-<bin/ciso_work.{native,byte}>: use_ciso
-<bin/ciso_work.{native,byte}>: use_ciso-worker
+<lib_test/*.ml{,i,y}>: use_datakit
+<lib_test/*.ml{,i,y}>: use_datakit-worker
+# Executable dk-show
+<bin/dk_show.{native,byte}>: pkg_bytes
+<bin/dk_show.{native,byte}>: pkg_cmdliner
+<bin/dk_show.{native,byte}>: pkg_fmt
+<bin/dk_show.{native,byte}>: pkg_hex
+<bin/dk_show.{native,byte}>: pkg_irmin.unix
+<bin/dk_show.{native,byte}>: pkg_jsont.jsonm
+<bin/dk_show.{native,byte}>: pkg_lwt
+<bin/dk_show.{native,byte}>: pkg_nocrypto
+<bin/dk_show.{native,byte}>: pkg_uri
+<bin/dk_show.{native,byte}>: pkg_uuidm
+<bin/dk_show.{native,byte}>: use_datakit
+# Executable dk-work
+<bin/dk_work.{native,byte}>: pkg_bytes
+<bin/dk_work.{native,byte}>: pkg_cmdliner
+<bin/dk_work.{native,byte}>: pkg_cstruct.unix
+<bin/dk_work.{native,byte}>: pkg_fmt
+<bin/dk_work.{native,byte}>: pkg_hex
+<bin/dk_work.{native,byte}>: pkg_irmin.unix
+<bin/dk_work.{native,byte}>: pkg_jsont.jsonm
+<bin/dk_work.{native,byte}>: pkg_lwt
+<bin/dk_work.{native,byte}>: pkg_nocrypto
+<bin/dk_work.{native,byte}>: pkg_ocamlgraph
+<bin/dk_work.{native,byte}>: pkg_rresult
+<bin/dk_work.{native,byte}>: pkg_threads
+<bin/dk_work.{native,byte}>: pkg_uri
+<bin/dk_work.{native,byte}>: pkg_uuidm
+<bin/dk_work.{native,byte}>: use_datakit
+<bin/dk_work.{native,byte}>: use_datakit-worker
 <bin/*.ml{,i,y}>: pkg_cstruct.unix
 <bin/*.ml{,i,y}>: pkg_ocamlgraph
-<bin/*.ml{,i,y}>: pkg_opam-lib.client
 <bin/*.ml{,i,y}>: pkg_rresult
 <bin/*.ml{,i,y}>: pkg_threads
-<bin/*.ml{,i,y}>: use_ciso-worker
-# Executable ciso-schedule
-<bin/ciso_schedule.{native,byte}>: pkg_bytes
-<bin/ciso_schedule.{native,byte}>: pkg_cmdliner
-<bin/ciso_schedule.{native,byte}>: pkg_fmt
-<bin/ciso_schedule.{native,byte}>: pkg_hex
-<bin/ciso_schedule.{native,byte}>: pkg_irmin.unix
-<bin/ciso_schedule.{native,byte}>: pkg_jsont.jsonm
-<bin/ciso_schedule.{native,byte}>: pkg_lwt
-<bin/ciso_schedule.{native,byte}>: pkg_nocrypto
-<bin/ciso_schedule.{native,byte}>: pkg_uri
-<bin/ciso_schedule.{native,byte}>: pkg_uuidm
-<bin/ciso_schedule.{native,byte}>: use_ciso
-# Executable ciso-add
-<bin/ciso_add.{native,byte}>: pkg_bytes
-<bin/ciso_add.{native,byte}>: pkg_cmdliner
-<bin/ciso_add.{native,byte}>: pkg_fmt
-<bin/ciso_add.{native,byte}>: pkg_hex
-<bin/ciso_add.{native,byte}>: pkg_irmin.unix
-<bin/ciso_add.{native,byte}>: pkg_jsont.jsonm
-<bin/ciso_add.{native,byte}>: pkg_lwt
-<bin/ciso_add.{native,byte}>: pkg_nocrypto
-<bin/ciso_add.{native,byte}>: pkg_uri
-<bin/ciso_add.{native,byte}>: pkg_uuidm
-<bin/ciso_add.{native,byte}>: use_ciso
-# Executable ciso-publish
-<bin/ciso_publish.{native,byte}>: pkg_bytes
-<bin/ciso_publish.{native,byte}>: pkg_cmdliner
-<bin/ciso_publish.{native,byte}>: pkg_fmt
-<bin/ciso_publish.{native,byte}>: pkg_hex
-<bin/ciso_publish.{native,byte}>: pkg_irmin.unix
-<bin/ciso_publish.{native,byte}>: pkg_jsont.jsonm
-<bin/ciso_publish.{native,byte}>: pkg_lwt
-<bin/ciso_publish.{native,byte}>: pkg_nocrypto
-<bin/ciso_publish.{native,byte}>: pkg_uri
-<bin/ciso_publish.{native,byte}>: pkg_uuidm
-<bin/ciso_publish.{native,byte}>: use_ciso
-# Executable ciso
-<bin/ciso.{native,byte}>: pkg_bytes
-<bin/ciso.{native,byte}>: pkg_cmdliner
-<bin/ciso.{native,byte}>: pkg_fmt
-<bin/ciso.{native,byte}>: pkg_hex
-<bin/ciso.{native,byte}>: pkg_irmin.unix
-<bin/ciso.{native,byte}>: pkg_jsont.jsonm
-<bin/ciso.{native,byte}>: pkg_lwt
-<bin/ciso.{native,byte}>: pkg_nocrypto
-<bin/ciso.{native,byte}>: pkg_uri
-<bin/ciso.{native,byte}>: pkg_uuidm
-<bin/ciso.{native,byte}>: use_ciso
+<bin/*.ml{,i,y}>: use_datakit-worker
+# Executable dk-schedule
+<bin/dk_schedule.{native,byte}>: pkg_bytes
+<bin/dk_schedule.{native,byte}>: pkg_cmdliner
+<bin/dk_schedule.{native,byte}>: pkg_fmt
+<bin/dk_schedule.{native,byte}>: pkg_hex
+<bin/dk_schedule.{native,byte}>: pkg_irmin.unix
+<bin/dk_schedule.{native,byte}>: pkg_jsont.jsonm
+<bin/dk_schedule.{native,byte}>: pkg_lwt
+<bin/dk_schedule.{native,byte}>: pkg_nocrypto
+<bin/dk_schedule.{native,byte}>: pkg_uri
+<bin/dk_schedule.{native,byte}>: pkg_uuidm
+<bin/dk_schedule.{native,byte}>: use_datakit
+# Executable dk-add
+<bin/dk_add.{native,byte}>: pkg_bytes
+<bin/dk_add.{native,byte}>: pkg_cmdliner
+<bin/dk_add.{native,byte}>: pkg_fmt
+<bin/dk_add.{native,byte}>: pkg_hex
+<bin/dk_add.{native,byte}>: pkg_irmin.unix
+<bin/dk_add.{native,byte}>: pkg_jsont.jsonm
+<bin/dk_add.{native,byte}>: pkg_lwt
+<bin/dk_add.{native,byte}>: pkg_nocrypto
+<bin/dk_add.{native,byte}>: pkg_uri
+<bin/dk_add.{native,byte}>: pkg_uuidm
+<bin/dk_add.{native,byte}>: use_datakit
+# Executable dk-publish
+<bin/dk_publish.{native,byte}>: pkg_bytes
+<bin/dk_publish.{native,byte}>: pkg_cmdliner
+<bin/dk_publish.{native,byte}>: pkg_fmt
+<bin/dk_publish.{native,byte}>: pkg_hex
+<bin/dk_publish.{native,byte}>: pkg_irmin.unix
+<bin/dk_publish.{native,byte}>: pkg_jsont.jsonm
+<bin/dk_publish.{native,byte}>: pkg_lwt
+<bin/dk_publish.{native,byte}>: pkg_nocrypto
+<bin/dk_publish.{native,byte}>: pkg_uri
+<bin/dk_publish.{native,byte}>: pkg_uuidm
+<bin/dk_publish.{native,byte}>: use_datakit
+# Executable dk
+<bin/dk.{native,byte}>: pkg_bytes
+<bin/dk.{native,byte}>: pkg_cmdliner
+<bin/dk.{native,byte}>: pkg_fmt
+<bin/dk.{native,byte}>: pkg_hex
+<bin/dk.{native,byte}>: pkg_irmin.unix
+<bin/dk.{native,byte}>: pkg_jsont.jsonm
+<bin/dk.{native,byte}>: pkg_lwt
+<bin/dk.{native,byte}>: pkg_nocrypto
+<bin/dk.{native,byte}>: pkg_uri
+<bin/dk.{native,byte}>: pkg_uuidm
+<bin/dk.{native,byte}>: use_datakit
 <bin/*.ml{,i,y}>: pkg_bytes
 <bin/*.ml{,i,y}>: pkg_cmdliner
 <bin/*.ml{,i,y}>: pkg_fmt
@@ -171,9 +166,9 @@ true: annot, bin_annot
 <bin/*.ml{,i,y}>: pkg_nocrypto
 <bin/*.ml{,i,y}>: pkg_uri
 <bin/*.ml{,i,y}>: pkg_uuidm
-<bin/*.ml{,i,y}>: use_ciso
-# Library ciso-github
-"lib/github/ciso-github.cmxs": use_ciso-github
+<bin/*.ml{,i,y}>: use_datakit
+# Library datakit-github
+"lib/github/datakit-github.cmxs": use_datakit-github
 <lib/github/*.ml{,i,y}>: pkg_bytes
 <lib/github/*.ml{,i,y}>: pkg_cstruct.unix
 <lib/github/*.ml{,i,y}>: pkg_fmt
@@ -184,13 +179,12 @@ true: annot, bin_annot
 <lib/github/*.ml{,i,y}>: pkg_lwt
 <lib/github/*.ml{,i,y}>: pkg_nocrypto
 <lib/github/*.ml{,i,y}>: pkg_ocamlgraph
-<lib/github/*.ml{,i,y}>: pkg_opam-lib.client
 <lib/github/*.ml{,i,y}>: pkg_rresult
 <lib/github/*.ml{,i,y}>: pkg_threads
 <lib/github/*.ml{,i,y}>: pkg_uri
 <lib/github/*.ml{,i,y}>: pkg_uuidm
-<lib/github/*.ml{,i,y}>: use_ciso
-<lib/github/*.ml{,i,y}>: use_ciso-worker
+<lib/github/*.ml{,i,y}>: use_datakit
+<lib/github/*.ml{,i,y}>: use_datakit-worker
 # OASIS_STOP
 true: debug, bin_annot
 true: warn(+A-4-41-44), warn_error(A-4-41-44)

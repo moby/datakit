@@ -1,0 +1,10 @@
+*~
+.#*
+\#*
+_build/
+setup.data
+setup.log
+*.native
+gh-pages/
+_tests/
+lib/version.ml

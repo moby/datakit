@@ -18,15 +18,7 @@
 
 type t
 
-val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
-val section: string ref
-val store: t -> Store.t
-val worker: t -> Worker.t
-val cache: t -> string
+val create: cache:string -> t
 
-type common_callback = t -> Worker.status -> unit Lwt.t
-
-val start: common_callback ->
-  ?tick:float -> ?cache:string -> kind:Worker.kind -> Store.t -> t Lwt.t
-
-val stop: t -> unit Lwt.t
+val jobs: t -> Task.t -> (Job.t -> unit) -> unit
+(** [jobs t task] are the jobs needed to execute the [task]. *)

@@ -16,17 +16,20 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type t
+val info: string -> string -> unit
+val err: ('a, Format.formatter, unit, unit) format4 -> 'a
+val block: 'a -> unit Lwt.t
 
-val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
-val section: string ref
-val store: t -> Store.t
-val worker: t -> Worker.t
-val cache: t -> string
+val cache: string option Cmdliner.Term.t
 
-type common_callback = t -> Worker.status -> unit Lwt.t
+val local: string option Cmdliner.Term.t
 
-val start: common_callback ->
-  ?tick:float -> ?cache:string -> kind:Worker.kind -> Store.t -> t Lwt.t
+val store: Store.t Lwt.t Cmdliner.Term.t
 
-val stop: t -> unit Lwt.t
+val config_file: unit -> (string -> string option) Lwt.t
+
+open Cmdliner
+
+val term_info: doc:string -> ?man:Manpage.block list -> string -> Term.info
+
+val global: 'a -> 'a Term.t

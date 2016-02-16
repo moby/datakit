@@ -40,10 +40,10 @@ configure:
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
 
 $(VFILE): _oasis
-	echo "(** CISO Version. *)" > $@
+	echo "(** Datakit Version. *)" > $@
 	echo "" >> $@
 	echo "let current = \"$(VERSION)\"" >> $@
-	echo "(** The current version of CISO. *)" >> $@
+	echo "(** The current version of Datakit. *)" >> $@
 
 init-doc:
 	mkdir -p gh-pages

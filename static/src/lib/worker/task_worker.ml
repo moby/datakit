@@ -26,14 +26,9 @@ let debug fmt =
 type callback = t -> Task.t -> (Job.t -> unit Lwt.t) -> unit Lwt.t
 
 let default_callback t task f =
-  let o = Opam.create ~root:(opam_root t) None in
-  Opam.repo_clean o;
-  Opam.repo_add o (Task.repos task);
-  Opam.pin_clean o;
-  Opam.pin_add o (Task.pins task);
-  Opam.update o;
+  let static = Static.create ~cache:(cache t) in
   let stream, push = Lwt_stream.create () in
-  Opam.jobs (opam t None) task (fun x -> push (Some x));
+  Static.jobs static task (fun x -> push (Some x));
   push None;
   Lwt_stream.iter_p f stream
 

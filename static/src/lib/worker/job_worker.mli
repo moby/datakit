@@ -39,9 +39,8 @@ val default_callback: callback
 (** [default_callback] is the function which builds the jobs using
     opam invocations. *)
 
-val start: ?callback:callback -> ?host:Host.t -> ?tick:float ->
-  opam_root:string -> Store.t -> t Lwt.t
-(** [starts ~opam_root store] starts a job worker. *)
+val start: ?callback:callback -> ?tick:float -> Store.t -> t Lwt.t
+(** [starts store] starts a job worker. *)
 
 val stop: t -> unit Lwt.t
 (** [stop t] stops the job worker. *)

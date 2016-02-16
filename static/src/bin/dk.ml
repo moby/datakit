@@ -17,7 +17,7 @@
  *)
 
 open Cmdliner
-open Ciso_common
+open Dk_common
 
 let commands = [
   "show"    , "Show the tasks, jobs and workers.";
@@ -28,7 +28,7 @@ let commands = [
 ]
 
 let default =
-  let doc = "CISO, a (distributed) Continuous Integration engine for OPAM." in
+  let doc = "Datakit, a distributed dataflow enfine." in
   let man = [
     `S "DESCRIPTION";
     `P "TODO";
@@ -37,9 +37,9 @@ let default =
   ] in
   let usage () =
     Fmt.(pf stdout)
-      "usage: ciso [--version]\n\
-      \            [--help]\n\
-      \            <command> [<args>]\n\
+      "usage: dk [--version]\n\
+      \          [--help]\n\
+      \          <command> [<args>]\n\
        \n\
        The most commonly used subcommands are:\n";
     List.iter (fun (name, doc) ->
@@ -47,25 +47,25 @@ let default =
       ) commands;
     Fmt.(pf stdout)
       "\n\
-       See `ciso help <command>` for more information on a specific \
+       See `dk help <command>` for more information on a specific \
        command.\n%!"
   in
   Term.(global usage $ pure ()),
-  term_info ~doc ~man "ciso"
+  term_info ~doc ~man "dk"
 
 let run () =
   match Array.to_list Sys.argv with
   | [] | [_] -> ()
-  | ciso :: name :: args ->
+  | dk :: name :: args ->
     if String.length name <> 0 && name.[0] <> '-' then (
-      let cmd = match ciso with
-        | "ciso" -> "ciso-" ^ name
-        | s      ->
+      let cmd = match dk with
+        | "dk" -> "dk-" ^ name
+        | s    ->
           if Filename.check_suffix s ".native" then
             let base = Filename.chop_suffix s ".native" in
             base ^ "_" ^ name ^ ".native"
           else (
-            err "%s: sub-command %s not found" ciso name;
+            err "%s: sub-command %s not found" dk name;
             exit 1
           )
       in

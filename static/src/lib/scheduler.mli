@@ -72,13 +72,13 @@ module Job: sig
 
   include S with type value := Job.t
 
-  val peek: t -> Host.t -> Job.t option
-  (** [peek t host] picks a job if it is runnable on the given host
+  val peek: t -> Job.t option
+  (** [peek t] picks a job if it is runnable on the given host
       configuration. *)
 
-  val peek_s: t -> Host.t -> Job.t Lwt.t
-  (** [peek_s t host] blocks until a job become runnable on the given
-      host configuration. *)
+  val peek_s: t -> Job.t Lwt.t
+  (** [peek_s t] blocks until a job become runnable on the given host
+      configuration. *)
 
 end
 

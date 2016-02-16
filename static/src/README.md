@@ -1,34 +1,24 @@
-## CISO:
+## Datakit
 
-A (distributed) Continuous Integration engine for OPAM.
+A (distributed) dataflow engine.
 
-[![Build Status](https://travis-ci.org/samoht/ciso.svg)](https://travis-ci.org/samoht/ciso)
-[![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://samoht.github.io/ciso/)
-
-### Install
-
-Ciso is not yet properly released so you need to add an OPAM remote to
-compile and install the project:
-
-```shell
-opam repo add ciso https://github.com/samoht/ciso-repo.git
-opam install ciso
-```
+[![Build Status](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
+[![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
 ### Usage
 
-See `ciso --help` for more information.
+See `dk --help` for more information.
 
 #### Quick configuration
 
-The `ciso` will look for a `.ciso` file located in the current directory. The
+The `dk` will look for a `.datakit` file located in the current directory. The
 options can be overriden using command-line parameters.
 
-A typical `.ciso` file contains:
+A typical `.datakit` file contains:
 
 ```
-local: /tmp/ciso
-opam-root: /tmp/xxx
+local: /tmp/datakit/db
+cache: /tmp/datakit/cache
 ```
 
 - `local` is the local Irmin store used by all the CISO tools It is a normal Git

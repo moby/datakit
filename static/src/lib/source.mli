@@ -16,17 +16,24 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+type id = [`Source] Id.t
+type digest = [ `SHA1 of string ]
+
 type t
 
-val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
-val section: string ref
-val store: t -> Store.t
-val worker: t -> Worker.t
-val cache: t -> string
+val create: ?digest:digest -> url:Url.t -> string -> t
 
-type common_callback = t -> Worker.status -> unit Lwt.t
+val id: t -> id
+val name: t -> string
+val url: t -> Url.t
+val digest: t -> digest option
 
-val start: common_callback ->
-  ?tick:float -> ?cache:string -> kind:Worker.kind -> Store.t -> t Lwt.t
+val pp: t Fmt.t
+val json: t Jsont.codec
+val to_string: t -> string
 
-val stop: t -> unit Lwt.t
+val compare: t -> t -> int
+val equal: t -> t -> bool
+val hash: t -> int
+
+val fetch: dst:string -> t -> t

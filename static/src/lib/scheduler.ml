@@ -208,17 +208,14 @@ module XJob = struct
     Fmt.pf ppf "[%d] " (Unix.getpid ());
     JMap.bindings t.jobs
     |> List.iter (fun (w, s) ->
-        Fmt.pf ppf "%a:%s:%a "
-          Id.pp (Job.id w) (Host.short @@ Job.host w) pp_status s
+        Fmt.pf ppf "%a:%a " Id.pp (Job.id w) pp_status s
       )
 
-  let runnable_jobs t h =
+  let runnable_jobs t =
     JMap.fold (fun job status acc ->
-        let h' = Job.host job in
-        if not (Host.equal h' h) then acc
-        else match status with
-          | `Runnable -> job :: acc
-          | _ -> acc
+        match status with
+        | `Runnable -> job :: acc
+        | _ -> acc
       ) t.jobs []
 
   let is_runnable t j = try JMap.find j t.jobs = `Runnable with Not_found -> false
@@ -250,22 +247,22 @@ module XJob = struct
       if s = `Runnable then Lwt_condition.broadcast t.cond ()
     )
 
-  let peek t host = match runnable_jobs t host with
+  let peek t = match runnable_jobs t with
     | []   -> None
     | h::_ -> Some h
 
   let count_job = count "job"
 
-  let peek_s t host =
+  let peek_s t =
     let name = count_job () in
-    let rec aux () = match peek t host with
+    let rec aux () = match peek t with
       | Some j ->
         let id = Job.id j in
-        debug "[%s] job:%a can run on %s" name Id.pp id (Host.short host);
+        debug "[%s] job:%a can run" name Id.pp id;
         update_status t j `Await;
         Lwt.return j
       | None   ->
-        debug "[%s] waiting for a job on %s ..." name (Host.short host);
+        debug "[%s] waiting for a job ..." name;
         Lwt_condition.wait t.cond >>= fun () ->
         aux ()
     in
@@ -625,7 +622,7 @@ let refresh_task t =
               | None        -> `Pending
               | Some `Await -> `Runnable
               | Some (#Job.status as s) -> s )
-          |> Job.task_status
+          |> Task.status
         in
         if status <> `Pending then
           Store.Task.update_status store (Task.id task) status
@@ -640,21 +637,19 @@ let start store =
   XWorker.start store >>= fun w ->
   let scheduler = { j; t; w; cancels = (fun () -> ()); } in
   cleanup_dead_workers scheduler >|= fun () ->
-  let peek_job host = XJob.peek_s j host in
+  let peek_job () = XJob.peek_s j in
   let peek_task () = XTask.peek_s t in
   let peek_worker kind = XWorker.peek_s w kind in
   let dbg worker =
-    debug "DISPATCH: %a-worker:%a (%s) is available"
+    debug "DISPATCH: %a-worker:%a is available"
       Worker.pp_kind (Worker.kind worker)
-      Id.pp (Worker.id worker)
-      (Host.short @@ Worker.host worker);
+      Id.pp (Worker.id worker);
   in
   let rec dispatch_job () =
     peek_worker `Job >>= fun worker ->
     dbg worker;
     let wid = Worker.id worker in
-    let host = Worker.host worker in
-    peek_job host >>= fun j ->
+    peek_job () >>= fun j ->
     XJob.on_complete scheduler.j j (fun () -> refresh_task scheduler);
     let id = Job.id j in
     Store.with_transaction store (fmt "starting job" id) (fun t ->

@@ -22,7 +22,6 @@ open Irmin_unix
 let debug fmt = Gol.debug ~section:"store" fmt
 let err fmt = Printf.ksprintf failwith ("Store: " ^^ fmt)
 let (/) dir file = List.append dir [file]
-let split_path f = List.filter ((<>)"") @@ Stringext.split f ~on:'/'
 
 module StringSet = struct
   include Set.Make(String)
@@ -299,34 +298,34 @@ let pretty id = Id.to_string id
 let fmt msg id = msg ^ " " ^ pretty id
 let mk t msg id = t.t (fmt msg id)
 
-module XObject = struct
+module XSource = struct
 
-  let root = ["objects"]
+  let root = ["sources"]
   let path id = root / Id.to_string id
   let value_p id = path id / "value"
 
   let list t =
-    Store.list (t.t "list objects") root >|= List.map (Id.of_string `Object)
+    Store.list (t.t "list sources") root >|= List.map (Id.of_string `Source)
 
   let forget t id =
-    debug "forget object:%a" Id.pp id;
-    Store.rmdir (mk t "forget object" id) (path id)
+    debug "forget source:%a" Id.pp id;
+    Store.rmdir (mk t "forget source" id) (path id)
 
-  let mem t id = Store.mem (mk t "mem object" id) (value_p id)
+  let mem t id = Store.mem (mk t "mem source" id) (value_p id)
 
   let add t obj =
-    let id = Object.id obj in
-    debug "add: object %s" (pretty id);
+    let id = Source.id obj in
+    debug "add: source %s" (pretty id);
     mem t id >>= function
     | true  -> Lwt.return_unit
     | false ->
-      let obj = to_str Object.json obj in
-      Store.update (mk t "publish object" id) (value_p id) obj >|= fun () ->
-      debug "add: object %s published!" (pretty id)
+      let obj = to_str Source.json obj in
+      Store.update (mk t "publish source" id) (value_p id) obj >|= fun () ->
+      debug "add: source %s published!" (pretty id)
 
   let get t id =
-    Store.read_exn (mk t "get object" id) (value_p id) >|=
-    of_str Object.json
+    Store.read_exn (mk t "get source" id) (value_p id) >|=
+    of_str Source.json
 
 end
 
@@ -338,8 +337,6 @@ module XJob = struct
   let status_p id = path id / "status"
   let outputs_p id = path id / "outputs"
   let output_p id obj = outputs_p id / "outputs" / Id.to_string obj
-  let package_p id pkg f = path id / "packages" / Package.to_string pkg @ f
-  let file_p id f = path id / "files" @ split_path f
 
   let mem t id = Store.mem (mk t "mem job" id) (value_p id)
 
@@ -350,29 +347,9 @@ module XJob = struct
     | true  -> Lwt.return_unit
     | false ->
       with_transaction t (fmt "add job" id) (fun t ->
-          Store.update (t.t "") (value_p id) (to_str Job.json job)
-          >>= fun () ->
+          Store.update (t.t "") (value_p id) (to_str Job.json job) >>= fun () ->
           Store.update (t.t "") (status_p id) (to_str Job.json_status `Pending)
-          >>= fun () ->
-          Lwt_list.iter_s (fun m ->
-              let p = Package.pkg m in
-              let one (k, v) = match v with
-                | None   -> Lwt.return_unit
-                | Some v ->
-                  Store.update (t.t "") (package_p id p k) (Cstruct.to_string v)
-              in
-              let files = Package.files m in
-              let files =
-                List.map (fun (f, c) -> "files" :: split_path f, Some c) files
-              in
-              Lwt_list.iter_s one ([
-                ["opam"] , Some (Package.opam m);
-                ["descr"], Package.descr m;
-                ["url"]  , Package.url m;
-                ] @ files)
-            ) (Job.packages job)
-        )
-      >|= fun () ->
+        ) >|= fun () ->
       debug "add: job %s published!" (pretty id)
 
   let get t id =
@@ -395,19 +372,14 @@ module XJob = struct
     | None   -> None
     | Some s -> Some (of_str Job.json_status s)
 
-  let add_output t id obj =
-    match Object.contents obj with
-    | Object.Archive _ ->
-      XObject.add t obj >>= fun () ->
-      let oid = Object.id obj in
-      Store.update (mk t "add job output" id) (output_p id oid) ""
-    | Object.File (n, c) ->
-      let c = Cstruct.to_string c in
-      Store.update (mk t "add job output" id) (file_p id n) c
+  let add_output t id src =
+    XSource.add t src >>= fun () ->
+    let oid = Source.id src in
+    Store.update (mk t "add job output" id) (output_p id oid) ""
 
   let outputs t id =
     Store.list (mk t "list job outputs" id) (outputs_p id) >|=
-    List.map (Id.of_string `Object)
+    List.map (Id.of_string `Source)
 
   let list t =
     Store.list (t.t "list jobs") root >|= List.map (Id.of_string `Job)
@@ -490,7 +462,7 @@ module XTask = struct
           | Some x -> x :: acc
         ) [] status
     in
-    let status = Job.task_status status |> to_str Task.json_status in
+    let status = Task.status status |> to_str Task.json_status in
     (* FIXME: because of https://github.com/mirage/irmin/issues/272  *)
     begin Store.read (t.t "") (status_p id) >|= function
       | None    -> true
@@ -600,7 +572,7 @@ end
 
 module Task = XTask
 module Job = XJob
-module Object = XObject
+module Source = XSource
 module Worker = XWorker
 
 let cancel_all_watches t = Lwt_list.iter_p (fun (_, t) -> t ()) t.cancels

@@ -16,112 +16,38 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(* name, address option *)
-type repo = string * Uri.t
-
-let default_repo =
-  "default", Uri.of_string "https://github.com/ocaml/opam-repository.git"
-
-(* package, target *)
-type pin = string * Uri.t option
-
-type rev_deps = [`All | `None | `Packages of Package.t list ]
-
-let json_uri =
-  let dec s = `Ok (Uri.of_string s) in
-  let enc u = Uri.to_string u in
-  Jsont.(view (dec, enc) string)
-
-let json_pair kind json_uri =
-  let o = Jsont.objc ~kind () in
-  let name = Jsont.mem o "name" Jsont.string in
-  let uri  = Jsont.mem o "uri"  json_uri in
-  let c = Jsont.obj ~seal:true o in
-  let dec o = `Ok (Jsont.get name o, Jsont.get uri o) in
-  let enc (n, u) = Jsont.(new_obj c [memv name n; memv uri u]) in
-  Jsont.view (dec, enc) c
-
-let pp_uri ppf x = Fmt.string ppf (Uri.to_string x)
-
-let pp_pair ppf (n, u) pp_uri = Fmt.(pf ppf "%s:%a" n pp_uri u)
-
-let json_repo = json_pair "repository" json_uri
-let json_pin  = json_pair "pin" (Jsont.some json_uri)
-
-let pp_repo ppf s = pp_pair ppf s pp_uri
-let pp_pin ppf s  = pp_pair ppf s (Fmt.option pp_uri)
-
 type id = [`Task] Id.t
 
 type t = {
-  id: id;
+  id  : id;
   date: float;
-  repos: repo list;
-  pins: pin list;
-  switches: Switch.t list;
-  hosts: Host.t list;
-  packages: Package.t list;
-  rev_deps: rev_deps;
+  flow: Flow.t;
 }
 
 let equal x y = Id.equal x.id y.id
 let compare x y = Id.compare x.id y.id
-let date t = t.date
-let hosts t = t.hosts
-let switches t = t.switches
-let repos t = t.repos
-let pins t = t.pins
-let rev_deps t = t.rev_deps
 
-let json_rev_deps =
-  let dec = function
-    | [] -> `Ok `None
-    | o  ->
-      if List.mem "*" o then `Ok `All
-      else `Ok (`Packages (List.map Package.of_string o))
-  in
-  let enc = function
-    | `None          -> []
-    | `All           -> ["*"]
-    | `Packages pkgs -> List.map Package.to_string pkgs
-  in
-  Jsont.(view ~default:`None (dec, enc) (array string))
+let id t = t.id
+let date t = t.date
+let flow t = t.flow
 
 let json =
   let o = Jsont.objc ~kind:"task" () in
   let id = Jsont.mem o "id" Id.json in
-  let repos = Jsont.(mem ~opt:`Yes_rem o "repos" @@ array json_repo) in
-  let pins = Jsont.(mem ~opt:`Yes_rem o "pins" @@ array json_pin) in
-  let switches = Jsont.(mem ~opt:`Yes_rem o "switches" @@ array Switch.json) in
-  let hosts = Jsont.(mem o ~opt:`Yes_rem "hosts" @@ array Host.json) in
-  let packages = Jsont.(mem o "packages" @@ array Package.json) in
-  let rev_deps = Jsont.(mem o ~opt:`Yes_rem "rev-deps" @@ json_rev_deps ) in
+  let flow = Jsont.mem o "flow" Flow.json in
   let date = Jsont.(mem o "date" float) in
   let c = Jsont.obj ~seal:true o in
   let dec o =
     let get m = Jsont.get m o in
-    `Ok {
-      id = get id; repos = get repos; pins = get pins;
-      switches = get switches; hosts = get hosts;
-      packages = get packages; rev_deps = get rev_deps;
-      date = get date;
-    } in
+    `Ok { id = get id; date = get date; flow = get flow; }
+  in
   let enc t =
     Jsont.(new_obj c [
-        memv id t.id; memv repos t.repos; memv pins t.pins;
-        memv switches t.switches; memv hosts t.hosts;
-        memv packages t.packages; memv rev_deps t.rev_deps;
-        memv date t.date])
-  in
+        memv id t.id;
+        memv date t.date;
+        memv flow t.flow;
+      ]) in
   Jsont.view (dec, enc) c
-
-let strings_of_rev_deps = function
-  | `None          -> []
-  | `All           -> ["*"]
-  | `Packages pkgs -> List.map Package.to_string pkgs
-
-let pp_rev_deps =
-  Fmt.of_to_string (fun r -> String.concat "," (strings_of_rev_deps r))
 
 let string_of_date f =
   let tm = Unix.localtime f in
@@ -129,44 +55,24 @@ let string_of_date f =
   Printf.sprintf "%d:%d:%d" tm.tm_hour tm.tm_min tm.tm_sec
 
 let pp ppf t =
-  let mk pp = List.map (Fmt.to_to_string pp) in
   let block = [
-    "id      ", [Id.to_string t.id];
-    "date    ", [string_of_date t.date];
-    "repo    ", mk pp_repo t.repos;
-    "pins    ", mk pp_pin t.pins;
-    "switches", mk Switch.pp t.switches;
-    "hosts   ", List.map Host.short t.hosts;
-    "rev-deps", strings_of_rev_deps t.rev_deps;
-    "packages", mk Package.pp t.packages;
+    "id  ", [Id.to_string t.id];
+    "date", [string_of_date t.date];
+    "flow", [Fmt.to_to_string Flow.pp t.flow]; (* FIXME: probably wrong fmt *)
   ] in
   Gol.show_block ppf block
 
-let id t = t.id
-let packages t = t.packages
-
-let hash ~date ~repos ~pins ~switches ~hosts ~rev_deps ~packages =
-  let x l = String.concat "+" (List.sort String.compare l) in
-  let y   = String.concat "-" in
-  let repos = List.map (Fmt.to_to_string pp_repo) repos in
-  let pins = List.map (Fmt.to_to_string pp_pin) pins in
-  let switches = List.map (Fmt.to_to_string Switch.pp) switches in
-  let hosts = List.map (Fmt.to_to_string Host.pp) hosts in
-  let packages = List.map Package.to_string packages in
-  let rev_deps = strings_of_rev_deps rev_deps in
-  let date = [string_of_date date] in
-  let str = y [
-      y repos; (* the order in which we stack the repos is important *)
-      x pins; x switches; x hosts; x packages; x rev_deps; x date;
-    ] in
+let hash ~date ~flow =
+  let concat = String.concat "-" in
+  let flow = Fmt.to_to_string Flow.pp flow in
+  let date = string_of_date date in
+  let str = concat [ flow; date; ] in
   Id.digest `Task str
 
-let create ?(repos=[default_repo]) ?(pins=[])
-    ?(switches=Switch.defaults) ?(hosts=Host.defaults)
-    ?(rev_deps=`None) packages =
+let create flow =
   let date = Unix.gettimeofday () in
-  let id = hash ~date ~repos ~pins ~switches ~hosts ~rev_deps ~packages in
-  { id; date; repos; pins; switches; hosts; rev_deps; packages }
+  let id = hash ~date ~flow in
+  { id; date; flow }
 
 type core = [ `New | `Pending | `Cancelled ]
 type dispatch =  [`Pending | `Started]
@@ -241,3 +147,15 @@ let pp_status ppf = function
   | `Dispatched (w, s) -> Fmt.pf ppf "dispatched to %a (%a)" Id.pp w pp_s s
   | `Complete s -> Fmt.pf ppf "complete: %a" pp_s s
   | #core as  x -> Fmt.of_to_string to_string  ppf x
+
+let is_success = function `Complete `Success -> true | _ -> false
+let is_failure = function `Complete `Failure -> true | _ -> false
+let is_cancelled = function `Cancelled -> true | _ -> false
+
+let status = function
+  | [] -> `New
+  | l  ->
+    if List.for_all is_success l then `Complete `Success
+    else if List.exists is_failure l then `Complete `Failure
+    else if List.exists is_cancelled l then `Cancelled
+    else `Pending

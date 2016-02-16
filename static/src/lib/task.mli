@@ -18,17 +18,12 @@
 
 (** User-defined tasks.
 
-    A task is a high-level description of user intents. It allows to
-    express things like:
-
-    {i "I want to compiler the package X to all supported host
-    configurations and all OCaml compiler versions."}
+    A task is a high-level description of user intents.
 
     Tasks are later translated into more specific {{!module:Job}jobs}
-    by {{!module:Worker}workers}, using the OPAM solver. These jobs
-    are then processed by other {{!module:Worker}workers} to generate
-    build {{!module:Object}objects}. The user can then access the jobs
-    outputs and results, and the genarated objects.
+    by {{!module:Worker}workers}. These jobs are then processed by
+    other {{!module:Worker}workers} The user can then access the jobs
+    outputs and results.
 *)
 
 type id = [`Task] Id.t
@@ -38,31 +33,6 @@ type id = [`Task] Id.t
     {!create} arguments (after normalisation) and calling {!Id.digest}
     on the result. *)
 
-type repo = string * Uri.t
-(** The type for remote opam repositories. *)
-
-val pp_repo: repo Fmt.t
-(** [pp_repository] formats a repository. *)
-
-val default_repo: repo
-(** [default_repo] is {i https://github.com/ocaml/opam-repository.git}. *)
-
-type pin = string * Uri.t option
-(** The type for pinned packages. The first argument is a package
-    name, the second one its pin target. It is either a version
-    string, or a Git repository. The target is similar to what would
-    be passed to {i opam pin add <name> <target>}. If the target is
-    not specified, it means {i --dev}. *)
-
-type rev_deps = [`All | `None | `Packages of Package.t list ]
-(** The type for specifying reverse dependencies. *)
-
-val pp_rev_deps: rev_deps Fmt.t
-(** [pp_rev_deps] formats reverse dependencies. *)
-
-val pp_pin: pin Fmt.t
-(** [pp_pin] formats a pin package. *)
-
 type t
 (** The type for task values. *)
 
@@ -70,57 +40,18 @@ val id: t -> id
 (** [id t] is [t]'s deterministic identifier. Is it obtaining by
     hashing a stable representation of [t]'s components. *)
 
-val switches: t -> Switch.t list
-(** [switches t] is the list of switches that [t]'s packages need
-    to be installed on. *)
-
-val hosts: t -> Host.t list
-(** [hosts t] is the list of hosts that [t]'s packages need to be
-    installed on. *)
-
-val packages: t -> Package.t list
-(** [packages t]'s is the list of packages that [t] wants to
-    install. *)
-
-val repos: t -> repo list
-(** [repos t] are [t]'s repositories. *)
-
-val pins: t -> pin list
-(** [pins t] are [t]'s pinned packages. *)
-
-val rev_deps: t -> rev_deps
-(** [rev_deps t] is true if [t] has to test reverse dependencies. *)
+val flow: t -> Flow.t
+(** [flow t]'s is the dataflow graph that the task will have to
+    execute. *)
 
 val date: t -> float
 (** [date t] is [t]'s date of creation. The date is number of seconds
     since 12:00 midnight January 1, 1970, UTC without accounting for
     leap seconds with an optional timezone info. *)
 
-val create:
-  ?repos:repo list -> ?pins:pin list ->
-  ?switches:Switch.t list -> ?hosts:Host.t list ->
-  ?rev_deps:rev_deps ->
-  Package.t list -> t
-(** [create pkgs] is the task of building the packages [pkgs] on all
-    possible compiler switches and on all possible host
-    configurations. This task can somehow be attenuated by specifying
-    some optional arguments:
-
-    {ul
-    {- [repos] is the list of (remote) repositories the the workers
-       should use.}
-    {- [pins] is the list of pinned packages that the worker should
-       use.}
-    {- [switches] restricts the list of compiler switches to test to
-       only the ones appearing in the list. An empty list means all
-       the {{!Switch.defaults}supported} compiler switches.}
-    {- [hosts] restricts the list of host configurations to test to only
-       the ones appearing in the list. An empty list means all the
-       {{!Host.defaults}supported} hosts.}
-    {- [rev_deps] specifies the reverse dependencies to test (default
-       is [`None]).}
-    }
-*)
+val create: Flow.t -> t
+(** [create flow] is the task of executing the dataflow graph [flow],
+    for the current versions of the inputs. *)
 
 val equal: t -> t -> bool
 (** [equal] is the task equality. *)
@@ -150,3 +81,8 @@ val pp_status: status Fmt.t
 
 val json_status: status Jsont.codec
 (** [json_status] is the JSON coded for task status. *)
+
+val status: Job.status list -> status
+(** [status s] is the status summary of s. If all status are
+    [`Success] then it is a [`Success]. If all status are [`Failed]
+    then it is also [`Failed]. Otherwise it is [`Pending]. *)

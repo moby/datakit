@@ -32,25 +32,25 @@ let () =
   Fmt.(set_style_renderer stdout `Ansi_tty);
   Fmt.(set_style_renderer stderr `Ansi_tty)
 
-let opam_root =
-  let doc = "The OPAM root to use to store the worker state." in
-  Arg.(value & opt (some string) None & info ["r";"opam-root"] ~docv:"DIR" ~doc)
+let cache =
+  let doc = "The location of the datakit cache." in
+  Arg.(value & opt (some string) None & info ["c";"cache"] ~docv:"DIR" ~doc)
 
 let local =
-  let doc = "The path to the local Irmin store."in
+  let doc = "The path to the local datakit store."in
   Arg.(value & opt (some string) None & info ["local"] ~docv:"DIR" ~doc)
 
 let global =
-  let doc = "The URI of the global Irmin store." in
+  let doc = "The URI of the global datakit store." in
   Arg.(value & opt (some string) None & info ["global"] ~docv:"URI" ~doc)
 
 let err_invalid_line l = err "invalid line: %S" l
 
 let config_file () =
-  let dot_ciso = ".ciso" in
-  if not (Sys.file_exists dot_ciso) then Lwt.return (fun _ -> None)
+  let dot_datakit = ".datakit" in
+  if not (Sys.file_exists dot_datakit) then Lwt.return (fun _ -> None)
   else
-    let lines = Lwt_io.lines_of_file dot_ciso in
+    let lines = Lwt_io.lines_of_file dot_datakit in
     Lwt_stream.to_list lines >|= fun lines ->
     let kvs =
       List.fold_left (fun acc l ->
@@ -79,7 +79,7 @@ let store =
     match local, global with
     | None, None ->
       config_file () >>= fun config ->
-      info "config" ".ciso";
+      info "config" ".datakit";
       choose_store (config "local") (config "global")
     | _ -> choose_store local global
   in
@@ -104,7 +104,7 @@ let help_sections = [
   `P "David Sheets        <sheets@alum.mit.edu>"; `Noblank;
   `P "Qi Li               <liqi0425@gmail.com>";
   `S "BUGS";
-  `P "Check bug reports at https://github.com/samoht/ciso/issues.";
+  `P "Check bug reports at https://github.com/docker/datakit/issues.";
 ]
 
 let global_t =

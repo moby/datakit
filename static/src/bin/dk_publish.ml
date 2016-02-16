@@ -19,7 +19,7 @@
 open Cmdliner
 open Lwt.Infix
 open Irmin_unix
-open Ciso_common
+open Dk_common
 
 module S =
   Irmin_git.FS(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
@@ -52,7 +52,7 @@ let uri =
 
 let main () =
   Term.(pure server $ local $ uri),
-  term_info ~doc:"Publish the database over HTTP" "ciso-publish"
+  term_info ~doc:"Publish the database over HTTP" "datakit-publish"
 
 let () = match Term.eval (main ()) with
   | `Error _ -> exit 1

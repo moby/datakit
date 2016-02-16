@@ -16,20 +16,26 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-val info: string -> string -> unit
-val err: ('a, Format.formatter, unit, unit) format4 -> 'a
-val block: 'a -> unit Lwt.t
-
-val opam_root: string option Cmdliner.Term.t
-
-val local: string option Cmdliner.Term.t
-
-val store: Store.t Lwt.t Cmdliner.Term.t
-
-val config_file: unit -> (string -> string option) Lwt.t
 
 open Cmdliner
+open Lwt.Infix
+include Dk_common
 
-val term_info: doc:string -> ?man:Manpage.block list -> string -> Term.info
+let main =
+  let mk store =
+    let flow = failwith "TODO" in
+    let task = Task.create flow in
+    Lwt_main.run begin
+      store >>= fun store ->
+      Store.Task.add store task >|= fun () ->
+      Fmt.(pf stdout) "Task %a added!\n"
+        Fmt.(styled `Cyan Id.pp) (Task.id task)
+    end
+  in
+  Term.(global mk $ store),
+  term_info ~doc:"Add new tasks to datakit" "dk-add" ~man:[`P "TODO"]
 
-val global: 'a -> 'a Term.t
+let () =
+  match Term.eval main with
+  | `Error _ -> exit 1
+  | `Ok () | `Version | `Help -> ()

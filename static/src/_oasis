@@ -1,94 +1,93 @@
 OASISFormat: 0.4
-Name:        ocaml-ci
+Name:        datakit
 Version:     0.1.0
-Synopsis:    distributed integration engine for opam packages
+Synopsis:    Distributed dataflow engine
 Authors:     Qi Li, David Sheets, Thomas Gazagnaire
 License:     ISC
 Plugins:     META (0.3), DevFiles (0.3)
 BuildTools:  ocamlbuild
 
-Library ciso
+Library datakit
   Install: false
   Path: lib
   InternalModules: Gol
   Modules:
-    Id, Task, Job, Object, Package, Host, Switch, Worker, Store, Scheduler,
-    Version
+    Id, Task, Job, Cmd, Source, Worker, Store, Scheduler, Version, Url, Exec,
+    GitSource, Flow
   BuildDepends:
     irmin.unix, lwt, uuidm, fmt, nocrypto, uri, jsont.jsonm, hex, bytes
 
-Library "ciso-worker"
+Library "datakit-worker"
   Install: false
   Path: lib/worker
-  FindlibParent: ciso
+  FindlibParent: datakit
   FindlibName: worker
-  InternalModules: Opam, Common_worker
+  InternalModules: Common_worker
   Modules: Task_worker, Job_worker
   BuildDepends:
-    ciso, irmin.unix, opam-lib.client, ocamlgraph, threads, cstruct.unix,
-    rresult
+    datakit, irmin.unix, threads, cstruct.unix, rresult, ocamlgraph
 
-Document ciso
-  Title:                CISO docs
+Document datakit
+  Title:                DataKit docs
   Type:                 OCamlbuild (0.4)
   BuildTools+:          ocamldoc
   Install:              true
   XOCamlbuildPath:      lib
-  XOCamlbuildLibraries: ciso, ciso.worker
+  XOCamlbuildLibraries: datakit, datakit.worker
 
-Executable test_ciso
+Executable test_datakit
   Build$:           flag(tests)
   Path:             lib_test
   MainIs:           test.ml
   CompiledObject:   best
   Install:          false
-  BuildDepends:     alcotest, ciso, ciso.worker
+  BuildDepends:     alcotest, datakit, datakit.worker
 
-Test test_ciso
+Test test_datakit
   Run$:             flag(tests)
-  Command:          $test_ciso -q
+  Command:          $test_datakit -q
   WorkingDirectory: lib_test/
 
-Executable "ciso-show"
+Executable "dk-show"
   Path: bin
-  MainIs: ciso_show.ml
+  MainIs: dk_show.ml
   CompiledObject: best
-  BuildDepends: ciso, cmdliner
+  BuildDepends: datakit, cmdliner
 
-Executable "ciso-work"
+Executable "dk-work"
   Path: bin
-  MainIs: ciso_work.ml
+  MainIs: dk_work.ml
   CompiledObject: best
-  BuildDepends: ciso.worker, cmdliner
+  BuildDepends: datakit.worker, cmdliner
 
-Executable "ciso-schedule"
+Executable "dk-schedule"
   Path: bin
-  MainIs: ciso_schedule.ml
+  MainIs: dk_schedule.ml
   CompiledObject: best
-  BuildDepends: ciso, cmdliner
+  BuildDepends: datakit, cmdliner
 
-Executable "ciso-add"
+Executable "dk-add"
   Path: bin
-  MainIs: ciso_add.ml
+  MainIs: dk_add.ml
   CompiledObject: best
-  BuildDepends: ciso, cmdliner
+  BuildDepends: datakit, cmdliner
 
-Executable "ciso-publish"
+Executable "dk-publish"
   Path: bin
-  MainIs: ciso_publish.ml
+  MainIs: dk_publish.ml
   CompiledObject: best
-  BuildDepends: ciso, cmdliner
+  BuildDepends: datakit, cmdliner
 
-Executable ciso
+Executable "dk"
   Path: bin
-  MainIs: ciso.ml
+  MainIs: dk.ml
   CompiledObject: best
-  BuildDepends: ciso, cmdliner
+  BuildDepends: datakit, cmdliner
 
-Library "ciso-github"
+Library "datakit-github"
   Build: false
   Path: lib/github
-  FindlibParent: ciso
+  FindlibParent: datakit
   FindlibName: github
   Modules: Github_pr
-  BuildDepends: ciso, ciso.worker, github.unix, lwt
+  BuildDepends: datakit, datakit.worker, github.unix, lwt

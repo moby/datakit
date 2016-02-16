@@ -1,7 +1,5 @@
 (*
- * Copyright (c) 2013-2015 David Sheets <sheets@alum.mit.edu>
- * Copyright (c)      2015 Qi Li <liqi0425@gmail.com>
- * Copyright (c)      2015 Thomas Gazagnaire <thomas@gazagnaire.org>
+ * Copyright (c) 2015 Thomas Gazagnaire <thomas@gazagnaire.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,28 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** Compiler switches. *)
-
 type t
-(** The type for compiler switches. *)
 
-val system: t
-(** The [system] switch. *)
+val nope: t
+val is_nope: t -> bool
 
-val defaults: t list
-(** [defaults] is the list of default switches. *)
-
-val of_string: string -> t
-(** [of_string] is the identity function. *)
-
-val to_string: t -> string
-(** [to_string] is the identity function. *)
+val name: t -> string
+val exec: t -> [`Ok | `Error of Unix.process_status] Lwt.t
+val create: exec: string -> string -> t
 
 val equal: t -> t -> bool
-(** [equal] is the equality for compiler switches. *)
-
-val json: t Jsont.codec
-(** [json] is the JSON codec for values compiler switches. *)
-
+val compare: t -> t -> int
+val hash: t -> int
 val pp: t Fmt.t
-(** [pp] formats compiler switches. *)
+val to_string: t -> string
+val json: t Jsont.codec

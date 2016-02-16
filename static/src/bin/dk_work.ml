@@ -18,17 +18,43 @@
 
 open Cmdliner
 open Lwt.Infix
-include Ciso_common
+include Dk_common
+
+let (/) = Filename.concat
+
+let tmp_dir = Filename.get_temp_dir_name ()
+
+let task =
+  let doc = "Start a task worker." in
+  Arg.(value & flag & info ["task"] ~doc)
+
+let start store cache = function
+  | true  -> Task_worker.start ~cache store >>= block
+  | false -> Job_worker.start store  >>= block
+
+let mk_cache x =
+  let return x = info "cache  " x; Lwt.return x in
+  let x = match x with
+    | Some r -> return r
+    | None   ->
+      config_file () >>= fun config ->
+      match config "cache" with
+      | None   -> return (tmp_dir / (Id.uuid `Worker |> Id.to_string))
+      | Some r -> return r
+  in
+  x
 
 let main =
-  let master store =
+  let worker store cache task =
+    info "kind  " (if task then "task" else "job");
     Lwt_main.run begin
       store >>= fun store ->
-      Scheduler.start store >>= block
+      mk_cache cache >>= fun cache ->
+      start store cache task
     end
   in
-  Term.(global master $ store),
-  term_info ~doc:"Run the CISO scheduler" "ciso-master"
+  Term.(global worker $ store $ cache $ task),
+  term_info ~doc:"Start a new datakit worker" "dk-worker"
 
 let () =
   match Term.eval main with `Error _ -> exit 1 | _ -> exit 0

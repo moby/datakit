@@ -20,7 +20,7 @@
 
 open Cmdliner
 open Lwt.Infix
-include Ciso_common
+include Dk_common
 
 let id_t: [`Id] Id.t Arg.converter =
   let parse x = `Ok (Id.of_string `Id x) in
@@ -68,7 +68,6 @@ let kind =
     "tasks"  , `Task;
     "workers", `Worker;
     "jobs"   , `Job;
-    "hosts"  , `Host
   ] in
   Arg.(value & opt (enum choices) `Task & info ["k";"kind"] ~docv:"KIND" ~doc)
 
@@ -91,13 +90,6 @@ let list_workers store =
   Lwt_list.map_p (find Store.Worker.(get, status) store) worker_ids
   >|= fun workers ->
   block "Workers" Worker.pp Worker.pp_status workers
-
-let list_hosts _ =
-  let hosts =
-    List.map (fun h -> Host.id h, Some (h, None)) Host.defaults
-  in
-  block "Hosts" Host.pp Fmt.string hosts;
-  Lwt.return_unit
 
 let task_id store id =
   find Store.Task.(get, status) store (cast `Task id) >|= function
@@ -136,11 +128,10 @@ let main =
         | `Task   -> list_tasks store
         | `Job    -> list_jobs store
         | `Worker -> list_workers store
-        | `Host   -> list_hosts store
     end
   in
   Term.(global list $ store $ kind $ id),
-  term_info ~doc:"Show CISO objects" "ciso-show"
+  term_info ~doc:"Show datakit objects" "dk-show"
 
 let () =
   match Term.eval main with `Error _ -> exit 1 | _ -> exit 0

@@ -37,9 +37,8 @@ val pp_kind: kind Fmt.t
 type t
 (** The type for worker configration .*)
 
-val create: kind -> Host.t -> t
-(** [create k h] is the worker with host configuration [h] and kind
-    [k]. *)
+val create: kind -> t
+(** [create k] is a worker of kind [k]. *)
 
 val id: t -> id
 (** [id t] is [t]'s identifier. It is a 128 bits universally unique
@@ -48,9 +47,6 @@ val id: t -> id
 
 val kind: t -> kind
 (** [kind t] is [t]'s kind. *)
-
-val host: t -> Host.t
-(** [host t] is [t]'s host configuration. *)
 
 val equal: t -> t -> bool
 (** [equal] is the equality for workers. *)

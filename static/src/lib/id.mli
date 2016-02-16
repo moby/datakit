@@ -55,3 +55,6 @@ val of_string: 'a -> string -> 'a t
 
 val to_string: 'a t -> string
 (** [to_string] is the identity function. *)
+
+val hash: 'a t -> int
+(** [hash] is the hash function. *)

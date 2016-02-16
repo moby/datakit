@@ -190,11 +190,11 @@ module Job: sig
   val failure: t -> Job.id -> unit Lwt.t
   (** [failure t j] set [j]'s status to [`Failure]. *)
 
-  val add_output: t -> Job.id -> Object.t -> unit Lwt.t
+  val add_output: t -> Job.id -> Source.t -> unit Lwt.t
   (** [add_output t j o] adds [o] to the object store and to the list
       of objects created by the job [j]. *)
 
-  val outputs: t -> Job.id -> Object.id list Lwt.t
+  val outputs: t -> Job.id -> Source.id list Lwt.t
   (** [outputs t job] are [job]'s output objects. *)
 
   val watch: t -> Job.t callback -> cancel Lwt.t
@@ -206,5 +206,4 @@ module Job: sig
 
 end
 
-(** Persisting state for objects. *)
-module Object: S with type id := Object.id and type value := Object.t
+module Source: S with type id := Source.id and type value := Source.t

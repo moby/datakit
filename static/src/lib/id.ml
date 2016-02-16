@@ -24,17 +24,12 @@ let json = Jsont.string
 let of_string _ x = x
 let to_string x = x
 let pp = Format.pp_print_string
+let hash = Hashtbl.hash
 
 let digest_cstruct _kind buf =
-  let `Hex h =
-    Hex.of_cstruct (Nocrypto.Hash.SHA1.digest buf)
-  in
-  h
+  let `Hex h = Hex.of_cstruct (Nocrypto.Hash.SHA1.digest buf) in h
 
 let digest kind str = digest_cstruct kind (Cstruct.of_string str)
 
 let uuid _kind =
-  let `Hex h =
-    Hex.of_string (Uuidm.to_bytes (Uuidm.create `V4))
-  in
-  h
+  let `Hex h = Hex.of_string (Uuidm.to_bytes (Uuidm.create `V4)) in h

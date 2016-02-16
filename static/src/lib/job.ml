@@ -21,9 +21,7 @@ type id = [`Job] Id.t
 type t = {
   id      : id;                                                 (* the job id *)
   inputs  : id list;                 (* the transitive reduction of need jobs *)
-  switch  : Switch.t;                       (* switch on which to run the job *)
-  host    : Host.t;                           (* host on which to run the job *)
-  packages: Package.meta list;(* the list of metadata anout packages to build *)
+  cmd     : Cmd.t;
 }
 
 let equal x y = Id.equal x.id y.id
@@ -33,71 +31,42 @@ let json =
   let o = Jsont.objc ~kind:"job" () in
   let id = Jsont.mem o "id" Id.json in
   let inputs = Jsont.(mem ~opt:`Yes_rem o "inputs" @@ array Id.json) in
-  let switch = Jsont.(mem o "switch" Switch.json) in
-  let host = Jsont.(mem o "host" Host.json) in
-  let packages = Jsont.(mem o "packages" @@ array Package.json_meta) in
+  let cmd = Jsont.mem o "cmd" Cmd.json in
   let c = Jsont.obj ~seal:true o in
   let dec o =
     let get m = Jsont.get m o in
-    `Ok {
-      id = get id; inputs = get inputs; switch = get switch;
-      host = get host; packages = get packages
-    } in
+    `Ok { id = get id; inputs = get inputs; cmd = get cmd }
+  in
   let enc t =
-    Jsont.(new_obj c [
-        memv id t.id; memv inputs t.inputs;
-        memv switch t.switch; memv host t.host;
-        memv packages t.packages])
+    Jsont.(new_obj c [memv id t.id; memv inputs t.inputs; memv cmd t.cmd])
   in
   Jsont.view (dec, enc) c
 
 let pp ppf t =
   let mk = Fmt.to_to_string in
   let mks pp = List.map (mk pp) in
-  let short id = String.sub id 0 8 in
-  let shorts ids = List.map short ids in
   let block = [
-    "id      ", [Id.to_string t.id];
-    "inputs  ", shorts @@ mks Id.pp t.inputs;
-    "switch  ", [mk Switch.pp t.switch];
-    "host    ", [Host.short t.host];
-    "packages", mks Package.pp @@ List.map Package.pkg t.packages;
+    "id    ", [Id.to_string t.id];
+    "inputs", mks Id.pp t.inputs;
+    "cmd   ", [Cmd.to_string t.cmd];
   ] in
   Gol.show_block ppf block
 
 let id t = t.id
+let cmd t = t.cmd
 let inputs t = t.inputs
-let switch t = t.switch
-let host t = t.host
-let packages t = t.packages
 
-let digest buf = Cstruct.to_string (Nocrypto.Hash.SHA1.digest buf)
-
-let hash ~host ~inputs ~switch ~packages =
+let hash ~cmd ~inputs =
   let x l = String.concat "+" (List.sort String.compare l) in
   let y   = String.concat "-" in
-  let switches = [Fmt.to_to_string Switch.pp switch] in
-  let hosts = [Fmt.to_to_string Host.pp host] in
+  let cmd = Cmd.to_string cmd in
   let inputs = List.map Id.to_string inputs in
-  let packages =
-    List.map (fun m ->
-        let p = Package.to_string (Package.pkg m) in
-        let mk f = digest (f m) in
-        let mko f = match f m with
-          | None   -> []
-          | Some k -> [digest k]
-        in
-        let mkf (f, c) = f ^ digest c in
-        let files = List.map mkf (Package.files m) in
-        y (p :: mk Package.opam :: mko Package.url @ files)
-      ) packages
-  in
-  let str = y [x switches; x hosts; x packages; x inputs] in
+  let str = y [cmd; x inputs] in
   Id.digest `Job str
 
-let create ?(inputs=[]) host switch packages =
-  let id = hash ~host ~inputs ~switch ~packages in
-  { id; inputs; switch; host; packages; }
+let create ?(inputs=[]) cmd =
+  let id = hash ~cmd ~inputs in
+  { id; inputs; cmd }
 
 type core = [ `Pending | `Runnable | `Cancelled ]
 type dispatch =  [`Pending | `Started]
@@ -127,7 +96,6 @@ let mk_enum status =
   let default = List.hd status in
   Jsont.enum ~default @@ List.map (fun s -> to_string s, s) status
 
-(* FIXME: code duplication with Task.json_{params,status} *)
 let json_params =
   let o = Jsont.objc ~kind:"job-status-params" () in
   let worker = Jsont.(mem_opt o "worker" Id.json) in
@@ -166,18 +134,6 @@ let json_status =
   in
   Jsont.view (dec, enc) c
 
-let is_success = function `Complete `Success -> true | _ -> false
-let is_failure = function `Complete `Failure -> true | _ -> false
-let is_cancelled = function `Cancelled -> true | _ -> false
-
-let task_status = function
-  | [] -> `New
-  | l  ->
-    if List.for_all is_success l then `Complete `Success
-    else if List.exists is_failure l then `Complete `Failure
-    else if List.exists is_cancelled l then `Cancelled
-    else `Pending
-
 (* FIXME: code duplication with task.pp_status *)
 
 let pp_s ppf = Fmt.of_to_string to_string ppf
@@ -186,3 +142,5 @@ let pp_status ppf = function
   | `Dispatched (w, s) -> Fmt.pf ppf "dispatched to %a (%a)" Id.pp w pp_s s
   | `Complete s -> Fmt.pf ppf "complete: %a" pp_s s
   | #core as  x -> Fmt.of_to_string to_string  ppf x
+
+let hash t = Id.hash t.id

@@ -40,13 +40,10 @@ let pair (type a) (type b)
     let pp = Fmt.pair A.pp B.pp
   end)
 
-let package_t: Package.t Alcotest.testable = (module Package)
+let source_t: Source.t Alcotest.testable = (module Source)
 let task_t: Task.t Alcotest.testable = (module Task)
-let host_t: Host.t Alcotest.testable = (module Host)
 let worker_t: Worker.t Alcotest.testable = (module Worker)
-let switch_t: Switch.t Alcotest.testable = (module Switch)
 let job_t: Job.t Alcotest.testable = (module Job)
-let object_t: Object.t Alcotest.testable = (module Object)
 let jobs_t = set job_t Job.compare
 let tasks_t = set task_t Task.compare
 let workers_t = set worker_t Worker.compare
@@ -93,64 +90,42 @@ let json codec v =
 let r1 = "example", Uri.of_string "http://example.com"
 let r2 = "example2", Uri.of_string "http://example.com/2"
 
-let p1 = Package.create "foo"
-let p2 = Package.create "foo" ~version:"bar"
-let t1 = Task.create ~repos:[Task.default_repo; r1; r2] [p1; p2]
-let t2 = Task.create ~rev_deps:`All [p1; p2]
+let url1 = Url.parse "http://github.com/samoht/foo.git"
+let url2 = Url.parse "http://github.com/samoht/foo.git#master"
 
-module HSet = Set.Make(Host)
+let s1 = Source.create "foo" ~url:url1
+let s2 = Source.create "foo" ~url:url2
 
-let hosts =
-  let set =
-    List.fold_left
-      (fun l e -> HSet.add e l) HSet.empty (Host.detect () :: Host.defaults)
-  in
-  HSet.elements set
+let c1 = Cmd.create "bar" ~exec:"echo bar"
+let c2 = Cmd.create "toto" ~exec:"foo/bar hello!"
 
-let job_workers = List.map (Worker.create `Job) hosts
-let task_workers = List.map (Worker.create `Task) hosts
+let f1 = Flow.create ~inputs:[(s1, c1)] ~deps:[(c1, c2)]
+let f2 = Flow.create ~inputs:[(s2, c2)] ~deps:[(c1, c2)]
+
+let t1 = Task.create f1
+let t2 = Task.create f2
+
+let job_workers  = [Worker.create `Job ; Worker.create `Job]
+let task_workers = [Worker.create `Task; Worker.create `Task]
 let workers = job_workers @ task_workers
 
 let wj1 = List.hd job_workers
 let wt1 = List.hd task_workers
 
-let jobs =
-  let info opam url p =
-    Package.meta
-      ~opam:(Cstruct.of_string opam) ~url:(Cstruct.of_string url)
-      p
-  in
-  let pkgs = [
-    info "build: [make]" "url: http://example.com" p1;
-    info "build: [make test]" "url: git://example.com" p2;
-  ] in
-  List.fold_left (fun acc h ->
-      List.fold_left (fun jobs c ->
-          let inputs =
-            List.filter (fun j -> Job.host j = h) jobs
-            |> List.map Job.id
-          in
-          let job = Job.create ~inputs h c pkgs in
-          job :: jobs
-        ) acc Switch.defaults
-    ) [] hosts
+let j1 = Job.create c1
+let j2 = Job.create ~inputs:[Job.id j1] c2
 
-let j1 = List.hd jobs
-let j2 = List.hd (List.rev jobs)
-
+let jobs = [j1; j2]
 let job_roots = List.filter (fun j -> Job.inputs j = []) jobs
 
-let job_root host =
-  try List.find (fun j -> Host.equal host (Job.host j)) job_roots
-  with Not_found ->
-    Alcotest.fail (Fmt.strf "no root for host %a" Host.pp host)
+let job_root = j1
 
-let jr1 = job_root (Worker.host wj1)
-let jnr1 = Job.(create ~inputs:[id jr1] (host jr1) (switch jr1) (packages jr1))
+let jr1 = wj1
+let jnr1 = wt1
 
 let store () =
-  let _ = Sys.command "rm -rf /tmp/ciso-tests" in
-  Store.local ~root:"/tmp/ciso-tests" ()
+  let _ = Sys.command "rm -rf /tmp/datakit-tests" in
+  Store.local ~root:"/tmp/datkit-tests" ()
 
 let ts = 0.01
 

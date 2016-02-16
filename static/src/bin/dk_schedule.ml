@@ -16,19 +16,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-type t = string
+open Cmdliner
+open Lwt.Infix
+include Dk_common
 
-let equal x y = String.compare x y = 0
-let pp = Fmt.string
-let json = Jsont.string
-let to_string x = x
-let of_string x = x
+let main =
+  let master store =
+    Lwt_main.run begin
+      store >>= fun store ->
+      Scheduler.start store >>= block
+    end
+  in
+  Term.(global master $ store),
+  term_info ~doc:"Run the datakit scheduler" "dk-master"
 
-let system = "system"
-
-let defaults = [
-  "3.12.1";
-  "4.00.1";
-  "4.01.0";
-  "4.02.3";
-]
+let () =
+  match Term.eval main with `Error _ -> exit 1 | _ -> exit 0

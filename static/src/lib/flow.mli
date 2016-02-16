@@ -1,6 +1,4 @@
 (*
- * Copyright (c) 2013-2015 David Sheets <sheets@alum.mit.edu>
- * Copyright (c)      2015 Qi Li <liqi0425@gmail.com>
  * Copyright (c)      2015 Thomas Gazagnaire <thomas@gazagnaire.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -18,15 +16,11 @@
 
 type t
 
-val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
-val section: string ref
-val store: t -> Store.t
-val worker: t -> Worker.t
-val cache: t -> string
+val create: inputs:(Source.t * Cmd.t) list -> deps:(Cmd.t * Cmd.t) list -> t
 
-type common_callback = t -> Worker.status -> unit Lwt.t
+val inputs: t -> (Source.t * Cmd.t) list
+val deps  : t -> (Cmd.t * Cmd.t) list
 
-val start: common_callback ->
-  ?tick:float -> ?cache:string -> kind:Worker.kind -> Store.t -> t Lwt.t
-
-val stop: t -> unit Lwt.t
+val fetch: dst:string -> t -> t
+val json: t Jsont.codec
+val pp: t Fmt.t

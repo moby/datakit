@@ -1,0 +1,14 @@
+bin: [
+  "?_build/bin/dk_show.byte"       {"dk-show"}
+  "?_build/bin/dk_show.native"     {"dk-show"}
+  "?_build/bin/dk_add.byte"        {"dk-add"}
+  "?_build/bin/dk_add.native"      {"dk-add"}
+  "?_build/bin/dk_work.byte"       {"dk-work"}
+  "?_build/bin/dk_work.native"     {"dk-work"}
+  "?_build/bin/dk_publish.byte"    {"dk-publish"}
+  "?_build/bin/dk_publish.native"  {"dk-publish"}
+  "?_build/bin/dk_schedule.byte"   {"dk-schedule"}
+  "?_build/bin/dk_schedule.native" {"dk-schedule"}
+  "?_build/bin/dk.byte"            {"dk"}
+  "?_build/bin/dk.native"          {"dk"}
+]

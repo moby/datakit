@@ -1,0 +1,34 @@
+# OASIS_START
+# DO NOT EDIT (digest: a46dc4ee23013e7e5a125ed29c9d0567)
+version = "0.1.0"
+description = "distributed integration engine for opam packages"
+requires = "irmin.unix lwt uuidm fmt nocrypto uri jsont.jsonm hex bytes"
+archive(byte) = "ciso.cma"
+archive(byte, plugin) = "ciso.cma"
+archive(native) = "ciso.cmxa"
+archive(native, plugin) = "ciso.cmxs"
+exists_if = "ciso.cma"
+package "worker" (
+ version = "0.1.0"
+ description = "distributed integration engine for opam packages"
+ requires =
+ "ciso irmin.unix opam-lib.client ocamlgraph threads cstruct.unix rresult"
+ archive(byte) = "ciso-worker.cma"
+ archive(byte, plugin) = "ciso-worker.cma"
+ archive(native) = "ciso-worker.cmxa"
+ archive(native, plugin) = "ciso-worker.cmxs"
+ exists_if = "ciso-worker.cma"
+)
+
+package "github" (
+ version = "0.1.0"
+ description = "distributed integration engine for opam packages"
+ requires = "ciso ciso.worker github.unix lwt"
+ archive(byte) = "ciso-github.cma"
+ archive(byte, plugin) = "ciso-github.cma"
+ archive(native) = "ciso-github.cmxa"
+ archive(native, plugin) = "ciso-github.cmxs"
+ exists_if = "ciso-github.cma"
+)
+# OASIS_STOP
+

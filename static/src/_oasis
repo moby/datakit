@@ -1,0 +1,94 @@
+OASISFormat: 0.4
+Name:        ocaml-ci
+Version:     0.1.0
+Synopsis:    distributed integration engine for opam packages
+Authors:     Qi Li, David Sheets, Thomas Gazagnaire
+License:     ISC
+Plugins:     META (0.3), DevFiles (0.3)
+BuildTools:  ocamlbuild
+
+Library ciso
+  Install: false
+  Path: lib
+  InternalModules: Gol
+  Modules:
+    Id, Task, Job, Object, Package, Host, Switch, Worker, Store, Scheduler,
+    Version
+  BuildDepends:
+    irmin.unix, lwt, uuidm, fmt, nocrypto, uri, jsont.jsonm, hex, bytes
+
+Library "ciso-worker"
+  Install: false
+  Path: lib/worker
+  FindlibParent: ciso
+  FindlibName: worker
+  InternalModules: Opam, Common_worker
+  Modules: Task_worker, Job_worker
+  BuildDepends:
+    ciso, irmin.unix, opam-lib.client, ocamlgraph, threads, cstruct.unix,
+    rresult
+
+Document ciso
+  Title:                CISO docs
+  Type:                 OCamlbuild (0.4)
+  BuildTools+:          ocamldoc
+  Install:              true
+  XOCamlbuildPath:      lib
+  XOCamlbuildLibraries: ciso, ciso.worker
+
+Executable test_ciso
+  Build$:           flag(tests)
+  Path:             lib_test
+  MainIs:           test.ml
+  CompiledObject:   best
+  Install:          false
+  BuildDepends:     alcotest, ciso, ciso.worker
+
+Test test_ciso
+  Run$:             flag(tests)
+  Command:          $test_ciso -q
+  WorkingDirectory: lib_test/
+
+Executable "ciso-show"
+  Path: bin
+  MainIs: ciso_show.ml
+  CompiledObject: best
+  BuildDepends: ciso, cmdliner
+
+Executable "ciso-work"
+  Path: bin
+  MainIs: ciso_work.ml
+  CompiledObject: best
+  BuildDepends: ciso.worker, cmdliner
+
+Executable "ciso-schedule"
+  Path: bin
+  MainIs: ciso_schedule.ml
+  CompiledObject: best
+  BuildDepends: ciso, cmdliner
+
+Executable "ciso-add"
+  Path: bin
+  MainIs: ciso_add.ml
+  CompiledObject: best
+  BuildDepends: ciso, cmdliner
+
+Executable "ciso-publish"
+  Path: bin
+  MainIs: ciso_publish.ml
+  CompiledObject: best
+  BuildDepends: ciso, cmdliner
+
+Executable ciso
+  Path: bin
+  MainIs: ciso.ml
+  CompiledObject: best
+  BuildDepends: ciso, cmdliner
+
+Library "ciso-github"
+  Build: false
+  Path: lib/github
+  FindlibParent: ciso
+  FindlibName: github
+  Modules: Github_pr
+  BuildDepends: ciso, ciso.worker, github.unix, lwt

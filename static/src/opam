@@ -1,0 +1,33 @@
+opam-version: "1.2"
+maintainer:   "thomas@gazagnaire.org"
+authors:      [ "David Sheets" "Qi Li" "Thomas Gazagnaire"]
+license:      "ISC"
+homepage:     "https://github.com/samoht/ciso-git"
+bug-reports:  "https://github.com/samoht/ciso/issues"
+dev-repo:     "https://github.com/samoht/ciso.git"
+
+build: [
+  ["./configure" "--prefix" prefix]
+  [make]
+]
+build-test: [
+  ["./configure" "--enable-tests"]
+  [make "test"]
+]
+depends: [
+  "ocamlfind" {build}
+  "alcotest"  {test}
+  "uuidm"
+  "lwt"
+  "uri"
+  "nocrypto"
+  "irmin-unix" {>= "0.9.9"}
+  "hex"
+  "fmt"
+  "jsont"
+  "opam-lib"
+  "ocamlgraph"
+  "rresult"
+  "js_of_ocaml" # needed because of https://github.com/dbuenzli/jsont/issues/3
+#  "cmdliner"
+]

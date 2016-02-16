@@ -1,0 +1,9 @@
+PKG lwt cmdliner nocrypto fmt jsont.jsonm
+PKG opam-lib opam-lib.client opam-lib.solver
+PKG irmin irmin.unix uuidm rresult
+PKG alcotest cstruct.unix
+S lib/
+S lib/worker/
+S lib_test/
+S bin/
+B _build/**

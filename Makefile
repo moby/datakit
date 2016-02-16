@@ -1,4 +1,4 @@
-.PHONY: all sdk db
+.PHONY: all sdk db static
 
 all: sdk db
 	@
@@ -8,6 +8,9 @@ sdk: sdk/src
 
 db: db/src sdk
 	make -C db
+
+db: static/src sdk
+	make -C static
 
 pinata:
 	git clone --depth 1 git@github.com:docker/pinata.git

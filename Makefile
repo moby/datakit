@@ -3,6 +3,9 @@
 all: sdk db
 	@
 
+mac:
+	cd db && make mac
+
 sdk:
 	make -C sdk
 

@@ -34,5 +34,5 @@ configure:
 
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
 
-version.ml: ../../VERSION
+version.ml:
 	echo "let v = \"$(VERSION)\"" > version.ml

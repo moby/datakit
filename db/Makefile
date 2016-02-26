@@ -1,4 +1,6 @@
-sdk: src/version.ml
+sdk:
+	cd src && make clean
+	cd src && make version.ml
 	docker build -t datakit-db .
 
 mac:

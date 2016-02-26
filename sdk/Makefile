@@ -1,6 +1,7 @@
 OPAMYES=1
 
 sdk:
+	cd src && make clean
 	docker build -t datakit-sdk .
 
 mac:

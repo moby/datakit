@@ -1,0 +1,39 @@
+OASISFormat: 0.4
+Name:        i9p
+Version:     0.1.0
+Synopsis:    A Git-like database with a filesystem interface
+Authors:     Thomas Leonard, Magnus Skjegstad, Dave Scott, Thomas Gazagnaire
+License:     ISC
+Plugins:     META (0.4), DevFiles (0.4)
+BuildTools:  ocamlbuild
+AlphaFeatures: pure_interface
+
+Library i9p
+  Path: src
+  Findlibname: i9p
+  InternalModules: I9p_error
+  Modules:
+      I9p_tree, I9p_inode, I9p_file, I9p_dir, I9p_fs, I9p_irmin,
+      I9p_merge, I9p_misc
+  BuildDepends: protocol-9p.unix,irmin.unix
+
+Document i9p
+  Title:                I9p docs
+  Type:                 ocamlbuild (0.4)
+  BuildTools+:          ocamldoc
+  Install:              true
+  XOCamlbuildPath:      src
+  XOCamlbuildLibraries: i9p
+
+Executable test
+  Path:           tests
+  MainIs:         test.ml
+  Build$:         flag(tests)
+  CompiledObject: best
+  Install:        false
+  BuildDepends:   i9p, alcotest
+
+Test test
+  Run$:             flag(tests)
+  Command:          $test -q
+  WorkingDirectory: .

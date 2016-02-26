@@ -1,3 +1,8 @@
+### 0.1.1 (2016-02-26)
+
+- Fix OSX build
+- Fix in-container build
+
 ### 0.1.0 (2016-02-26)
 
 - Initial release. Code extracted from:

@@ -27,7 +27,7 @@ let term =
         as a 9p mount point."
   ] in
   Term.(pure mount $ socket $ mnt),
-  Term.info "irmin-mount" ~version:"0.1" ~doc ~man
+  Term.info "irmin-mount" ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with
   | `Error _ -> exit 1

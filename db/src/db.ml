@@ -162,7 +162,7 @@ let term =
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
   Term.(pure start $ url $ sandbox $ git),
-  Term.info "com.docker.db" ~version:"0.1" ~doc ~man
+  Term.info "com.docker.db" ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with
   | `Error _ -> exit 1

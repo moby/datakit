@@ -4,7 +4,7 @@ sdk:
 	docker build -t datakit-db .
 
 mac:
-	OPAMYES=1 opam pin add sdk.dev ../sdk/src/ -n
+	OPAMYES=1 opam pin add i9p.dev ../sdk/src/ -n
 	OPAMYES=1 opam pin add db.dev src/
 
 src/version.ml:

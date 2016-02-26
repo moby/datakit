@@ -5,4 +5,4 @@ sdk:
 	docker build -t datakit-sdk .
 
 mac:
-	OPAMYES=1 opam pin add sdk.dev src/
+	OPAMYES=1 opam pin add i9p.dev src/

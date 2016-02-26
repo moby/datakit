@@ -25,6 +25,6 @@ clean:
 	rm -rf pinata sdk/src db/src
 
 release:
-	if [ -z "$VERSION" ]; then echo "VERSION is not set"; exit 1; done
+	if [ -z "$(VERSION)" ]; then echo "VERSION is not set"; exit 1; done
 	git tag $(VERSION) -m "Version $(VERSION)"
 	git push upstream master $(VERSION)

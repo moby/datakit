@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: d217086be4edc9d6704e1a208423b67f)
+I9p_tree
+I9p_inode
+I9p_file
+I9p_dir
+I9p_fs
+I9p_irmin
+I9p_transport
+I9p_unix_socket
+I9p_launchd_socket
+# OASIS_STOP

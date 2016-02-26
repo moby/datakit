@@ -3,26 +3,17 @@
 all: sdk db
 	@
 
-sdk: sdk/src
+sdk:
 	make -C sdk
 
-db: db/src sdk
+db:
 	make -C db
 
-db: static/src sdk
+db: sdk
 	make -C static
 
-pinata:
-	git clone --depth 1 git@github.com:docker/pinata.git
-
-sdk/src: pinata
-	cd sdk && cp -r ../pinata/v1/i9p src
-
-db/src: pinata
-	cd db && cp -r ../pinata/v1/cmd/com.docker.db src
-
 clean:
-	rm -rf pinata sdk/src db/src
+	rm -rf pinata
 
 release:
 	if [ -z "$(VERSION)" ]; then echo "VERSION is not set"; exit 1; fi

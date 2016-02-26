@@ -4,7 +4,7 @@ sdk:
 	docker build -t datakit-db .
 
 mac:
-	cd ../sdk && make make
+	cd ../sdk && make mac
 	OPAMYES=1 opam pin add db.dev src/
 
 src/version.ml:

@@ -9,11 +9,11 @@ sdk:
 db:
 	make -C db
 
-db: sdk
+static: sdk
 	make -C static
 
 clean:
-	rm -rf pinata
+	@rm -rf pinata
 
 release:
 	if [ -z "$(VERSION)" ]; then echo "VERSION is not set"; exit 1; fi

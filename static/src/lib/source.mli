@@ -17,16 +17,14 @@
  *)
 
 type id = [`Source] Id.t
-type digest = [ `SHA1 of string ]
 
 type t
 
-val create: ?digest:digest -> url:Url.t -> string -> t
+val create: url:Url.t -> string -> t
 
 val id: t -> id
 val name: t -> string
 val url: t -> Url.t
-val digest: t -> digest option
 
 val pp: t Fmt.t
 val json: t Jsont.codec
@@ -36,4 +34,4 @@ val compare: t -> t -> int
 val equal: t -> t -> bool
 val hash: t -> int
 
-val fetch: dst:string -> t -> t
+val fetch: dst:string -> t -> [`SHA1 of string]

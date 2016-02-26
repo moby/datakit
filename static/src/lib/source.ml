@@ -24,22 +24,15 @@ type t = {
   id    : id;
   name  : string;
   url   : Url.t;
-  digest: digest option;
 }
 
 let id t = t.id
 let name t = t.name
 let url t = t.url
-let digest t = t.digest
 
 let json_uri =
   let dec s = `Ok (Url.of_string s) in
   let enc u = Url.to_string u in
-  Jsont.(view (dec, enc) string)
-
-let json_digest =
-  let dec s = `Ok (`SHA1 s) in (* FIXME: check if valid SHA1 *)
-  let enc (`SHA1 s) = s in
   Jsont.(view (dec, enc) string)
 
 let json =
@@ -47,16 +40,14 @@ let json =
   let id = Jsont.mem o "id" Id.json in
   let name = Jsont.mem o "name" Jsont.string in
   let uri = Jsont.mem o "uri" json_uri in
-  let digest = Jsont.mem_opt o "digest" json_digest in
   let c = Jsont.obj ~seal:true o in
   let dec o =
     let get x = Jsont.get x o in
-    `Ok { id = get id; name = get name; url = get uri; digest = get digest } in
+    `Ok { id = get id; name = get name; url = get uri } in
   let enc t = Jsont.(new_obj c [
       memv id t.id;
       memv name t.name;
       memv uri t.url;
-      memv digest t.digest;
     ]) in
   Jsont.view (dec, enc) c
 
@@ -66,19 +57,18 @@ let pp_digest ppf = function
   | None           -> ()
   | Some (`SHA1 d) -> Fmt.pf ppf "#%s" d
 
-let pp ppf t = Fmt.(pf ppf "%s:%a%a" t.name pp_uri t.url pp_digest t.digest)
+let pp ppf t = Fmt.(pf ppf "%s:%a" t.name pp_uri t.url)
 let to_string = Fmt.to_to_string pp
 
-let hash ~name ~url ~digest =
+let hash ~name ~url =
   let y   = String.concat "-" in
   let url = Url.to_string url in
-  let digest = Fmt.to_to_string pp_digest digest in
-  let str = y [name; url; digest] in
+  let str = y [name; url] in
   Id.digest `Source str
 
 let create ?digest ~url name =
-  let id = hash ~name ~url ~digest in
-  { id; name; url; digest }
+  let id = hash ~name ~url in
+  { id; name; url; }
 
 let hash t = Id.hash t.id
 let equal x y = Id.equal x.id y.id
@@ -97,7 +87,6 @@ let fetch ~dst source =
     if GitSource.exists repo
     then GitSource.fetch repo
     else GitSource.init repo;
-    let r = GitSource.revision repo in
-    { source with digest = Some (`SHA1 r) }
+    `SHA1 (GitSource.revision repo)
 
   | _ -> failwith "TODO"

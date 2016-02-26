@@ -1,0 +1,15 @@
+opam-version: "1.2"
+maintainer:   "talex5@gmail.com"
+authors:      ["Thomas Leonard" "Magnus Skjegstad"
+               "David Scott" "Thomas Gazagnaire"]
+homepage:     "https://github.com/docker/pinata"
+dev-repo:     "https://github.com/docker/pinata.git"
+bug-reports:  "https://github.com/docker/pinata/issues"
+
+depends: [
+  "ocamlfind" {build}
+  "result"
+  "uri"
+  "i9p"
+  "cmdliner"
+]

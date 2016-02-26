@@ -1,6 +1,4 @@
-# OASIS_START
-# DO NOT EDIT (digest: a3c674b4239234cbbe53afe090018954)
-
+VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 SETUP = ocaml setup.ml
 
 build: setup.data
@@ -12,7 +10,7 @@ doc: setup.data build
 test: setup.data build
 	$(SETUP) -test $(TESTFLAGS)
 
-all:
+all: version.ml
 	$(SETUP) -all $(ALLFLAGS)
 
 install: setup.data
@@ -26,11 +24,9 @@ reinstall: setup.data
 
 clean:
 	$(SETUP) -clean $(CLEANFLAGS)
+	rm -f version.ml setup.data
 
-distclean:
-	$(SETUP) -distclean $(DISTCLEANFLAGS)
-
-setup.data:
+setup.data: version.ml
 	$(SETUP) -configure $(CONFIGUREFLAGS)
 
 configure:
@@ -38,4 +34,5 @@ configure:
 
 .PHONY: build doc test all install uninstall reinstall clean distclean configure
 
-# OASIS_STOP
+version.ml: ../../VERSION
+	echo "let v = \"$(VERSION)\"" > version.ml

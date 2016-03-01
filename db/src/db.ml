@@ -28,10 +28,10 @@ module Git_fs_store = struct
   type t = Store.Repo.t
   module Filesystem = I9p_irmin.Make(Server.Inode)(Store)
   let listener = lazy (Irmin_unix.install_dir_polling_listener 1.0)
-  let connect path =
+  let connect ~bare path =
     Lazy.force listener;
     log "Using Git-format store %S" path;
-    let config = Irmin_unix.Irmin_git.config ~root:path () in
+    let config = Irmin_unix.Irmin_git.config ~root:path ~bare () in
     Store.Repo.create config >|= fun repo ->
     fun () -> Filesystem.create make_task repo
 end
@@ -72,7 +72,7 @@ let make_unix_socket path =
   Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path);
   Lwt.return s
 
-let start url sandbox git =
+let start url sandbox git ~bare =
   Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
   Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
     log "Caught SIGTERM, will exit";
@@ -86,7 +86,7 @@ let start url sandbox git =
   let prefix = if sandbox then "." else "" in
   begin match git with
   | None -> In_memory_store.connect ()
-  | Some path -> Git_fs_store.connect (prefix ^ path)
+  | Some path -> Git_fs_store.connect ~bare (prefix ^ path)
   end >>= fun make_root ->
   let url = url |> default "file:///var/tmp/com.docker.db.socket" in
   Lwt.catch
@@ -129,7 +129,7 @@ let start url sandbox git =
   log "Waiting for connections on socket %S" url;
   aux ()
 
-let start url sandbox git = Lwt_main.run (start url sandbox git)
+let start url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
 
 open Cmdliner
 
@@ -155,13 +155,19 @@ let sandbox =
   in
   Arg.(value & flag & doc)
 
+let bare =
+  let doc =
+    Arg.info ~doc:"Use a bare Git repository (no working directory)" ["bare"]
+  in
+  Arg.(value & flag & doc)
+
 let term =
   let doc = "A git-like database with a 9p interface." in
   let man = [
     `S "DESCRIPTION";
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ url $ sandbox $ git),
+  Term.(pure start $ url $ sandbox $ git $ bare),
   Term.info "com.docker.db" ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

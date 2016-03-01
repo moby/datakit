@@ -222,8 +222,8 @@ let test_bad_range () =
       | Ok _ -> Alcotest.fail "out-of-range"
       | Error (`Msg msg) ->
       Alcotest.(check string) "Out-of-range" "Offset 100 beyond end-of-file (len = 0)" msg;
-      Lwt.return ()
-    )
+      Lwt.return (Ok ())
+    ) >>*= return
   )
 
 let test_qids () =
@@ -231,14 +231,14 @@ let test_qids () =
   run (fun _repo conn ->
       Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
       Client.with_fid conn (fun newfid ->
-          Client.walk_from_root conn newfid ["branch"; "master"; "head"]
-          >>*= fun resp ->
-          List.map (fun q ->
-              List.mem Qid.Directory q.Qid.flags
-            ) resp.Protocol_9p.Response.Walk.wqids
-          |> Alcotest.(check (list bool)) "Correct Qid flags" [true; true; false];
-          Lwt.return ()
-        )
+        Client.walk_from_root conn newfid ["branch"; "master"; "head"]
+        >>*= fun resp ->
+        List.map (fun q ->
+            List.mem Qid.Directory q.Qid.flags
+          ) resp.Protocol_9p.Response.Walk.wqids
+        |> Alcotest.(check (list bool)) "Correct Qid flags" [true; true; false];
+        Lwt.return (Ok ())
+      ) >>*= return
     )
 
 let test_watch () =
@@ -286,8 +286,8 @@ let test_rename () =
       Client.walk_from_root conn newfid ["branch"; "old"] >>*= fun _ ->
       Client.LowLevel.update conn ~name:"new" newfid >|= function
       | Error (`Msg x) -> Alcotest.fail x
-      | Ok () -> ()
-    ) >>= fun () ->
+      | Ok () -> Ok ()
+    ) >>*= fun () ->
     check_dir conn ["branch"] "New branches" ["new"] >>= fun () ->
     Client.stat conn ["branch"; "new"] >>*= fun info ->
     Alcotest.(check string) "Inode name" "new" info.Protocol_9p.Types.Stat.name;
@@ -320,8 +320,9 @@ let test_truncate () =
       Client.LowLevel.update conn ~length:6L newfid >>*= fun () ->
       check "Extend to 6" "Hell\x00\x00" >>= fun () ->
       Client.LowLevel.update conn ~length:0L newfid >>*= fun () ->
-      check "Truncate to 0" ""
-    )
+      check "Truncate to 0" "" >>= fun () ->
+      return (Ok ())
+    ) >>*= return
   )
 
 let test_writes () =

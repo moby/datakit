@@ -6,6 +6,13 @@ homepage:     "https://github.com/docker/pinata"
 dev-repo:     "https://github.com/docker/pinata.git"
 bug-reports:  "https://github.com/docker/pinata/issues"
 
+build:   [make]
+install: [make "install"]
+remove: [
+  ["./configure"]
+  [make "uninstall"]
+]
+
 depends: [
   "ocamlfind" {build}
   "result"

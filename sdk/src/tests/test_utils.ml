@@ -105,8 +105,8 @@ let with_file conn path fn =
       Client.walk_from_root conn newfid path >>*= fun _resp ->
       fn newfid >>= fun result ->
       Client.LowLevel.clunk conn newfid >>*= fun () ->
-      return result
-    )
+      return (Ok result)
+    ) >>*= return
 
 let stream conn ?(off=0L) fid =
   let mvar = Lwt_mvar.create_empty () in
@@ -184,8 +184,8 @@ let echo conn str path =
     Client.LowLevel.update conn ~length:0L newfid >>*= fun () ->
     Client.LowLevel.openfid conn newfid Protocol_9p.Types.OpenMode.write_only >>*= fun _ ->
     Client.LowLevel.write conn newfid 0L (Cstruct.of_string (str ^ "\n")) >>*= fun _ ->
-    Lwt.return ()
-  )
+    Lwt.return (Ok ())
+  ) >>*= return
 
 let with_transaction conn ~branch name fn =
   let path = ["branch"; branch; "transactions"] in

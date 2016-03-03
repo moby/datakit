@@ -5,17 +5,17 @@ Synopsis:    A Git-like database with a filesystem interface
 Authors:     Thomas Leonard, Magnus Skjegstad, Dave Scott, Thomas Gazagnaire
 License:     ISC
 Plugins:     META (0.4), DevFiles (0.4)
-BuildTools:  ocamlbuild
-AlphaFeatures: pure_interface
+
+BuildTools:    ocamlbuild
+AlphaFeatures: pure_interface, ocamlbuild_more_args
 
 Library i9p
-  Path: src
-  Findlibname: i9p
-  InternalModules: I9p_error
-  Modules:
-      I9p_tree, I9p_inode, I9p_file, I9p_dir, I9p_fs, I9p_irmin,
-      I9p_merge, I9p_misc
-  BuildDepends: protocol-9p.unix,irmin.unix
+  Path:            src/i9p/
+  Findlibname:     i9p
+  InternalModules: I9p_error, I9p_misc
+  Modules:         I9p_tree, I9p_inode, I9p_file, I9p_dir, I9p_fs, I9p_irmin,
+                   I9p_merge
+  BuildDepends:    protocol-9p.unix,irmin.unix
 
 Document i9p
   Title:                I9p docs
@@ -24,6 +24,22 @@ Document i9p
   Install:              true
   XOCamlbuildPath:      src
   XOCamlbuildLibraries: i9p
+  XOCamlbuildExtraArgs:
+    "-docflags '-t Functoria -colorize-code -short-functors -charset utf-8'"
+
+Executable datakit
+  Path:           src/bin
+  MainIs:         main.ml
+  CompiledObject: best
+  Install:        true
+  BuildDepends:   i9p, cmdliner
+
+Executable "datakit-mount"
+  Path:           src/bin
+  MainIs:         mount.ml
+  CompiledObject: best
+  Install:        true
+  BuildDepends:   i9p, cmdliner
 
 Executable test
   Path:           tests

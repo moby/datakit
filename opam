@@ -3,22 +3,23 @@ maintainer:   "thomas@gazagnaire.org"
 authors:      ["Thomas Leonard" "Magnus Skjegstad"
                "David Scott" "Thomas Gazagnaire"]
 license:      "ISC"
-homepage:     "https://github.com/docker/pinata"
-bug-reports:  "https://github.com/docker/pinata"
-dev-repo:     "https://github.com/docker/pinata.git"
+homepage:     "https://github.com/docker/datakit"
+bug-reports:  "https://github.com/docker/datakit"
+dev-repo:     "https://github.com/docker/dataki.git"
 
-build: [
-  ["./configure" "--prefix" prefix]
-  [make]
-]
-build-test: [
-  ["./configure" "--enable-tests"]
-  [make "test"]
-]
+build: [make "PREFIX=%{prefix}"]
+build-test: [make "test"]
 install: [make "install"]
-remove: ["ocamlfind" "remove" "i9p"]
+remove: [
+  ["./configure" "--prefix" prefix]
+  [make "uninstall"]
+  ["ocamlfind" "remove" "i9p"]
+]
+
 depends: [
   "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "oasis"     {build}
   "irmin-unix"
   "protocol-9p" {>= "0.5.0"}
   "alcotest" {test}

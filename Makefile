@@ -1,37 +1,60 @@
-.PHONY: all sdk db static
+VERSION = $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+VFILE   = src/bin/version.ml
+APP     = Datakit.app
+PREFIX ?= $(shell opam config var prefix)
 
-all: sdk db
-	@
+SETUP = ocaml setup.ml
 
-mac:
-	cd db && make mac
+build: setup.data $(VFILE)
+	$(SETUP) -build $(BUILDFLAGS)
 
-sdk:
-	make -C sdk
+all: setup.data
+	$(SETUP) -all $(ALLFLAGS)
 
-db:
-	make -C db
+setup.ml: _oasis
+	oasis setup
+	echo 'true: debug, bin_annot' >> _tags
+	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags
 
-I9P=$(shell which i9p)
+doc: setup.data build
+	$(SETUP) -doc $(DOCFLAGS)
 
-bundle: mac
-	rm -rf root
-	mkdir -p root/Contents/MacOS/
-	mkdir -p root/Contents/Resources/lib/
-	echo $(I9P)
-	cp $(I9P) root/Contents/MacOS/com.docker.db
-	dylibbundler -od -b \
-	  -x root/Contents/MacOS/com.docker.db \
-	  -d root/Contents/Resources/lib \
-	  -p @executable_path/../Resources/lib
+test:
+	$(SETUP) -configure --enable-tests --prefix $(PREFIX)
+	$(MAKE) build
+	$(SETUP) -test $(TESTFLAGS)
 
-static: sdk
-	make -C static
+install: setup.data
+	$(SETUP) -install $(INSTALLFLAGS)
+
+uninstall: setup.data
+	$(SETUP) -uninstall $(UNINSTALLFLAGS)
+
+reinstall: setup.data
+	$(SETUP) -reinstall $(REINSTALLFLAGS)
 
 clean:
-	@rm -rf pinata
+	if [ -f setup.ml ]; then $(SETUP) -clean $(CLEANFLAGS); fi
+	rm -f setup.data setup.ml myocamlbuild.ml _tags configure
+	rm -f src/i9p.odocl src/META
+	rm -f src/i9p/META src/i9p/i9p.mldylib src/i9p/i9p.mllib src/i9p/META
+	rm -f $(VFILE)
+	rm -rf $(APP) _tests
 
-release:
-	if [ -z "$(VERSION)" ]; then echo "VERSION is not set"; exit 1; fi
-	git tag $(VERSION) -m "Version $(VERSION)"
-	git push upstream master $(VERSION)
+setup.data: setup.ml
+	$(SETUP) -configure --prefix $(PREFIX)
+
+bundle: build
+	rm -rf $(APP)
+	mkdir -p $(APP)/Contents/MacOS/
+	mkdir -p $(APP)/Contents/Resources/lib/
+	cp _build/src/bin/main.native $(APP)/Contents/MacOS/com.docker.db
+	dylibbundler -od -b \
+	 -x $(APP)/Contents/MacOS/com.docker.db \
+	 -d $(APP)/Contents/Resources/lib \
+	 -p @executable_path/../Resources/lib
+
+$(VFILE): .git/refs/heads/master
+	echo "let v = \"$(VERSION)\"" > $(VFILE)
+
+.PHONY: build doc test all install uninstall reinstall clean distclean

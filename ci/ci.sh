@@ -1,0 +1,6 @@
+#!/bin/bash -eux
+while read HASH; do
+  echo Testing $HASH...
+  ./build.sh $HASH || echo '*** BUILD FAILED ***'
+  echo Waiting for next update...
+done < /db/branch/master/head.live

@@ -58,7 +58,7 @@ module Log : Protocol_9p.S.LOG = struct
   let error fmt = Fmt.kstrf (fun s -> print_endline s; append s) fmt
 end
 module Store = Irmin_mem.Make(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
-module Server = I9p_fs.Make(Log)(Test_flow)
+module Server = Fs9p_fs.Make(Log)(Test_flow)
 module Filesystem = I9p_irmin.Make(Server.Inode)(Store)
 
 module Client = Protocol_9p.Client.Make(Log)(Test_flow)

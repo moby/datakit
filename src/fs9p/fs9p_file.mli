@@ -1,6 +1,6 @@
 (** File in the filesystem. *)
 
-open I9p_misc
+open Fs9p_misc
 
 type t
 (** The type for files. *)

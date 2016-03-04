@@ -1,6 +1,6 @@
 (** Filesystem server. *)
 
-open I9p_misc
+open Fs9p_misc
 
 (** The server signature. *)
 module type S = sig
@@ -12,7 +12,7 @@ module type S = sig
   type inode
   (** The type of filesystem inodes. *)
 
-  module Inode: I9p_inode.S with type t = inode
+  module Inode: Fs9p_inode.S with type t = inode
   (** A server should implement the inode signature. *)
 
   val accept: root:Inode.dir -> flow -> unit or_error Lwt.t

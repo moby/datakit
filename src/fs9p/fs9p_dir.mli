@@ -1,10 +1,10 @@
 (** Directory in the filesystem. *)
 
-open I9p_misc
+open Fs9p_misc
 
 module InodeMap : Map.S with type key = string
 
-module Make(Inode : I9p_inode.S) : sig
+module Make(Inode : Fs9p_inode.S) : sig
   type t = Inode.dir
   (** A directory. *)
 

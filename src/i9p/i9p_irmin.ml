@@ -1,6 +1,8 @@
 open Lwt.Infix
 open Result
-open I9p_misc
+open Fs9p_misc
+
+module PathSet = I9p_merge.PathSet
 
 module type S = sig
   type repo
@@ -9,18 +11,18 @@ module type S = sig
 end
 
 let ok x = Lwt.return (Ok x)
-let err_enoent = Lwt.return I9p_error.enoent
-let err_eisdir = Lwt.return I9p_error.eisdir
-let err_read_only = Lwt.return I9p_error.ero
+let err_enoent = Lwt.return Fs9p_error.enoent
+let err_eisdir = Lwt.return Fs9p_error.eisdir
+let err_read_only = Lwt.return Fs9p_error.ero
 let err_already_exists name = Lwt.return (error "Entry %S already exists" name)
 let err_conflict msg = Lwt.return (error "Merge conflict: %s" msg)
 let err_unknown_cmd x = Lwt.return (error "Unknown command %S" x)
 let err_invalid_commit_id x = error "Invalid commit ID %S" x
 
-module InodeMap = I9p_dir.InodeMap
+module InodeMap = Fs9p_dir.InodeMap
 
-module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
-  module Dir = I9p_dir.Make(Inode)
+module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
+  module Dir = Fs9p_dir.Make(Inode)
 
   type repo = Store.Repo.t
   type dir = Inode.dir
@@ -41,7 +43,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
         Store.Private.Contents.read_exn contents_t content >|= fun content ->
         Ok (Some (Cstruct.of_string content))
     in
-    I9p_file.read_only ~read
+    Fs9p_file.read_only ~read
 
   let irmin_rw_file ~remove_conflict ~view path =
     let read () =
@@ -54,7 +56,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       remove_conflict path; Ok () in
     let remove () = View.remove view path >|= fun () ->
       remove_conflict path; Ok () in
-   I9p_file.read_write ~read ~write ~remove
+   Fs9p_file.read_write ~read ~write ~remove
 
   let name_of_irmin_path ~root path =
     match Path.rdecons path with
@@ -103,7 +105,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
           | `Directory as ty -> ok (get ~dir:path (ty, name))
           | `None            -> err_enoent
       in
-      let remove () = I9p_dir.err_ro in
+      let remove () = Fs9p_dir.err_ro in
       Dir.read_only ~ls ~lookup ~remove () |> Inode.of_dir name in
     irmin_ro_dir []
 
@@ -234,10 +236,10 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
   let re_newline = Str.regexp_string "\n"
   let make_instance store ~remover _name =
     let path = [] in
-    let msg_file, get_msg = I9p_file.mutable_string "" in
+    let msg_file, get_msg = Fs9p_file.mutable_string "" in
     View.of_path (store "view") path >|= fun view ->
     let parents = View.parents view |> string_of_parents in
-    let parents_file, get_parents = I9p_file.mutable_string parents in
+    let parents_file, get_parents = Fs9p_file.mutable_string parents in
     let conflicts = ref PathSet.empty in
     (* Commit transaction *)
     let merge () =
@@ -264,10 +266,10 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       |> add stage
       |> add (Inode.of_file "msg" msg_file)
       |> add (Inode.of_file "parents" parents_file)
-      |> add (Inode.of_file "ctl" (I9p_file.command (transactions_ctl ~merge ~remover)))
-      |> add (Inode.of_file "origin" (I9p_file.static_string (Path.to_hum path))) in
+      |> add (Inode.of_file "ctl" (Fs9p_file.command (transactions_ctl ~merge ~remover)))
+      |> add (Inode.of_file "origin" (Fs9p_file.static_string (Path.to_hum path))) in
     let rec normal_mode () = common
-      |> add (Inode.of_file "merge" (I9p_file.command merge_mode))
+      |> add (Inode.of_file "merge" (Fs9p_file.command merge_mode))
     (* Merge mode *)
     and merge_mode commit_id =
       (* Check hash is valid *)
@@ -284,9 +286,9 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       let theirs = theirs () in
       (* Add to parents *)
       let data = Cstruct.of_string (commit_id ^ "\n") in
-      I9p_file.size parents_file >>*= fun size ->
-      I9p_file.open_ parents_file >>*= fun fd ->
-      I9p_file.write fd ~offset:size data >>*= fun () ->
+      Fs9p_file.size parents_file >>*= fun size ->
+      Fs9p_file.open_ parents_file >>*= fun fd ->
+      Fs9p_file.write fd ~offset:size data >>*= fun () ->
       (* Grab current "rw" dir as "ours" *)
       View.make_head store (Store.task store) ~parents:(View.parents view) ~contents:view >>= fun our_commit ->
       Store.of_commit_id unit_task our_commit repo >>= fun ours ->
@@ -303,9 +305,9 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       end >>= fun (base, base_ro) ->
       Merge.merge ~ours ~theirs ~base view >>= fun merge_conflicts ->
       conflicts := PathSet.union !conflicts merge_conflicts;
-      let conflicts_file = I9p_file.read_only ~read:(fun () -> Lwt.return (Ok (Some (format_conflicts !conflicts)))) in
+      let conflicts_file = Fs9p_file.read_only ~read:(fun () -> Lwt.return (Ok (Some (format_conflicts !conflicts)))) in
       contents := common
-        |> add (Inode.of_file "merge" (I9p_file.command merge_mode))
+        |> add (Inode.of_file "merge" (Fs9p_file.command merge_mode))
         |> add (Inode.of_file "conflicts" conflicts_file)
         |> add ours_ro
         |> add base_ro
@@ -320,7 +322,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
      reads call [wait_for_change_from x], where [x] is the value
      previously Lwt.returned and then Lwt.return that, until the file
      is closed. *)
-  let watch_stream ~initial ~wait_for_change_from ~str : I9p_file.stream =
+  let watch_stream ~initial ~wait_for_change_from ~str : Fs9p_file.stream =
     let last_seen = ref initial in
     let data = ref (Cstruct.of_string (str initial)) in
     let read count =
@@ -363,7 +365,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
     watch_stream ~initial:initial_head ~wait_for_change_from ~str
 
   let head_live store =
-    I9p_file.of_stream (fun () ->
+    Fs9p_file.of_stream (fun () ->
         Store.head store >|= fun initial_head ->
         head_stream store initial_head
       )
@@ -398,7 +400,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
     (read, write)
 
   let reflog store =
-    I9p_file.of_stream (fun () -> Lwt.return (reflog_stream store))
+    Fs9p_file.of_stream (fun () -> Lwt.return (reflog_stream store))
 
   let equal_ty a b =
     match a, b with
@@ -437,7 +439,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
     watch_stream ~initial ~wait_for_change_from ~str
 
   let watch_tree store ~path =
-    I9p_file.of_stream (fun () ->
+    Fs9p_file.of_stream (fun () ->
         Tree.snapshot store >>= fun snapshot ->
         Tree.node snapshot path >|= fun initial ->
         watch_tree_stream store ~path ~initial
@@ -469,7 +471,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
         ok (lookup (Filename.chop_suffix x ".node"))
       | _ -> err_enoent
     in
-    let remove () = I9p_dir.err_ro in
+    let remove () = Fs9p_dir.err_ro in
     Dir.read_only ~ls ~lookup ~remove ()
 
   (* Note: can't use [Store.fast_forward_head] because it can sometimes return [false] on success
@@ -492,7 +494,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       | `Max_depth_reached | `Too_many_lcas -> assert false
 
   let fast_forward_merge store =
-    I9p_file.command @@ fun hash ->
+    Fs9p_file.command @@ fun hash ->
     match Store.Hash.of_hum hash with
     | exception ex ->
       Lwt.return (error "invalid-hash %S: %s" hash (Printexc.to_string ex))
@@ -512,7 +514,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
         Inode.of_file "head.live" (head_live (store "watch"));
         Inode.of_file "fast-forward" (fast_forward_merge store);
         Inode.of_file "reflog" (reflog (store "watch"));
-        Inode.of_file "head" (I9p_file.status (fun () ->
+        Inode.of_file "head" (Fs9p_file.status (fun () ->
             Store.head (store "head") >|= function
             | None -> "\n"
             | Some head -> Store.Hash.to_hum head ^ "\n"
@@ -523,7 +525,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
     let lookup name =
       !contents >|= fun items ->
       let rec aux = function
-        | [] -> I9p_error.enoent
+        | [] -> Fs9p_error.enoent
         | x :: _ when Inode.basename x = name -> Ok x
         | _ :: xs -> aux xs in
       aux items
@@ -562,10 +564,10 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       with Not_found ->
         Store.Private.Ref.mem (Store.Private.Repo.ref_t repo) name >|= function
         | true  -> Ok (get_via_cache name |> fst)
-        | false -> I9p_error.enoent
+        | false -> Fs9p_error.enoent
     in
     let mkdir name = ok (get_via_cache name |> fst) in
-    let remove () = I9p_dir.err_ro in
+    let remove () = Fs9p_dir.err_ro in
     let rename inode new_name =
       (* TODO: some races here... *)
       let old_name = Inode.basename inode in
@@ -595,9 +597,9 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
       else match String.sub h 0 2, String.sub h 2 (String.length h - 2) with
         | "F-", hash -> Ok (`File (String.trim hash |> Store.Private.Contents.Key.of_hum))
         | "D-", hash -> Ok (`Dir (String.trim hash |> Store.Private.Node.Key.of_hum))
-        | _ -> I9p_error.enoent
+        | _ -> Fs9p_error.enoent
     with _ex ->
-      I9p_error.enoent
+      Fs9p_error.enoent
 
   let trees_dir _make_task repo =
     let inode_of_tree_hash name =
@@ -607,8 +609,8 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
           Store.Private.Contents.read (Store.Private.Repo.contents_t repo) hash
           >|= function
           | Some data ->
-            Ok (I9p_file.static (Cstruct.of_string data) |> Inode.of_file name)
-          | None -> I9p_error.enoent
+            Ok (Fs9p_file.static (Cstruct.of_string data) |> Inode.of_file name)
+          | None -> Fs9p_error.enoent
         end
       | `None ->
         let root = Tree.of_dir_hash repo None in
@@ -626,7 +628,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
         cache := !cache |> InodeMap.add name inode;
         ok inode
     in
-    let remove () = I9p_dir.err_ro in
+    let remove () = Fs9p_dir.err_ro in
     Dir.read_only ~ls ~lookup ~remove ()
 
   (* /snapshots *)
@@ -640,13 +642,13 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
           Store.History.pred hist head
       end >|= fun parents ->
       Ok (Some (Cstruct.of_string (string_of_parents parents))) in
-    I9p_file.read_only ~read
+    Fs9p_file.read_only ~read
 
   let snapshot_dir store name =
     let open Inode in
     static_dir name [
       ro ~name:"ro" (store "ro");
-      of_file "hash" (I9p_file.static_string name);
+      of_file "hash" (Fs9p_file.static_string name);
       of_file "parents" (parents_file store)
     ]
 
@@ -668,7 +670,7 @@ module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE) = struct
           cache := !cache |> InodeMap.add name inode;
           Ok inode
     in
-    let remove () = I9p_dir.err_ro in
+    let remove () = Fs9p_dir.err_ro in
     Dir.read_only ~ls ~lookup ~remove ()
 
   let create make_task repo =

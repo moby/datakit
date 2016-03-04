@@ -1,14 +1,14 @@
 open Lwt.Infix
 open Result
 module P = Protocol_9p
-open I9p_misc
+open Fs9p_misc
 
 let max_chunk_size = Int32.of_int (100 * 1024)
 
 module type S = sig
   type flow
   type inode
-  module Inode: I9p_inode.S with type t = inode
+  module Inode: Fs9p_inode.S with type t = inode
   val accept: root:Inode.dir -> flow -> unit or_error Lwt.t
 end
 
@@ -23,7 +23,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       obj : obj;
     }
     and obj =
-      | File of I9p_file.t
+      | File of Fs9p_file.t
       | Dir of dir
     and open_dir =                    (* All you can do with an open dir is list it *)
       { offset : int64;
@@ -38,7 +38,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
     >
 
     type open_obj =
-      [ `OpenFile of I9p_file.open_file
+      [ `OpenFile of Fs9p_file.open_file
       | `OpenDir of open_dir ]
 
     let mint_qid =
@@ -79,7 +79,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
           Lwt.return (Ok (0L, P.Types.FileMode.make
                             ~owner:rwx ~group:rwx ~other:rx ~is_directory:true
                             ()))
-        | File f -> I9p_file.size f >>*= fun length ->
+        | File f -> Fs9p_file.size f >>*= fun length ->
           Lwt.return (Ok (length, P.Types.FileMode.make
                             ~owner:rw ~group:rw ~other:r ()))
       end >>*= fun (length, mode) ->
@@ -98,12 +98,12 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       match inode.obj with
       | Dir _ when length = 0L -> Lwt.return (Ok ())
       | Dir _ -> Lwt.return (error "Can't set length of a directory")
-      | File f -> I9p_file.truncate f length
+      | File f -> Fs9p_file.truncate f length
 
     let read inode =
       match inode.obj with
       | File file ->
-        I9p_file.open_ file >>*= fun o ->
+        Fs9p_file.open_ file >>*= fun o ->
         Lwt.return (Ok (`OpenFile o))
       | Dir dir ->
         dir#ls >>*= fun items ->
@@ -145,7 +145,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
 
     let remove inode =
       match inode.obj with
-      | File f -> I9p_file.remove f
+      | File f -> Fs9p_file.remove f
       | Dir d  -> d#remove
   end
 
@@ -247,7 +247,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       match fd.state with
       | `Ready -> Lwt.return (error "Can't read from unopened fid")
       | `OpenFile file ->
-        I9p_file.read file ~offset ~count >>*= fun data ->
+        Fs9p_file.read file ~offset ~count >>*= fun data ->
         Lwt.return (Ok { P.Response.Read.data } )
       | `OpenDir d ->
         Inode_ops.read_dir ~info:connection.info ~offset ~count d >>*= fun (new_state, data) ->
@@ -282,7 +282,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       | `Ready -> Lwt.return (error "Can't write to unopened fid")
       | `OpenDir _ -> Lwt.return (error "Can't write to directories")
       | `OpenFile file ->
-        I9p_file.write file ~offset data >>*= fun () ->
+        Fs9p_file.write file ~offset data >>*= fun () ->
         let count = Int32.of_int (Cstruct.len data) in
         Lwt.return (Ok { P.Response.Write.count } )
 

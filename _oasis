@@ -9,13 +9,29 @@ Plugins:     META (0.4), DevFiles (0.4)
 BuildTools:    ocamlbuild
 AlphaFeatures: pure_interface, ocamlbuild_more_args
 
+Library fs9p
+  Path:            src/fs9p/
+  Findlibname:     fs9p
+  InternalModules: Fs9p_error, Fs9p_misc
+  Modules:         Fs9p_inode, Fs9p_file, Fs9p_dir, Fs9p_fs
+  BuildDepends:    protocol-9p.unix
+
+Document fs9p
+  Title:                FS9p docs
+  Type:                 ocamlbuild (0.4)
+  BuildTools+:          ocamldoc
+  Install:              true
+  XOCamlbuildPath:      src
+  XOCamlbuildLibraries: fs9p
+  XOCamlbuildExtraArgs:
+    "-docflags '-t Fs9p -colorize-code -short-functors -charset utf-8'"
+
 Library i9p
   Path:            src/i9p/
   Findlibname:     i9p
-  InternalModules: I9p_error, I9p_misc
-  Modules:         I9p_tree, I9p_inode, I9p_file, I9p_dir, I9p_fs, I9p_irmin,
-                   I9p_merge
-  BuildDepends:    protocol-9p.unix,irmin.unix
+  InternalModules:
+  Modules:         I9p_irmin, I9p_merge, I9p_tree
+  BuildDepends:    protocol-9p.unix,irmin.unix,fs9p
 
 Document i9p
   Title:                I9p docs
@@ -25,7 +41,7 @@ Document i9p
   XOCamlbuildPath:      src
   XOCamlbuildLibraries: i9p
   XOCamlbuildExtraArgs:
-    "-docflags '-t Functoria -colorize-code -short-functors -charset utf-8'"
+    "-docflags '-t Irmin9p -colorize-code -short-functors -charset utf-8'"
 
 Executable datakit
   Path:           src/bin

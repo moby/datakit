@@ -2,7 +2,7 @@
 
 open Lwt.Infix
 open Result
-open I9p_misc
+open Fs9p_misc
 
 type open_file = <
   read : offset:int64 -> count:int -> Cstruct.t or_err Lwt.t;
@@ -19,7 +19,7 @@ class type t = object
   method truncate : int64 -> unit or_err Lwt.t
 end
 
-let err_enoent = Lwt.return I9p_error.enoent
+let err_enoent = Lwt.return Fs9p_error.enoent
 
 let empty = Cstruct.create 0
 
@@ -135,7 +135,7 @@ let command handler =
       in
       Lwt.return (Ok (open_file_of_stream (read, write)))
 
-    method remove = Lwt.return I9p_error.eperm
+    method remove = Lwt.return Fs9p_error.eperm
 
     method truncate = function
       | 0L -> Lwt.return (Ok ())        (* For `echo cmd > file` *)

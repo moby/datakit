@@ -1,4 +1,4 @@
-open I9p_misc
+open Fs9p_misc
 open Result
 open Lwt.Infix
 
@@ -7,11 +7,11 @@ let err_already_exists = Lwt.return (error "Already exists")
 let err_dir_only = Lwt.return (error "Can only contain directories")
 
 let ok x = Lwt.return (Ok x)
-let enoent = Lwt.return I9p_error.enoent
+let enoent = Lwt.return Fs9p_error.enoent
 
 module InodeMap = Map.Make(String)
 
-module Make(Inode : I9p_inode.S) = struct
+module Make(Inode : Fs9p_inode.S) = struct
   type t = Inode.dir
 
   let fixed items =
@@ -22,7 +22,7 @@ module Make(Inode : I9p_inode.S) = struct
       method ls = ok items
       method lookup name =
         let rec aux = function
-          | [] -> I9p_error.enoent
+          | [] -> Fs9p_error.enoent
           | x :: _ when Inode.basename x = name -> Ok x
           | _ :: xs -> aux xs in
         Lwt.return (aux items)
@@ -69,7 +69,7 @@ module Make(Inode : I9p_inode.S) = struct
               ) in
               make ~remover name >|= function
               | Ok dir ->
-                if Lazy.is_val remover then I9p_error.enoent else (
+                if Lazy.is_val remover then Fs9p_error.enoent else (
                   let inode = Inode.of_dir name dir in
                   items <- items |> InodeMap.add name inode;
                   Ok inode

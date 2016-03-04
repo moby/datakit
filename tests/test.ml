@@ -334,11 +334,11 @@ let test_writes () =
   let read () = Lwt.return (Ok (Some (Cstruct.of_string !v))) in
   let write x = v := Cstruct.to_string x; Lwt.return (Ok ()) in
   let remove _ = failwith "delete" in
-  let file = I9p_file.read_write ~read ~write ~remove in
+  let file = Fs9p_file.read_write ~read ~write ~remove in
   Lwt_main.run begin
-    I9p_file.open_ file >>*= fun h ->
+    Fs9p_file.open_ file >>*= fun h ->
     let check src off expect =
-      I9p_file.write h ~offset:(Int64.of_int off) (Cstruct.of_string src) >>*= fun () ->
+      Fs9p_file.write h ~offset:(Int64.of_int off) (Cstruct.of_string src) >>*= fun () ->
       Alcotest.(check string) (Printf.sprintf "After %S at %d" src off) expect !v;
       Lwt.return () in
     check "hello" 0 "hello" >>= fun () ->

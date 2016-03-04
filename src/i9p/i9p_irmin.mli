@@ -16,5 +16,5 @@ module type S = sig
 
 end
 
-module Make (Inode : I9p_inode.S) (Store : I9p_tree.STORE):
+module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE):
   S with type repo = Store.Repo.t and type dir = Inode.dir

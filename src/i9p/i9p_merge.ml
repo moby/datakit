@@ -1,5 +1,6 @@
 open Lwt.Infix
-open I9p_misc
+
+module PathSet = Set.Make(Irmin.Path.String_list)
 
 module Make (Store : I9p_tree.STORE) (View : Irmin.VIEW with type db = Store.t and type key = string list and type value = string) = struct
   module LeafMap = Map.Make(String)

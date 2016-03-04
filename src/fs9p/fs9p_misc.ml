@@ -15,5 +15,3 @@ let error ?(errno=0l) fmt =
     ) fmt
 let ( >>*= ) = Protocol_9p.Infix.( >>*= )
 let ( >>!= ) = Protocol_9p.Error.(>>=)
-
-module PathSet = Set.Make(Irmin.Path.String_list)

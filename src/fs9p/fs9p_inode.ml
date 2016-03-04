@@ -1,6 +1,6 @@
 (** Objects (file or directory) in the filesystem. *)
 
-open I9p_misc
+open Fs9p_misc
 
 module type S = sig
   type t
@@ -19,7 +19,7 @@ module type S = sig
     (* [rename inode new_name] renames direct child [inode] to [new_name]. *)
   >
 
-  val of_file: string -> I9p_file.t -> t
+  val of_file: string -> Fs9p_file.t -> t
   val of_dir: string -> dir -> t
   val basename: t -> string
 end

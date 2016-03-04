@@ -16,7 +16,7 @@ let error fmt = Printf.ksprintf (fun s ->
 
 let max_chunk_size = Int32.of_int (100 * 1024)
 
-module Server = I9p_fs.Make(Log)(Flow_lwt_unix)
+module Server = Fs9p_fs.Make(Log)(Flow_lwt_unix)
 
 let make_task msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in

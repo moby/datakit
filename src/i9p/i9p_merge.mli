@@ -1,4 +1,4 @@
-open I9p_misc
+module PathSet : Set.S with type elt = Irmin.Path.String_list.t
 
 module Make (Store : I9p_tree.STORE) (View : Irmin.VIEW with type db = Store.t and type key = string list and type value = string) : sig
   val merge :

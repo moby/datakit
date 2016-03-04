@@ -1,5 +1,7 @@
 ## Datakit: a Git-like database with a 9p interface
 
+[![docs](https://img.shields.io/badge/doc-online-blue.svg)](http://nuc1.local:1234)
+
 ### Build
 
 At the root of this repository, type `make`. This will produces

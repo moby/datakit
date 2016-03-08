@@ -166,10 +166,10 @@ module rec Dir: sig
   (** [of_list l] is a read-only, static directory containing only the
       inodes [l]. *)
 
-  val of_map: Inode.t Map.Make(String).t ref -> t
-  (** [of_map tbl] is a read-only directory containing the inodes in
-      [tbl]. The content of the directory is computed dynamically by
-      accessing elements in the table on every access. *)
+  val of_map_ref: Inode.t Map.Make(String).t ref -> t
+  (** [of_map_ref m] is a read-only directory containing the inodes
+      defined in [m]. The content of the directory is computed
+      dynamically by accessing elements in the map on every access. *)
 
   val directories:
     make:(remover:unit Lwt.t lazy_t -> string -> t or_err) ->

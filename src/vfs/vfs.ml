@@ -347,7 +347,7 @@ module Dir = struct
 
   let empty = of_list []
 
-  let of_map m =
+  let of_map_ref m =
     let ls () = ok (StringMap.bindings !m |> List.map snd) in
     let lookup name =
       try ok (StringMap.find name !m)

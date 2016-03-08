@@ -36,154 +36,155 @@ module type S = sig
   val accept: root:Vfs.Dir.t -> flow -> unit or_err
 end
 
-module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
+(* 9p inodes: wrap VFS inodes with Qid and mutable names. *)
+module Inode = struct
 
-  module Inode = struct
+  type t = {
+    qid: Protocol_9p.Types.Qid.t;      (* Unique id (similar to inode number) *)
+    mutable basename: string;         (* Statting a 9p file returns the name. *)
+    inode: Vfs.Inode.t;
+  }
 
-    (* 9p inodes: wrap VFS inodes with Qid and mutable names. *)
-    type t = {
-      qid: Protocol_9p.Types.Qid.t;    (* Unique id (similar to inode number) *)
-      mutable name: string;           (* Statting a 9p file returns the name. *)
-      inode: Vfs.Inode.t;
-    }
+  (* All you can do with an open dir is list it *)
+  type open_dir = { offset: int64; unread: t list }
 
-    (* All you can do with an open dir is list it *)
-    type open_dir = { offset : int64; unread : t list }
+  let offset t = t.offset
+  let unread t = t.unread
 
-    let offset t = t.offset
-    let unread t = t.unread
+  type fd =
+    [ `OpenFile of Vfs.File.fd
+    | `OpenDir of open_dir ]
 
-    type open_obj =
-      [ `OpenFile of Vfs.File.fd
-      | `OpenDir of open_dir ]
+  let mint_qid =
+    let last = ref 0L in
+    fun () ->
+      let next = Int64.succ !last in
+      last := next;
+      next
 
-    let mint_qid =
-      let last = ref 0L in
-      fun () ->
-        let next = Int64.succ !last in
-        last := next;
-        next
+  let dir basename dir =
+    let qid = P.Types.Qid.dir ~id:(mint_qid ()) ~version:0l () in
+    { qid; basename; inode = Vfs.Inode.dir basename dir }
 
-    let dir name dir =
-      let qid = P.Types.Qid.dir ~id:(mint_qid ()) ~version:0l () in
-      { qid; name; inode = Vfs.Inode.dir name dir }
+  let qid t = t.qid
+  let kind t = Vfs.Inode.kind t.inode
+  let inode t = t.inode
+  let basename t = t.basename
+  let set_basename t n = t.basename <- n
 
-    let qid t = t.qid
-    let kind t = Vfs.Inode.kind t.inode
-    let inode t = t.inode
-    let name t = t.name
-    let set_name t n = t.name <- n
+  let file basename obj =
+    let qid = P.Types.Qid.file ~id:(mint_qid ()) ~version:0l () in
+    { qid; basename; inode = Vfs.Inode.file basename obj }
 
-    let file name obj =
-      let qid = P.Types.Qid.file ~id:(mint_qid ()) ~version:0l () in
-      { qid; name; inode = Vfs.Inode.file name obj }
+  let create inode =
+    let name = Vfs.Inode.basename inode in
+    match Vfs.Inode.kind inode with
+    | `Dir d  -> dir name d
+    | `File f -> file name f
 
-    let create inode =
-      let name = Vfs.Inode.basename inode in
-      match Vfs.Inode.kind inode with
-      | `Dir d  -> dir name d
-      | `File f -> file name f
+end
 
-  end
+(* 9p operations. *)
+module Op9p = struct
 
-  module Op = struct
+  let rwx = [`Read; `Write; `Execute]
+  let rw = [`Read; `Write]
+  let rx = [`Read; `Execute]
+  let r = [`Read]
 
-    let rwx = [`Read; `Write; `Execute]
-    let rw = [`Read; `Write]
-    let rx = [`Read; `Execute]
-    let r = [`Read]
+  let stat ~info inode =
+    let u =
+      if info.P.Info.version <> P.Types.Version.unix then None
+      else Some (P.Types.Stat.make_extension ()) (* or mortdeus will crash *)
+    in
+    begin match Inode.kind inode with
+      | `Dir _ ->
+        let dir =
+          P.Types.FileMode.make
+            ~owner:rwx ~group:rwx ~other:rx ~is_directory:true ()
+        in
+        ok (0L, dir)
+      | `File f ->
+        Vfs.File.size f >>= map_error >>*= fun length ->
+        let file = P.Types.FileMode.make ~owner:rw ~group:rw ~other:r () in
+        ok (length, file)
+    end >>*= fun (length, mode) ->
+    let qid = Inode.qid inode in
+    let name = Inode.basename inode in
+    ok (P.Types.Stat.make ~qid ~mode ~length ~name ?u ())
 
-    let stat ~info inode =
-      let u =
-        if info.P.Info.version = P.Types.Version.unix then
-          Some (P.Types.Stat.make_extension ()) (* or mortdeus will crash *)
-        else
-          None in
-      begin match Inode.kind inode with
-        | `Dir _ ->
-          let dir =
-            P.Types.FileMode.make
-              ~owner:rwx ~group:rwx ~other:rx ~is_directory:true ()
-          in
-          ok (0L, dir)
-        | `File f ->
-          Vfs.File.size f >>= map_error >>*= fun length ->
-          let file = P.Types.FileMode.make ~owner:rw ~group:rw ~other:r () in
-          ok (length, file)
-      end >>*= fun (length, mode) ->
-      let qid = Inode.qid inode in
-      let name = Inode.name inode in
-      ok (P.Types.Stat.make ~qid ~mode ~length ~name ?u ())
+  let rename dir inode new_name =
+    match Inode.kind dir with
+    | `File _ -> assert false
+    | `Dir d ->
+      Vfs.Dir.rename d (Inode.inode inode) new_name >>= map_error
+      >>*= fun () ->
+      Inode.set_basename inode new_name;
+      ok ()
 
-    let rename dir inode new_name =
-      match Inode.kind dir with
-      | `File _ -> assert false
-      | `Dir d ->
-        Vfs.Dir.rename d (Inode.inode inode) new_name >>= map_error >>*= fun () ->
-        Inode.set_name inode new_name;
-        ok ()
+  let truncate inode length =
+    match Inode.kind inode with
+    | `Dir _ when length = 0L -> ok ()
+    | `Dir _  -> err_can't_set_length_of_dir
+    | `File f -> Vfs.File.truncate f length >>= map_error
 
-    let truncate inode length =
-      match Inode.kind inode with
-      | `Dir _ when length = 0L -> ok ()
-      | `Dir _  -> err_can't_set_length_of_dir
-      | `File f -> Vfs.File.truncate f length >>= map_error
+  let read inode =
+    match Inode.kind inode with
+    | `File file ->
+      Vfs.File.open_ file >>= map_error >>*= fun o ->
+      ok (`OpenFile o)
+    | `Dir dir ->
+      Vfs.Dir.ls dir >>= map_error >>*= fun items ->
+      let items = List.map Inode.create items in
+      ok (`OpenDir { Inode.offset = 0L; unread = items })
 
-    let read inode =
-      match Inode.kind inode with
-      | `File file ->
-        Vfs.File.open_ file >>= map_error >>*= fun o ->
-        ok (`OpenFile o)
-      | `Dir dir ->
-        Vfs.Dir.ls dir >>= map_error >>*= fun items ->
-        let items = List.map Inode.create items in
-        ok (`OpenDir { Inode.offset = 0L; unread = items })
-
-    let read_dir ~info ~offset ~count state =
-      let open Protocol_9p.Infix in
-      if offset <> Inode.offset state then
-        err_can't_seek_dir (* TODO: allow 0 to restart *)
+  let read_dir ~info ~offset ~count state =
+    let open Protocol_9p.Infix in
+    if offset <> Inode.offset state then
+      err_can't_seek_dir (* TODO: allow 0 to restart *)
+    else (
+      let buffer = Cstruct.create count in
+      let rec aux buf = function
+        | []      -> ok (buf, [])   (* Done *)
+        | x :: xs ->
+          stat ~info x >>*= fun x_info ->
+          match P.Types.Stat.write x_info buf with
+          | Ok buf  -> aux buf xs
+          | Error _ -> ok (buf, xs) (* No more room *)
+      in
+      aux buffer (Inode.unread state) >>*= fun (unused, remaining) ->
+      let data = Cstruct.sub buffer 0 (count - Cstruct.len unused) in
+      let len = Cstruct.len data in
+      if len = 0 && remaining <> [] then err_buffer_too_small
       else (
-        let buffer = Cstruct.create count in
-        let rec aux buf = function
-          | []      -> ok (buf, [])   (* Done *)
-          | x :: xs ->
-            stat ~info x >>*= fun x_info ->
-            match P.Types.Stat.write x_info buf with
-            | Ok buf  -> aux buf xs
-            | Error _ -> ok (buf, xs) (* No more room *)
-        in
-        aux buffer (Inode.unread state) >>*= fun (unused, remaining) ->
-        let data = Cstruct.sub buffer 0 (count - Cstruct.len unused) in
-        let len = Cstruct.len data in
-        if len = 0 && remaining <> [] then err_buffer_too_small
-        else (
-          let offset = Int64.add (Inode.offset state) (Int64.of_int len) in
-          let new_state = { Inode.offset;  unread = remaining } in
-          ok (new_state, data)
-        )
+        let offset = Int64.add (Inode.offset state) (Int64.of_int len) in
+        let new_state = { Inode.offset;  unread = remaining } in
+        ok (new_state, data)
       )
+    )
 
-    let create ~parent ~perm name =
-      match Inode.kind parent with
-      | `Dir d ->
-        let inode =
-          if perm.P.Types.FileMode.is_directory then Vfs.Dir.mkdir d name
-          else Vfs.Dir.mkfile d name
-        in
-        let open Protocol_9p.Infix in
-        inode >>= map_error >>*= fun inode ->
-        let inode = Inode.create inode in
-        read inode >>*= fun open_file ->
-        ok (inode, open_file)
-      | `File _ -> err_not_a_dir (Inode.name parent)
+  let create ~parent ~perm name =
+    match Inode.kind parent with
+    | `Dir d ->
+      let inode =
+        if perm.P.Types.FileMode.is_directory then Vfs.Dir.mkdir d name
+        else Vfs.Dir.mkfile d name
+      in
+      let open Protocol_9p.Infix in
+      inode >>= map_error >>*= fun inode ->
+      let inode = Inode.create inode in
+      read inode >>*= fun open_file ->
+      ok (inode, open_file)
+    | `File _ -> err_not_a_dir (Inode.basename parent)
 
-    let remove inode =
-      match Inode.kind inode with
-      | `File f -> Vfs.File.remove f >>= map_error
-      | `Dir d  -> Vfs.Dir.remove d  >>= map_error
+  let remove inode =
+    match Inode.kind inode with
+    | `File f -> Vfs.File.remove f >>= map_error
+    | `Dir d  -> Vfs.Dir.remove d  >>= map_error
 
-  end
+end
+
+module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
 
   type flow = Flow.flow
 
@@ -193,15 +194,15 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
     type fd = {
       inode  : Inode.t;
       parents: Inode.t list;   (* closest first *)
-      mutable state: [ `Ready | Inode.open_obj ]
+      mutable state: [ `Ready | Inode.fd ]
     }
 
     type t = Vfs.Dir.t  (* The root directory *)
 
     type connection = {
-      root : t;
-      info : Protocol_9p.Info.t;
-      mutable fds : fd P.Types.Fid.Map.t;
+      root: t;
+      info: Protocol_9p.Info.t;
+      mutable fds: fd P.Types.Fid.Map.t;
     }
 
     let connect root info =
@@ -214,7 +215,8 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
 
     let alloc_fid ?may_reuse connection newfid fd =
       let alloc () =
-        connection.fds <- connection.fds |> P.Types.Fid.Map.add newfid fd; ok ()
+        connection.fds <- P.Types.Fid.Map.add newfid fd connection.fds;
+        ok ()
       in
       match may_reuse with
       | Some old when old = newfid -> alloc ()
@@ -272,7 +274,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
 
     let stat connection ~cancel:_ { P.Request.Stat.fid } =
       lookup connection fid >>*= fun fd ->
-      Op.stat ~info:connection.info fd.inode >>*= fun stat ->
+      Op9p.stat ~info:connection.info fd.inode >>*= fun stat ->
       ok { P.Response.Stat.stat }
 
     let read connection ~cancel:_ { P.Request.Read.fid; offset; count } =
@@ -284,7 +286,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
         Vfs.File.read file ~offset ~count >>= map_error >>*= fun data ->
         ok { P.Response.Read.data }
       | `OpenDir d ->
-        Op.read_dir ~info:connection.info ~offset ~count d >>*=
+        Op9p.read_dir ~info:connection.info ~offset ~count d >>*=
         fun (new_state, data) ->
         fd.state <- `OpenDir new_state;
         ok { P.Response.Read.data }
@@ -294,7 +296,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       match fd.state with
       | `OpenDir _ | `OpenFile _ -> err_already_open
       | `Ready ->
-        Op.read fd.inode >>*= fun state ->
+        Op9p.read fd.inode >>*= fun state ->
         fd.state <- state;
         ok { P.Response.Open.qid = fd.inode.Inode.qid; iounit = 0l }
 
@@ -302,7 +304,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       lookup connection fid >>*= fun fd ->
       if fd.state <> `Ready then err_create_open
       else (
-        Op.create ~parent:fd.inode ~perm name >>*= fun (inode, open_file) ->
+        Op9p.create ~parent:fd.inode ~perm name >>*= fun (inode, open_file) ->
         let fd = { inode; parents = fd.inode :: fd.parents; state = open_file } in
         connection.fds <- connection.fds |> P.Types.Fid.Map.add fid fd;
         ok { P.Response.Create.qid = inode.Inode.qid; iounit = 0l }
@@ -320,26 +322,29 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
 
     let remove connection ~cancel:_ { P.Request.Remove.fid } =
       lookup connection fid >>*= fun fd ->
-      Op.remove fd.inode >|= fun err ->
+      Op9p.remove fd.inode >|= fun err ->
       clunk_fid connection fid;
       err
 
-    let rename fd name =
-      match fd.parents with
+    let rename fd name = match fd.parents with
       | []   -> err_rename_root
-      | p::_ -> Op.rename p fd.inode name
+      | p::_ -> Op9p.rename p fd.inode name
 
     let wstat connection ~cancel:_ { P.Request.Wstat.fid; stat } =
       lookup connection fid >>*= fun fd ->
-      let { P.Types.Stat.name; length; _ } = stat in
-      (* It's illegal to set these, but checking if we're setting to
-         the current value is tedious, so ignore: *)
+      let { P.Types.Stat.name; length; mtime; gid; mode; _ } = stat in
+      (* It's illegal to set [ty], [dev], [qid], [atime], [uid],
+         [muid] and [u], but checking if we're setting to the current
+         value is tedious, so ignore: *)
+      ignore mtime;                               (* Linux needs to set mtime *)
+      ignore gid;                          (* We don't care about permissions *)
+      ignore mode;                          (* TODO: reject changing dir bit? *)
       let name = if name = "" then None else Some name in
       let length = if P.Types.Int64.is_any length then None else Some length in
       match name, length with
-      | Some name, None -> rename fd name
-      | None, Some length -> Op.truncate fd.inode length
-      | None, None -> ok ()
+      | Some n, None   -> rename fd n
+      | None  , Some l -> Op9p.truncate fd.inode l
+      | None  , None   -> ok ()
       | Some _, Some _ ->
         (* Hard to support atomically, and unlikely to be useful. *)
         err_rename_truncate
@@ -351,6 +356,6 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
   let accept ~root flow =
     Server.connect root flow () >>= function
     | Error _ as e -> Flow.close flow >|= fun () -> e
-    | Ok _ -> (* XXX: When to close flow? *) ok ()
+    | Ok _         -> (* XXX: When to close flow? *) ok ()
 
 end

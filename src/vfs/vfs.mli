@@ -212,10 +212,7 @@ module rec Dir: sig
 
 end and Inode: sig
 
-  (** Inode.t operations.
-
-      An inode has a basename, a kind (a file or a directory) and a
-      tag to let frontends attach additional runtime state. *)
+  (** Inode.t operations. *)
 
   type t
   (** The type for inodes. *)

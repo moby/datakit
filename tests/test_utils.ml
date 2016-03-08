@@ -51,11 +51,17 @@ end
 let log = ref []
 
 module Log : Protocol_9p.S.LOG = struct
+(*
   let append s = log := s :: !log
 
   let debug fmt = Fmt.kstrf append fmt
   let info fmt = Fmt.kstrf (fun s -> append ("info: " ^ s)) fmt
   let error fmt = Fmt.kstrf (fun s -> print_endline s; append s) fmt
+*)
+  let debug fmt = Fmt.kstrf print_endline fmt
+  let info  fmt = Fmt.kstrf (fun s -> print_endline s) fmt
+  let error fmt = Fmt.kstrf (fun s -> print_endline s) fmt
+
 end
 module Store =
   Irmin_mem.Make(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)

@@ -17,10 +17,8 @@ module Error = struct
   let read_only_file = Error Read_only_file
   let perm = Error Perm
 
-  let other ?(errno=0l) fmt =
-    Printf.ksprintf (fun descr ->
-        Error (Other { descr; errno = Some errno})
-      ) fmt
+  let other ?errno fmt =
+    Printf.ksprintf (fun descr -> Error (Other { descr; errno })) fmt
 
   module Infix = struct
 

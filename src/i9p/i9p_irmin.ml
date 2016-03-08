@@ -337,7 +337,7 @@ module Make (Store : I9p_tree.STORE) = struct
           Lwt.return (Ok "ok")
     in
     contents := normal_mode ();
-    Ok (Vfs.Dir.of_map contents)
+    Ok (Vfs.Dir.of_map_ref contents)
 
   let static_dir name items = Vfs.Inode.dir name (Vfs.Dir.of_list items)
 

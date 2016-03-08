@@ -13,7 +13,7 @@ Library vfs
   Path:            src/vfs/
   Findlibname:     vfs
   Modules:         Vfs
-  BuildDepends:    lwt, rresult, cstruct
+  BuildDepends:    lwt, rresult, cstruct, fmt
 
 Library fs9p
   Path:            src/fs9p/

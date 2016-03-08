@@ -177,14 +177,6 @@ module rec Dir: sig
       defined in [m]. The content of the directory is computed
       dynamically by accessing elements in the map on every access. *)
 
-  val directories:
-    make:(remover:unit Lwt.t lazy_t -> string -> t or_err) ->
-    init:Inode.t list -> t
-  (** [directories ~make ~init] is a directory that initially contains
-      [init].  If the user tries to make a new subdirectory, [make
-      ~remover name] is called to create it. To delete the new
-      directory, force [remover]. *)
-
   (** [read_only] is a read-only directory. FIXME. *)
   val read_only:
     ls:(unit -> Inode.t list or_err) ->

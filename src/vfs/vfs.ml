@@ -364,45 +364,7 @@ module Dir = struct
       with Not_found -> err_enoent
     in
     let remove () = err_read_only in
-    read_only ~ls ~lookup ~remove
-
-  let directories ~make ~init =
-    let lock = Lwt_mutex.create () in
-    let items: inode_map ref =
-      List.fold_left
-        (fun acc inode -> acc |> StringMap.add inode.basename inode)
-        StringMap.empty init
-      |> ref
-    in
-    let ls () = ok (StringMap.bindings !items |> List.map snd) in
-    let lookup name =
-      try ok (StringMap.find name !items)
-      with Not_found -> err_enoent
-    in
-    let mkdir name =
-      Lwt_mutex.with_lock lock (fun () ->
-          if StringMap.mem name !items then err_already_exists
-          else (
-            let remover = lazy (
-              Lwt_mutex.with_lock lock (fun () ->
-                  items := !items |> StringMap.remove name;
-                  Lwt.return_unit
-                )
-            ) in
-            make ~remover name >>= function
-            | Ok dir ->
-              if Lazy.is_val remover then err_enoent else (
-                let inode = { basename = name; kind = `Dir dir } in
-                items := !items |> StringMap.add name inode;
-                ok inode
-              )
-            | Error _ as e -> Lwt.return e
-          ))
-    in
-    let mkfile _ = err_dir_only in
-    let rename _ _ = err_read_only in   (* TODO *)
-    let remove _ = err_read_only in
-    create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename
+    read_only_aux ~debug:"of_map_ref" ~ls ~lookup ~remove
 
   let dir_only =
     let mkfile _ = err_dir_only in

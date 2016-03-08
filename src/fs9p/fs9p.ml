@@ -4,22 +4,26 @@ open Fs9p_error.Infix
 
 module P = Protocol_9p
 
+let pp_fid =
+  let str x = P.Types.Fid.sexp_of_t x |> Sexplib.Sexp.to_string in
+  Fmt.of_to_string str
+
+let pp_qid =
+  let str x = P.Types.Qid.sexp_of_t x |> Sexplib.Sexp.to_string in
+  Fmt.of_to_string str
+
 type 'a or_err = 'a Protocol_9p.Error.t Lwt.t
 
 let ok x = Lwt.return (Ok x)
 let map_error x = Fs9p_error.map_error x
-
-let error fmt =
-  Printf.ksprintf (fun s -> Lwt.return (Fs9p_error.error "%s" s)) fmt
-
+let error fmt = Fmt.kstrf (fun s -> Lwt.return (Fs9p_error.error "%s" s)) fmt
 let err_not_a_dir name = error "%S is not a directory" name
 let err_can't_set_length_of_dir = error "Can't set length of a directory"
 let err_can't_walk_from_file = error "Can't walk from a file"
 let err_can't_seek_dir  = error "Can't seek in a directory"
 let err_buffer_too_small = error "Buffer too small"
-let fmt_fid () x = P.Types.Fid.sexp_of_t x |> Sexplib.Conv.string_of_sexp
-let err_unknown_fid fid = error "Unknown fid %a" fmt_fid fid
-let err_fid_in_use fid = error "Fid %a already in use" fmt_fid fid
+let err_unknown_fid fid = error "Unknown fid %a" pp_fid fid
+let err_fid_in_use fid = error "Fid %a already in use" pp_fid fid
 let err_dot = error "'.' is not valid in 9p"
 let err_read_not_open = error "Can't read from unopened fid"
 let err_already_open = error "Already open"
@@ -36,17 +40,21 @@ module type S = sig
   val accept: root:Vfs.Dir.t -> flow -> unit or_err
 end
 
-(* 9p inodes: wrap VFS inodes with Qid and mutable names. *)
+(* 9p inodes: wrap VFS inodes with Qids. *)
 module Inode = struct
 
   type t = {
-    qid: Protocol_9p.Types.Qid.t;      (* Unique id (similar to inode number) *)
-    mutable basename: string;         (* Statting a 9p file returns the name. *)
+    qid  : Protocol_9p.Types.Qid.t;    (* Unique id (similar to inode number) *)
     inode: Vfs.Inode.t;
   }
 
+  let pp ppf t = Fmt.pf ppf "%a:%a" pp_qid t.qid Vfs.Inode.pp t.inode
+
   (* All you can do with an open dir is list it *)
   type open_dir = { offset: int64; unread: t list }
+
+  let _pp_open_dir ppf t =
+    Fmt.pf ppf "offset:%Ld unread:[%a]" t.offset Fmt.(list pp) t.unread
 
   let offset t = t.offset
   let unread t = t.unread
@@ -64,17 +72,19 @@ module Inode = struct
 
   let dir basename dir =
     let qid = P.Types.Qid.dir ~id:(mint_qid ()) ~version:0l () in
-    { qid; basename; inode = Vfs.Inode.dir basename dir }
+    let inode = Vfs.Inode.dir basename dir in
+    { qid; inode }
+
+  let file basename obj =
+    let qid = P.Types.Qid.file ~id:(mint_qid ()) ~version:0l () in
+    let inode = Vfs.Inode.file basename obj in
+    { qid; inode }
 
   let qid t = t.qid
   let kind t = Vfs.Inode.kind t.inode
   let inode t = t.inode
-  let basename t = t.basename
-  let set_basename t n = t.basename <- n
-
-  let file basename obj =
-    let qid = P.Types.Qid.file ~id:(mint_qid ()) ~version:0l () in
-    { qid; basename; inode = Vfs.Inode.file basename obj }
+  let basename t = Vfs.Inode.basename t.inode
+  let set_basename t n = Vfs.Inode.set_basename t.inode n
 
   let create inode =
     let name = Vfs.Inode.basename inode in
@@ -139,7 +149,6 @@ module Op9p = struct
       ok (`OpenDir { Inode.offset = 0L; unread = items })
 
   let read_dir ~info ~offset ~count state =
-    let open Protocol_9p.Infix in
     if offset <> Inode.offset state then
       err_can't_seek_dir (* TODO: allow 0 to restart *)
     else (
@@ -170,7 +179,6 @@ module Op9p = struct
         if perm.P.Types.FileMode.is_directory then Vfs.Dir.mkdir d name
         else Vfs.Dir.mkfile d name
       in
-      let open Protocol_9p.Infix in
       inode >>= map_error >>*= fun inode ->
       let inode = Inode.create inode in
       read inode >>*= fun open_file ->
@@ -264,12 +272,12 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       ok { P.Response.Attach.qid = Inode.qid fd.inode }
 
     let clunk_fid connection fid =
-      connection.fds <- connection.fds |> P.Types.Fid.Map.remove fid
+      connection.fds <- P.Types.Fid.Map.remove fid connection.fds
 
     let clunk connection ~cancel:_ { P.Request.Clunk.fid } =
       let old = connection.fds in
       clunk_fid connection fid;
-      if connection.fds == old then error "Unknown fid %a" fmt_fid fid
+      if connection.fds == old then error "Unknown fid %a" pp_fid fid
       else ok ()
 
     let stat connection ~cancel:_ { P.Request.Stat.fid } =
@@ -305,8 +313,10 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
       if fd.state <> `Ready then err_create_open
       else (
         Op9p.create ~parent:fd.inode ~perm name >>*= fun (inode, open_file) ->
-        let fd = { inode; parents = fd.inode :: fd.parents; state = open_file } in
-        connection.fds <- connection.fds |> P.Types.Fid.Map.add fid fd;
+        let fd =
+          { inode; parents = fd.inode :: fd.parents; state = open_file }
+        in
+        connection.fds <- P.Types.Fid.Map.add fid fd connection.fds;
         ok { P.Response.Create.qid = inode.Inode.qid; iounit = 0l }
       )
 

@@ -1,7 +1,7 @@
 (** Virtual filesystem.
 
-    A virtual filesystem is an abstract description of {!{files}File},
-    {!{directories}Dir}, {!{inodes}Inode} and {!{error codes}Error}}.
+    A virtual filesystem is an abstract description of {{!File}files},
+    {{!Dir}directoires}, {{!Inode}inodes} and {{!Error}error codes}.
 *)
 
 open Result
@@ -116,7 +116,7 @@ module File: sig
       file. *)
 
   val of_kvro: read:(unit -> Cstruct.t option or_err) -> t
-  (** [of_kvro ~read] is similar to {!read_write} but for read-only
+  (** [of_kvro ~read] is similar to {!of_kv} but for read-only
       values. *)
 
   (** {1 Streams} *)

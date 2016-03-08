@@ -3,4 +3,4 @@ PKG alcotest rresult
 S src/**
 S tests/
 B _build/src/**
-B _build/tests
+B _build/tests/

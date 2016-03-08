@@ -12,6 +12,7 @@ all: setup.data
 	$(SETUP) -all $(ALLFLAGS)
 
 setup.ml: _oasis
+	rm -f _tags myocamlbuild.ml
 	oasis setup
 	echo 'true: debug, bin_annot' >> _tags
 	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags

@@ -1,7 +1,5 @@
 (** Filesystem server. *)
 
-open Fs9p_misc
-
 (** The server signature. *)
 module type S = sig
 
@@ -9,13 +7,7 @@ module type S = sig
   (** The type for communication "channels" between the clients and
       the server. *)
 
-  type inode
-  (** The type of filesystem inodes. *)
-
-  module Inode: Fs9p_inode.S with type t = inode
-  (** A server should implement the inode signature. *)
-
-  val accept: root:Inode.dir -> flow -> unit or_error Lwt.t
+  val accept: root:Vfs.Dir.t -> flow -> unit Protocol_9p.Error.t Lwt.t
   (** [accept root f] accepts connection on [f]. *)
 
 end

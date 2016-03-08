@@ -9,19 +9,25 @@ Plugins:     META (0.4), DevFiles (0.4)
 BuildTools:    ocamlbuild
 AlphaFeatures: pure_interface, ocamlbuild_more_args
 
+Library vfs
+  Path:            src/vfs/
+  Findlibname:     vfs
+  Modules:         Vfs
+  BuildDepends:    lwt, rresult, cstruct
+
 Library fs9p
   Path:            src/fs9p/
   Findlibname:     fs9p
-  InternalModules: Fs9p_error, Fs9p_misc
-  Modules:         Fs9p_inode, Fs9p_file, Fs9p_dir, Fs9p_fs
-  BuildDepends:    protocol-9p.unix
+  InternalModules: Fs9p_error
+  Modules:         Fs9p
+  BuildDepends:    protocol-9p.unix, vfs
 
 Library i9p
   Path:            src/i9p/
   Findlibname:     i9p
   InternalModules:
-  Modules:         I9p_irmin, I9p_merge, I9p_tree
-  BuildDepends:    protocol-9p.unix,irmin.unix,fs9p
+  Modules:         I9p_merge, I9p_tree, I9p_irmin
+  BuildDepends:    lwt, irmin.unix, rresult, vfs
 
 Document datakit
   Title:                Datakit docs
@@ -29,7 +35,7 @@ Document datakit
   BuildTools+:          ocamldoc
   Install:              true
   XOCamlbuildPath:      src
-  XOCamlbuildLibraries: i9p, fs9p
+  XOCamlbuildLibraries: vfs, fs9p, i9p
   XOCamlbuildExtraArgs:
     "-docflags '-t Datakit -colorize-code -short-functors -charset utf-8'"
 
@@ -38,7 +44,7 @@ Executable datakit
   MainIs:         main.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   i9p, cmdliner
+  BuildDepends:   fmt, i9p, cmdliner, fs9p
 
 Executable "datakit-mount"
   Path:           src/bin
@@ -53,7 +59,7 @@ Executable test
   Build$:         flag(tests)
   CompiledObject: best
   Install:        false
-  BuildDepends:   i9p, alcotest
+  BuildDepends:   i9p, alcotest, fmt, fs9p
 
 Test test
   Run$:             flag(tests)

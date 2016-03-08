@@ -1,0 +1,356 @@
+open Lwt.Infix
+open Result
+open Fs9p_error.Infix
+
+module P = Protocol_9p
+
+type 'a or_err = 'a Protocol_9p.Error.t Lwt.t
+
+let ok x = Lwt.return (Ok x)
+let map_error x = Fs9p_error.map_error x
+
+let error fmt =
+  Printf.ksprintf (fun s -> Lwt.return (Fs9p_error.error "%s" s)) fmt
+
+let err_not_a_dir name = error "%S is not a directory" name
+let err_can't_set_length_of_dir = error "Can't set length of a directory"
+let err_can't_walk_from_file = error "Can't walk from a file"
+let err_can't_seek_dir  = error "Can't seek in a directory"
+let err_buffer_too_small = error "Buffer too small"
+let fmt_fid () x = P.Types.Fid.sexp_of_t x |> Sexplib.Conv.string_of_sexp
+let err_unknown_fid fid = error "Unknown fid %a" fmt_fid fid
+let err_fid_in_use fid = error "Fid %a already in use" fmt_fid fid
+let err_dot = error "'.' is not valid in 9p"
+let err_read_not_open = error "Can't read from unopened fid"
+let err_already_open = error "Already open"
+let err_create_open = error "Can't create in an opened fid"
+let err_write_not_open = error "Can't write to unopened fid"
+let err_write_dir = error "Can't write to directories"
+let err_rename_root = error "Can't rename /"
+let err_rename_truncate = error "Can't rename and truncate at the same time"
+
+let max_chunk_size = Int32.of_int (100 * 1024)
+
+module type S = sig
+  type flow
+  val accept: root:Vfs.Dir.t -> flow -> unit or_err
+end
+
+module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
+
+  module Inode = struct
+
+    (* 9p inodes: wrap VFS inodes with Qid and mutable names. *)
+    type t = {
+      qid: Protocol_9p.Types.Qid.t;    (* Unique id (similar to inode number) *)
+      mutable name: string;           (* Statting a 9p file returns the name. *)
+      inode: Vfs.Inode.t;
+    }
+
+    (* All you can do with an open dir is list it *)
+    type open_dir = { offset : int64; unread : t list }
+
+    let offset t = t.offset
+    let unread t = t.unread
+
+    type open_obj =
+      [ `OpenFile of Vfs.File.fd
+      | `OpenDir of open_dir ]
+
+    let mint_qid =
+      let last = ref 0L in
+      fun () ->
+        let next = Int64.succ !last in
+        last := next;
+        next
+
+    let dir name dir =
+      let qid = P.Types.Qid.dir ~id:(mint_qid ()) ~version:0l () in
+      { qid; name; inode = Vfs.Inode.dir name dir }
+
+    let qid t = t.qid
+    let kind t = Vfs.Inode.kind t.inode
+    let inode t = t.inode
+    let name t = t.name
+    let set_name t n = t.name <- n
+
+    let file name obj =
+      let qid = P.Types.Qid.file ~id:(mint_qid ()) ~version:0l () in
+      { qid; name; inode = Vfs.Inode.file name obj }
+
+    let create inode =
+      let name = Vfs.Inode.basename inode in
+      match Vfs.Inode.kind inode with
+      | `Dir d  -> dir name d
+      | `File f -> file name f
+
+  end
+
+  module Op = struct
+
+    let rwx = [`Read; `Write; `Execute]
+    let rw = [`Read; `Write]
+    let rx = [`Read; `Execute]
+    let r = [`Read]
+
+    let stat ~info inode =
+      let u =
+        if info.P.Info.version = P.Types.Version.unix then
+          Some (P.Types.Stat.make_extension ()) (* or mortdeus will crash *)
+        else
+          None in
+      begin match Inode.kind inode with
+        | `Dir _ ->
+          let dir =
+            P.Types.FileMode.make
+              ~owner:rwx ~group:rwx ~other:rx ~is_directory:true ()
+          in
+          ok (0L, dir)
+        | `File f ->
+          Vfs.File.size f >>= map_error >>*= fun length ->
+          let file = P.Types.FileMode.make ~owner:rw ~group:rw ~other:r () in
+          ok (length, file)
+      end >>*= fun (length, mode) ->
+      let qid = Inode.qid inode in
+      let name = Inode.name inode in
+      ok (P.Types.Stat.make ~qid ~mode ~length ~name ?u ())
+
+    let rename dir inode new_name =
+      match Inode.kind dir with
+      | `File _ -> assert false
+      | `Dir d ->
+        Vfs.Dir.rename d (Inode.inode inode) new_name >>= map_error >>*= fun () ->
+        Inode.set_name inode new_name;
+        ok ()
+
+    let truncate inode length =
+      match Inode.kind inode with
+      | `Dir _ when length = 0L -> ok ()
+      | `Dir _  -> err_can't_set_length_of_dir
+      | `File f -> Vfs.File.truncate f length >>= map_error
+
+    let read inode =
+      match Inode.kind inode with
+      | `File file ->
+        Vfs.File.open_ file >>= map_error >>*= fun o ->
+        ok (`OpenFile o)
+      | `Dir dir ->
+        Vfs.Dir.ls dir >>= map_error >>*= fun items ->
+        let items = List.map Inode.create items in
+        ok (`OpenDir { Inode.offset = 0L; unread = items })
+
+    let read_dir ~info ~offset ~count state =
+      let open Protocol_9p.Infix in
+      if offset <> Inode.offset state then
+        err_can't_seek_dir (* TODO: allow 0 to restart *)
+      else (
+        let buffer = Cstruct.create count in
+        let rec aux buf = function
+          | []      -> ok (buf, [])   (* Done *)
+          | x :: xs ->
+            stat ~info x >>*= fun x_info ->
+            match P.Types.Stat.write x_info buf with
+            | Ok buf  -> aux buf xs
+            | Error _ -> ok (buf, xs) (* No more room *)
+        in
+        aux buffer (Inode.unread state) >>*= fun (unused, remaining) ->
+        let data = Cstruct.sub buffer 0 (count - Cstruct.len unused) in
+        let len = Cstruct.len data in
+        if len = 0 && remaining <> [] then err_buffer_too_small
+        else (
+          let offset = Int64.add (Inode.offset state) (Int64.of_int len) in
+          let new_state = { Inode.offset;  unread = remaining } in
+          ok (new_state, data)
+        )
+      )
+
+    let create ~parent ~perm name =
+      match Inode.kind parent with
+      | `Dir d ->
+        let inode =
+          if perm.P.Types.FileMode.is_directory then Vfs.Dir.mkdir d name
+          else Vfs.Dir.mkfile d name
+        in
+        let open Protocol_9p.Infix in
+        inode >>= map_error >>*= fun inode ->
+        let inode = Inode.create inode in
+        read inode >>*= fun open_file ->
+        ok (inode, open_file)
+      | `File _ -> err_not_a_dir (Inode.name parent)
+
+    let remove inode =
+      match Inode.kind inode with
+      | `File f -> Vfs.File.remove f >>= map_error
+      | `Dir d  -> Vfs.Dir.remove d  >>= map_error
+
+  end
+
+  type flow = Flow.flow
+
+  (** Handle incoming requests from the client. *)
+  module Dispatcher = struct
+
+    type fd = {
+      inode  : Inode.t;
+      parents: Inode.t list;   (* closest first *)
+      mutable state: [ `Ready | Inode.open_obj ]
+    }
+
+    type t = Vfs.Dir.t  (* The root directory *)
+
+    type connection = {
+      root : t;
+      info : Protocol_9p.Info.t;
+      mutable fds : fd P.Types.Fid.Map.t;
+    }
+
+    let connect root info =
+      let fds = P.Types.Fid.Map.empty in
+      { root; info; fds }
+
+    let lookup connection fid =
+      try ok (P.Types.Fid.Map.find fid connection.fds)
+      with Not_found -> err_unknown_fid fid
+
+    let alloc_fid ?may_reuse connection newfid fd =
+      let alloc () =
+        connection.fds <- connection.fds |> P.Types.Fid.Map.add newfid fd; ok ()
+      in
+      match may_reuse with
+      | Some old when old = newfid -> alloc ()
+      | Some _ | None ->
+        if P.Types.Fid.Map.mem newfid connection.fds then err_fid_in_use newfid
+        else alloc ()
+
+    (* Returns the final inode, the path that led to it, and the new parents. *)
+    let rec do_walk ~parents ~wqids inode = function
+      | []      -> ok (inode, List.rev wqids, parents)
+      | x :: xs ->
+        match Inode.kind inode with
+        | `File _  -> err_can't_walk_from_file
+        | `Dir dir ->
+          begin match x with
+            | "."  -> err_dot
+            | ".." ->
+              begin match parents with
+                | []    -> ok (inode, parents)     (* /.. = / *)
+                | p::ps -> ok (p, ps)
+              end
+            | x ->
+              Vfs.Dir.lookup dir x >>= map_error >>*= fun x_inode ->
+              let x_inode = Inode.create x_inode in
+              ok (x_inode, inode :: parents)
+          end >>*= fun (inode, parents) ->
+          let wqids = Inode.qid inode :: wqids in
+          do_walk ~parents ~wqids inode xs
+
+    let walk connection ~cancel:_ { P.Request.Walk.fid; newfid; wnames } =
+      lookup connection fid >>*= fun fd ->
+      do_walk ~parents:fd.parents ~wqids:[] fd.inode wnames
+      >>*= fun (inode, wqids, parents) ->
+      let fd =  { inode; parents; state = `Ready } in
+      alloc_fid ~may_reuse:fid connection newfid fd >>*= fun () ->
+      ok { P.Response.Walk.wqids }
+
+    let attach connection ~cancel:_ { P.Request.Attach.fid; _ } =
+      let fd = {
+        inode   = Inode.dir "/" connection.root;
+        parents = [];
+        state   = `Ready
+      } in
+      alloc_fid connection fid fd >>*= fun () ->
+      ok { P.Response.Attach.qid = Inode.qid fd.inode }
+
+    let clunk_fid connection fid =
+      connection.fds <- connection.fds |> P.Types.Fid.Map.remove fid
+
+    let clunk connection ~cancel:_ { P.Request.Clunk.fid } =
+      let old = connection.fds in
+      clunk_fid connection fid;
+      if connection.fds == old then error "Unknown fid %a" fmt_fid fid
+      else ok ()
+
+    let stat connection ~cancel:_ { P.Request.Stat.fid } =
+      lookup connection fid >>*= fun fd ->
+      Op.stat ~info:connection.info fd.inode >>*= fun stat ->
+      ok { P.Response.Stat.stat }
+
+    let read connection ~cancel:_ { P.Request.Read.fid; offset; count } =
+      let count = Int32.to_int (min count max_chunk_size) in
+      lookup connection fid >>*= fun fd ->
+      match fd.state with
+      | `Ready         -> err_read_not_open
+      | `OpenFile file ->
+        Vfs.File.read file ~offset ~count >>= map_error >>*= fun data ->
+        ok { P.Response.Read.data }
+      | `OpenDir d ->
+        Op.read_dir ~info:connection.info ~offset ~count d >>*=
+        fun (new_state, data) ->
+        fd.state <- `OpenDir new_state;
+        ok { P.Response.Read.data }
+
+    let open_ connection ~cancel:_ { P.Request.Open.fid; _ } =
+      lookup connection fid >>*= fun fd ->
+      match fd.state with
+      | `OpenDir _ | `OpenFile _ -> err_already_open
+      | `Ready ->
+        Op.read fd.inode >>*= fun state ->
+        fd.state <- state;
+        ok { P.Response.Open.qid = fd.inode.Inode.qid; iounit = 0l }
+
+    let create connection ~cancel:_ { P.Request.Create.fid; perm; name; _ } =
+      lookup connection fid >>*= fun fd ->
+      if fd.state <> `Ready then err_create_open
+      else (
+        Op.create ~parent:fd.inode ~perm name >>*= fun (inode, open_file) ->
+        let fd = { inode; parents = fd.inode :: fd.parents; state = open_file } in
+        connection.fds <- connection.fds |> P.Types.Fid.Map.add fid fd;
+        ok { P.Response.Create.qid = inode.Inode.qid; iounit = 0l }
+      )
+
+    let write connection ~cancel:_ { P.Request.Write.fid; offset; data } =
+      lookup connection fid >>*= fun fd ->
+      match fd.state with
+      | `Ready     -> err_write_not_open
+      | `OpenDir _ -> err_write_dir
+      | `OpenFile file ->
+        Vfs.File.write file ~offset data >>= map_error >>*= fun () ->
+        let count = Int32.of_int (Cstruct.len data) in
+        ok { P.Response.Write.count }
+
+    let remove connection ~cancel:_ { P.Request.Remove.fid } =
+      lookup connection fid >>*= fun fd ->
+      Op.remove fd.inode >|= fun err ->
+      clunk_fid connection fid;
+      err
+
+    let rename fd name =
+      match fd.parents with
+      | []   -> err_rename_root
+      | p::_ -> Op.rename p fd.inode name
+
+    let wstat connection ~cancel:_ { P.Request.Wstat.fid; stat } =
+      lookup connection fid >>*= fun fd ->
+      let { P.Types.Stat.name; length; _ } = stat in
+      (* It's illegal to set these, but checking if we're setting to
+         the current value is tedious, so ignore: *)
+      let name = if name = "" then None else Some name in
+      let length = if P.Types.Int64.is_any length then None else Some length in
+      match name, length with
+      | Some name, None -> rename fd name
+      | None, Some length -> Op.truncate fd.inode length
+      | None, None -> ok ()
+      | Some _, Some _ ->
+        (* Hard to support atomically, and unlikely to be useful. *)
+        err_rename_truncate
+
+  end
+
+  module Server = P.Server.Make(Log)(Flow)(Dispatcher)
+
+  let accept ~root flow =
+    Server.connect root flow () >>= function
+    | Error _ as e -> Flow.close flow >|= fun () -> e
+    | Ok _ -> (* XXX: When to close flow? *) ok ()
+
+end

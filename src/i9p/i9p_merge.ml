@@ -2,14 +2,19 @@ open Lwt.Infix
 
 module PathSet = Set.Make(Irmin.Path.String_list)
 
-module Make (Store : I9p_tree.STORE) (View : Irmin.VIEW with type db = Store.t and type key = string list and type value = string) = struct
+module Make
+    (Store : I9p_tree.STORE)
+    (View : Irmin.VIEW with type db = Store.t
+                        and type key = string list
+                        and type value = string)
+= struct
   module LeafMap = Map.Make(String)
   module Tree = I9p_tree.Make(Store)
 
   let as_map =
-    List.fold_left (fun acc (ty, leaf) -> 
-      LeafMap.add leaf ty acc
-    ) LeafMap.empty
+    List.fold_left (fun acc (ty, leaf) ->
+        LeafMap.add leaf ty acc
+      ) LeafMap.empty
 
   let as_file contents_t = function
     | `File f -> Store.Private.Contents.read contents_t f
@@ -34,24 +39,24 @@ module Make (Store : I9p_tree.STORE) (View : Irmin.VIEW with type db = Store.t a
       Tree.ls theirs >|= as_map >>= fun their_files ->
       let types =
         LeafMap.merge (fun _leaf our_ty their_ty ->
-          match our_ty, their_ty with
-          | Some `Directory, Some `Directory -> Some `Directory
-          | Some `File, Some `File -> Some `File
-          | Some _, Some _ -> Some `Conflict
-          | Some `File, _ | _, Some `File -> Some `File
-          | Some `Directory, _ | _, Some `Directory -> Some `Directory
-          | None, None -> assert false
-        ) our_files their_files in
+            match our_ty, their_ty with
+            | Some `Directory, Some `Directory -> Some `Directory
+            | Some `File, Some `File -> Some `File
+            | Some _, Some _ -> Some `Conflict
+            | Some `File, _ | _, Some `File -> Some `File
+            | Some `Directory, _ | _, Some `Directory -> Some `Directory
+            | None, None -> assert false
+          ) our_files their_files in
       LeafMap.bindings types |> Lwt_list.iter_s (fun (leaf, ty) ->
-        let path = Irmin.Path.String_list.rcons path leaf in
-        match ty with
-        | `Conflict -> note_conflict path "File vs dir"
-        | `Directory ->
+          let path = Irmin.Path.String_list.rcons path leaf in
+          match ty with
+          | `Conflict -> note_conflict path "File vs dir"
+          | `Directory ->
             Tree.node ours [leaf] >|= as_dir >>= fun ours ->
             Tree.node theirs [leaf] >|= as_dir >>= fun theirs ->
             Tree.node base [leaf] >|= as_dir >>= fun base ->
             merge_dir ~ours ~theirs ~base path
-        | `File ->
+          | `File ->
             Tree.node ours [leaf] >>= as_file contents_t >>= fun ours ->
             Tree.node theirs [leaf] >>= as_file contents_t >>= fun theirs ->
             let old () =
@@ -63,12 +68,12 @@ module Make (Store : I9p_tree.STORE) (View : Irmin.VIEW with type db = Store.t a
             | `Ok None -> View.remove result path
             | `Conflict "default" -> note_conflict path "Changed on both branches"
             | `Conflict x -> note_conflict path x
-      ) in
+        ) in
     Tree.snapshot ours >>= fun ours ->
     Tree.snapshot theirs >>= fun theirs ->
     begin match base with
-    | None -> Lwt.return (Tree.empty repo)
-    | Some base -> Tree.snapshot base
+      | None -> Lwt.return (Tree.empty repo)
+      | Some base -> Tree.snapshot base
     end >>= fun base ->
     merge_dir ~ours ~theirs ~base [] >>= fun () ->
     Lwt.return !conflicts

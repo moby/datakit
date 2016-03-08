@@ -1,31 +1,34 @@
+open Rresult
 open Lwt.Infix
-open Result
-open Fs9p_misc
+open Vfs.Error.Infix
 
 module PathSet = I9p_merge.PathSet
 
 module type S = sig
   type repo
-  type dir
-  val create: string Irmin.Task.f -> repo -> dir
+  val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
 end
 
 let ok x = Lwt.return (Ok x)
-let err_enoent = Lwt.return Fs9p_error.enoent
-let err_eisdir = Lwt.return Fs9p_error.eisdir
-let err_read_only = Lwt.return Fs9p_error.ero
-let err_already_exists name = Lwt.return (error "Entry %S already exists" name)
-let err_conflict msg = Lwt.return (error "Merge conflict: %s" msg)
-let err_unknown_cmd x = Lwt.return (error "Unknown command %S" x)
-let err_invalid_commit_id x = error "Invalid commit ID %S" x
+let error fmt =
+  Printf.ksprintf (fun s -> Lwt.return (Vfs.Error.other "%s" s)) fmt
 
-module InodeMap = Fs9p_dir.InodeMap
+let err_enoent = Lwt.return Vfs.Error.noent
+let err_eisdir = Lwt.return Vfs.Error.isdir
+let err_read_only = Lwt.return Vfs.Error.read_only_file
+let err_already_exists name = error "Entry %S already exists" name
+let err_conflict msg = error "Merge conflict: %s" msg
+let err_unknown_cmd x = error "Unknown command %S" x
+let err_invalid_commit_id id = error "Invalid commit ID %S" id
+let err_invalid_hash h x = error "invalid-hash %S: %s" h (Printexc.to_string x)
+let err_not_fast_forward = error "not-fast-forward"
 
-module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
-  module Dir = Fs9p_dir.Make(Inode)
+module StringMap = Map.Make(String)
+
+module Make (Store : I9p_tree.STORE) = struct
 
   type repo = Store.Repo.t
-  type dir = Inode.dir
+  let empty_inode_map: Vfs.Inode.t StringMap.t = StringMap.empty
 
   module Path = Irmin.Path.String_list
   module Tree = I9p_tree.Make(Store)
@@ -43,7 +46,7 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
         Store.Private.Contents.read_exn contents_t content >|= fun content ->
         Ok (Some (Cstruct.of_string content))
     in
-    Fs9p_file.read_only ~read
+    Vfs.File.of_kvro ~read
 
   let irmin_rw_file ~remove_conflict ~view path =
     let read () =
@@ -56,7 +59,7 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       remove_conflict path; Ok () in
     let remove () = View.remove view path >|= fun () ->
       remove_conflict path; Ok () in
-   Fs9p_file.read_write ~read ~write ~remove
+    Vfs.File.of_kv ~read ~write ~remove
 
   let name_of_irmin_path ~root path =
     match Path.rdecons path with
@@ -83,7 +86,7 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       | `File      ->
         let path = name_of_irmin_path full_path in
         let file = irmin_ro_file ~get_root full_path in
-        Inode.of_file path file
+        Vfs.Inode.file path file
 
     and irmin_ro_dir path =
       let name = name_of_irmin_path path in
@@ -105,11 +108,12 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
           | `Directory as ty -> ok (get ~dir:path (ty, name))
           | `None            -> err_enoent
       in
-      let remove () = Fs9p_dir.err_ro in
-      Dir.read_only ~ls ~lookup ~remove () |> Inode.of_dir name in
+      let remove () = Vfs.Dir.err_read_only in
+      Vfs.Dir.read_only ~ls ~lookup ~remove |> Vfs.Inode.dir name
+    in
     irmin_ro_dir []
 
-  let ro store = ro_tree ~get_root:(fun () -> Tree.snapshot store)
+  let read_only store = ro_tree ~get_root:(fun () -> Tree.snapshot store)
 
   (* Ugly! *)
   let snapshot ~store view =
@@ -124,15 +128,15 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
 
   let remove_shadowed_by items map =
     List.fold_left (fun acc (_, name) ->
-        acc |> InodeMap.remove name
+        acc |> StringMap.remove name
       ) map items
 
   let rec has_prefix ~prefix p =
     match prefix, p with
     | [], _ -> true
     | pre::pres, p::ps ->
-        if pre = p then has_prefix ~prefix:pres ps
-        else false
+      if pre = p then has_prefix ~prefix:pres ps
+      else false
     | _, [] -> false
 
   (* Note: writing to a path removes it from [conflicts], if present *)
@@ -158,13 +162,13 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       | `File ->
         let path = name_of_irmin_path full_path in
         let file = irmin_rw_file ~remove_conflict ~view full_path in
-        Inode.of_file path file
+        Vfs.Inode.file path file
 
     and irmin_rw_dir path =
       let name = name_of_irmin_path path in
       (* Irmin doesn't store empty directories, so we need to store
          that list in the server's memory. Meet [extra_dirs]. *)
-      let extra_dirs = ref InodeMap.empty in
+      let extra_dirs = ref empty_inode_map in
       let ls () =
         snapshot ~store view >>= fun root ->
         begin Tree.get_dir root path >>= function
@@ -172,10 +176,10 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
           | Some dir -> Tree.ls dir
         end >>= fun items ->
         extra_dirs := remove_shadowed_by items !extra_dirs;
-        let extra_inodes = InodeMap.bindings !extra_dirs |> List.map snd in
+        let extra_inodes = StringMap.bindings !extra_dirs |> List.map snd in
         ok (extra_inodes @ List.map (get ~dir:path) items)
       in
-      let create name =
+      let mkfile name =
         let new_path = Path.rcons path name in
         View.update view new_path "" >|= fun () ->
         remove_conflict new_path;
@@ -195,7 +199,7 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
         real_result >|= function
         | Ok _ as ok   -> ok
         | Error _ as e ->
-          try Ok (InodeMap.find name !extra_dirs)
+          try Ok (StringMap.find name !extra_dirs)
           with Not_found -> e
       in
       let mkdir name =
@@ -203,27 +207,32 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
         | Ok _    -> err_already_exists name
         | Error _ ->
           let new_dir = get ~dir:path (`Directory, name) in
-          extra_dirs := !extra_dirs |> InodeMap.add name new_dir;
+          extra_dirs := !extra_dirs |> StringMap.add name new_dir;
           remove_conflict (Irmin.Path.String_list.rcons path name);
           ok new_dir
       in
       let remove () =
         (* FIXME: is this correct? *)
-        extra_dirs := InodeMap.empty;
+        extra_dirs := StringMap.empty;
         conflicts := !conflicts |> PathSet.filter (fun p ->
-          has_prefix ~prefix:path p
-        );
+            has_prefix ~prefix:path p
+          );
         View.remove_rec view path >>= ok
       in
-      Dir.read_write ~ls ~create ~mkdir ~lookup ~remove |> Inode.of_dir name in
+      let rename _ = failwith "TODO" in
+      Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename |>
+      Vfs.Inode.dir name
+    in
     irmin_rw_dir []
 
   let transactions_ctl ~merge ~remover = function
     | "close" -> Lazy.force remover >|= fun () -> Ok ""
-    | "commit" -> begin merge () >>= function
-      | Ok (`Ok ()) -> Lazy.force remover >|= fun () -> Ok ""
-      | Ok (`Conflict msg) -> err_conflict msg
-      | Error ename -> Lwt.return (Error {Protocol_9p.Response.Err.ename; errno = None}) end
+    | "commit" ->
+      begin merge () >>= function
+        | Ok (`Ok ()) -> Lazy.force remover >|= fun () -> Ok ""
+        | Ok (`Conflict msg) -> err_conflict msg
+        | Error ename -> error "%s" ename
+      end
     | x -> err_unknown_cmd x
 
   let string_of_parents parents =
@@ -236,93 +245,107 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
   let re_newline = Str.regexp_string "\n"
   let make_instance store ~remover _name =
     let path = [] in
-    let msg_file, get_msg = Fs9p_file.mutable_string "" in
+    let msg_file, get_msg = Vfs.File.rw_of_string "" in
     View.of_path (store "view") path >|= fun view ->
     let parents = View.parents view |> string_of_parents in
-    let parents_file, get_parents = Fs9p_file.mutable_string parents in
+    let parents_file, get_parents = Vfs.File.rw_of_string parents in
     let conflicts = ref PathSet.empty in
     (* Commit transaction *)
     let merge () =
       match !conflicts with
       | e when not (PathSet.is_empty e) -> Lwt.return (Error "conflicts file is not empty")
       | _ ->
-      let parents = get_parents () |> Str.split re_newline in
-      match List.map Store.Hash.of_hum parents with
-      | exception Invalid_argument msg -> Lwt.return (Error msg)
-      | parents ->
-      let msg =
-        match get_msg () with
-        | "" -> "(no commit message)"
-        | x -> x in
-      let store = store msg in
-      View.make_head store (Store.task store) ~parents ~contents:view >>= fun head ->
-      Store.merge_head store head >>= ok in
+        let parents = get_parents () |> Str.split re_newline in
+        match List.map Store.Hash.of_hum parents with
+        | exception Invalid_argument msg -> Lwt.return (Error msg)
+        | parents ->
+          let msg =
+            match get_msg () with
+            | "" -> "(no commit message)"
+            | x -> x in
+          let store = store msg in
+          View.make_head store (Store.task store) ~parents ~contents:view >>= fun head ->
+          Store.merge_head store head >>= ok in
     (* Current state (will finish initialisation below) *)
-    let contents = ref InodeMap.empty in
+    let contents = ref empty_inode_map in
     (* Files present in both normal and merge modes *)
     let stage = rw ~conflicts ~store view in
-    let add inode = InodeMap.add (Inode.basename inode) inode in
-    let common = InodeMap.empty
+    let add inode = StringMap.add (Vfs.Inode.basename inode) inode in
+    let ctl = Vfs.File.command (transactions_ctl ~merge ~remover) in
+    let origin = Vfs.File.ro_of_string (Path.to_hum path) in
+    let common =
+      empty_inode_map
       |> add stage
-      |> add (Inode.of_file "msg" msg_file)
-      |> add (Inode.of_file "parents" parents_file)
-      |> add (Inode.of_file "ctl" (Fs9p_file.command (transactions_ctl ~merge ~remover)))
-      |> add (Inode.of_file "origin" (Fs9p_file.static_string (Path.to_hum path))) in
-    let rec normal_mode () = common
-      |> add (Inode.of_file "merge" (Fs9p_file.command merge_mode))
+      |> add (Vfs.Inode.file "msg"     msg_file)
+      |> add (Vfs.Inode.file "parents" parents_file)
+      |> add (Vfs.Inode.file "ctl"     ctl)
+      |> add (Vfs.Inode.file "origin"  origin)
+    in
+    let rec normal_mode () =
+      common
+      |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
+
     (* Merge mode *)
     and merge_mode commit_id =
       (* Check hash is valid *)
       let store = store "merge" in
       let repo = Store.repo store in
       match Store.Hash.of_hum commit_id with
-      | exception _ -> Lwt.return (error "Invalid commit ID %S" commit_id)
+      | exception _  -> err_invalid_commit_id commit_id
       | their_commit ->
-      Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) their_commit >>= function
-      | false -> err_enoent
-      | true ->
-      let unit_task () = Irmin.Task.empty in
-      Store.of_commit_id unit_task their_commit repo >>= fun theirs ->
-      let theirs = theirs () in
-      (* Add to parents *)
-      let data = Cstruct.of_string (commit_id ^ "\n") in
-      Fs9p_file.size parents_file >>*= fun size ->
-      Fs9p_file.open_ parents_file >>*= fun fd ->
-      Fs9p_file.write fd ~offset:size data >>*= fun () ->
-      (* Grab current "rw" dir as "ours" *)
-      View.make_head store (Store.task store) ~parents:(View.parents view) ~contents:view >>= fun our_commit ->
-      Store.of_commit_id unit_task our_commit repo >>= fun ours ->
-      let ours = ours () in
-      let ours_ro = ro ~name:"ours" ours in
-      let theirs_ro = ro ~name:"theirs" theirs in
-      begin Store.lcas_head ours ~n:1 their_commit >>= function
-      | `Max_depth_reached | `Too_many_lcas -> assert false
-      | `Ok [] -> Lwt.return (None, Inode.of_dir "base" (Dir.fixed []))
-      | `Ok (base::_) ->
-          Store.of_commit_id unit_task base repo >|= fun s ->
-          let s = s () in
-          (Some s, ro ~name:"base" s)
-      end >>= fun (base, base_ro) ->
-      Merge.merge ~ours ~theirs ~base view >>= fun merge_conflicts ->
-      conflicts := PathSet.union !conflicts merge_conflicts;
-      let conflicts_file = Fs9p_file.read_only ~read:(fun () -> Lwt.return (Ok (Some (format_conflicts !conflicts)))) in
-      contents := common
-        |> add (Inode.of_file "merge" (Fs9p_file.command merge_mode))
-        |> add (Inode.of_file "conflicts" conflicts_file)
-        |> add ours_ro
-        |> add base_ro
-        |> add theirs_ro;
-      Lwt.return (Ok "ok") in
+        Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) their_commit
+        >>= function
+        | false -> err_enoent
+        | true ->
+          let unit_task () = Irmin.Task.empty in
+          Store.of_commit_id unit_task their_commit repo >>= fun theirs ->
+          let theirs = theirs () in
+          (* Add to parents *)
+          let data = Cstruct.of_string (commit_id ^ "\n") in
+          Vfs.File.size parents_file >>*= fun size ->
+          Vfs.File.open_ parents_file >>*= fun fd ->
+          Vfs.File.write fd ~offset:size data >>*= fun () ->
+          (* Grab current "rw" dir as "ours" *)
+          View.make_head store (Store.task store)
+            ~parents:(View.parents view) ~contents:view
+          >>= fun our_commit ->
+          Store.of_commit_id unit_task our_commit repo >>= fun ours ->
+          let ours = ours () in
+          let ours_ro = read_only ~name:"ours" ours in
+          let theirs_ro = read_only ~name:"theirs" theirs in
+          begin Store.lcas_head ours ~n:1 their_commit >>= function
+            | `Max_depth_reached | `Too_many_lcas -> assert false
+            | `Ok [] -> Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
+            | `Ok (base::_) ->
+              Store.of_commit_id unit_task base repo >|= fun s ->
+              let s = s () in
+              (Some s, read_only ~name:"base" s)
+          end >>= fun (base, base_ro) ->
+          Merge.merge ~ours ~theirs ~base view >>= fun merge_conflicts ->
+          conflicts := PathSet.union !conflicts merge_conflicts;
+          let conflicts_file =
+            let read () = ok (Some (format_conflicts !conflicts)) in
+            Vfs.File.of_kvro ~read:read
+          in
+          contents :=
+            common
+            |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
+            |> add (Vfs.Inode.file "conflicts" conflicts_file)
+            |> add ours_ro
+            |> add base_ro
+            |> add theirs_ro;
+          Lwt.return (Ok "ok")
+    in
     contents := normal_mode ();
-    Ok (Dir.of_map_ref contents)
+    Ok (Vfs.Dir.of_map contents)
 
-  let static_dir name items = Inode.of_dir name (Dir.fixed items)
+  let static_dir name items = Vfs.Inode.dir name (Vfs.Dir.of_list items)
 
   (* A stream file that initially Lwt.returns [str initial]. Further
      reads call [wait_for_change_from x], where [x] is the value
      previously Lwt.returned and then Lwt.return that, until the file
      is closed. *)
-  let watch_stream ~initial ~wait_for_change_from ~str : Fs9p_file.stream =
+  let watch_stream ~initial ~wait_for_change_from ~str =
     let last_seen = ref initial in
     let data = ref (Cstruct.of_string (str initial)) in
     let read count =
@@ -334,11 +357,11 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       end >|= fun () ->
       let count = min count (Cstruct.len !data) in
       let response = Cstruct.sub !data 0 count in
-        data := Cstruct.shift !data count;
-        Ok (response)
+      data := Cstruct.shift !data count;
+      Ok (response)
     in
     let write _ = err_read_only in
-    read, write
+    Vfs.File.Stream.create ~read ~write
 
   let head_stream store initial_head =
     let cond = Lwt_condition.create () in
@@ -365,7 +388,7 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
     watch_stream ~initial:initial_head ~wait_for_change_from ~str
 
   let head_live store =
-    Fs9p_file.of_stream (fun () ->
+    Vfs.File.of_stream (fun () ->
         Store.head store >|= fun initial_head ->
         head_stream store initial_head
       )
@@ -397,10 +420,10 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       Ok (response)
     in
     let  write _ = err_read_only in
-    (read, write)
+    Vfs.File.Stream.create ~read ~write
 
   let reflog store =
-    Fs9p_file.of_stream (fun () -> Lwt.return (reflog_stream store))
+    Vfs.File.of_stream (fun () -> Lwt.return (reflog_stream store))
 
   let equal_ty a b =
     match a, b with
@@ -439,22 +462,22 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
     watch_stream ~initial ~wait_for_change_from ~str
 
   let watch_tree store ~path =
-    Fs9p_file.of_stream (fun () ->
+    Vfs.File.of_stream (fun () ->
         Tree.snapshot store >>= fun snapshot ->
         Tree.node snapshot path >|= fun initial ->
         watch_tree_stream store ~path ~initial
       )
 
   let rec watch_dir store ~path =
-    let live = lazy (Inode.of_file "tree.live" (watch_tree store ~path)) in
-    let cache = ref InodeMap.empty in   (* Could use a weak map here *)
+    let live = lazy (Vfs.Inode.file "tree.live" (watch_tree store ~path)) in
+    let cache = ref empty_inode_map in   (* Could use a weak map here *)
     let lookup name =
-      try InodeMap.find name !cache
+      try StringMap.find name !cache
       with Not_found ->
         let new_path = Path.rcons path name in
         let dir = watch_dir store ~path:new_path in
-        let inode = Inode.of_dir (name ^ ".node") dir in
-        cache := !cache |> InodeMap.add name inode;
+        let inode = Vfs.Inode.dir (name ^ ".node") dir in
+        cache := !cache |> StringMap.add name inode;
         inode
     in
     let ls () =
@@ -471,8 +494,8 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
         ok (lookup (Filename.chop_suffix x ".node"))
       | _ -> err_enoent
     in
-    let remove () = Fs9p_dir.err_ro in
-    Dir.read_only ~ls ~lookup ~remove ()
+    let remove () = Vfs.Dir.err_read_only in
+    Vfs.Dir.read_only ~ls ~lookup ~remove
 
   (* Note: can't use [Store.fast_forward_head] because it can sometimes return [false] on success
      (when already up-to-date). *)
@@ -494,43 +517,46 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       | `Max_depth_reached | `Too_many_lcas -> assert false
 
   let fast_forward_merge store =
-    Fs9p_file.command @@ fun hash ->
+    Vfs.File.command @@ fun hash ->
     match Store.Hash.of_hum hash with
-    | exception ex ->
-      Lwt.return (error "invalid-hash %S: %s" hash (Printexc.to_string ex))
-    | hash ->
-        fast_forward store hash >|= function
-        | `Ok -> Ok ""
-        | `Not_fast_forward -> error "not-fast-forward"
+    | exception ex -> err_invalid_hash hash ex
+    | hash         ->
+      fast_forward store hash >>= function
+      | `Ok               -> ok ""
+      | `Not_fast_forward -> err_not_fast_forward
+
+  let status store () =
+    Store.head (store "head") >|= function
+    | None      -> "\n"
+    | Some head -> Store.Hash.to_hum head ^ "\n"
+
+  let transactions store =
+    Vfs.Dir.directories ~make:(make_instance store) ~init:[]
 
   let branch make_task ~remove repo name =
     let name = ref name in
     let remove () = remove !name in
     let make_contents name =
       Store.of_branch_id make_task name repo >|= fun store -> [
-        ro ~name:"ro" (store "ro");
-        Inode.of_dir "transactions" (Dir.directories (make_instance store) []);
-        Inode.of_dir "watch" (watch_dir ~path:[] (store "watch"));
-        Inode.of_file "head.live" (head_live (store "watch"));
-        Inode.of_file "fast-forward" (fast_forward_merge store);
-        Inode.of_file "reflog" (reflog (store "watch"));
-        Inode.of_file "head" (Fs9p_file.status (fun () ->
-            Store.head (store "head") >|= function
-            | None -> "\n"
-            | Some head -> Store.Hash.to_hum head ^ "\n"
-          ));
+        read_only ~name:"ro" (store "ro");
+        Vfs.Inode.dir  "transactions" (transactions store);
+        Vfs.Inode.dir  "watch"        (watch_dir ~path:[] @@ store "watch");
+        Vfs.Inode.file "head.live"    (head_live @@ store "watch");
+        Vfs.Inode.file "fast-forward" (fast_forward_merge store);
+        Vfs.Inode.file "reflog"       (reflog @@ store "watch");
+        Vfs.Inode.file "head"         (Vfs.File.status @@ status store);
       ] in
     let contents = ref (make_contents !name) in
     let ls () = !contents >|= fun contents -> Ok contents in
     let lookup name =
       !contents >|= fun items ->
       let rec aux = function
-        | [] -> Fs9p_error.enoent
-        | x :: _ when Inode.basename x = name -> Ok x
+        | [] -> Vfs.Error.noent
+        | x :: _ when Vfs.Inode.basename x = name -> Ok x
         | _ :: xs -> aux xs in
       aux items
     in
-    let i = Dir.read_only ~ls ~lookup ~remove () |> Inode.of_dir !name in
+    let i = Vfs.Dir.read_only ~ls ~lookup ~remove |> Vfs.Inode.dir !name in
     let renamed new_name =
       name := new_name;
       contents := make_contents new_name in
@@ -539,55 +565,57 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
   module StringSet = Set.Make(String)
 
   let branch_dir make_task repo =
-    let cache = ref InodeMap.empty in
+    let cache = ref StringMap.empty in
     let remove name =
       Store.Repo.remove_branch repo name >|= fun () ->
-      cache := !cache |> InodeMap.remove name;
+      cache := !cache |> StringMap.remove name;
       Ok () in
     let get_via_cache name =
-      try InodeMap.find name !cache
+      try StringMap.find name !cache
       with Not_found ->
         let entry = branch ~remove make_task repo name in
-        cache := !cache |> InodeMap.add name entry;
+        cache := !cache |> StringMap.add name entry;
         entry
     in
     let ls () =
       Store.Repo.branches repo >|= fun names ->
       let names =
         StringSet.of_list names
-        |> StringSet.union (InodeMap.bindings !cache |> List.map fst |> StringSet.of_list)
+        |> StringSet.union (StringMap.bindings !cache |> List.map fst |> StringSet.of_list)
         |> StringSet.elements in
       Ok (names |> List.map (fun n -> fst (get_via_cache n)))
     in
     let lookup name =
-      try ok (InodeMap.find name !cache |> fst)
+      try ok (StringMap.find name !cache |> fst)
       with Not_found ->
-        Store.Private.Ref.mem (Store.Private.Repo.ref_t repo) name >|= function
-        | true  -> Ok (get_via_cache name |> fst)
-        | false -> Fs9p_error.enoent
+        Store.Private.Ref.mem (Store.Private.Repo.ref_t repo) name >>= function
+        | true  -> ok (get_via_cache name |> fst)
+        | false -> err_enoent
     in
     let mkdir name = ok (get_via_cache name |> fst) in
-    let remove () = Fs9p_dir.err_ro in
+    let remove () = Vfs.Dir.err_read_only in
     let rename inode new_name =
       (* TODO: some races here... *)
-      let old_name = Inode.basename inode in
+      let old_name = Vfs.Inode.basename inode in
       let refs = Store.Private.Repo.ref_t repo in
       Store.Private.Ref.mem refs new_name >>= function
       | true -> err_eisdir
       | false ->
-      Store.Private.Ref.read refs old_name >>= fun head ->
-      begin match head with
-      | None -> Lwt.return ()
-      | Some head -> Store.Private.Ref.update refs new_name head end
-      >>= fun () ->
-      Store.Private.Ref.remove refs old_name >>= fun () ->
-      let entry = InodeMap.find old_name !cache in
-      snd entry new_name;
-      cache := !cache
-        |> InodeMap.remove old_name
-        |> InodeMap.add new_name entry;
-      Lwt.return (Ok ()) in
-    Dir.dir_only ~ls ~lookup ~mkdir ~remove ~rename ()
+        Store.Private.Ref.read refs old_name >>= fun head ->
+        begin match head with
+          | None      -> Lwt.return_unit
+          | Some head -> Store.Private.Ref.update refs new_name head end
+        >>= fun () ->
+        Store.Private.Ref.remove refs old_name >>= fun () ->
+        let entry = StringMap.find old_name !cache in
+        snd entry new_name;
+        cache :=
+          !cache
+          |> StringMap.remove old_name
+          |> StringMap.add new_name entry;
+        Lwt.return (Ok ())
+    in
+    Vfs.Dir.dir_only ~ls ~lookup ~mkdir ~remove ~rename
 
   (* /trees *)
 
@@ -597,9 +625,9 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
       else match String.sub h 0 2, String.sub h 2 (String.length h - 2) with
         | "F-", hash -> Ok (`File (String.trim hash |> Store.Private.Contents.Key.of_hum))
         | "D-", hash -> Ok (`Dir (String.trim hash |> Store.Private.Node.Key.of_hum))
-        | _ -> Fs9p_error.enoent
+        | _ -> Vfs.Error.noent
     with _ex ->
-      Fs9p_error.enoent
+      Vfs.Error.noent
 
   let trees_dir _make_task repo =
     let inode_of_tree_hash name =
@@ -608,9 +636,8 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
         begin
           Store.Private.Contents.read (Store.Private.Repo.contents_t repo) hash
           >|= function
-          | Some data ->
-            Ok (Fs9p_file.static (Cstruct.of_string data) |> Inode.of_file name)
-          | None -> Fs9p_error.enoent
+          | Some data -> Ok (Vfs.File.ro_of_string data |> Vfs.Inode.file name)
+          | None      -> Vfs.Error.noent
         end
       | `None ->
         let root = Tree.of_dir_hash repo None in
@@ -619,17 +646,17 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
         let root = Tree.of_dir_hash repo (Some hash) in
         ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
     in
-    let cache = ref InodeMap.empty in   (* Could use a weak map here *)
+    let cache = ref StringMap.empty in   (* Could use a weak map here *)
     let ls () = ok [] in
     let lookup name =
-      try ok (InodeMap.find name !cache)
+      try ok (StringMap.find name !cache)
       with Not_found ->
         inode_of_tree_hash name >>*= fun inode ->
-        cache := !cache |> InodeMap.add name inode;
+        cache := !cache |> StringMap.add name inode;
         ok inode
     in
-    let remove () = Fs9p_dir.err_ro in
-    Dir.read_only ~ls ~lookup ~remove ()
+    let remove () = Vfs.Dir.err_read_only in
+    Vfs.Dir.read_only ~ls ~lookup ~remove
 
   (* /snapshots *)
 
@@ -637,47 +664,46 @@ module Make (Inode : Fs9p_inode.S) (Store : I9p_tree.STORE) = struct
     let read () =
       let store = store "parents" in
       begin Store.head store >>= function
-      | None -> Lwt.return []
-      | Some head -> Store.history store ~depth:1 >|= fun hist ->
+        | None -> Lwt.return []
+        | Some head -> Store.history store ~depth:1 >|= fun hist ->
           Store.History.pred hist head
       end >|= fun parents ->
       Ok (Some (Cstruct.of_string (string_of_parents parents))) in
-    Fs9p_file.read_only ~read
+    Vfs.File.of_kvro ~read
 
   let snapshot_dir store name =
-    let open Inode in
     static_dir name [
-      ro ~name:"ro" (store "ro");
-      of_file "hash" (Fs9p_file.static_string name);
-      of_file "parents" (parents_file store)
+      read_only ~name:"ro"     (store "ro");
+      Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
+      Vfs.Inode.file "parents" (parents_file store)
     ]
 
   let snapshots_dir make_task repo =
-    let cache = ref InodeMap.empty in   (* Could use a weak map here *)
+    let cache = ref empty_inode_map in   (* Could use a weak map here *)
     let ls () = ok [] in
     let lookup name =
-      try ok (InodeMap.find name !cache)
+      try ok (StringMap.find name !cache)
       with Not_found ->
-        Lwt.return (
-          try Ok (Store.Hash.of_hum name)
+        begin
+          try ok (Store.Hash.of_hum name)
           with _ex -> err_invalid_commit_id name
-        ) >>*= fun commit_id ->
+        end >>*= fun commit_id ->
         Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) commit_id >>= function
         | false -> err_enoent
         | true ->
           Store.of_commit_id make_task commit_id repo >|= fun store ->
           let inode = snapshot_dir store name in
-          cache := !cache |> InodeMap.add name inode;
+          cache := !cache |> StringMap.add name inode;
           Ok inode
     in
-    let remove () = Fs9p_dir.err_ro in
-    Dir.read_only ~ls ~lookup ~remove ()
+    let remove () = Vfs.Dir.err_read_only in
+    Vfs.Dir.read_only ~ls ~lookup ~remove
 
   let create make_task repo =
-    Dir.fixed Inode.[
-      of_dir "branch" (branch_dir make_task repo);
-      of_dir "trees" (trees_dir make_task repo);
-      of_dir "snapshots" (snapshots_dir make_task repo);
+    Vfs.Dir.of_list [
+      Vfs.Inode.dir "branch"    (branch_dir make_task repo);
+      Vfs.Inode.dir "trees"     (trees_dir make_task repo);
+      Vfs.Inode.dir "snapshots" (snapshots_dir make_task repo);
     ]
 
 end

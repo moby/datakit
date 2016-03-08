@@ -62,6 +62,9 @@ module File: sig
   type t
   (** The type for files. *)
 
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for files. *)
+
   val create:
     size:(unit -> int64 or_err) ->
     open_:(unit -> fd or_err) ->
@@ -141,6 +144,9 @@ module rec Dir: sig
   type t
   (** The type for directories. *)
 
+  val pp: t Fmt.t
+  (** [pp] is a pretty-printer for directories. *)
+
   val ls: t -> Inode.t list or_err
   (** The [ls] commands. *)
 
@@ -214,10 +220,16 @@ module rec Dir: sig
 
 end and Inode: sig
 
-  (** Inode.t operations. *)
+  (** Inode.t operations.
+
+      An inode has a basename, a kind (a file or a directory) and a
+      tag to let frontends attach additional runtime state. *)
 
   type t
   (** The type for inodes. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for inodes. *)
 
   type kind = [`File of File.t | `Dir of Dir.t]
   (** The type for inode kinds. *)
@@ -232,6 +244,9 @@ end and Inode: sig
 
   val basename: t -> string
   (** [basenane t] is [t]'s basename. *)
+
+  val set_basename: t -> string -> unit
+  (** [set_basename t name] changes [t]'s basename to [name]. *)
 
   val kind: t -> kind
   (** [kind t] is [t]'s kind. *)

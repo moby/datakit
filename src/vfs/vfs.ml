@@ -127,33 +127,39 @@ module File = struct
   let write = Fd.write
 
   type t = {
+    debug: string;
     size: unit -> int64 or_err;
     open_: unit -> fd or_err;
     remove: unit -> unit or_err;
     truncate: int64 -> unit or_err;
   }
 
-  let create ~size ~open_ ~remove ~truncate = { size; open_; remove; truncate }
+  let pp ppf t = Fmt.pf ppf "Vfs.File.%s" t.debug
+
+  let create_aux ~debug ~size ~open_ ~remove ~truncate =
+    { debug; size; open_; remove; truncate }
+
   let size t = t.size ()
   let open_ t = t.open_ ()
   let remove t = t.remove ()
   let truncate t = t.truncate
 
-  let read_only =
-    create ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only)
+  let read_only_aux =
+    create_aux ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only)
 
   let ro_of_cstruct data =
     let len = Cstruct.len data |> Int64.of_int in
     let size () = ok len in
     let open_ () = Fd.static data in
-    read_only ~size ~open_
+    read_only_aux ~size ~open_
 
-  let ro_of_string text = ro_of_cstruct (Cstruct.of_string text)
+  let ro_of_string text =
+    ro_of_cstruct ~debug:"ro_of_string" (Cstruct.of_string text)
 
   let of_stream stream =
     let size () = ok 0L in
     let open_ () = stream () >>= fun s -> Fd.of_stream s in
-    read_only ~size ~open_
+    read_only_aux ~debug:"of_stream" ~size ~open_
 
   let command handler =
     (* Value currently being returned to user. Note that this is
@@ -184,7 +190,7 @@ module File = struct
       | 0L -> ok () (* For `echo cmd > file` *)
       | _  -> err_extend_cmd_file
     in
-    create ~size ~open_ ~remove ~truncate
+    create_aux ~debug:"command" ~size ~open_ ~remove ~truncate
 
   let status fn =
     let size () = fn () >|= fun data -> (Ok (String.length data |> Int64.of_int)) in
@@ -201,7 +207,7 @@ module File = struct
       let stream = Stream.create ~read ~write in
       Fd.of_stream stream
     in
-    read_only ~size ~open_
+    read_only_aux ~debug:"status" ~size ~open_
 
   (* [overwrite orig (new, offset)] is a buffer [start; padding; new;
       end] where [new] is at position [offset], [start] and [end] are
@@ -229,7 +235,7 @@ module File = struct
       ]
     )
 
-  let of_kv ~read ~write =
+  let of_kv_aux ~read ~write =
     let size () = read () >>*= function
       | None          -> err_noent
       | Some contents -> ok @@ Int64.of_int (Cstruct.len contents)
@@ -271,20 +277,23 @@ module File = struct
           write (Cstruct.append old padding)
         )
       ) in
-    create ~size ~open_ ~truncate
+    create_aux ~size ~open_ ~truncate
 
   let of_kvro ~read =
     let write _ = err_read_only in
     let remove () = err_read_only in
-    of_kv ~read ~write ~remove
+    of_kv_aux ~debug:"of_kvro" ~read ~write ~remove
 
   let rw_of_string init =
     let data = ref (Cstruct.of_string init) in
     let read () = ok (Some !data) in
     let write v = data := v; ok () in
     let remove () = err_read_only in
-    let file = of_kv ~read ~write ~remove in
+    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove in
     (file, fun () -> Cstruct.to_string !data)
+
+  let create = create_aux ~debug:"create"
+  let of_kv = of_kv_aux ~debug:"of_kv"
 
 end
 
@@ -298,6 +307,7 @@ module Dir = struct
   module StringMap  = Map.Make(String)
 
   type t = {
+    debug: string;
     ls: unit -> inode list or_err;
     mkfile: string -> inode or_err;
     lookup: string -> inode or_err;
@@ -308,12 +318,14 @@ module Dir = struct
 
   and kind = [`File of File.t | `Dir of t]
 
-  and inode = {
-    basename: string;
-    kind: kind;
-  }
+  and inode = { mutable basename: string; kind: kind }
 
-  type inode_map = inode StringMap.t
+  let pp ppf t = Fmt.pf ppf "Vfs.Dir.%s" t.debug
+
+  let pp_kind ppf k =
+    Fmt.string ppf (match k with `Dir _ -> "dir" | `File _ -> "file")
+
+  let pp_inode ppf t = Fmt.pf ppf "%s:%a" t.basename pp_kind t.kind
 
   let ls t = t.ls ()
   let mkfile t = t.mkfile
@@ -322,16 +334,16 @@ module Dir = struct
   let remove t = t.remove ()
   let rename t = t.rename
 
-  let create ~ls ~mkfile ~lookup ~mkdir ~remove ~rename =
-    {ls; mkfile; mkdir; remove; lookup; rename }
+  let create_aux ~debug ~ls ~mkfile ~lookup ~mkdir ~remove ~rename =
+    { debug; ls; mkfile; mkdir; remove; lookup; rename }
 
-  let read_only =
+  let read_only_aux =
     let mkfile _ = err_read_only in
     let mkdir _ = err_read_only in
     let rename _ _ = err_read_only in
-    create ~mkfile ~mkdir ~rename
+    create_aux ~mkfile ~mkdir ~rename
 
-  let of_list items =
+  let of_list_aux items =
     let ls () = ok items in
     let lookup name =
       let rec aux = function
@@ -341,9 +353,9 @@ module Dir = struct
       aux items
     in
     let remove () = err_read_only in
-    read_only ~ls ~lookup ~remove
+    read_only_aux ~ls ~lookup ~remove
 
-  let empty = of_list []
+  let empty = of_list_aux ~debug:"empty" []
 
   let of_map_ref m =
     let ls () = ok (StringMap.bindings !m |> List.map snd) in
@@ -392,17 +404,22 @@ module Dir = struct
     let remove _ = err_read_only in
     create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename
 
-  let dir_only  =
+  let dir_only =
     let mkfile _ = err_dir_only in
-    create ~mkfile
+    create_aux ~debug:"dir_only" ~mkfile
 
+  let of_list = of_list_aux ~debug:"of_list"
+  let create = create_aux ~debug:"create"
+  let read_only = read_only_aux ~debug:"read_only"
 end
 
 module Inode = struct
   type t = Dir.inode
+  let pp = Dir.pp_inode
   type kind = Dir.kind
   let file basename file = { Dir.basename; kind = `File file }
   let dir basename dir = { Dir.basename; kind = `Dir dir }
   let basename t = t.Dir.basename
+  let set_basename t b = t.Dir.basename <- b
   let kind t = t.Dir.kind
 end

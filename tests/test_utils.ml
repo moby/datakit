@@ -1,4 +1,4 @@
-open Lwt
+open Lwt.Infix
 open Result
 
 let () = Printexc.record_backtrace true
@@ -7,10 +7,13 @@ let ( ++ ) = Int64.add
 
 let ok x = `Ok x
 
-let ( >>*= ) x f =
-  x >>= function
+let ( >>*= ) x f = x >>= function
   | Ok y -> f y
   | Error (`Msg msg) -> Alcotest.fail msg
+
+let ( >>**= ) x f = x >>= function
+  | Ok y -> f y
+  | Error _ as e -> Lwt.return e
 
 let fd_stderr = Unix.descr_of_out_channel stderr
 let real_stderr = Unix.dup fd_stderr
@@ -40,7 +43,7 @@ module Test_flow = struct
     let flow2 = { from_remote = b; to_remote = a } in
     (flow1, flow2)
 
-  let close _t = return ()
+  let close _t = Lwt.return_unit
   let write1 t buf = Lwt_mvar.put t.to_remote buf
   let write t buf = write1 t buf >|= ok
   let writev t bufv = Lwt_list.iter_s (write1 t) bufv >|= ok
@@ -82,15 +85,15 @@ let run fn =
       Irmin.Task.create ~date ~owner:"irmin9p" msg
     in
     let root = Filesystem.create make_task repo in
-    let server_thread = Server.accept ~root for_server >>*= return in
+    let server_thread = Server.accept ~root for_server >>*= Lwt.return in
     Lwt.finalize
       (fun () ->
          Lwt.catch
            (fun () -> Client.connect for_client () >>*= fn repo)
            (fun ex ->
               List.rev !log |> List.iter print_endline;
-              fail ex))
-      (fun () -> Lwt.cancel server_thread; return ())
+              Lwt.fail ex))
+      (fun () -> Lwt.cancel server_thread; Lwt.return ())
   end
 
 let rwx = [`Read; `Write; `Execute]
@@ -105,15 +108,15 @@ let check_dir conn path msg expected =
   List.map (fun stat -> stat.Protocol_9p.Types.Stat.name) items
   |> List.sort String.compare
   |> Alcotest.(check (list string)) msg expected;
-  return ()
+  Lwt.return_unit
 
 let with_file conn path fn =
   Client.with_fid conn (fun newfid ->
       Client.walk_from_root conn newfid path >>*= fun _resp ->
       fn newfid >>= fun result ->
       Client.LowLevel.clunk conn newfid >>*= fun () ->
-      return (Ok result)
-    ) >>*= return
+      Lwt.return (Ok result)
+    ) >>*= Lwt.return
 
 let stream conn ?(off=0L) fid =
   let mvar = Lwt_mvar.create_empty () in
@@ -163,20 +166,20 @@ let create_file conn path leaf contents =
       >>*= fun _open ->
       Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
       >>*= fun _resp ->
-      return ()
+      Lwt.return_unit
     )
 
 let write_file conn ?(truncate=false) path contents =
   with_file conn path (fun fid ->
       begin
-        if truncate then Client.LowLevel.update ~length:0L conn fid >>*= return
-        else return ()
+        if not truncate then Lwt.return_unit
+        else Client.LowLevel.update ~length:0L conn fid >>*= Lwt.return
       end >>= fun () ->
       Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.write_only
-      >>*= fun _open ->
+      >>**= fun _open ->
       Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
-      >>*= fun _resp ->
-      return (Ok ())
+      >>**= fun _resp ->
+      Lwt.return (Ok ())
     )
 
 let read_file conn path =
@@ -197,7 +200,7 @@ let echo conn str path =
       Client.LowLevel.write
         conn newfid 0L (Cstruct.of_string (str ^ "\n")) >>*= fun _ ->
       Lwt.return (Ok ())
-    ) >>*= return
+    ) >>*= Lwt.return
 
 let with_transaction conn ~branch name fn =
   let path = ["branch"; branch; "transactions"] in
@@ -206,18 +209,21 @@ let with_transaction conn ~branch name fn =
   write_file conn (path @ ["msg"]) name >>*= fun () ->
   Lwt.try_bind
     (fun () -> fn path)
-    (fun r -> write_file conn (path @ ["ctl"]) "commit" >>*= fun () -> return r)
+    (fun r ->
+       write_file conn (path @ ["ctl"]) "commit" >>*= fun () ->
+       Lwt.return r)
     (fun ex ->
        Lwt.try_bind
-         (fun () -> write_file conn (path @ ["ctl"]) "close" >>*= return)
-         (fun () -> fail ex)
+         (fun () -> write_file conn (path @ ["ctl"]) "close" >>*= Lwt.return)
+         (fun () -> Lwt.fail ex)
          (fun ex2 ->
-            failwith (Printf.sprintf "Error trying to close transaction:\n%s\n\
-                                      ... in response to error:\n%s)"
-                        (Printexc.to_string ex2) (Printexc.to_string ex)
-                     )
-         )
-    )
+            let err =
+              Printf.sprintf
+                "Error trying to close transaction:\n%s\n\
+                 ... in response to error:\n%s)"
+                (Printexc.to_string ex2) (Printexc.to_string ex)
+            in
+            failwith err))
 
 let head conn branch = read_file conn ["branch"; branch; "head"] >|= String.trim
 
@@ -240,7 +246,7 @@ let make_branch conn ?src name =
   let path = ["branch"; name] in
   match src with
   | None -> Lwt.return ()
-  | Some src -> write_file conn (path @ ["fast-forward"]) src >>*= return
+  | Some src -> write_file conn (path @ ["fast-forward"]) src >>*= Lwt.return
 
 (* Replace the files currently on [branch] with [files]. *)
 let populate conn ~branch files =
@@ -256,17 +262,20 @@ let populate conn ~branch files =
       |> Alcotest.(check (list string)) "rw is empty" [];
       let dirs = Hashtbl.create 2 in
       let rec ensure_dir d =
-        if Hashtbl.mem dirs d then return ()
+        if Hashtbl.mem dirs d then Lwt.return_unit
         else (
           match Irmin.Path.String_list.rdecons d with
-          | None -> return ()
+          | None -> Lwt.return_unit
           | Some (parent, name) ->
             ensure_dir parent >>= fun () ->
             Hashtbl.add dirs d ();
-            Client.mkdir conn (t @ ["rw"] @ parent) name rwxr_xr_x >>*= return
+            Client.mkdir conn (t @ ["rw"] @ parent) name rwxr_xr_x >>*=
+            Lwt.return
         ) in
       files |> Lwt_list.iter_s (fun (path, value) ->
-          match Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons with
+          match
+            Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons
+          with
           | None -> assert false
           | Some (dir, name) ->
             ensure_dir dir >>= fun () ->

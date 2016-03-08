@@ -17,10 +17,10 @@ let real_stderr = Unix.dup fd_stderr
 let () =
   let old_hook = !Lwt.async_exception_hook in
   Lwt.async_exception_hook := (fun ex ->
-    Unix.dup2 real_stderr fd_stderr;
-    Printf.eprintf "\nasync_exception_hook:\n%!";
-    old_hook ex
-  )
+      Unix.dup2 real_stderr fd_stderr;
+      Printf.eprintf "\nasync_exception_hook:\n%!";
+      old_hook ex
+    )
 
 module Test_flow = struct
   type error = {zero : 'a. 'a}
@@ -57,9 +57,10 @@ module Log : Protocol_9p.S.LOG = struct
   let info fmt = Fmt.kstrf (fun s -> append ("info: " ^ s)) fmt
   let error fmt = Fmt.kstrf (fun s -> print_endline s; append s) fmt
 end
-module Store = Irmin_mem.Make(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
-module Server = Fs9p_fs.Make(Log)(Test_flow)
-module Filesystem = I9p_irmin.Make(Server.Inode)(Store)
+module Store =
+  Irmin_mem.Make(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+module Server = Fs9p.Make(Log)(Test_flow)
+module Filesystem = I9p_irmin.Make(Store)
 
 module Client = Protocol_9p.Client.Make(Log)(Test_flow)
 
@@ -78,11 +79,11 @@ let run fn =
     let server_thread = Server.accept ~root for_server >>*= return in
     Lwt.finalize
       (fun () ->
-        Lwt.catch
-          (fun () -> Client.connect for_client () >>*= fn repo)
-          (fun ex ->
-            List.rev !log |> List.iter print_endline;
-            fail ex))
+         Lwt.catch
+           (fun () -> Client.connect for_client () >>*= fn repo)
+           (fun ex ->
+              List.rev !log |> List.iter print_endline;
+              fail ex))
       (fun () -> Lwt.cancel server_thread; return ())
   end
 
@@ -101,7 +102,7 @@ let check_dir conn path msg expected =
   return ()
 
 let with_file conn path fn =
-    Client.with_fid conn (fun newfid ->
+  Client.with_fid conn (fun newfid ->
       Client.walk_from_root conn newfid path >>*= fun _resp ->
       fn newfid >>= fun result ->
       Client.LowLevel.clunk conn newfid >>*= fun () ->
@@ -116,58 +117,61 @@ let stream conn ?(off=0L) fid =
       with Not_found -> None in
     match i with
     | Some i ->
-        let line = String.sub buf 0 i in
-        Lwt_mvar.put mvar (`Line line) >>= fun () ->
-        let buf = String.sub buf (i + 1) (String.length buf - i - 1) in
-        read_line ~saw_flush ~buf ~off
+      let line = String.sub buf 0 i in
+      Lwt_mvar.put mvar (`Line line) >>= fun () ->
+      let buf = String.sub buf (i + 1) (String.length buf - i - 1) in
+      read_line ~saw_flush ~buf ~off
     | None ->
-        Client.LowLevel.read conn fid off 256l >>*= fun resp ->
-        match Cstruct.to_string resp.Protocol_9p.Response.Read.data with
-        | "" when saw_flush -> Lwt_mvar.put mvar `Eof
-        | "" -> read_line ~saw_flush:true ~buf ~off
-        | data ->
-            read_line
-              ~saw_flush:false
-              ~buf:(buf ^ data)
-              ~off:(off ++ Int64.of_int (String.length data)) in
+      Client.LowLevel.read conn fid off 256l >>*= fun resp ->
+      match Cstruct.to_string resp.Protocol_9p.Response.Read.data with
+      | "" when saw_flush -> Lwt_mvar.put mvar `Eof
+      | "" -> read_line ~saw_flush:true ~buf ~off
+      | data ->
+        read_line
+          ~saw_flush:false
+          ~buf:(buf ^ data)
+          ~off:(off ++ Int64.of_int (String.length data)) in
   Lwt.async (fun () ->
-    Lwt.catch
-      (fun () -> read_line ~saw_flush:false ~buf:"" ~off)
-      (fun ex -> Lwt_mvar.put mvar (`Line (Printexc.to_string ex)))
-  );
+      Lwt.catch
+        (fun () -> read_line ~saw_flush:false ~buf:"" ~off)
+        (fun ex -> Lwt_mvar.put mvar (`Line (Printexc.to_string ex)))
+    );
   fun () -> Lwt_mvar.take mvar
 
 let with_stream conn path fn =
   with_file conn path (fun fid ->
-    Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.read_only >>*= fun _resp ->
-    fn (stream conn fid)
-  )
+      Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.read_only
+      >>*= fun _resp ->
+      fn (stream conn fid)
+    )
 
 let read_line_exn stream =
   stream () >|= function
   | `Line l -> l
-  | `Eof -> Alcotest.fail "Unexpected end-of-stream"
+  | `Eof    -> Alcotest.fail "Unexpected end-of-stream"
 
 let create_file conn path leaf contents =
   with_file conn path (fun fid ->
-    Client.LowLevel.create conn fid leaf rw_r__r__ Protocol_9p.Types.OpenMode.write_only >>*= fun _open ->
-    Client.LowLevel.write conn fid 0L (Cstruct.of_string contents) >>*= fun _resp ->
-    return ()
-  )
+      Client.LowLevel.create
+        conn fid leaf rw_r__r__ Protocol_9p.Types.OpenMode.write_only
+      >>*= fun _open ->
+      Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
+      >>*= fun _resp ->
+      return ()
+    )
 
 let write_file conn ?(truncate=false) path contents =
   with_file conn path (fun fid ->
-    begin if truncate then (Client.LowLevel.update ~length:0L conn fid >>*= return)
-    else return ()
-    end >>= fun () ->
-    let ( >>*= ) x f =
-      x >>= function
-      | Ok y -> f y
-      | Error _ as e -> Lwt.return e in
-    Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.write_only >>*= fun _open ->
-    Client.LowLevel.write conn fid 0L (Cstruct.of_string contents) >>*= fun _resp ->
-    return (Ok ())
-  )
+      begin
+        if truncate then Client.LowLevel.update ~length:0L conn fid >>*= return
+        else return ()
+      end >>= fun () ->
+      Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.write_only
+      >>*= fun _open ->
+      Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
+      >>*= fun _resp ->
+      return (Ok ())
+    )
 
 let read_file conn path =
   Client.stat conn path >>*= fun info ->
@@ -180,12 +184,14 @@ let check_file conn path msg expected =
 
 let echo conn str path =
   Client.with_fid conn (fun newfid ->
-    Client.walk_from_root conn newfid path >>*= fun _ ->
-    Client.LowLevel.update conn ~length:0L newfid >>*= fun () ->
-    Client.LowLevel.openfid conn newfid Protocol_9p.Types.OpenMode.write_only >>*= fun _ ->
-    Client.LowLevel.write conn newfid 0L (Cstruct.of_string (str ^ "\n")) >>*= fun _ ->
-    Lwt.return (Ok ())
-  ) >>*= return
+      Client.walk_from_root conn newfid path >>*= fun _ ->
+      Client.LowLevel.update conn ~length:0L newfid >>*= fun () ->
+      Client.LowLevel.openfid
+        conn newfid Protocol_9p.Types.OpenMode.write_only >>*= fun _ ->
+      Client.LowLevel.write
+        conn newfid 0L (Cstruct.of_string (str ^ "\n")) >>*= fun _ ->
+      Lwt.return (Ok ())
+    ) >>*= return
 
 let with_transaction conn ~branch name fn =
   let path = ["branch"; branch; "transactions"] in
@@ -196,14 +202,15 @@ let with_transaction conn ~branch name fn =
     (fun () -> fn path)
     (fun r -> write_file conn (path @ ["ctl"]) "commit" >>*= fun () -> return r)
     (fun ex ->
-      Lwt.try_bind
-        (fun () -> write_file conn (path @ ["ctl"]) "close" >>*= return)
-        (fun () -> fail ex)
-        (fun ex2 ->
-          failwith (Printf.sprintf "Error trying to close transaction:\n%s\n... in response to error:\n%s)"
-            (Printexc.to_string ex2) (Printexc.to_string ex)
-          )
-        )
+       Lwt.try_bind
+         (fun () -> write_file conn (path @ ["ctl"]) "close" >>*= return)
+         (fun () -> fail ex)
+         (fun ex2 ->
+            failwith (Printf.sprintf "Error trying to close transaction:\n%s\n\
+                                      ... in response to error:\n%s)"
+                        (Printexc.to_string ex2) (Printexc.to_string ex)
+                     )
+         )
     )
 
 let head conn branch = read_file conn ["branch"; branch; "head"] >|= String.trim
@@ -218,7 +225,8 @@ let rec history conn hash =
   Commit (hash, histories)
 
 let rec pp_history fmt (Commit (hash, parents)) =
-  Format.fprintf fmt "@[<v2>%s@\n%a@]" hash (Format.pp_print_list pp_history) parents
+  Format.fprintf fmt "@[<v2>%s@\n%a@]"
+    hash (Format.pp_print_list pp_history) parents
 
 (* Create a new branch. If [src] is given, use this as the starting commit. *)
 let make_branch conn ?src name =
@@ -231,38 +239,41 @@ let make_branch conn ?src name =
 (* Replace the files currently on [branch] with [files]. *)
 let populate conn ~branch files =
   with_transaction conn ~branch "init" (fun t ->
-    Client.readdir conn (t @ ["rw"]) >>*= fun existing ->
-    existing |> Lwt_list.iter_s (fun stat ->
-      let name = stat.Protocol_9p_types.Stat.name in
-      Client.remove conn (t @ ["rw"; name]) >>*= Lwt.return
-    ) >>= fun () ->
-    Client.readdir conn (t @ ["rw"]) >>*= fun existing ->
-    existing |> List.map (fun e -> e.Protocol_9p_types.Stat.name) |> Alcotest.(check (list string)) "rw is empty" [];
-    let dirs = Hashtbl.create 2 in
-    let rec ensure_dir d =
-      if Hashtbl.mem dirs d then return ()
-      else (
-        match Irmin.Path.String_list.rdecons d with
-        | None -> return ()
-        | Some (parent, name) ->
+      Client.readdir conn (t @ ["rw"]) >>*= fun existing ->
+      existing |> Lwt_list.iter_s (fun stat ->
+          let name = stat.Protocol_9p_types.Stat.name in
+          Client.remove conn (t @ ["rw"; name]) >>*= Lwt.return
+        ) >>= fun () ->
+      Client.readdir conn (t @ ["rw"]) >>*= fun existing ->
+      existing
+      |> List.map (fun e -> e.Protocol_9p_types.Stat.name)
+      |> Alcotest.(check (list string)) "rw is empty" [];
+      let dirs = Hashtbl.create 2 in
+      let rec ensure_dir d =
+        if Hashtbl.mem dirs d then return ()
+        else (
+          match Irmin.Path.String_list.rdecons d with
+          | None -> return ()
+          | Some (parent, name) ->
             ensure_dir parent >>= fun () ->
             Hashtbl.add dirs d ();
             Client.mkdir conn (t @ ["rw"] @ parent) name rwxr_xr_x >>*= return
-      ) in
-    files |> Lwt_list.iter_s (fun (path, value) ->
-      match Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons with
-      | None -> assert false
-      | Some (dir, name) ->
-      ensure_dir dir >>= fun () ->
-      let dir = t @ ["rw"] @ dir in
-      create_file conn dir name value
+        ) in
+      files |> Lwt_list.iter_s (fun (path, value) ->
+          match Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons with
+          | None -> assert false
+          | Some (dir, name) ->
+            ensure_dir dir >>= fun () ->
+            let dir = t @ ["rw"] @ dir in
+            create_file conn dir name value
+        )
     )
-  )
 
-(* Commit [base] to master. Then fork a branch which replaces this with [theirs].
-   Replace [base] with [ours] on master, then merge [theirs]. Calls [fn trans] on
-   the transaction after irmin9p has done its part and is waiting for us to resolve
-   the remaining conflicts manually. *)
+(* Commit [base] to master. Then fork a branch which replaces this
+   with [theirs].  Replace [base] with [ours] on master, then merge
+   [theirs]. Calls [fn trans] on the transaction after irmin9p has
+   done its part and is waiting for us to resolve the remaining
+   conflicts manually. *)
 let try_merge conn ~base ~ours ~theirs fn =
   make_branch conn "master" >>= fun () ->
   populate conn ~branch:"master" base >>= fun () ->
@@ -271,7 +282,7 @@ let try_merge conn ~base ~ours ~theirs fn =
   populate conn ~branch:"master" ours >>= fun () ->
   populate conn ~branch:"theirs" theirs >>= fun () ->
   with_transaction conn ~branch:"master" "merge" (fun t ->
-    head conn "theirs" >>= fun theirs_head ->
-    write_file conn (t @ ["merge"]) theirs_head >>*= fun () ->
-    fn t
-  )
+      head conn "theirs" >>= fun theirs_head ->
+      write_file conn (t @ ["merge"]) theirs_head >>*= fun () ->
+      fn t
+    )

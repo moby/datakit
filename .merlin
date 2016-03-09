@@ -1,5 +1,6 @@
-PKG lwt rresult fmt protocol-9p irmin.unix launchd cmdliner
-PKG alcotest
+PKG lwt result fmt protocol-9p irmin.unix launchd cmdliner
+PKG alcotest rresult
 S src/**
 S tests/
-B _build/**
+B _build/src/**
+B _build/tests/

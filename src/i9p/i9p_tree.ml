@@ -1,7 +1,7 @@
 open Lwt.Infix
 
-type leaf = Fs9p_misc.leaf
-type path = Fs9p_misc.path
+type leaf = string
+type path = string list
 
 module Path = Irmin.Path.String_list
 

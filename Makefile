@@ -12,9 +12,11 @@ all: setup.data
 	$(SETUP) -all $(ALLFLAGS)
 
 setup.ml: _oasis
+	rm -f _tags myocamlbuild.ml
 	oasis setup
 	echo 'true: debug, bin_annot' >> _tags
 	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags
+	echo 'Ocamlbuild_plugin.mark_tag_used "tests"' >> myocamlbuild.ml
 
 doc: setup.data build
 	$(SETUP) -doc $(DOCFLAGS)
@@ -36,8 +38,8 @@ reinstall: setup.data
 clean:
 	if [ -f setup.ml ]; then $(SETUP) -clean $(CLEANFLAGS); fi
 	rm -f setup.data setup.ml myocamlbuild.ml _tags configure
-	rm -f src/i9p.odocl src/META setup.log
-	rm -f src/i9p/META src/i9p/i9p.mldylib src/i9p/i9p.mllib src/i9p/META
+	rm -f src/*.odocl src/META setup.log
+	rm -f src/**/META src/**/*.mldylib src/**/*.mllib
 	rm -f $(VFILE)
 	rm -rf $(APP) _tests
 

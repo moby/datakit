@@ -178,6 +178,30 @@ one.
 that currently exist. However, these are just suggestions; you can
 watch any path, whether it currently exists or not.
 
+### Fetch
+
+To fetch from a remote repository, use the `/remotes` root directory.
+This directory is *not persisted* so will disapear accross reboots.
+
+Each directory under `/remotes/<name>` corresponds to the configuration
+of a remote server called `<name>`. Create a new directory (with `mkdir`)
+to add a new configuration. Every configuration folder contains:
+
+- A writable file: `url`, which contains the remote url.
+- A control file: `fetch`, which is used to fetch branches from the
+  remote server.
+- A read-only stream file: `head` which contains the last knowns
+  commit ID of the remote. On every fetch, a new line is added
+  with the commit ID of the remote branch.
+
+To  fetch `https://github.com/docker/datakit`'s master branch:
+
+    ~/mnt $ cd remotes
+    ~/mnt/remotes $ mkdir origin
+    ~/mnt/remotes $ echo https://github.com/docker/datakit > origin/url
+    ~/mnt/remotes $ echo master > origin/fetch
+    ~/mnt/remotes $ cat origin/head
+    4b6557542ec9cc578d5fe09b664110ba3b68e2c2
 
 ### How do I...
 

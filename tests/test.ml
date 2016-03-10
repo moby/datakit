@@ -2,13 +2,13 @@ open Lwt.Infix
 open Test_utils
 open Result
 
-let transaction repo conn =
-  check_dir conn [] "Root entries" ["branch"; "snapshots"; "trees"]
-  >>= fun () ->
+let root_entries = ["branch"; "snapshots"; "trees"; "remotes"]
+
+let test_transaction repo conn =
+  check_dir conn [] "Root entries" root_entries >>= fun () ->
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
   check_dir conn ["branch"] "Check master exists" ["master"] >>= fun () ->
-  check_dir conn ["branch"; "master"; ".."; ".."]
-    "Check .. works" ["branch"; "snapshots"; "trees"]
+  check_dir conn ["branch"; "master"; ".."; ".."] "Check .. works" root_entries
   >>= fun () ->
 
   Client.mkdir conn ["branch"; "master"; "transactions"] "init" rwxr_xr_x
@@ -85,7 +85,8 @@ let test_parents _repo conn =
   check_parents ~branch:"dev" master_head >>= fun () ->
 
   check_fails "Invalid hash" "hello" >>= fun () ->
-  check_fails "Missing hash" "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35" >>= fun () ->
+  check_fails "Missing hash" "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35"
+  >>= fun () ->
 
   read_file conn ["branch"; "dev"; "head"] >>= fun dev_head ->
   with_transaction conn ~branch:"master" "test3" (fun t1 ->
@@ -105,13 +106,14 @@ let test_parents _repo conn =
   let a, b, c =
     match history with
     | Commit (_, [
+        Commit (a, _);
         Commit (_, [
             Commit (b, _);
             Commit (c, _)
           ]);
-        Commit (a, _);
       ]) -> a, b, c
-    | x -> Alcotest.fail (Format.asprintf "Bad history:@\n%a" pp_history x) in
+    | x -> Alcotest.fail (Format.asprintf "Bad history:@\n%a" pp_history x)
+  in
   Alcotest.(check string) "First parent" after_inner (a ^ "\n");
   Alcotest.(check string) "Dev parent" dev_head (b ^ "\n");
   Alcotest.(check string) "Orig parent" orig_parent (c ^ "\n");
@@ -144,8 +146,9 @@ let test_merge _repo conn =
     ) >>= fun () ->
   head conn "master" >>= fun merge_commit ->
   read_file conn ["snapshots"; merge_commit; "parents"] >>= fun parents ->
-  Alcotest.(check string) "Merge parents"
-    (Printf.sprintf "%s\n%s\n" merge_b merge_a) parents;
+  let parents = Str.(split (regexp "\n")) parents in
+  Alcotest.(check @@ slist string String.compare) "Merge parents"
+    [merge_b; merge_a] parents;
   read_file conn ["branch"; "master"; "ro"; "file"] >>= fun merged ->
   Alcotest.(check string) "Merge result" "from-master+pr" merged;
   Lwt.return ()
@@ -275,18 +278,18 @@ let test_watch repo conn =
   @@ fun makefile ->
   read_line_exn makefile >>= fun makefile_init ->
   Alcotest.(check string) "Makefile hash"
-    "F-79f665b460015f226a432bc39e8f9d43053fa05b" makefile_init;
+    "F-d81e367f87ee314bcd3e449b1c6641efda5bc269" makefile_init;
   (* Modify file under doc *)
   let next_make = makefile () in
   Store.update master ["doc"; "README"] "Instructions" >>= fun () ->
   read_line_exn doc >>= fun doc_new ->
   Alcotest.(check string) "Doc update"
-    "D-1d8b9cdb86a24803f934575b356d7e2cb3e61a68" doc_new;
-  check_dir conn ["trees"; "D-1d8b9cdb86a24803f934575b356d7e2cb3e61a68"]
+    "D-a3e8adf6d194bfbdec2ca73aebe0990edee2ddbf" doc_new;
+  check_dir conn ["trees"; "D-a3e8adf6d194bfbdec2ca73aebe0990edee2ddbf"]
     "Check /trees/D..." ["README"] >>= fun () ->
   read_line_exn top >>= fun top_new ->
   Alcotest.(check string) "Top update"
-    "D-845ffd8bc63ff2f8c9e18a4fdd9b962a01bdf1ef" top_new;
+    "D-acaa8ac97706d94e012da475e8a63d647011a72c" top_new;
   Alcotest.(check bool) "No Makefile update" true
     (Lwt.state next_make = Lwt.Sleep);
   Lwt.return_unit
@@ -318,9 +321,11 @@ let test_rename repo conn =
 let test_truncate _repo conn =
   let path = ["branch"; "master"; "transactions"; "init"; "rw"; "file"] in
   let check msg expected =
-    read_file conn path >|= Alcotest.(check string) msg expected in
+    read_file conn path >|= Alcotest.(check string) msg expected
+  in
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
-  Client.mkdir conn ["branch"; "master"; "transactions"] "init" rwxr_xr_x >>*= fun () ->
+  Client.mkdir conn ["branch"; "master"; "transactions"] "init" rwxr_xr_x
+  >>*= fun () ->
   Client.create conn ["branch"; "master"; "transactions"; "init"; "rw"]
     "file" rwxr_xr_x >>*= fun () ->
   Client.write conn path 0L (Cstruct.of_string "Hello") >>*= fun () ->
@@ -337,6 +342,23 @@ let test_truncate _repo conn =
       Lwt.return (Ok ())
     ) >>*=
   Lwt.return
+
+(* FIXME: automaticall run ./scripts/git-dumb-server *)
+let test_remotes _repo conn =
+  check_dir conn [] "Root entries" root_entries >>= fun () ->
+  Client.mkdir conn ["remotes"] "origin" rwxr_xr_x  >>*= fun () ->
+  check_dir conn ["remotes"] "Remotes entries" ["origin"] >>= fun () ->
+  check_dir conn ["remotes";"origin"] "Remote files" ["url"; "fetch"; "head"]
+  >>= fun () ->
+  write_file conn ["remotes";"origin";"url"] "git://localhost/" >>*= fun () ->
+  write_file conn ["remotes";"origin";"fetch"] "master" >>*= fun () ->
+  with_stream conn ["remotes"; "origin"; "head"] @@ fun head ->
+  read_line_exn head >>= fun head ->
+  let remote_head = "ecf6b63a94681222b1be76c0f95159122ce80db1" in
+  Alcotest.(check string) "remote head" remote_head head;
+  check_dir conn ["snapshots"; remote_head; "ro"] "Remote entries"
+    ["foo";"x"] >>= fun () ->
+  Lwt.return_unit
 
 let test_writes () =
   let ( >>*= ) x f =
@@ -368,7 +390,7 @@ let test_writes () =
 let run f () = Test_utils.run f
 
 let test_set = [
-  "Transaction", `Quick, run transaction;
+  "Transaction", `Quick, run test_transaction;
   "Qids"       , `Quick, run test_qids;
   "Watch"      , `Quick, run test_watch;
   "Range"      , `Quick, run test_bad_range;
@@ -378,9 +400,10 @@ let test_set = [
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;
   "Conflicts"  , `Quick, run test_conflicts;
+  "Remotes"    , `Slow , run test_remotes;
 ]
 
 let () =
   Alcotest.run "datakit" [
-    "9pfs", test_set;
+    "all", test_set;
   ]

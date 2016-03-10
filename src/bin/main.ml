@@ -26,7 +26,7 @@ module Git_fs_store = struct
   open Irmin
   module Store = Irmin_unix.Irmin_git.FS(Contents.String)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
-  module Filesystem = I9p_irmin.Make(Store)
+  module Filesystem = I9p.Make(Store)
   let listener = lazy (Irmin_unix.install_dir_polling_listener 1.0)
   let connect ~bare path =
     Lazy.force listener;
@@ -40,7 +40,7 @@ module In_memory_store = struct
   open Irmin
   module Store = Irmin_mem.Make(Contents.String)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
-  module Filesystem = I9p_irmin.Make(Store)
+  module Filesystem = I9p.Make(Store)
   let connect () =
     log "Using in-memory store (use --git for a disk-backed store)";
     let config = Irmin_mem.config () in

@@ -1,4 +1,4 @@
-(** Irmin trees.
+(** Expose Irmin internal trees (to be upstreamed).
 
     Irmin's public API exposes a key/value store, but we need to see
     directory nodes too.  This module uses Irmin's private API to get

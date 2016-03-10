@@ -66,10 +66,11 @@ module Log : Protocol_9p.S.LOG = struct
   let error fmt = Fmt.kstrf (fun s -> print_endline s) fmt
 
 end
-module Store =
-  Irmin_mem.Make(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+module Store = Irmin_unix.Irmin_git.Memory
+    (Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+
 module Server = Fs9p.Make(Log)(Test_flow)
-module Filesystem = I9p_irmin.Make(Store)
+module Filesystem = I9p.Make(Store)
 
 module Client = Protocol_9p.Client.Make(Log)(Test_flow)
 
@@ -106,8 +107,7 @@ let rw_r__r__ = Protocol_9p.Types.FileMode.make ~owner:rw ~group:r ~other:r ()
 let check_dir conn path msg expected =
   Client.readdir conn path >>*= fun items ->
   List.map (fun stat -> stat.Protocol_9p.Types.Stat.name) items
-  |> List.sort String.compare
-  |> Alcotest.(check (list string)) msg expected;
+  |> Alcotest.(check (slist string String.compare)) msg expected;
   Lwt.return_unit
 
 let with_file conn path fn =

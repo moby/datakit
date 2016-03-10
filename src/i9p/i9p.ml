@@ -32,6 +32,7 @@ module Make (Store : I9p_tree.STORE) = struct
   module Tree = I9p_tree.Make(Store)
   module View = Irmin.View(Store)
   module Merge = I9p_merge.Make(Store)(View)
+  module Remote = I9p_remote.Make(Store)
 
   let irmin_ro_file ~get_root path =
     let read () =
@@ -753,6 +754,7 @@ module Make (Store : I9p_tree.STORE) = struct
       Vfs.Inode.dir "branch"    (branch_dir make_task repo);
       Vfs.Inode.dir "trees"     (trees_dir make_task repo);
       Vfs.Inode.dir "snapshots" (snapshots_dir make_task repo);
+      Vfs.Inode.dir "remotes"   (Remote.create make_task repo);
     ]
 
 end

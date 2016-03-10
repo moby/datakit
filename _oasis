@@ -25,8 +25,8 @@ Library fs9p
 Library i9p
   Path:            src/i9p/
   Findlibname:     i9p
-  InternalModules:
-  Modules:         I9p_merge, I9p_tree, I9p_irmin
+  InternalModules: I9p_merge
+  Modules:         I9p, I9p_tree
   BuildDepends:    lwt, irmin.unix, rresult, vfs
 
 Document datakit

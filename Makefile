@@ -61,7 +61,6 @@ $(VFILE): .git/refs/heads/master
 
 www: doc
 	cd www && cp ../datakit.docdir/*.html .
-	rsync -avz www/ user@nuc1.local:/home/user/www-1234/
-
+	if [ $(shell uname -s) == "Darwin" ]; then open www/index.html; fi
 
 .PHONY: build doc test all install uninstall reinstall clean distclean

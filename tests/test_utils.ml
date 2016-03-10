@@ -69,7 +69,7 @@ end
 module Store =
   Irmin_mem.Make(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 module Server = Fs9p.Make(Log)(Test_flow)
-module Filesystem = I9p_irmin.Make(Store)
+module Filesystem = I9p.Make(Store)
 
 module Client = Protocol_9p.Client.Make(Log)(Test_flow)
 

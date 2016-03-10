@@ -1,6 +1,11 @@
 module PathSet : Set.S with type elt = Irmin.Path.String_list.t
 
-module Make (Store : I9p_tree.STORE) (View : Irmin.VIEW with type db = Store.t and type key = string list and type value = string) : sig
+module Make
+    (Store : I9p_tree.STORE)
+    (View : Irmin.VIEW with type db = Store.t
+                        and type key = string list
+                        and type value = string) :
+sig
   val merge :
     ours:Store.t ->
     theirs:Store.t ->

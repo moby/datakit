@@ -1,6 +1,6 @@
-(** Expose an Irmin store as a 9p filesystem. *)
+(** Expose an Irmin store as a VFS directory. *)
 
-(** The signature of an Irmin9p server. *)
+(** The signature of an Irmin VFS servers. *)
 module type S = sig
 
   type repo

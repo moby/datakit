@@ -47,6 +47,12 @@ end
 type 'a or_err = ('a, Error.t) Result.result Lwt.t
 (** The type of errors. *)
 
+val ok: 'a -> 'a or_err
+(** [ok x] is [Lwt.return (Ok x)] *)
+
+val error: ('a, unit, string, 'b or_err) format4 -> 'a
+(** [error fmt] is [Lwt.return (Error <fmt>)]. *)
+
 (** File operations. *)
 module File: sig
 

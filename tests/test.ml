@@ -106,11 +106,11 @@ let test_parents _repo conn =
   let a, b, c =
     match history with
     | Commit (_, [
+        Commit (a, _);
         Commit (_, [
             Commit (b, _);
             Commit (c, _)
           ]);
-        Commit (a, _);
       ]) -> a, b, c
     | x -> Alcotest.fail (Format.asprintf "Bad history:@\n%a" pp_history x)
   in
@@ -278,18 +278,18 @@ let test_watch repo conn =
   @@ fun makefile ->
   read_line_exn makefile >>= fun makefile_init ->
   Alcotest.(check string) "Makefile hash"
-    "F-79f665b460015f226a432bc39e8f9d43053fa05b" makefile_init;
+    "F-d81e367f87ee314bcd3e449b1c6641efda5bc269" makefile_init;
   (* Modify file under doc *)
   let next_make = makefile () in
   Store.update master ["doc"; "README"] "Instructions" >>= fun () ->
   read_line_exn doc >>= fun doc_new ->
   Alcotest.(check string) "Doc update"
-    "D-1d8b9cdb86a24803f934575b356d7e2cb3e61a68" doc_new;
-  check_dir conn ["trees"; "D-1d8b9cdb86a24803f934575b356d7e2cb3e61a68"]
+    "D-a3e8adf6d194bfbdec2ca73aebe0990edee2ddbf" doc_new;
+  check_dir conn ["trees"; "D-a3e8adf6d194bfbdec2ca73aebe0990edee2ddbf"]
     "Check /trees/D..." ["README"] >>= fun () ->
   read_line_exn top >>= fun top_new ->
   Alcotest.(check string) "Top update"
-    "D-845ffd8bc63ff2f8c9e18a4fdd9b962a01bdf1ef" top_new;
+    "D-acaa8ac97706d94e012da475e8a63d647011a72c" top_new;
   Alcotest.(check bool) "No Makefile update" true
     (Lwt.state next_make = Lwt.Sleep);
   Lwt.return_unit

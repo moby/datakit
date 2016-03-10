@@ -343,6 +343,23 @@ let test_truncate _repo conn =
     ) >>*=
   Lwt.return
 
+(* FIXME: automaticall run ./scripts/git-dumb-server *)
+let test_remotes _repo conn =
+  check_dir conn [] "Root entries" root_entries >>= fun () ->
+  Client.mkdir conn ["remotes"] "origin" rwxr_xr_x  >>*= fun () ->
+  check_dir conn ["remotes"] "Remotes entries" ["origin"] >>= fun () ->
+  check_dir conn ["remotes";"origin"] "Remote files" ["url"; "fetch"; "head"]
+  >>= fun () ->
+  write_file conn ["remotes";"origin";"url"] "git://localhost/" >>*= fun () ->
+  write_file conn ["remotes";"origin";"fetch"] "master" >>*= fun () ->
+  with_stream conn ["remotes"; "origin"; "head"] @@ fun head ->
+  read_line_exn head >>= fun head ->
+  let remote_head = "ecf6b63a94681222b1be76c0f95159122ce80db1" in
+  Alcotest.(check string) "remote head" remote_head head;
+  check_dir conn ["snapshots"; remote_head; "ro"] "Remote entries"
+    ["foo";"x"] >>= fun () ->
+  Lwt.return_unit
+
 let test_writes () =
   let ( >>*= ) x f =
     x >>= function
@@ -373,7 +390,7 @@ let test_writes () =
 let run f () = Test_utils.run f
 
 let test_set = [
-  "Transaction", `Quick, run transaction;
+  "Transaction", `Quick, run test_transaction;
   "Qids"       , `Quick, run test_qids;
   "Watch"      , `Quick, run test_watch;
   "Range"      , `Quick, run test_bad_range;

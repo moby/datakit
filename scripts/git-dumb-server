@@ -1,0 +1,66 @@
+#!/usr/bin/env ocaml
+open Printf
+
+let run fmt =
+  ksprintf (fun cmd ->
+      printf "+ %s\n%!" cmd;
+      let i = Sys.command cmd in
+      if i <> 0 then (
+        Printf.eprintf "\027[31mERROR %d\027[0m\n" i;
+        exit i
+      )
+    ) fmt
+
+let git_daemon dir =
+  Sys.chdir dir;
+  run "git daemon --base-path=. --export-all \
+       --enable=receive-pack --reuseaddr \
+       --informative-errors --verbose"
+
+let git_add file =
+  run "git add %s" file
+
+let git_commit msg =
+  let date = "Thu Mar 10 19:25:07 2016 +0000" in
+  let name = "John Doo" in
+  let email = "<john.doo@docker.com>" in
+  run "export GIT_AUTHOR_DATE=%S; export GIT_COMMITTER_DATE=%S; \
+      \  git -c user.name=%S -c user.email=%S commit -a -m %S"
+    date date name email msg
+
+let rmdir dir =
+  run "rm -rf %s" dir
+
+let mkdir = function
+  | ""
+  | "." -> ()
+  | dir -> run "mkdir -p %s" dir
+
+let cat (file, contents) =
+  mkdir (Filename.dirname file);
+  run "echo %S > %s" contents file
+
+let git_init dir files =
+  mkdir dir;
+  let cwd = Sys.getcwd () in
+  Sys.chdir dir;
+  run "git init";
+  List.iter cat files;
+  List.iter (fun (file, _) ->
+      git_add file
+    ) files;
+  git_commit "Initial commit";
+  Sys.chdir cwd
+
+let files =
+  [ "foo", "foo";
+    "x/y", "bar"; ]
+
+let (/) = Filename.concat
+let tmp = Filename.temp_dir_name
+
+let () =
+  let repo = tmp / "ogit" / "xxx" in
+  rmdir repo;
+  git_init repo files;
+  git_daemon repo

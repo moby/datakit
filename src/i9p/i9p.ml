@@ -9,19 +9,17 @@ module type S = sig
   val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
 end
 
-let ok x = Lwt.return (Ok x)
-let error fmt =
-  Printf.ksprintf (fun s -> Lwt.return (Vfs.Error.other "%s" s)) fmt
-
+let ok = Vfs.ok
 let err_enoent = Lwt.return Vfs.Error.noent
 let err_eisdir = Lwt.return Vfs.Error.isdir
 let err_read_only = Lwt.return Vfs.Error.read_only_file
-let err_already_exists name = error "Entry %S already exists" name
-let err_conflict msg = error "Merge conflict: %s" msg
-let err_unknown_cmd x = error "Unknown command %S" x
-let err_invalid_commit_id id = error "Invalid commit ID %S" id
-let err_invalid_hash h x = error "invalid-hash %S: %s" h (Printexc.to_string x)
-let err_not_fast_forward = error "not-fast-forward"
+let err_already_exists name = Vfs.error "Entry %S already exists" name
+let err_conflict msg = Vfs.error "Merge conflict: %s" msg
+let err_unknown_cmd x = Vfs.error "Unknown command %S" x
+let err_invalid_commit_id id = Vfs.error "Invalid commit ID %S" id
+let err_invalid_hash h x =
+  Vfs.error "invalid-hash %S: %s" h (Printexc.to_string x)
+let err_not_fast_forward = Vfs.error "not-fast-forward"
 
 module StringMap = Map.Make(String)
 
@@ -56,9 +54,13 @@ module Make (Store : I9p_tree.STORE) = struct
     in
     let write data =
       View.update view path (Cstruct.to_string data) >|= fun () ->
-      remove_conflict path; Ok () in
-    let remove () = View.remove view path >|= fun () ->
-      remove_conflict path; Ok () in
+      remove_conflict path;
+      Ok ()
+    in
+    let remove () =
+      View.remove view path >|= fun () ->
+      remove_conflict path; Ok ()
+    in
     Vfs.File.of_kv ~read ~write ~remove
 
   let name_of_irmin_path ~root path =
@@ -68,8 +70,8 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let ro_tree ~name ~get_root =
     let name_of_irmin_path = name_of_irmin_path ~root:name in
-    (* Keep track of which qids we're still using. We need to give the same qid to the
-       client each time. TODO: use a weak map here. *)
+    (* Keep track of which qids we're still using. We need to give the
+       same qid to the client each time. TODO: use a weak map here. *)
     let nodes = Hashtbl.create 10 in
 
     let rec get ~dir (ty, leaf) =
@@ -128,7 +130,7 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let remove_shadowed_by items map =
     List.fold_left (fun acc (_, name) ->
-        acc |> StringMap.remove name
+        StringMap.remove name acc
       ) map items
 
   let rec has_prefix ~prefix p =
@@ -141,8 +143,7 @@ module Make (Store : I9p_tree.STORE) = struct
 
   (* Note: writing to a path removes it from [conflicts], if present *)
   let rw ~conflicts ~store view =
-    let remove_conflict path =
-      conflicts := !conflicts |> PathSet.remove path in
+    let remove_conflict path = conflicts := PathSet.remove path !conflicts in
     let name_of_irmin_path = name_of_irmin_path ~root:"rw" in
     (* Keep track of which qids we're still using. We need to give the
        same qid to the client each time. TODO: use a weak map here. *)
@@ -207,7 +208,7 @@ module Make (Store : I9p_tree.STORE) = struct
         | Ok _    -> err_already_exists name
         | Error _ ->
           let new_dir = get ~dir:path (`Directory, name) in
-          extra_dirs := !extra_dirs |> StringMap.add name new_dir;
+          extra_dirs := StringMap.add name new_dir !extra_dirs;
           remove_conflict (Irmin.Path.String_list.rcons path name);
           ok new_dir
       in
@@ -227,9 +228,9 @@ module Make (Store : I9p_tree.STORE) = struct
     | "close" -> Lazy.force remover >|= fun () -> Ok ""
     | "commit" ->
       begin merge () >>= function
-        | Ok (`Ok ()) -> Lazy.force remover >|= fun () -> Ok ""
+        | Ok (`Ok ())        -> Lazy.force remover >|= fun () -> Ok ""
         | Ok (`Conflict msg) -> err_conflict msg
-        | Error ename -> error "%s" ename
+        | Error ename        -> Vfs.error "%s" ename
       end
     | x -> err_unknown_cmd x
 
@@ -271,7 +272,7 @@ module Make (Store : I9p_tree.STORE) = struct
           let store = store msg in
           View.make_head store (Store.task store) ~parents ~contents:view
           >>= fun head ->
-          Store.merge_head store head >>= ok
+          Store.merge_head store head >|= fun x -> Ok x
     in
     (* Current state (will finish initialisation below) *)
     let contents = ref empty_inode_map in
@@ -735,7 +736,8 @@ module Make (Store : I9p_tree.STORE) = struct
           try ok (Store.Hash.of_hum name)
           with _ex -> err_invalid_commit_id name
         end >>*= fun commit_id ->
-        Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) commit_id >>= function
+        Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) commit_id
+        >>= function
         | false -> err_enoent
         | true ->
           Store.of_commit_id make_task commit_id repo >|= fun store ->

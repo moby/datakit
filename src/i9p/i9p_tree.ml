@@ -1,3 +1,5 @@
+(* FIXME: upstream that module *)
+
 open Lwt.Infix
 
 type leaf = string

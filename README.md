@@ -2,22 +2,26 @@
 
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](http://nuc1.local:1234)
 
-### Build
+### Quick Setup
 
-At the root of this repository, type `make`. This will produces
-`main.native` and `mount.native` in the current directory.
-
-### Setup
-
-How to run the experiments:
+At the root of the repositoru:
 
 ```
-./main.native --git=/tmp/db.git  # starts the DB using /tmp/db.git for storage
-./mount.native /tmp/mnt          # mount the DB into /tmp/mnt
+docker build -l datakit .
+docker run -d -p 5650:5640 -n db datakit # this starts a Datakit server
+docker run --link db:db datakit sh # this start a new shell
+$ datakit-mount
+$ cd /db
+$ ls
 ```
 
-Now you can explore, edit and script `/tmp/mnt` and see the result in
-`/tmp/db.git`. The full filesystem interface is described below.
+Now you can explore, edit and script `/db`.
+
+### Build and Install
+
+If you want to compile and install from sources, at the root of this
+repository, type `make PREFIX=<prefix>` and `make install`. This will
+install `datakit` and `datakit-mount` in `PREFIX/bin`.
 
 ### Filesystem API
 

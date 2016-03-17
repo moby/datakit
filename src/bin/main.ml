@@ -24,14 +24,16 @@ let make_task msg =
 
 module Git_fs_store = struct
   open Irmin
-  module Store = Irmin_unix.Irmin_git.FS(Contents.String)(Ref.String)(Hash.SHA1)
+  module Store =
+    Irmin_git.FS(Ir_io.Sync)(Ir_io.Zlib)(Ir_io.Lock)(Ir_io.FS)
+      (Contents.String)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = I9p.Make(Store)
-  let listener = lazy (Irmin_unix.install_dir_polling_listener 1.0)
+  let listener = lazy (Ir_io.Poll.install_dir_polling_listener 1.0)
   let connect ~bare path =
     Lazy.force listener;
     log "Using Git-format store %S" path;
-    let config = Irmin_unix.Irmin_git.config ~root:path ~bare () in
+    let config = Irmin_git.config ~root:path ~bare () in
     Store.Repo.create config >|= fun repo ->
     fun () -> Filesystem.create make_task repo
 end

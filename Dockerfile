@@ -1,7 +1,7 @@
 FROM ocaml/opam:alpine
 
-RUN opam depext lwt tls && \
-    opam install lwt tls alcotest                     # TLS support
+RUN sudo apk add zlib-dev
+RUN opam depext lwt &&  opam install lwt alcotest
 
 COPY opam /home/opam/src/i9p/opam
 RUN opam pin add i9p.dev /home/opam/src/i9p -n

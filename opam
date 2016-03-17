@@ -17,12 +17,14 @@ remove: [
 ]
 
 depends: [
-  "ocamlfind" {build}
+  "ocamlfind"  {build}
   "ocamlbuild" {build}
-  "oasis"     {build}
+  "oasis"      {build}
   "rresult"
-  "irmin-unix"
+  "git"
+  "irmin"       {>= "0.10.1"}
+  "camlzip"
   "protocol-9p" {>= "0.5.0"}
-  "alcotest" {test}
+  "alcotest"   {test}
 ]
 available: [ocaml-version >= "4.02.0"]

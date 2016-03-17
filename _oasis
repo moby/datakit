@@ -27,7 +27,13 @@ Library i9p
   Findlibname:     i9p
   InternalModules: I9p_merge
   Modules:         I9p, I9p_tree, I9p_remote
-  BuildDepends:    lwt, irmin.unix, rresult, vfs
+  BuildDepends:    lwt, irmin, rresult, vfs
+
+Library "irmin-io"
+  Path:            src/irmin-io/
+  Findlibname:     irmin-io
+  Modules:         Ir_io
+  BuildDepends:    zip, uri, lwt.unix, fmt, cstruct, git, tc, irmin
 
 Document datakit
   Title:                Datakit docs
@@ -44,7 +50,7 @@ Executable datakit
   MainIs:         main.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   fmt, i9p, cmdliner, fs9p
+  BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io
 
 Executable "datakit-mount"
   Path:           src/bin
@@ -59,7 +65,7 @@ Executable test
   Build$:         flag(tests)
   CompiledObject: best
   Install:        false
-  BuildDepends:   i9p, alcotest, fmt, fs9p
+  BuildDepends:   i9p, alcotest, fmt, fs9p, irmin-io, irmin.git, irmin.mem
 
 Test test
   Run$:             flag(tests)

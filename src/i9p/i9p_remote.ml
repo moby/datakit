@@ -1,7 +1,5 @@
-open Result
 open Lwt.Infix
 
-let err_read_only = Lwt.return Vfs.Error.read_only_file
 let err_no_head =  Vfs.error "error: no head to fetch"
 let err_fetch_error = Vfs.error "error: cannot fetch %s"
 let err_no_url = Vfs.error "error: remote url is not defined"
@@ -15,24 +13,20 @@ module Make (Store : I9p_tree.STORE) = struct
     update_head: string option -> unit;
   }
 
-  (* /remotes/<name>/head *)
   let mk_head () =
     let stream, push = Lwt_stream.create () in
-    let data = ref (Cstruct.create 0) in
-    let read count =
-      begin if Cstruct.len !data = 0 then (
-          Lwt_stream.next stream >|= fun next ->
-          data := Cstruct.of_string next
-        ) else Lwt.return ()
-      end >|= fun () ->
-      let count = min count (Cstruct.len !data) in
-      let response = Cstruct.sub !data 0 count in
-      data := Cstruct.shift !data count;
-      Ok (response)
+    let current : string option ref = ref None in
+    let wait old =
+      if old <> !current then Lwt.return !current
+      else Lwt_stream.next stream >|= fun s -> current := s; s
     in
-    let write _ = err_read_only in
-    let file () = Lwt.return @@ Vfs.File.Stream.create ~read ~write in
-    Vfs.File.of_stream file, push
+    let pp ppf = function
+      | None      -> Fmt.string ppf ""
+      | Some hash -> Fmt.pf ppf "%s\n" hash
+    in
+    let stream () = Vfs.File.Stream.watch pp ~init:!current ~wait in
+    let file = Vfs.File.of_stream @@ fun () -> Lwt.return (stream ()) in
+    file, fun x -> push (Some x)
 
   (* /remotes/<name>/url *)
   let mk_url default =

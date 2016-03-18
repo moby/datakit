@@ -27,6 +27,27 @@ module Sync = struct
       (fun () -> fn (p#stdout, p#stdin))
       (fun () -> let _ = p#close in Lwt.return_unit)
 
+  let with_conduit ?init uri fn =
+    Log.debug "Connecting to %s" (Uri.to_string uri);
+    let resolver = Resolver_lwt_unix.system in
+    Resolver_lwt.resolve_uri ~uri resolver >>= fun endp ->
+    let ctx = Conduit_lwt_unix.default_ctx in
+    Conduit_lwt_unix.endp_to_client ~ctx endp >>= fun client ->
+    Conduit_lwt_unix.connect ~ctx client >>= fun (_flow, ic, oc) ->
+    Lwt.finalize
+      (fun () ->
+         begin match init with
+           | None   -> Lwt.return_unit
+           | Some s -> write oc s
+         end >>= fun () ->
+         fn (ic, oc))
+      (fun ()  ->
+         Lwt.catch
+           (fun () -> Lwt_io.close ic)
+           (function
+             | Unix.Unix_error _ -> Lwt.return_unit
+             | e -> Lwt.fail e))
+
   module IC = struct
     type t = Lwt_io.input_channel
     let make ?close perform_io =
@@ -41,15 +62,28 @@ module Sync = struct
       Lwt_io.make ~mode:Lwt_io.Output ?close perform_io
   end
 
-  let not_supported = Lwt.fail (Failure "Not supported, use SSH.")
+  (*
+  module Client = struct
+    (* FIXME in cohttp *)
+    module IO = Cohttp_lwt_unix_io
+    let close_in x = Lwt.ignore_result (Lwt_io.close x)
+    let close_out x = Lwt.ignore_result (Lwt_io.close x)
+  end
+
+  module HTTP = Git_http.Flow(Client)(IC)(OC)
+  *)
 
   let with_connection ?ctx:_ uri ?init fn =
     match Git.Sync.protocol uri with
     | `Ok `SSH -> with_ssh_process ?init uri fn
-    | `Ok `Git -> not_supported
-    | `Ok `Smart_HTTP -> not_supported
-    | `Not_supported _ -> not_supported
-    | `Unknown -> not_supported
+    | `Ok `Git -> with_conduit ?init uri fn
+    | `Ok `Smart_HTTP ->
+      (* HTTP.with_http ?init (with_conduit ?init:None) uri fn *)
+      Lwt.fail (Failure ("smart HTTP is not supported. Use git:// or SSH"))
+    | `Not_supported x ->
+      Lwt.fail (Failure ("Scheme " ^ x ^ " not supported yet"))
+    | `Unknown ->
+      Lwt.fail (Failure ("Unknown protocol. Must supply a scheme like git://"))
 
   let read_all ic =
     let len = 4 * 4096 in

@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        i9p
-Version:     0.1.1
+Version:     0.2.0
 Synopsis:    A Git-like database with a filesystem interface
 Authors:     Thomas Leonard, Magnus Skjegstad, Dave Scott, Thomas Gazagnaire
 License:     ISC

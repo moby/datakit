@@ -69,6 +69,25 @@ module File = struct
     let create ~read ~write = { read; write }
     let read t = t.read
     let write t = t.write
+
+    let watch pp ~init ~wait =
+      let last_seen = ref init in
+      let data = ref (Cstruct.of_string (Fmt.to_to_string pp init)) in
+      let read count =
+        begin if Cstruct.len !data = 0 then (
+            wait !last_seen >|= fun now ->
+            last_seen := now;
+            data := Cstruct.of_string (Fmt.to_to_string pp now)
+          ) else Lwt.return ()
+        end >|= fun () ->
+        let count = min count (Cstruct.len !data) in
+        let response = Cstruct.sub !data 0 count in
+        data := Cstruct.shift !data count;
+        Ok (response)
+      in
+      let write _ = err_read_only in
+      create ~read ~write
+
   end
 
   module Fd = struct

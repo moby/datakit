@@ -350,28 +350,6 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let static_dir name items = Vfs.Inode.dir name (Vfs.Dir.of_list items)
 
-  (* A stream file that initially Lwt.returns [str initial]. Further
-     reads call [wait_for_change_from x], where [x] is the value
-     previously Lwt.returned and then Lwt.return that, until the file
-     is closed. *)
-  let watch_stream ~initial ~wait_for_change_from ~str =
-    let last_seen = ref initial in
-    let data = ref (Cstruct.of_string (str initial)) in
-    let read count =
-      begin if Cstruct.len !data = 0 then (
-          wait_for_change_from !last_seen >|= fun now ->
-          last_seen := now;
-          data := Cstruct.of_string (str now)
-        ) else Lwt.return ()
-      end >|= fun () ->
-      let count = min count (Cstruct.len !data) in
-      let response = Cstruct.sub !data 0 count in
-      data := Cstruct.shift !data count;
-      Ok (response)
-    in
-    let write _ = err_read_only in
-    Vfs.File.Stream.create ~read ~write
-
   let head_stream store initial_head =
     let cond = Lwt_condition.create () in
     let current = ref initial_head in
@@ -382,19 +360,18 @@ module Make (Store : I9p_tree.STORE) = struct
           current := commit_id;
           Lwt_condition.broadcast cond ()
         ) in
-      let remove_watch =
-        Store.watch_head store ?init:initial_head cb in
-      ignore remove_watch in (* TODO *)
-    let str = function
-      | None -> "\n"
-      | Some hash -> Store.Hash.to_hum hash ^ "\n" in
-    let rec wait_for_change_from old =
+      let remove_watch = Store.watch_head store ?init:initial_head cb in
+      ignore remove_watch (* TODO *)
+    in
+    let pp ppf = function
+      | None      -> Fmt.string ppf "\n"
+      | Some hash -> Fmt.string ppf (Store.Hash.to_hum hash ^ "\n")
+    in
+    let rec wait old =
       if old <> !current then Lwt.return !current
-      else (
-        Lwt_condition.wait cond >>= fun () ->
-        wait_for_change_from old
-      ) in
-    watch_stream ~initial:initial_head ~wait_for_change_from ~str
+      else Lwt_condition.wait cond >>= fun () -> wait old
+    in
+    Vfs.File.Stream.watch pp ~init:initial_head ~wait
 
   let head_live store =
     Vfs.File.of_stream (fun () ->
@@ -441,9 +418,9 @@ module Make (Store : I9p_tree.STORE) = struct
     | `Directory a, `Directory b -> Tree.equal a b
     | _ -> false
 
-  let watch_tree_stream store ~path ~initial =
+  let watch_tree_stream store ~path ~init =
     let cond = Lwt_condition.create () in
-    let current = ref initial in
+    let current = ref init in
     let () =
       let cb _diff =
         Tree.snapshot store >>= fun root ->
@@ -452,29 +429,30 @@ module Make (Store : I9p_tree.STORE) = struct
           current := node;
           Lwt_condition.broadcast cond ()
         ) in
-      let remove_watch =
-        Store.watch_head store cb in
-      ignore remove_watch in (* TODO *)
-    let str = function
-      | `None -> "\n"
-      | `File hash -> "F-" ^ Store.Private.Contents.Key.to_hum hash ^ "\n"
+      let remove_watch = Store.watch_head store cb in
+      ignore remove_watch (* TODO *)
+    in
+    let pp ppf = function
+      | `None -> Fmt.string ppf "\n"
+      | `File h -> Fmt.pf ppf "F-%s\n" @@ Store.Private.Contents.Key.to_hum h
       | `Directory dir ->
         match Tree.hash dir with
-        | None -> "\n"
-        | Some hash -> "D-" ^ Store.Private.Node.Key.to_hum hash ^ "\n" in
-    let rec wait_for_change_from old =
+        | None   -> Fmt.string ppf "\n"
+        | Some h -> Fmt.pf ppf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
+    in
+    let rec wait old =
       if not (equal_ty old !current) then Lwt.return !current
       else (
         Lwt_condition.wait cond >>= fun () ->
-        wait_for_change_from old
+        wait old
       ) in
-    watch_stream ~initial ~wait_for_change_from ~str
+    Vfs.File.Stream.watch pp ~init ~wait
 
   let watch_tree store ~path =
     Vfs.File.of_stream (fun () ->
         Tree.snapshot store >>= fun snapshot ->
-        Tree.node snapshot path >|= fun initial ->
-        watch_tree_stream store ~path ~initial
+        Tree.node snapshot path >|= fun init ->
+        watch_tree_stream store ~path ~init
       )
 
   let rec watch_dir store ~path =

@@ -1,4 +1,4 @@
-VERSION = $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+VERSION = $(shell grep 'Version:' _oasis | sed 's/Version: *//')
 VFILE   = src/bin/version.ml
 APP     = Datakit.app
 PREFIX ?= $(shell opam config var prefix)
@@ -56,8 +56,18 @@ bundle: build
 	 -d $(APP)/Contents/Resources/lib \
 	 -p @executable_path/../Resources/lib
 
-$(VFILE): .git/refs/heads/master
+ifeq ($(wildcard .git/refs/heads/master),)
+$(VFILE):
 	echo "let v = \"$(VERSION)\"" > $(VFILE)
+else
+GIT_VERSION = $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
+$(VFILE): .git/refs/heads/master
+	echo "let v = \"$(GIT_VERSION)\"" > $(VFILE)
+endif
+
+release:
+	git tag -a v$(VERSION) -m "Version $(VERSION)."
+	git push upstream v$(VERSION)
 
 www: doc
 	cd www && cp ../datakit.docdir/*.html .

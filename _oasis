@@ -33,7 +33,8 @@ Library "irmin-io"
   Path:            src/irmin-io/
   Findlibname:     irmin-io
   Modules:         Ir_io
-  BuildDepends:    zip, uri, lwt.unix, fmt, cstruct, git, tc, irmin
+  BuildDepends:    zip, uri, lwt.unix, fmt, cstruct, git, tc, irmin,
+                   conduit.lwt-unix
 
 Document datakit
   Title:                Datakit docs

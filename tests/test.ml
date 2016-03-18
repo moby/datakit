@@ -353,9 +353,14 @@ let test_remotes _repo conn =
   write_file conn ["remotes";"origin";"url"] "git://localhost/" >>*= fun () ->
   write_file conn ["remotes";"origin";"fetch"] "master" >>*= fun () ->
   with_stream conn ["remotes"; "origin"; "head"] @@ fun head ->
-  read_line_exn head >>= fun head ->
+  read_line_exn head >>= fun head1 ->
   let remote_head = "ecf6b63a94681222b1be76c0f95159122ce80db1" in
-  Alcotest.(check string) "remote head" remote_head head;
+  Alcotest.(check string) "remote head 1" remote_head head1;
+  read_line_exn head >>= fun head1 ->
+  Alcotest.(check string) "empty head 1" "" head1;
+  with_stream conn ["remotes"; "origin"; "head"] @@ fun head ->
+  read_line_exn head >>= fun head2 ->
+  Alcotest.(check string) "remote head 2" remote_head head2;
   check_dir conn ["snapshots"; remote_head; "ro"] "Remote entries"
     ["foo";"x"] >>= fun () ->
   Lwt.return_unit

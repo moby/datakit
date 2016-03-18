@@ -136,6 +136,12 @@ module File: sig
     val create:
       read:(int -> Cstruct.t or_err) -> write:(Cstruct.t -> unit or_err) -> t
 
+    (** A watch stream file that initially Lwt.returns
+        [Fmt.to_to_string pp initial]. Further reads call [wait x],
+        where [x] is the value previously Lwt.returned and then
+        Lwt.return that, until the file is closed. *)
+    val watch: 'a Fmt.t -> init:'a -> wait:('a -> 'a Lwt.t) -> t
+
   end
 
   val of_stream: (unit -> Stream.t Lwt.t) -> t

@@ -55,7 +55,8 @@ module API = struct
     |> run
     |> List.map (fun r -> r.repository_name)
 
-  let status { token; user; repo } git_ref =
+  let status { token; user; repo } pr =
+    let git_ref = pr.pull_head.branch_sha in
     Status.for_ref ~token ~user ~repo ~git_ref ()
     |> Stream.to_list
     |> run
@@ -75,7 +76,6 @@ module API = struct
     Pull.for_repo ~token:t.token ~state:`Open ~user:t.user ~repo:t.repo ()
     |> Stream.to_list
     |> run
-    |> List.map (fun pr -> pr, status t pr.pull_head.branch_sha)
 
   let _pp_pr ppf (pr, status) =
     Fmt.pf ppf "%d %s @[%a@]@."
@@ -100,38 +100,60 @@ let status_file t pr context status =
         )
     )
 
-let status_files t pr status =
-  List.fold_left (fun acc status ->
-      let path = match status.status_context with
-        | None   -> ["default"]
-        | Some c -> String.cuts ~sep:"/" c
-      in
-      let context = String.concat ~sep:"/" path in
-      if List.mem_assoc path acc then acc
-      else
-        let rec aux = function
-          | []     -> assert false
-          | [name] ->
-            let file = status_file t pr context status.status_state in
-            Vfs.Inode.file name file
-          | name :: rest ->
-            Vfs.Inode.dir name @@ Vfs.Dir.of_list (fun () -> [aux rest])
-        in
-        (path, aux path) :: acc
-    ) [] status
-  |> List.map snd
+let status_context s = match s.status_context with
+  | None   -> ["default"]
+  | Some c -> String.cuts ~empty:false ~sep:"/" c
 
-let pr_root t =
-  let prs () =
-    API.prs t
-    |> List.map (fun (pr, status) ->
-        Vfs.Inode.dir (string_of_int pr.pull_number) @@
-        Vfs.Dir.of_list (fun () -> status_files t pr status)
-      )
+(* /github.com/${USER}/${REPO}/pr/${PR} *)
+let pr_files t pr =
+  let inode context status =
+    let context_str = String.concat ~sep:"/" context in
+    let rec aux = function
+      | []     -> assert false
+      | [name] ->
+        let file = status_file t pr context_str status.status_state in
+        Vfs.Inode.file name file
+      | name :: rest ->
+        Vfs.Inode.dir name @@ Vfs.Dir.of_list (fun () -> [aux rest])
+    in
+    aux context
   in
-  Vfs.Dir.of_list prs
+  let ls () =
+    let status = API.status t pr in
+    List.fold_left (fun acc status ->
+        let context = status_context status in
+        let name = match context with h::_ -> h | [] -> assert false in
+        if List.mem_assoc name acc then acc
+        else (name, inode context status) :: acc
+      ) [] status
+    |> List.map snd
+    |> Vfs.ok
+  in
+  let lookup name =
+    let status = API.status t pr in
+    try
+      let s = List.find (fun s -> List.hd (status_context s) = name) status in
+      Vfs.ok @@ inode (status_context s) s
+    with Not_found ->
+      Vfs.File.err_no_entry
+  in
+  let mkfile _ = Vfs.error "TODO" in
+  let mkdir _ = Vfs.error "TODO" in
+  let remove _ = Vfs.error "TODO" in
+  let rename _ _ = Vfs.error "TODO" in
+  Vfs.Dir.create ~ls ~lookup ~mkfile ~mkdir ~remove ~rename
 
-(* repo sub-directory. Can just see the pr sub-folder. *)
+(* /github.com/${USER}/${REPO}/pr *)
+  let pr_root t =
+    let prs () =
+      API.prs t
+      |> List.map (fun pr ->
+          Vfs.Inode.dir (string_of_int pr.pull_number) @@ pr_files t pr
+        )
+    in
+    Vfs.Dir.of_list prs
+
+(* /github.com/${USER}/${REPO} *)
 let repo_root t =
   match API.repo t with
   | None   -> None
@@ -142,11 +164,11 @@ let repo_root t =
     let dir = Vfs.Dir.of_list files in
     Some (Vfs.Inode.dir t.API.repo dir)
 
-(* user sub-directory, can see all the user's repos. *)
+(* /github.com/${USER}/ *)
 let user_root ~token ~user =
   let t = API.create ~token ~user ~repo:"" in
   match API.user t with
-  | None   -> Vfs.Dir.err_enoent
+  | None   -> Vfs.Dir.err_no_entry
   | Some _ ->
     let ls () =
       API.list_repos t
@@ -159,14 +181,13 @@ let user_root ~token ~user =
     in
     let remove _ = Vfs.Dir.err_read_only in
     let lookup name = match repo_root { t with API.repo = name } with
-      | None   -> Vfs.Dir.err_enoent
+      | None   -> Vfs.Dir.err_no_entry
       | Some x -> Vfs.ok x
     in
     let dir = Vfs.Dir.read_only ~ls ~remove ~lookup in
     Vfs.ok (Vfs.Inode.dir user dir)
 
-(* top-level directory, can read all the users sub-directories but
-   [ls] returns nothing. *)
+(* /github.com/ *)
 let create token =
   let token = lazy (token ()) in
   let ls () = Vfs.ok [] in

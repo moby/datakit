@@ -69,7 +69,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let ls () = Vfs.ok (List.map snd !remotes) in
     let lookup n =
       try Vfs.ok (List.assoc n !remotes)
-      with Not_found -> Vfs.Dir.err_enoent
+      with Not_found -> Vfs.Dir.err_no_entry
     in
     let mkdir n =
       if List.mem_assoc n !remotes then Vfs.Dir.err_already_exists

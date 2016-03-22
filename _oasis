@@ -33,7 +33,7 @@ Library vgithub
   Path:            src/vgithub
   Findlibname:     vgithub
   Modules:         Vgithub
-  BuildDepends:    lwt, github, vfs
+  BuildDepends:    lwt, github, vfs, astring
 
 Library "irmin-io"
   Path:            src/irmin-io/

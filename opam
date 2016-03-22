@@ -20,7 +20,7 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "oasis"      {build}
-  "rresult"
+  "rresult" "astring" "fmt"
   "git"
   "irmin"       {>= "0.10.1"}
   "camlzip"

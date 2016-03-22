@@ -505,13 +505,14 @@ module Make (Store : I9p_tree.STORE) = struct
       | `Max_depth_reached | `Too_many_lcas -> assert false
 
   let fast_forward_merge store =
-    Vfs.File.command @@ fun hash ->
-    match Store.Hash.of_hum hash with
-    | exception ex -> err_invalid_hash hash ex
-    | hash         ->
-      fast_forward store hash >>= function
-      | `Ok               -> ok ""
-      | `Not_fast_forward -> err_not_fast_forward
+    Vfs.File.command (fun hash ->
+        match Store.Hash.of_hum hash with
+        | exception ex -> err_invalid_hash hash ex
+        | hash         ->
+          fast_forward store hash >>= function
+          | `Ok               -> ok ""
+          | `Not_fast_forward -> err_not_fast_forward
+      )
 
   let status store () =
     Store.head (store "head") >|= function

@@ -180,14 +180,14 @@ module File = struct
     let open_ () = stream () >>= fun s -> Fd.of_stream s in
     read_only_aux ~debug:"of_stream" ~size ~open_
 
-  let command handler =
+  let command ?(init="") handler =
     (* Value currently being returned to user. Note that this is
        attached to the file, not the client's FD. This is so a shell
        client can write and then read in a separate step, but does
        mean we can't support parallel commands for a single FS (so if
        this is used, you should create a fresh FS for each client
        connection at least). *)
-    let data = ref (Cstruct.create 0) in
+    let data = ref (Cstruct.of_string init) in
     let size () = ok 0L in
     let open_ () =
       let read count =

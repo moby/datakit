@@ -107,9 +107,10 @@ module File: sig
   (** [status f] is the file containing the result of [f]. [f] is
       evaluated everytime the file is open. *)
 
-  val command: (string -> string or_err) -> t
-  (** [command f] is the file containing the result of [f]. [f] is
-      evaluated on every write. *)
+  val command: ?init:string -> (string -> string or_err) -> t
+  (** [command ?init f] is the file containing the result of [f]. [f]
+      is evaluated on every write, with the contents of the file as
+      argument. Initially the file contains [init]. *)
 
   (** {1 K/V stores.} *)
 

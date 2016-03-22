@@ -1,5 +1,6 @@
 open Github
 open Github_t
+open Astring
 
 let run x = Lwt_main.run (Github.Monad.run x)
 
@@ -13,14 +14,13 @@ module API = struct
     repo : string;
   }
 
-  let pp_status_state =
-    let aux = function
-      | `Error   -> "error"
-      | `Failure -> "failure"
-      | `Pending -> "pending"
-      | `Success -> "success"
-    in
-    Fmt.of_to_string aux
+  let string_of_status_state = function
+    | `Error   -> "error"
+    | `Failure -> "failure"
+    | `Pending -> "pending"
+    | `Success -> "success"
+
+  let pp_status_state =  Fmt.of_to_string string_of_status_state
 
   let status_state_of_string = function
     | "error"   -> Some `Error
@@ -60,11 +60,12 @@ module API = struct
     |> Stream.to_list
     |> run
 
-  let set_status { token; user; repo } ?description pr status =
+  let set_status { token; user; repo } ?description ~context pr status =
     let status = {
       new_status_target_url = None;
       new_status_description = description;
-      new_status_state = status
+      new_status_state = status;
+      new_status_context = Some context;
     } in
     Status.create ~token ~user ~repo ~sha:pr.pull_head.branch_sha ~status ()
     |> run
@@ -84,31 +85,48 @@ module API = struct
 
 end
 
-let status_file t pr status =
+let status_file t pr context status =
   let current_status = ref status in
-  Vfs.File.command (fun s ->
-      match API.status_state_of_string s with
-      | None   -> err_invalid_status s
+  let init = API.string_of_status_state status ^ "\n" in
+  Vfs.File.command ~init (fun str ->
+      match API.status_state_of_string str with
+      | None   -> err_invalid_status str
       | Some s ->
-        if s = !current_status then Vfs.ok ""
+        if s = !current_status then Vfs.ok (str ^ "\n")
         else (
           current_status := s;
-          API.set_status t pr s; Vfs.ok ""
+          API.set_status t ~context pr s;
+          Vfs.ok (API.string_of_status_state s ^ "\n");
         )
     )
 
+let status_files t pr status =
+  List.fold_left (fun acc status ->
+      let path = match status.status_context with
+        | None   -> ["default"]
+        | Some c -> String.cuts ~sep:"/" c
+      in
+      let context = String.concat ~sep:"/" path in
+      if List.mem_assoc path acc then acc
+      else
+        let rec aux = function
+          | []     -> assert false
+          | [name] ->
+            let file = status_file t pr context status.status_state in
+            Vfs.Inode.file name file
+          | name :: rest ->
+            Vfs.Inode.dir name @@ Vfs.Dir.of_list (fun () -> [aux rest])
+        in
+        (path, aux path) :: acc
+    ) [] status
+  |> List.map snd
+
 let pr_root t =
-  let files pr status () =
-    List.map (fun status ->
-        Vfs.Inode.file status.status_creator.user_login @@
-        status_file t pr status.status_state
-      ) status
-  in
   let prs () =
     API.prs t
     |> List.map (fun (pr, status) ->
         Vfs.Inode.dir (string_of_int pr.pull_number) @@
-        Vfs.Dir.of_list (files pr status)
+        Vfs.Dir.of_list (fun () -> status_files t pr status)
       )
   in
   Vfs.Dir.of_list prs

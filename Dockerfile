@@ -7,6 +7,8 @@ COPY opam /home/opam/src/i9p/opam
 RUN opam pin add i9p.dev /home/opam/src/i9p -n
 RUN opam depext i9p && opam install i9p --deps        # Install i9p deps
 
+RUN opam pin add github https://github.com/samoht/ocaml-github.git#status-context
+
 COPY .git /home/opam/src/i9p/.git
 COPY src /home/opam/src/i9p/src
 COPY Makefile /home/opam/src/i9p/Makefile

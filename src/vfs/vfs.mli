@@ -26,11 +26,11 @@ module Error: sig
       ('a, t) result Lwt.t -> ('a -> ('b, t) result Lwt.t) -> ('b, t) result Lwt.t
   end
 
-  val noent: ('a, t) result
-  (** [enoent] is [Error Noent]. *)
+  val no_entry: ('a, t) result
+  (** [no_entry] is [Error Noent]. *)
 
-  val isdir: ('a, t) result
-  (** [isdir] is [Error Isdir]. *)
+  val is_dir: ('a, t) result
+  (** [is_dir] is [Error Isdir]. *)
 
   val read_only_file: ('a, t) result
   (** [read_only_file] is [Error Read_only_file]. *)
@@ -149,6 +149,10 @@ module File: sig
   (** [of_stream s] is the file which will be, once opened, similar to
       the stream [s ()]. *)
 
+  (** {1 Errors} *)
+
+  val err_no_entry: 'a or_err
+
 end
 
 (** Directory operations. *)
@@ -222,7 +226,7 @@ module rec Dir: sig
   val err_read_only: 'a or_err
   val err_already_exists: 'a or_err
   val err_dir_only: 'a or_err
-  val err_enoent: 'a or_err
+  val err_no_entry: 'a or_err
 
 end and Inode: sig
 

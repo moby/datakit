@@ -29,6 +29,12 @@ Library i9p
   Modules:         I9p, I9p_tree, I9p_remote
   BuildDepends:    lwt, irmin, rresult, vfs
 
+Library vgithub
+  Path:            src/vgithub
+  Findlibname:     vgithub
+  Modules:         Vgithub
+  BuildDepends:    lwt, github, vfs
+
 Library "irmin-io"
   Path:            src/irmin-io/
   Findlibname:     irmin-io
@@ -51,7 +57,8 @@ Executable datakit
   MainIs:         main.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io
+  BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io,
+                  vgithub, github.unix
 
 Executable "datakit-mount"
   Path:           src/bin

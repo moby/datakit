@@ -180,9 +180,10 @@ module rec Dir: sig
   val empty: t
   (** [empty] is the empty directory. *)
 
-  val of_list: Inode.t list -> t
+  val of_list: (unit -> Inode.t list) -> t
   (** [of_list l] is a read-only, static directory containing only the
-      inodes [l]. *)
+      inodes [l]. The sub-directories are re-evaluated on every [ls]
+      and [read]. *)
 
   val of_map_ref: Inode.t Map.Make(String).t ref -> t
   (** [of_map_ref m] is a read-only directory containing the inodes

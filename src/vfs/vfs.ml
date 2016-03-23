@@ -1,6 +1,9 @@
 open Rresult
 open Lwt.Infix
 
+let src = Logs.Src.create "vfs" ~doc:"Datakit VFS"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 module Error = struct
 
   type err = { errno: int32 option; descr: string }

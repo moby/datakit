@@ -1,6 +1,5 @@
 FROM ocaml/opam:alpine
 
-RUN sudo apk add zlib-dev
 RUN opam depext lwt &&  opam install lwt alcotest
 
 COPY opam /home/opam/src/i9p/opam
@@ -25,4 +24,4 @@ EXPOSE 5640
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp /home/opam/.opam/system/bin/datakit /usr/bin/datakit
 
-CMD ["/usr/bin/datakit", "--url=tcp://0.0.0.0:5640", "--git=/data"]
+CMD ["/usr/bin/datakit", "--url=tcp://0.0.0.0:5640", "--git=/data", "--verbose=debug"]

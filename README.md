@@ -210,6 +210,18 @@ To  fetch `https://github.com/docker/datakit`'s master branch:
     ~/mnt/remotes $ cat origin/head
     4b6557542ec9cc578d5fe09b664110ba3b68e2c2
 
+### Github PRs
+
+There is a rudimentary support for interacting with Github PRs.
+
+    ~/mnt $ ls github.com/docker/datakit
+    41  42
+    ~/mnt $ cat github.com/docker/datakit/pr/41/status/default
+    pending
+    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default
+
+This will toggle the status of the pull request on the Github interface.
+
 ### How do I...
 
 #### Create a new branch

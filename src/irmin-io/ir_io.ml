@@ -1,5 +1,8 @@
 open Lwt.Infix
 
+let src = Logs.Src.create "irmin-io" ~doc:"Datakit sync support"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 module Sync = struct
   type ctx = unit
   type ic = Lwt_io.input_channel
@@ -20,7 +23,7 @@ module Sync = struct
       | None   -> [| "ssh"; user ^ host; |]
       | Some x -> [| "ssh"; user ^ host; x |]
     in
-    Log.info "Executing '%s'" (String.concat " " (Array.to_list cmd));
+    Log.info (fun f -> f "Executing '%s'" (String.concat " " (Array.to_list cmd)));
     let env = Unix.environment () in
     let p = Lwt_process.open_process_full ~env ("ssh", cmd) in
     Lwt.finalize
@@ -28,7 +31,7 @@ module Sync = struct
       (fun () -> let _ = p#close in Lwt.return_unit)
 
   let with_conduit ?init uri fn =
-    Log.debug "Connecting to %s" (Uri.to_string uri);
+    Log.debug (fun f -> f "Connecting to %s" (Uri.to_string uri));
     let resolver = Resolver_lwt_unix.system in
     Resolver_lwt.resolve_uri ~uri resolver >>= fun endp ->
     let ctx = Conduit_lwt_unix.default_ctx in
@@ -132,14 +135,14 @@ module FS = struct
       else (
         let clear =
           if Sys.file_exists dir then (
-            Log.debug "%s already exists but is a file, removing." dir;
+            Log.debug (fun f -> f "%s already exists but is a file, removing." dir);
             remove_file dir;
           ) else
             Lwt.return_unit
         in
         clear >>= fun () ->
         aux (Filename.dirname dir) >>= fun () ->
-        Log.debug "mkdir %s" dir;
+        Log.debug (fun f -> f "mkdir %s" dir);
         protect (Lwt_unix.mkdir dir) 0o755;
       ) in
     Lwt_pool.use mkdir_pool (fun () -> aux dirname)
@@ -209,7 +212,7 @@ module FS = struct
     mkdir dir >>= fun () ->
     let tmp = Filename.temp_file ?temp_dir (Filename.basename file) "write" in
     Lwt_pool.use openfile_pool (fun () ->
-        Log.info "Writing %s (%s)" file tmp;
+        Log.info (fun f -> f "Writing %s (%s)" file tmp);
         Lwt_unix.(openfile tmp [O_WRONLY; O_NONBLOCK; O_CREAT; O_TRUNC] 0o644)
         >>= fun fd ->
         Lwt.finalize (fun () -> protect fn fd) (fun () -> Lwt_unix.close fd)
@@ -238,7 +241,7 @@ module FS = struct
 
   let read_file file =
     Lwt_pool.use openfile_pool (fun () ->
-        Log.info "Reading %s" file;
+        Log.info (fun f -> f "Reading %s" file);
         Lwt_io.(with_file ~mode:input) ~flags:[Unix.O_RDONLY] file (fun ch ->
             Lwt_io.length ch >|= Int64.to_int >|= Cstruct.create >>= fun buf ->
             read_into buf ch
@@ -345,10 +348,10 @@ module Lock = struct
 
   let lock ?(max_age = 2.) ?(sleep = 0.001) file =
     let rec aux i =
-      Log.debug "lock %d" i;
+      Log.debug (fun f -> f "lock %d" i);
       is_stale max_age file >>= fun is_stale ->
       if is_stale then (
-        Log.error "%s is stale, removing it." file;
+        Log.err (fun f -> f "%s is stale, removing it." file);
         unlock file >>= fun () ->
         aux 1
       ) else
@@ -436,10 +439,10 @@ module Poll = struct
     read_files dir >>= fun new_files ->
     let diff = S.sdiff files new_files in
     begin if S.is_empty diff then (
-        Log.debug "polling %s: no changes!" dir;
+        Log.debug (fun f -> f "polling %s: no changes!" dir);
         Lwt.return_unit
       ) else (
-        Log.debug "polling %s: diff:%s" dir (to_string diff);
+        Log.debug (fun f -> f "polling %s: diff:%s" dir (to_string diff));
         let files =
           S.to_list diff |> List.map fst |> StringSet.of_list |> StringSet.elements
         in
@@ -465,7 +468,7 @@ module Poll = struct
   (* call all the callbacks on the file *)
   let callback dir file =
     let fns = try Hashtbl.find listeners dir with Not_found -> [] in
-    Lwt_list.iter_p (fun (id, f) -> Log.debug "callback %d" id; f file) fns
+    Lwt_list.iter_p (fun (id, f) -> Log.debug (fun f -> f "callback %d" id); f file) fns
 
   let realdir dir = if Filename.is_relative dir then Sys.getcwd () / dir else dir
 
@@ -478,7 +481,7 @@ module Poll = struct
       match watchdog dir with
       | Some _ -> u ()
       | None   ->
-        Log.debug "Start watchdog for %s" dir;
+        Log.debug (fun f -> f "Start watchdog for %s" dir);
         Hashtbl.add watchdogs dir u
 
   let stop_watchdog dir =
@@ -486,7 +489,7 @@ module Poll = struct
     | None      -> assert (nb_listeners dir = 0)
     | Some stop ->
       if nb_listeners dir = 0 then (
-        Log.debug "Stop watchdog for %s" dir;
+        Log.debug (fun f -> f "Stop watchdog for %s" dir);
         Hashtbl.remove watchdogs dir;
         stop ()
       )

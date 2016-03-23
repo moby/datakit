@@ -55,11 +55,12 @@ module Make (Store : I9p_tree.STORE) = struct
     let head_file, update_head = mk_head () in
     let t = { remote_url; update_head } in
     let fetch_file = mk_fetch t make_task repo in
-    Vfs.Dir.of_list [
+    let files = [
       Vfs.Inode.file "url" url_file;
       Vfs.Inode.file "head" head_file;
       Vfs.Inode.file "fetch" fetch_file;
-    ]
+    ] in
+    Vfs.Dir.of_list (fun () -> files)
 
   let create ?(init=[]) make_task repo =
     let remote ?url name = Vfs.Inode.dir name (mk_remote ?url make_task repo) in
@@ -68,7 +69,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let ls () = Vfs.ok (List.map snd !remotes) in
     let lookup n =
       try Vfs.ok (List.assoc n !remotes)
-      with Not_found -> Vfs.Dir.err_enoent
+      with Not_found -> Vfs.Dir.err_no_entry
     in
     let mkdir n =
       if List.mem_assoc n !remotes then Vfs.Dir.err_already_exists

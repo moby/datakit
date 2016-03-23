@@ -1,26 +1,43 @@
 open Lwt.Infix
 open Result
 
-module Log : Protocol_9p.S.LOG = struct
-  let debug fmt = Fmt.kstrf print_endline fmt
-  let info  fmt = Fmt.kstrf (fun s -> print_endline s) fmt
-  let error fmt = Fmt.kstrf (fun s -> print_endline s) fmt
+module Log9p : Protocol_9p.S.LOG = struct
+  let src = Logs.Src.create "9p" ~doc:"9p server"
+  module Log = (val Logs.src_log src : Logs.LOG)
+  let debug fmt = Fmt.kstrf (fun str -> Log.debug (fun l ->  l "%s" str)) fmt
+  let info  fmt = Fmt.kstrf (fun str -> Log.info (fun l -> l "%s" str)) fmt
+  let error fmt = Fmt.kstrf (fun str -> Log.err (fun l -> l "%s" str)) fmt
 end
+module Server = Fs9p.Make(Log9p)(Flow_lwt_unix)
 
-let log fmt = Printf.ksprintf print_endline fmt
+let src = Logs.Src.create "9p" ~doc:"9p server"
+module Log = (val Logs.src_log src : Logs.LOG)
 
 let error fmt = Printf.ksprintf (fun s ->
-    ignore (log "error: %s" s);
+    Log.err (fun l -> l  "error: %s" s);
     Error (`Msg s)
   ) fmt
 
 let max_chunk_size = Int32.of_int (100 * 1024)
 
-module Server = Fs9p.Make(Log)(Flow_lwt_unix)
-
 let make_task msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
   Irmin.Task.create ~date ~owner:"irmin9p" msg
+
+let token () =
+  let cookie = "datakit" in
+  Lwt_unix.run (
+    let open Lwt.Infix in
+    Github_cookie_jar.init () >>= fun jar ->
+    Github_cookie_jar.get jar ~name:cookie >|= function
+    | Some t -> Github.Token.of_string t.Github_t.auth_token
+    | None   ->
+      Printf.eprintf "Missing cookie: use git-jar to create cookie `%s`.\n%!"
+        cookie;
+      exit 1
+  )
+
+let subdirs = [Vgithub.create token]
 
 module Git_fs_store = struct
   open Irmin
@@ -32,10 +49,10 @@ module Git_fs_store = struct
   let listener = lazy (Ir_io.Poll.install_dir_polling_listener 1.0)
   let connect ~bare path =
     Lazy.force listener;
-    log "Using Git-format store %S" path;
+    Log.debug (fun l -> l "Using Git-format store %S" path);
     let config = Irmin_git.config ~root:path ~bare () in
     Store.Repo.create config >|= fun repo ->
-    fun () -> Filesystem.create make_task repo
+    fun () -> Filesystem.create make_task repo ~subdirs
 end
 
 module In_memory_store = struct
@@ -44,19 +61,21 @@ module In_memory_store = struct
   type t = Store.Repo.t
   module Filesystem = I9p.Make(Store)
   let connect () =
-    log "Using in-memory store (use --git for a disk-backed store)";
+    Log.debug (fun l ->
+        l "Using in-memory store (use --git for a disk-backed store)");
     let config = Irmin_mem.config () in
     Store.Repo.create config >|= fun repo ->
-    fun () -> Filesystem.create make_task repo
+    fun () -> Filesystem.create make_task repo ~subdirs
 end
 
 let handle_flow ~make_root flow =
-  log "New client";
+  Log.debug (fun l -> l "New client");
   (* Re-build the filesystem for each client because command files
      need per-client state. *)
   let root = make_root () in
   Server.accept ~root flow >|= function
-  | Error (`Msg msg) -> log "Error handling client connection: %s" msg
+  | Error (`Msg msg) ->
+    Log.debug (fun l -> l "Error handling client connection: %s" msg)
   | Ok () -> ()
 
 let default d = function
@@ -77,14 +96,14 @@ let make_unix_socket path =
 let start url sandbox git ~bare =
   Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
   Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
-      log "Caught SIGTERM, will exit";
+      Log.debug (fun l -> l "Caught SIGTERM, will exit");
       exit 1
     ));
   Sys.set_signal Sys.sigint (Sys.Signal_handle (fun _ ->
-      log "Caught SIGINT, will exit";
+      Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));
-  log "Starting com.docker.db...";
+  Log.app (fun l -> l "Starting com.docker.db...");
   let prefix = if sandbox then "." else "" in
   begin match git with
     | None -> In_memory_store.connect ()
@@ -110,7 +129,8 @@ let start url sandbox git ~bare =
          exit 1
     )
     (fun ex ->
-       Printf.fprintf stderr "Failed to set up server socket listening on %S: %s\n%!"
+       Printf.fprintf stderr
+         "Failed to set up server socket listening on %S: %s\n%!"
          url (Printexc.to_string ex);
        exit 1
     )
@@ -123,17 +143,46 @@ let start url sandbox git ~bare =
         Lwt.catch
           (fun () ->handle_flow ~make_root flow)
           (fun e ->
-             Log.error "Caught %s: closing connection" (Printexc.to_string e);
+             Log.err (fun l ->
+                 l "Caught %s: closing connection" (Printexc.to_string e));
              Lwt.return ()
           )
       );
     aux () in
-  log "Waiting for connections on socket %S" url;
+  Log.debug (fun l -> l "Waiting for connections on socket %S" url);
   aux ()
 
-let start url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
+let start () url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
 
 open Cmdliner
+
+let pad n x =
+  if String.length x > n then x else x ^ String.make (n - String.length x) ' '
+
+let reporter () =
+  let report src level ~over k msgf =
+    let k _ = over (); k () in
+    let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
+    let with_stamp h _tags k fmt =
+      let dt = Mtime.to_us (Mtime.elapsed ()) in
+      Fmt.kpf k ppf ("\r%0+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
+        dt
+        Fmt.(styled `Magenta string) (pad 10 @@ Logs.Src.name src)
+        Logs_fmt.pp_header (level, h)
+    in
+    msgf @@ fun ?header ?tags fmt ->
+    with_stamp header tags k fmt
+  in
+  { Logs.report = report }
+
+let setup_log style_renderer level =
+  Fmt_tty.setup_std_outputs ?style_renderer ();
+  Logs.set_level level;
+  Logs.set_reporter (reporter ());
+  ()
+
+let setup_log =
+  Term.(const setup_log $ Fmt_cli.style_renderer () $ Logs_cli.level ())
 
 let git =
   let doc =
@@ -170,7 +219,7 @@ let term =
     `S "DESCRIPTION";
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ url $ sandbox $ git $ bare),
+  Term.(pure start $ setup_log $ url $ sandbox $ git $ bare),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

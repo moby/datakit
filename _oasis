@@ -13,7 +13,7 @@ Library vfs
   Path:            src/vfs/
   Findlibname:     vfs
   Modules:         Vfs
-  BuildDepends:    lwt, rresult, cstruct, fmt
+  BuildDepends:    lwt, rresult, cstruct, fmt, logs
 
 Library fs9p
   Path:            src/fs9p/
@@ -28,6 +28,12 @@ Library i9p
   InternalModules: I9p_merge
   Modules:         I9p, I9p_tree, I9p_remote
   BuildDepends:    lwt, irmin, rresult, vfs
+
+Library vgithub
+  Path:            src/vgithub
+  Findlibname:     vgithub
+  Modules:         Vgithub
+  BuildDepends:    lwt, github, vfs, astring
 
 Library "irmin-io"
   Path:            src/irmin-io/
@@ -51,7 +57,9 @@ Executable datakit
   MainIs:         main.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io
+  BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io,
+                  vgithub, github.unix, logs.fmt, logs.cli, mtime.os, fmt.tty,
+                  fmt.cli
 
 Executable "datakit-mount"
   Path:           src/bin

@@ -2,6 +2,9 @@ open Github
 open Github_t
 open Astring
 
+let src = Logs.Src.create "vgithub" ~doc:"Virtual Github API"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 let run x = Lwt_main.run (Github.Monad.run x)
 
 let err_invalid_status s = Vfs.error "%S: invalid status" s
@@ -85,33 +88,39 @@ module API = struct
 
 end
 
-let status_file t pr context status =
-  let current_status = ref status in
-  let init = API.string_of_status_state status ^ "\n" in
+(* /github.com/${USER}/${REPO}/pr/${PR}/status/${CONTEXT} *)
+let pr_status_file t pr context state =
+  Logs.debug (fun l ->
+      l "status_file %s/%s %d %a"
+        t.API.user t.API.repo pr.pull_number API.pp_status_state state);
+  let current_state = ref state in
+  let init = API.string_of_status_state state ^ "\n" in
   Vfs.File.command ~init (fun str ->
       match API.status_state_of_string str with
       | None   -> err_invalid_status str
       | Some s ->
-        if s = !current_status then Vfs.ok (str ^ "\n")
+        if s = !current_state then Vfs.ok (str ^ "\n")
         else (
-          current_status := s;
+          current_state := s;
           API.set_status t ~context pr s;
           Vfs.ok (API.string_of_status_state s ^ "\n");
         )
     )
 
-let status_context s = match s.status_context with
+let context_of_status s = match s.status_context with
   | None   -> ["default"]
   | Some c -> String.cuts ~empty:false ~sep:"/" c
 
-(* /github.com/${USER}/${REPO}/pr/${PR} *)
-let pr_files t pr =
+(* /github.com/${USER}/${REPO}/pr/${PR}/status *)
+let pr_status_dir t pr =
+  Log.debug (fun l ->
+      l "status_dir %s/%s %d" t.API.user t.API.repo pr.pull_number);
   let inode context status =
     let context_str = String.concat ~sep:"/" context in
     let rec aux = function
       | []     -> assert false
       | [name] ->
-        let file = status_file t pr context_str status.status_state in
+        let file = pr_status_file t pr context_str status.status_state in
         Vfs.Inode.file name file
       | name :: rest ->
         Vfs.Inode.dir name @@ Vfs.Dir.of_list (fun () -> [aux rest])
@@ -121,7 +130,7 @@ let pr_files t pr =
   let ls () =
     let status = API.status t pr in
     List.fold_left (fun acc status ->
-        let context = status_context status in
+        let context = context_of_status status in
         let name = match context with h::_ -> h | [] -> assert false in
         if List.mem_assoc name acc then acc
         else (name, inode context status) :: acc
@@ -132,41 +141,66 @@ let pr_files t pr =
   let lookup name =
     let status = API.status t pr in
     try
-      let s = List.find (fun s -> List.hd (status_context s) = name) status in
-      Vfs.ok @@ inode (status_context s) s
+      let s =
+        List.find (fun s -> List.hd (context_of_status s) = name) status
+      in
+      Vfs.ok @@ inode (context_of_status s) s
     with Not_found ->
       Vfs.File.err_no_entry
   in
-  let mkfile _ = Vfs.error "TODO" in
+  let mkfile name =
+    API.set_status t ~context:name pr `Pending;
+    Vfs.ok @@ Vfs.Inode.file name @@ pr_status_file t pr name `Pending
+  in
   let mkdir _ = Vfs.error "TODO" in
   let remove _ = Vfs.error "TODO" in
   let rename _ _ = Vfs.error "TODO" in
   Vfs.Dir.create ~ls ~lookup ~mkfile ~mkdir ~remove ~rename
 
-(* /github.com/${USER}/${REPO}/pr *)
-  let pr_root t =
-    let prs () =
-      API.prs t
-      |> List.map (fun pr ->
-          Vfs.Inode.dir (string_of_int pr.pull_number) @@ pr_files t pr
-        )
-    in
-    Vfs.Dir.of_list prs
+(* /github.com/${USER}/${REPO}/pr/${PR}/head *)
+let pr_head t pr =
+  Logs.debug (fun l ->
+      l "pr_dir %s/%s %d" t.API.user t.API.repo pr.pull_number);
+  (* FIXME: this should be a stream, and update the relevant status
+     files. *)
+  Vfs.File.ro_of_string (pr.pull_head.branch_sha ^ "\n")
+
+(* /github.com/${USER}/${REPO}/pr/${PR} *)
+let pr_dir t pr =
+  Logs.debug (fun l ->
+      l "pr_dir %s/%s %d" t.API.user t.API.repo pr.pull_number);
+  let dirs () = [
+    Vfs.Inode.dir "status" @@ pr_status_dir t pr;
+    Vfs.Inode.file "head"  @@ pr_head t pr;
+  ] in
+  Vfs.Dir.of_list dirs
+
+let pr_root t =
+  Logs.debug (fun l -> l "pr_root %s/%s" t.API.user t.API.repo);
+  let prs () =
+    API.prs t
+    |> List.map (fun pr ->
+        Vfs.Inode.dir (string_of_int pr.pull_number) @@ pr_dir t pr
+      )
+  in
+  Vfs.Dir.of_list prs
 
 (* /github.com/${USER}/${REPO} *)
 let repo_root t =
+  Logs.debug (fun l -> l "repo_root %s/%s" t.API.user t.API.repo);
   match API.repo t with
   | None   -> None
   | Some _ ->
-    let files () = [
+    let files = [
       Vfs.Inode.dir "pr" @@ pr_root t
     ] in
-    let dir = Vfs.Dir.of_list files in
+    let dir = Vfs.Dir.of_list (fun () -> files) in
     Some (Vfs.Inode.dir t.API.repo dir)
 
 (* /github.com/${USER}/ *)
 let user_root ~token ~user =
   let t = API.create ~token ~user ~repo:"" in
+  Logs.debug (fun l -> l "user_root %s/%s" t.API.user t.API.repo);
   match API.user t with
   | None   -> Vfs.Dir.err_no_entry
   | Some _ ->

@@ -7,9 +7,12 @@
 At the root of the repository:
 
 ```
-docker build -l datakit .
-docker run -d -p 5650:5640 -n db datakit # this starts a Datakit server
-docker run --link db:db datakit sh # this start a new shell
+docker build -t datakit .
+docker rm -f db                                      # Remove previous instances
+docker run -d -p 5650:5640 --name=db \
+  -v ${HOME}/.github:/home/opam/.github \
+  datakit                                             # Start the Datakit server
+docker run -it --privileged --rm --link db datakit sh        # Start a new shell
 $ datakit-mount
 $ cd /db
 $ ls

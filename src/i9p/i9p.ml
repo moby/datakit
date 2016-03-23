@@ -6,7 +6,8 @@ module PathSet = I9p_merge.PathSet
 
 module type S = sig
   type repo
-  val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
+  val create:
+    ?subdirs:Vfs.Inode.t list -> string Irmin.Task.f -> repo -> Vfs.Dir.t
 end
 
 let ok = Vfs.ok
@@ -699,11 +700,12 @@ module Make (Store : I9p_tree.STORE) = struct
     Vfs.File.of_kvro ~read
 
   let snapshot_dir store name =
-    static_dir name [
+    let dirs = [
       read_only ~name:"ro"     (store "ro");
       Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
       Vfs.Inode.file "parents" (parents_file store)
-    ]
+    ] in
+    static_dir name (fun () -> dirs)
 
   let snapshots_dir make_task repo =
     let cache = ref empty_inode_map in   (* Could use a weak map here *)
@@ -727,12 +729,13 @@ module Make (Store : I9p_tree.STORE) = struct
     let remove () = Vfs.Dir.err_read_only in
     Vfs.Dir.read_only ~ls ~lookup ~remove
 
-  let create make_task repo =
-    Vfs.Dir.of_list [
-      Vfs.Inode.dir "branch"    (branch_dir make_task repo);
-      Vfs.Inode.dir "trees"     (trees_dir make_task repo);
-      Vfs.Inode.dir "snapshots" (snapshots_dir make_task repo);
-      Vfs.Inode.dir "remotes"   (Remote.create make_task repo);
-    ]
+  let create ?(subdirs=[]) make_task repo =
+    let dirs = [
+      Vfs.Inode.dir "branch"     (branch_dir make_task repo);
+      Vfs.Inode.dir "trees"      (trees_dir make_task repo);
+      Vfs.Inode.dir "snapshots"  (snapshots_dir make_task repo);
+      Vfs.Inode.dir "remotes"    (Remote.create make_task repo);
+    ] @ subdirs in
+    Vfs.Dir.of_list (fun () -> dirs)
 
 end

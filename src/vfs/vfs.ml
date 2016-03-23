@@ -363,18 +363,18 @@ module Dir = struct
     create_aux ~mkfile ~mkdir ~rename
 
   let of_list_aux items =
-    let ls () = ok items in
+    let ls () = ok (items ()) in
     let lookup name =
       let rec aux = function
         | [] -> err_enoent
         | x :: _ when x.basename = name -> ok x
         | _ :: xs -> aux xs in
-      aux items
+      aux (items ())
     in
     let remove () = err_read_only in
     read_only_aux ~ls ~lookup ~remove
 
-  let empty = of_list_aux ~debug:"empty" []
+  let empty = of_list_aux ~debug:"empty" (fun () -> [])
 
   let of_map_ref m =
     let ls () = ok (StringMap.bindings !m |> List.map snd) in

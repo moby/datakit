@@ -223,17 +223,16 @@ module FS = struct
   let write_file file ?temp_dir b =
     with_write_file file ?temp_dir (fun fd -> write_cstruct fd b)
 
-  (* [read_into ~off buf ch] reads from [ch] into [buf] until either
-     [buf] is full or [ch] is exhausted. It returns the subset of
-     [buf] that was filled. *)
-  let read_into buf ch =
-    let len = 4 * 4096 in
-    let data = Bytes.create len in
+  (* [read_into ~chunk_size ~off buf ch] reads from [ch] into [buf] until
+     either [buf] is full or [ch] is exhausted. It returns the
+     subset of [buf] that was filled. *)
+  let read_into ~chunk_size buf ch =
+    let data = Bytes.create chunk_size in
     let rec aux off =
       match Cstruct.len buf - off with
       | 0     -> Lwt.return buf   (* Buffer full *)
       | avail ->
-        Lwt_io.read_into ch data 0 (min len avail) >>= fun read ->
+        Lwt_io.read_into ch data 0 (min chunk_size avail) >>= fun read ->
         Cstruct.blit_from_string data 0 buf off read;
         aux (off + read)
     in
@@ -241,10 +240,18 @@ module FS = struct
 
   let read_file file =
     Lwt_pool.use openfile_pool (fun () ->
-        Log.info (fun f -> f "Reading %s" file);
-        Lwt_io.(with_file ~mode:input) ~flags:[Unix.O_RDONLY] file (fun ch ->
-            Lwt_io.length ch >|= Int64.to_int >|= Cstruct.create >>= fun buf ->
-            read_into buf ch
+        Log.info (fun l -> l "Reading %s" file);
+        Lwt_unix.stat file >>= fun stats ->
+        (* There are really too many buffers here. First we copy from
+           the FS to the Lwt_io buffer, then from there into our own
+           string buffer, then blit from there into a Cstruct. *)
+        let chunk_size = max 4096 (min stats.Lwt_unix.st_size 0x100000) in
+        let lwt_buffer = Lwt_bytes.create chunk_size in
+        Lwt_io.(with_file
+                  ~buffer:lwt_buffer ~mode:input) ~flags:[Unix.O_RDONLY] file
+          (fun ch ->
+             let buf = Cstruct.create stats.Lwt_unix.st_size in
+             read_into ~chunk_size buf ch
           )
       )
 

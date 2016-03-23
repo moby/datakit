@@ -1,5 +1,5 @@
 PKG lwt result fmt protocol-9p irmin.unix launchd cmdliner
-PKG alcotest rresult
+PKG alcotest rresult github astring fmt irmin logs mtime.os
 S src/**
 S tests/
 B _build/src/**

@@ -1,6 +1,9 @@
 open Rresult
 open Lwt.Infix
 
+let src = Logs.Src.create "vfs" ~doc:"Datakit VFS"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 module Error = struct
 
   type err = { errno: int32 option; descr: string }
@@ -12,8 +15,8 @@ module Error = struct
     | Perm
     | Other of err
 
-  let noent = Error Noent
-  let isdir = Error Isdir
+  let no_entry = Error Noent
+  let is_dir = Error Isdir
   let read_only_file = Error Read_only_file
   let perm = Error Perm
 
@@ -42,7 +45,7 @@ type 'a or_err = ('a, Error.t) Result.result Lwt.t
 
 module File = struct
 
-  let err_noent = Lwt.return Error.noent
+  let err_no_entry = Lwt.return Error.no_entry
   let err_read_only = Lwt.return Error.read_only_file
   let err_perm = Lwt.return Error.perm
   let err_negative_offset o = error "Negative offset %Ld" o
@@ -180,14 +183,14 @@ module File = struct
     let open_ () = stream () >>= fun s -> Fd.of_stream s in
     read_only_aux ~debug:"of_stream" ~size ~open_
 
-  let command handler =
+  let command ?(init="") handler =
     (* Value currently being returned to user. Note that this is
        attached to the file, not the client's FD. This is so a shell
        client can write and then read in a separate step, but does
        mean we can't support parallel commands for a single FS (so if
        this is used, you should create a fresh FS for each client
        connection at least). *)
-    let data = ref (Cstruct.create 0) in
+    let data = ref (Cstruct.of_string init) in
     let size () = ok 0L in
     let open_ () =
       let read count =
@@ -256,13 +259,13 @@ module File = struct
 
   let of_kv_aux ~read ~write =
     let size () = read () >>*= function
-      | None          -> err_noent
+      | None          -> err_no_entry
       | Some contents -> ok @@ Int64.of_int (Cstruct.len contents)
     in
     let open_ () =
       let read ~offset ~count =
         read () >>*= function
-        | None -> err_noent
+        | None -> err_no_entry
         | Some contents ->
           check_offset ~offset (Cstruct.len contents) >>*= fun () ->
           let avail = Cstruct.shift contents (Int64.to_int offset) in
@@ -321,7 +324,7 @@ module Dir = struct
   let err_read_only = error "Directory is read-only"
   let err_already_exists = error "Already exists"
   let err_dir_only = error "Can only contain directories"
-  let err_enoent = Lwt.return Error.noent
+  let err_no_entry = Lwt.return Error.no_entry
 
   module StringMap  = Map.Make(String)
 
@@ -363,24 +366,24 @@ module Dir = struct
     create_aux ~mkfile ~mkdir ~rename
 
   let of_list_aux items =
-    let ls () = ok items in
+    let ls () = ok (items ()) in
     let lookup name =
       let rec aux = function
-        | [] -> err_enoent
+        | [] -> err_no_entry
         | x :: _ when x.basename = name -> ok x
         | _ :: xs -> aux xs in
-      aux items
+      aux (items ())
     in
     let remove () = err_read_only in
     read_only_aux ~ls ~lookup ~remove
 
-  let empty = of_list_aux ~debug:"empty" []
+  let empty = of_list_aux ~debug:"empty" (fun () -> [])
 
   let of_map_ref m =
     let ls () = ok (StringMap.bindings !m |> List.map snd) in
     let lookup name =
       try ok (StringMap.find name !m)
-      with Not_found -> err_enoent
+      with Not_found -> err_no_entry
     in
     let remove () = err_read_only in
     read_only_aux ~debug:"of_map_ref" ~ls ~lookup ~remove

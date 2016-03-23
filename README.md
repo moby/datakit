@@ -7,9 +7,12 @@
 At the root of the repository:
 
 ```
-docker build -l datakit .
-docker run -d -p 5650:5640 -n db datakit # this starts a Datakit server
-docker run --link db:db datakit sh # this start a new shell
+docker build -t datakit .
+docker rm -f db                                      # Remove previous instances
+docker run -d -p 5650:5640 --name=db \
+  -v ${HOME}/.github:/home/opam/.github \
+  datakit                                             # Start the Datakit server
+docker run -it --privileged --rm --link db datakit sh        # Start a new shell
 $ datakit-mount
 $ cd /db
 $ ls
@@ -206,6 +209,18 @@ To  fetch `https://github.com/docker/datakit`'s master branch:
     ~/mnt/remotes $ echo master > origin/fetch
     ~/mnt/remotes $ cat origin/head
     4b6557542ec9cc578d5fe09b664110ba3b68e2c2
+
+### Github PRs
+
+There is a rudimentary support for interacting with Github PRs.
+
+    ~/mnt $ ls github.com/docker/datakit
+    41  42
+    ~/mnt $ cat github.com/docker/datakit/pr/41/status/default
+    pending
+    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default
+
+This will toggle the status of the pull request on the Github interface.
 
 ### How do I...
 

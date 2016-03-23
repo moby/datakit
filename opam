@@ -20,7 +20,7 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "oasis"      {build}
-  "rresult"
+  "rresult" "astring" "fmt"
   "git"
   "irmin"       {>= "0.10.1"}
   "camlzip"
@@ -28,6 +28,8 @@ depends: [
   "conduit"
   "protocol-9p" {>= "0.5.0"}
   "logs"        {>= "0.5.0"}
+  "github"
+  "mtime"
   "alcotest"   {test}
 ]
 available: [ocaml-version >= "4.02.0"]

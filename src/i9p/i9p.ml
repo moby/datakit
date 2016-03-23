@@ -6,12 +6,13 @@ module PathSet = I9p_merge.PathSet
 
 module type S = sig
   type repo
-  val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
+  val create:
+    ?subdirs:Vfs.Inode.t list -> string Irmin.Task.f -> repo -> Vfs.Dir.t
 end
 
 let ok = Vfs.ok
-let err_enoent = Lwt.return Vfs.Error.noent
-let err_eisdir = Lwt.return Vfs.Error.isdir
+let err_no_entry = Lwt.return Vfs.Error.no_entry
+let err_is_dir = Lwt.return Vfs.Error.is_dir
 let err_read_only = Lwt.return Vfs.Error.read_only_file
 let err_already_exists name = Vfs.error "Entry %S already exists" name
 let err_conflict msg = Vfs.error "Merge conflict: %s" msg
@@ -39,7 +40,7 @@ module Make (Store : I9p_tree.STORE) = struct
       get_root () >>= fun root ->
       Tree.node root path >>= function
       | `None         -> Lwt.return (Ok None)
-      | `Directory _  -> err_eisdir
+      | `Directory _  -> err_is_dir
       | `File content ->
         let contents_t = Store.Private.Repo.contents_t (Tree.repo root) in
         Store.Private.Contents.read_exn contents_t content >|= fun content ->
@@ -96,7 +97,7 @@ module Make (Store : I9p_tree.STORE) = struct
       let ls () =
         get_root () >>= fun root ->
         Tree.get_dir root path >>= function
-        | None -> err_enoent
+        | None -> err_no_entry
         | Some dir ->
           Tree.ls dir >>= fun items ->
           ok (List.map (get ~dir:path) items)
@@ -104,12 +105,12 @@ module Make (Store : I9p_tree.STORE) = struct
       let lookup name =
         get_root () >>= fun root ->
         Tree.get_dir root path >>= function
-        | None -> err_enoent
+        | None -> err_no_entry
         | Some dir ->
           Tree.ty dir name >>= function
           | `File
           | `Directory as ty -> ok (get ~dir:path (ty, name))
-          | `None            -> err_enoent
+          | `None            -> err_no_entry
       in
       let remove () = Vfs.Dir.err_read_only in
       Vfs.Dir.read_only ~ls ~lookup ~remove |> Vfs.Inode.dir name
@@ -191,12 +192,12 @@ module Make (Store : I9p_tree.STORE) = struct
         let real_result =
           snapshot ~store view >>= fun snapshot ->
           Tree.get_dir snapshot path >>= function
-          | None -> err_enoent
+          | None -> err_no_entry
           | Some dir ->
             Tree.ty dir name >>= function
             | `File
             | `Directory as ty -> ok (get ~dir:path (ty, name))
-            | `None            -> err_enoent
+            | `None            -> err_no_entry
         in
         real_result >|= function
         | Ok _ as ok   -> ok
@@ -304,7 +305,7 @@ module Make (Store : I9p_tree.STORE) = struct
       | their_commit ->
         Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) their_commit
         >>= function
-        | false -> err_enoent
+        | false -> err_no_entry
         | true ->
           let unit_task () = Irmin.Task.empty in
           Store.of_commit_id unit_task their_commit repo >>= fun theirs ->
@@ -479,7 +480,7 @@ module Make (Store : I9p_tree.STORE) = struct
       | "tree.live" -> ok (Lazy.force live)
       | x when Filename.check_suffix x ".node" ->
         ok (lookup (Filename.chop_suffix x ".node"))
-      | _ -> err_enoent
+      | _ -> err_no_entry
     in
     let remove () = Vfs.Dir.err_read_only in
     Vfs.Dir.read_only ~ls ~lookup ~remove
@@ -504,13 +505,14 @@ module Make (Store : I9p_tree.STORE) = struct
       | `Max_depth_reached | `Too_many_lcas -> assert false
 
   let fast_forward_merge store =
-    Vfs.File.command @@ fun hash ->
-    match Store.Hash.of_hum hash with
-    | exception ex -> err_invalid_hash hash ex
-    | hash         ->
-      fast_forward store hash >>= function
-      | `Ok               -> ok ""
-      | `Not_fast_forward -> err_not_fast_forward
+    Vfs.File.command (fun hash ->
+        match Store.Hash.of_hum hash with
+        | exception ex -> err_invalid_hash hash ex
+        | hash         ->
+          fast_forward store hash >>= function
+          | `Ok               -> ok ""
+          | `Not_fast_forward -> err_not_fast_forward
+      )
 
   let status store () =
     Store.head (store "head") >|= function
@@ -523,7 +525,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let ls () = ok (StringMap.bindings !items |> List.map snd) in
     let lookup name =
       try ok (StringMap.find name !items)
-      with Not_found -> err_enoent
+      with Not_found -> err_no_entry
     in
     let make = make_instance store in
     let remover name =
@@ -541,7 +543,7 @@ module Make (Store : I9p_tree.STORE) = struct
             make ~remover name >>= function
             | Error _ as e -> Lwt.return e
             | Ok dir       ->
-              if Lazy.is_val remover then err_enoent else (
+              if Lazy.is_val remover then err_no_entry else (
                 let inode = Vfs.Inode.dir name dir in
                 items := StringMap.add name inode !items;
                 ok inode
@@ -570,7 +572,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let lookup name =
       !contents >|= fun items ->
       let rec aux = function
-        | [] -> Vfs.Error.noent
+        | [] -> Vfs.Error.no_entry
         | x :: _ when Vfs.Inode.basename x = name -> Ok x
         | _ :: xs -> aux xs in
       aux items
@@ -615,7 +617,7 @@ module Make (Store : I9p_tree.STORE) = struct
       with Not_found ->
         Store.Private.Ref.mem (Store.Private.Repo.ref_t repo) name >>= function
         | true  -> ok (get_via_cache name |> fst)
-        | false -> err_enoent
+        | false -> err_no_entry
     in
     let mkdir name = ok (get_via_cache name |> fst) in
     let remove () = Vfs.Dir.err_read_only in
@@ -624,7 +626,7 @@ module Make (Store : I9p_tree.STORE) = struct
       let old_name = Vfs.Inode.basename inode in
       let refs = Store.Private.Repo.ref_t repo in
       Store.Private.Ref.mem refs new_name >>= function
-      | true -> err_eisdir
+      | true -> err_is_dir
       | false ->
         Store.Private.Ref.read refs old_name >>= fun head ->
         begin match head with
@@ -652,9 +654,9 @@ module Make (Store : I9p_tree.STORE) = struct
       else match String.sub h 0 2, String.sub h 2 (String.length h - 2) with
         | "F-", hash -> Ok (file hash)
         | "D-", hash -> Ok (dir hash)
-        | _ -> Vfs.Error.noent
+        | _ -> Vfs.Error.no_entry
     with _ex ->
-      Vfs.Error.noent
+      Vfs.Error.no_entry
 
   let trees_dir _make_task repo =
     let inode_of_tree_hash name =
@@ -664,7 +666,7 @@ module Make (Store : I9p_tree.STORE) = struct
           Store.Private.Contents.read (Store.Private.Repo.contents_t repo) hash
           >|= function
           | Some data -> Ok (Vfs.File.ro_of_string data |> Vfs.Inode.file name)
-          | None      -> Vfs.Error.noent
+          | None      -> Vfs.Error.no_entry
         end
       | `None ->
         let root = Tree.of_dir_hash repo None in
@@ -699,11 +701,12 @@ module Make (Store : I9p_tree.STORE) = struct
     Vfs.File.of_kvro ~read
 
   let snapshot_dir store name =
-    static_dir name [
+    let dirs = [
       read_only ~name:"ro"     (store "ro");
       Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
       Vfs.Inode.file "parents" (parents_file store)
-    ]
+    ] in
+    static_dir name (fun () -> dirs)
 
   let snapshots_dir make_task repo =
     let cache = ref empty_inode_map in   (* Could use a weak map here *)
@@ -717,8 +720,8 @@ module Make (Store : I9p_tree.STORE) = struct
         end >>*= fun commit_id ->
         Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) commit_id
         >>= function
-        | false -> err_enoent
-        | true ->
+        | false -> err_no_entry
+        | true  ->
           Store.of_commit_id make_task commit_id repo >|= fun store ->
           let inode = snapshot_dir store name in
           cache := StringMap.add name inode !cache;
@@ -727,12 +730,13 @@ module Make (Store : I9p_tree.STORE) = struct
     let remove () = Vfs.Dir.err_read_only in
     Vfs.Dir.read_only ~ls ~lookup ~remove
 
-  let create make_task repo =
-    Vfs.Dir.of_list [
-      Vfs.Inode.dir "branch"    (branch_dir make_task repo);
-      Vfs.Inode.dir "trees"     (trees_dir make_task repo);
-      Vfs.Inode.dir "snapshots" (snapshots_dir make_task repo);
-      Vfs.Inode.dir "remotes"   (Remote.create make_task repo);
-    ]
+  let create ?(subdirs=[]) make_task repo =
+    let dirs = [
+      Vfs.Inode.dir "branch"     (branch_dir make_task repo);
+      Vfs.Inode.dir "trees"      (trees_dir make_task repo);
+      Vfs.Inode.dir "snapshots"  (snapshots_dir make_task repo);
+      Vfs.Inode.dir "remotes"    (Remote.create make_task repo);
+    ] @ subdirs in
+    Vfs.Dir.of_list (fun () -> dirs)
 
 end

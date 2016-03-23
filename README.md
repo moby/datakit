@@ -4,7 +4,7 @@
 
 ### Quick Setup
 
-At the root of the repositoru:
+At the root of the repository:
 
 ```
 docker build -l datakit .

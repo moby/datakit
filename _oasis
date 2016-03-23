@@ -34,7 +34,7 @@ Library "irmin-io"
   Findlibname:     irmin-io
   Modules:         Ir_io
   BuildDepends:    zip, uri, lwt.unix, fmt, cstruct, git, tc, irmin,
-                   conduit.lwt-unix
+                   conduit.lwt-unix, logs
 
 Document datakit
   Title:                Datakit docs

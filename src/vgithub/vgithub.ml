@@ -112,7 +112,7 @@ let context_of_status s = match s.status_context with
   | Some c -> String.cuts ~empty:false ~sep:"/" c
 
 (* /github.com/${USER}/${REPO}/pr/${PR}/status *)
-let pr_status_dir t pr =
+let pr_status_root t pr =
   Log.debug (fun l ->
       l "status_dir %s/%s %d" t.API.user t.API.repo pr.pull_number);
   let inode context status =
@@ -170,11 +170,12 @@ let pr_dir t pr =
   Logs.debug (fun l ->
       l "pr_dir %s/%s %d" t.API.user t.API.repo pr.pull_number);
   let dirs () = [
-    Vfs.Inode.dir "status" @@ pr_status_dir t pr;
+    Vfs.Inode.dir "status" @@ pr_status_root t pr;
     Vfs.Inode.file "head"  @@ pr_head t pr;
   ] in
   Vfs.Dir.of_list dirs
 
+(* /github.com/${USER}/${REPO}/pr *)
 let pr_root t =
   Logs.debug (fun l -> l "pr_root %s/%s" t.API.user t.API.repo);
   let prs () =
@@ -186,7 +187,7 @@ let pr_root t =
   Vfs.Dir.of_list prs
 
 (* /github.com/${USER}/${REPO} *)
-let repo_root t =
+let repo_dir t =
   Logs.debug (fun l -> l "repo_root %s/%s" t.API.user t.API.repo);
   match API.repo t with
   | None   -> None
@@ -198,7 +199,7 @@ let repo_root t =
     Some (Vfs.Inode.dir t.API.repo dir)
 
 (* /github.com/${USER}/ *)
-let user_root ~token ~user =
+let user_dir ~token ~user =
   let t = API.create ~token ~user ~repo:"" in
   Logs.debug (fun l -> l "user_root %s/%s" t.API.user t.API.repo);
   match API.user t with
@@ -206,7 +207,7 @@ let user_root ~token ~user =
   | Some _ ->
     let ls () =
       API.list_repos t
-      |> List.rev_map (fun repo -> repo_root { t with API.repo })
+      |> List.rev_map (fun repo -> repo_dir { t with API.repo })
       |> List.fold_left (fun acc -> function
           | None   -> acc
           | Some x -> x :: acc)
@@ -214,7 +215,7 @@ let user_root ~token ~user =
       |> Vfs.ok
     in
     let remove _ = Vfs.Dir.err_read_only in
-    let lookup name = match repo_root { t with API.repo = name } with
+    let lookup name = match repo_dir { t with API.repo = name } with
       | None   -> Vfs.Dir.err_no_entry
       | Some x -> Vfs.ok x
     in
@@ -226,5 +227,5 @@ let create token =
   let token = lazy (token ()) in
   let ls () = Vfs.ok [] in
   let remove () = Vfs.Dir.err_read_only in
-  let lookup name = user_root ~token ~user:name in
+  let lookup name = user_dir ~token ~user:name in
   Vfs.Inode.dir "github.com" @@ Vfs.Dir.read_only ~ls ~remove ~lookup

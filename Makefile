@@ -1,6 +1,7 @@
 VERSION = $(shell grep 'Version:' _oasis | sed 's/Version: *//')
 VFILE   = src/bin/version.ml
 APP     = Datakit.app
+EXE     = Datakit.win
 PREFIX ?= $(shell opam config var prefix)
 
 SETUP = ocaml setup.ml
@@ -55,6 +56,12 @@ bundle: build
 	 -x $(APP)/Contents/MacOS/com.docker.db \
 	 -d $(APP)/Contents/Resources/lib \
 	 -p @executable_path/../Resources/lib
+
+exe: build
+	rm -rf $(EXE)
+	mkdir -p $(EXE)
+	cp _build/src/bin/main.native $(EXE)/datakit.exe
+	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)
 
 ifeq ($(wildcard .git/refs/heads/master),)
 $(VFILE):

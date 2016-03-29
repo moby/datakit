@@ -9,6 +9,10 @@ Plugins:     META (0.4), DevFiles (0.4)
 BuildTools:    ocamlbuild
 AlphaFeatures: pure_interface, ocamlbuild_more_args
 
+Flag github
+  Description:       build the Github APi bindings
+  Default:           false
+
 Library vfs
   Path:            src/vfs/
   Findlibname:     vfs
@@ -33,6 +37,7 @@ Library vgithub
   Path:            src/vgithub
   Findlibname:     vgithub
   Modules:         Vgithub
+  Build$:          flag(github)
   BuildDepends:    lwt, github, vfs, astring
 
 Library "irmin-io"
@@ -58,8 +63,8 @@ Executable datakit
   CompiledObject: best
   Install:        true
   BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io,
-                  vgithub, github.unix, logs.fmt, logs.cli, mtime.os, fmt.tty,
-                  fmt.cli
+                  logs.fmt, logs.cli, mtime.os, fmt.tty,
+                  fmt.cli # see myocamlbuild.ml: vgithub, github.unix
 
 Executable "datakit-mount"
   Path:           src/bin

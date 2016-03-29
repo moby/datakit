@@ -6,6 +6,8 @@ PREFIX ?= $(shell opam config var prefix)
 
 SETUP = ocaml setup.ml
 
+GITHUB ?= disable
+
 build: setup.data $(VFILE)
 	$(SETUP) -build $(BUILDFLAGS)
 
@@ -19,13 +21,14 @@ setup.ml: _oasis
 	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags
 	echo '"$(APP)": -traverse' >> _tags
 	echo '"$(EXE)": -traverse' >> _tags
-	echo 'Ocamlbuild_plugin.mark_tag_used "tests"' >> myocamlbuild.ml
+	echo "true: pp_github" > src/bin/_tags
+	cat _myocamlbuild.ml >> myocamlbuild.ml
 
 doc: setup.data build
 	$(SETUP) -doc $(DOCFLAGS)
 
 test:
-	$(SETUP) -configure --enable-tests --prefix $(PREFIX)
+	$(SETUP) -configure --enable-tests --prefix $(PREFIX) --$(GITHUB)-github
 	$(MAKE) build
 	$(SETUP) -test $(TESTFLAGS)
 
@@ -41,13 +44,14 @@ reinstall: setup.data
 clean:
 	if [ -f setup.ml ]; then $(SETUP) -clean $(CLEANFLAGS); fi
 	rm -f setup.data setup.ml myocamlbuild.ml _tags configure
+	rm -f src/bin/_tags
 	rm -f src/*.odocl src/META setup.log
 	rm -f src/**/META src/**/*.mldylib src/**/*.mllib
 	rm -f $(VFILE)
 	rm -rf $(APP) $(EXE) _tests
 
 setup.data: setup.ml
-	$(SETUP) -configure --prefix $(PREFIX)
+	$(SETUP) -configure --prefix $(PREFIX) --$(GITHUB)-github
 
 bundle: build
 	rm -rf $(APP)

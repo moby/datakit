@@ -27,7 +27,7 @@ Library i9p
   Findlibname:     i9p
   InternalModules: I9p_merge
   Modules:         I9p, I9p_tree, I9p_remote
-  BuildDepends:    lwt, irmin, rresult, vfs
+  BuildDepends:    lwt, irmin, rresult, vfs, str
 
 Library vgithub
   Path:            src/vgithub

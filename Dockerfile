@@ -2,20 +2,16 @@ FROM ocaml/opam:alpine
 
 RUN opam depext lwt &&  opam install lwt alcotest
 
-COPY opam /home/opam/src/i9p/opam
-RUN opam pin add i9p.dev /home/opam/src/i9p -n
+COPY opam /home/opam/src/datakit/opam
+RUN opam pin add i9p.dev /home/opam/src/datakit -n
 RUN opam depext i9p && opam install i9p --deps        # Install i9p deps
 
 RUN opam pin add github https://github.com/samoht/ocaml-github.git#status-context
 
-COPY .git /home/opam/src/i9p/.git
-COPY src /home/opam/src/i9p/src
-COPY Makefile /home/opam/src/i9p/Makefile
-COPY _oasis /home/opam/src/i9p/_oasis
-COPY tests /home/opam/src/i9p/tests
+COPY . /home/opam/src/datakit
 
 RUN sudo chown -R opam.nogroup /home/opam/src
-WORKDIR /home/opam/src/i9p
+WORKDIR /home/opam/src/datakit
 
 RUN opam config exec -- make && make test && make install
 

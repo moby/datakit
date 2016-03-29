@@ -7,11 +7,11 @@ homepage:     "https://github.com/docker/datakit"
 bug-reports:  "https://github.com/docker/datakit"
 dev-repo:     "https://github.com/docker/dataki.git"
 
-build: [make "PREFIX=%{prefix}"]
+build: [make "PREFIX=%{prefix}" "GITHUB=%{github:enable}%"]
 build-test: [make "test"]
 install: [make "install"]
 remove: [
-  ["./configure" "--prefix" prefix]
+  ["./configure" "--prefix" prefix "--%{github:enable}%-github"]
   [make "uninstall"]
   ["ocamlfind" "remove" "i9p"]
 ]
@@ -28,8 +28,8 @@ depends: [
   "conduit"
   "protocol-9p" {>= "0.5.0"}
   "logs"        {>= "0.5.0"}
-  "github"
   "mtime"
   "alcotest"   {test}
 ]
+depopts: ["github"]
 available: [ocaml-version >= "4.02.0"]

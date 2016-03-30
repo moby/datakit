@@ -1,0 +1,13 @@
+machine:
+  environment:
+    CI: "1"
+    OPAMYES: "1"
+dependencies:
+  override:
+    - brew install ocaml opam
+    - opam init -a
+    - opam pin add . --deps
+test:
+  override:
+    - make
+    - make test

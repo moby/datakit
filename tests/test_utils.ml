@@ -53,12 +53,24 @@ end
 
 let log = ref []
 
-module Log : Protocol_9p.S.LOG = struct
-  let append s = log := s :: !log
-  let debug fmt = Fmt.kstrf append fmt
-  let info fmt = Fmt.kstrf (fun s -> append ("info: " ^ s)) fmt
-  let error fmt = Fmt.kstrf (fun s -> print_endline s; append s) fmt
-end
+let () =
+  let buf = Buffer.create 200 in
+  let log_fmt = Format.formatter_of_buffer buf in
+  let report src _level ~over k msgf =
+    msgf @@ fun ?header:_ ?tags:_ fmt ->
+    let k _ =
+      Format.pp_print_flush log_fmt ();
+      let msg = Buffer.contents buf in
+      Buffer.clear buf;
+      log := msg :: !log;
+      over ();
+      k () in
+    Format.kfprintf k log_fmt ("[%s] " ^^ fmt) (Logs.Src.name src) in
+  Logs.set_reporter { Logs.report }
+
+let src = Logs.Src.create "datakit" ~doc:"Datakit tests"
+module Log = (val Logs.src_log src)
+
 module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)
     (Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 

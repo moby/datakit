@@ -1,16 +1,11 @@
 open Lwt.Infix
 open Result
 
-module Log9p : Protocol_9p.S.LOG = struct
-  let src = Logs.Src.create "9p" ~doc:"9p server"
-  module Log = (val Logs.src_log src : Logs.LOG)
-  let debug fmt = Fmt.kstrf (fun str -> Log.debug (fun l ->  l "%s" str)) fmt
-  let info  fmt = Fmt.kstrf (fun str -> Log.info (fun l -> l "%s" str)) fmt
-  let error fmt = Fmt.kstrf (fun str -> Log.err (fun l -> l "%s" str)) fmt
-end
+let src_9p = Logs.Src.create "9p" ~doc:"9p protocol library"
+module Log9p = (val Logs.src_log src_9p)
 module Server = Fs9p.Make(Log9p)(Flow_lwt_unix)
 
-let src = Logs.Src.create "9p" ~doc:"9p server"
+let src = Logs.Src.create "Datakit" ~doc:"Datakit 9p server"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let error fmt = Printf.ksprintf (fun s ->

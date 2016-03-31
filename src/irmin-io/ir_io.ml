@@ -113,6 +113,20 @@ module FS = struct
 
   (* From mirage/ocaml-git/lib/unix/git_unix.ml (v1.7.3) *)
 
+  let mmap_threshold = 4096
+  (* Files smaller than this are loaded using [read].
+
+     Use of mmap is necessary to handle packfiles efficiently. Since these
+     are stored in a weak map, we won't run out of open files if we keep
+     accessing the same one.
+
+     Using read is necessary to handle references, since these are mutable
+     and can't be cached. Using mmap here leads to hitting the OS limit on
+     the number of open files.
+
+     This threshold must be larger than the size of a reference.
+  *)
+
   let mkdir_pool = Lwt_pool.create 1 (fun () -> Lwt.return_unit)
   let openfile_pool = Lwt_pool.create 200 (fun () -> Lwt.return_unit)
 
@@ -238,22 +252,35 @@ module FS = struct
     in
     aux 0
 
-  let read_file file =
-    Lwt_pool.use openfile_pool (fun () ->
-        Log.info (fun l -> l "Reading %s" file);
-        Lwt_unix.stat file >>= fun stats ->
-        (* There are really too many buffers here. First we copy from
-           the FS to the Lwt_io buffer, then from there into our own
-           string buffer, then blit from there into a Cstruct. *)
-        let chunk_size = max 4096 (min stats.Lwt_unix.st_size 0x100000) in
-        let lwt_buffer = Lwt_bytes.create chunk_size in
-        Lwt_io.(with_file
-                  ~buffer:lwt_buffer ~mode:input) ~flags:[Unix.O_RDONLY] file
-          (fun ch ->
-             let buf = Cstruct.create stats.Lwt_unix.st_size in
-             read_into ~chunk_size buf ch
-          )
+  let read_file_with_read file size =
+    (* There are really too many buffers here. First we copy from
+       the FS to the Lwt_io buffer, then from there into our own
+       string buffer, then blit from there into a Cstruct. *)
+    let chunk_size = max 4096 (min size 0x100000) in
+    let lwt_buffer = Lwt_bytes.create chunk_size in
+    Lwt_io.(with_file
+              ~buffer:lwt_buffer ~mode:input) ~flags:[Unix.O_RDONLY] file
+      (fun ch ->
+         let buf = Cstruct.create size in
+         read_into ~chunk_size buf ch
       )
+
+  let read_file_with_mmap file =
+    let fd = Unix.(openfile file [O_RDONLY; O_NONBLOCK] 0o644) in
+    let ba = Lwt_bytes.map_file ~fd ~shared:false () in
+    Unix.close fd;
+    Lwt.return (Cstruct.of_bigarray ba)
+
+  let read_file file =
+    Unix.handle_unix_error (fun () ->
+        Lwt_pool.use openfile_pool (fun () ->
+            Log.info (fun l -> l "Reading %s" file);
+            Lwt_unix.stat file >>= fun stats ->
+            let size = stats.Lwt_unix.st_size in
+            if size >= mmap_threshold then read_file_with_mmap file
+            else read_file_with_read file size
+          )
+    ) ()
 
   let realdir dir =
     if Sys.file_exists dir && Sys.is_directory dir then (

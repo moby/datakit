@@ -16,111 +16,130 @@ module type STORE = Irmin.S
 
 module type S = sig
   type store
-  type file
+  module File : sig
+    type t
+    val content : t -> string Lwt.t
+    val equal : t -> t -> bool
+    val pp_hash : Format.formatter -> t -> unit
+  end
   type repo
-  type dir
-  val empty : repo -> dir
-  val snapshot: store -> dir Lwt.t
-  val ty: dir -> leaf -> [`File | `Directory | `None] Lwt.t
-  val node: dir -> path -> [`File of file | `Directory of dir | `None ] Lwt.t
-  val get_dir: dir -> path -> dir option Lwt.t
-  val ls: dir -> ([`File | `Directory] * leaf) list Lwt.t
-  val equal: dir -> dir -> bool
-  val repo: dir -> repo
-  type hash
-  val of_dir_hash: repo -> hash option -> dir
-  val hash: dir -> hash option
+  module Dir : sig
+    type t
+    type hash
+    val empty : repo -> t
+    val ty : t -> leaf -> [`File | `Directory | `None] Lwt.t
+    val node : t -> path -> [`File of File.t | `Directory of t | `None ] Lwt.t
+    val get : t -> path -> t option Lwt.t
+    val ls : t -> ([`File | `Directory] * leaf) list Lwt.t
+    val equal : t -> t -> bool
+    val of_hash : repo -> hash option -> t
+    val hash : t -> hash option
+    val repo : t -> repo
+  end
+  val snapshot : store -> Dir.t Lwt.t
 end
 
 module Make (Store : STORE) = struct
   type store = Store.t
-  type file = Store.Private.Node.Val.contents
   type repo = Store.Repo.t
-  type hash = Store.Private.Node.Key.t
 
   module Graph = Irmin.Private.Node.Graph(Store.Private.Contents)(Store.Private.Node)
 
-  type dir = {
-    repo : Store.Repo.t;
-    node : Store.Private.Node.key option;
-  }
+  module File = struct
+    type t = {
+      repo : Store.Repo.t;
+      hash : Store.Private.Node.Val.contents;
+    }
 
-  let graph dir =
-    (Store.Private.Repo.contents_t dir.repo, Store.Private.Repo.node_t dir.repo)
+    let equal a b =
+      Store.Private.Contents.Key.equal a.hash b.hash
 
-  (* Hack until https://github.com/mirage/irmin/pull/327 is available *)
-  let string_of_leaf l =
-    match Path.cons l [] |> Store.Private.Node.Path.decons with
-    | None -> assert false
-    | Some (l, _) -> l
+    let content f =
+      let contents_t = Store.Private.Repo.contents_t f.repo in
+      Store.Private.Contents.read_exn contents_t f.hash
 
-  let empty repo = {repo; node = None}
+    let pp_hash fmt f =
+      Fmt.string fmt (Store.Private.Contents.Key.to_hum f.hash)
+  end
 
-  let read_node dir =
-    match dir.node with
-    | None -> Lwt.return Store.Private.Node.Val.empty
-    | Some key ->
-      let node_t = Store.Private.Repo.node_t dir.repo in
-      Store.Private.Node.read_exn node_t key
+  module Dir = struct
+    type hash = Store.Private.Node.Key.t
 
-  let ty dir leaf =
-    read_node dir >|= fun node ->
-    let step = string_of_leaf leaf in
-    match Store.Private.Node.Val.succ node step with
-    | Some _ -> `Directory
-    | None ->
-      match Store.Private.Node.Val.contents node step with
-      | Some _ -> `File
-      | None -> `None
+    type t = {
+      repo : Store.Repo.t;
+      node : Store.Private.Node.key option;
+    }
 
-  let lookup dir leaf =
-    let step = string_of_leaf leaf in
-    read_node dir >|= fun node ->
-    match Store.Private.Node.Val.succ node step with
-    | Some node -> `Directory {dir with node = Some node}
-    | None ->
-      match Store.Private.Node.Val.contents node step with
-      | Some f -> `File f
-      | None -> `None
+    let graph dir =
+      (Store.Private.Repo.contents_t dir.repo, Store.Private.Repo.node_t dir.repo)
 
-  let get_dir dir path =
-    match dir.node with
-    | None -> Lwt.return None
-    | Some node ->
-      Graph.read_node (graph dir) node path >|= function
-      | None -> None
-      | Some _ as node -> Some {dir with node}
+    let empty repo = {repo; node = None}
 
-  let node dir path =
-    match dir.node with
-    | None -> Lwt.return `None
-    | Some node ->
-      match Path.rdecons path with
-      | None -> Lwt.return (`Directory dir)
-      | Some (path, leaf) ->
-        Graph.read_node (graph dir) node path >>= function
-        | None -> Lwt.return `None
-        | Some node -> lookup {dir with node = Some node} leaf
+    let read_node dir =
+      match dir.node with
+      | None -> Lwt.return Store.Private.Node.Val.empty
+      | Some key ->
+        let node_t = Store.Private.Repo.node_t dir.repo in
+        Store.Private.Node.read_exn node_t key
+
+    let ty dir step =
+      read_node dir >|= fun node ->
+      match Store.Private.Node.Val.succ node step with
+      | Some _ -> `Directory
+      | None ->
+        match Store.Private.Node.Val.contents node step with
+        | Some _ -> `File
+        | None -> `None
+
+    let lookup dir step =
+      read_node dir >|= fun node ->
+      match Store.Private.Node.Val.succ node step with
+      | Some node -> `Directory {dir with node = Some node}
+      | None ->
+        match Store.Private.Node.Val.contents node step with
+        | Some hash -> `File {File.repo = dir.repo; hash}
+        | None -> `None
+
+    let get dir path =
+      match dir.node with
+      | None -> Lwt.return None
+      | Some node ->
+        Graph.read_node (graph dir) node path >|= function
+        | None -> None
+        | Some _ as node -> Some {dir with node}
+
+    let node dir path =
+      match dir.node with
+      | None -> Lwt.return `None
+      | Some node ->
+        match Path.rdecons path with
+        | None -> Lwt.return (`Directory dir)
+        | Some (path, leaf) ->
+          Graph.read_node (graph dir) node path >>= function
+          | None -> Lwt.return `None
+          | Some node -> lookup {dir with node = Some node} leaf
+
+    let ls dir =
+      read_node dir >|= fun node ->
+      Store.Private.Node.Val.alist node |> List.map (function
+          | leaf, `Contents _ -> `File, (leaf : string)
+          | leaf, `Node _ -> `Directory, leaf
+        )
+
+    let equal a b =
+      match a.node, b.node with
+      | None, None -> true
+      | Some a, Some b -> Store.Private.Node.Key.equal a b
+      | _ -> false
+
+    let hash a = a.node
+    let repo a = a.repo
+    let of_hash repo node = {repo; node}
+  end
 
   let snapshot store =
     let repo = Store.repo store in
     Store.Private.read_node store [] >|= fun node ->
-    {repo; node}
+    {Dir.repo; node}
 
-  let ls dir =
-    read_node dir >|= fun node ->
-    Store.Private.Node.Val.alist node |> List.map (function
-        | leaf, `Contents _ -> `File, (leaf : string)
-        | leaf, `Node _ -> `Directory, leaf
-      )
-
-  let equal a b =
-    match a.node, b.node with
-    | None, None -> true
-    | Some a, Some b -> Store.Private.Node.Key.equal a b
-    | _ -> false
-
-  let hash a = a.node
-  let repo a = a.repo
-  let of_dir_hash repo node = {repo; node}
 end

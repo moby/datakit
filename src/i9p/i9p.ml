@@ -38,13 +38,12 @@ module Make (Store : I9p_tree.STORE) = struct
   let irmin_ro_file ~get_root path =
     let read () =
       get_root () >>= fun root ->
-      Tree.node root path >>= function
+      Tree.Dir.node root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
-      | `File content ->
-        let contents_t = Store.Private.Repo.contents_t (Tree.repo root) in
-        Store.Private.Contents.read_exn contents_t content >|= fun content ->
-        Ok (Some (Cstruct.of_string content))
+      | `File f       ->
+          Tree.File.content f >|= fun content ->
+          Ok (Some (Cstruct.of_string content))
     in
     Vfs.File.of_kvro ~read
 
@@ -96,18 +95,18 @@ module Make (Store : I9p_tree.STORE) = struct
       let name = name_of_irmin_path path in
       let ls () =
         get_root () >>= fun root ->
-        Tree.get_dir root path >>= function
+        Tree.Dir.get root path >>= function
         | None -> err_no_entry
         | Some dir ->
-          Tree.ls dir >>= fun items ->
+          Tree.Dir.ls dir >>= fun items ->
           ok (List.map (get ~dir:path) items)
       in
       let lookup name =
         get_root () >>= fun root ->
-        Tree.get_dir root path >>= function
+        Tree.Dir.get root path >>= function
         | None -> err_no_entry
         | Some dir ->
-          Tree.ty dir name >>= function
+          Tree.Dir.ty dir name >>= function
           | `File
           | `Directory as ty -> ok (get ~dir:path (ty, name))
           | `None            -> err_no_entry
@@ -174,9 +173,9 @@ module Make (Store : I9p_tree.STORE) = struct
       let extra_dirs = ref empty_inode_map in
       let ls () =
         snapshot ~store view >>= fun root ->
-        begin Tree.get_dir root path >>= function
+        begin Tree.Dir.get root path >>= function
           | None     -> Lwt.return []   (* in parent's extra_dirs? *)
-          | Some dir -> Tree.ls dir
+          | Some dir -> Tree.Dir.ls dir
         end >>= fun items ->
         extra_dirs := remove_shadowed_by items !extra_dirs;
         let extra_inodes = StringMap.bindings !extra_dirs |> List.map snd in
@@ -191,10 +190,10 @@ module Make (Store : I9p_tree.STORE) = struct
       let lookup name =
         let real_result =
           snapshot ~store view >>= fun snapshot ->
-          Tree.get_dir snapshot path >>= function
+          Tree.Dir.get snapshot path >>= function
           | None -> err_no_entry
           | Some dir ->
-            Tree.ty dir name >>= function
+            Tree.Dir.ty dir name >>= function
             | `File
             | `Directory as ty -> ok (get ~dir:path (ty, name))
             | `None            -> err_no_entry
@@ -415,8 +414,8 @@ module Make (Store : I9p_tree.STORE) = struct
   let equal_ty a b =
     match a, b with
     | `None, `None -> true
-    | `File a, `File b -> a = b
-    | `Directory a, `Directory b -> Tree.equal a b
+    | `File a, `File b -> Tree.File.equal a b
+    | `Directory a, `Directory b -> Tree.Dir.equal a b
     | _ -> false
 
   let watch_tree_stream store ~path ~init =
@@ -425,7 +424,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let () =
       let cb _diff =
         Tree.snapshot store >>= fun root ->
-        Tree.node root path >|= fun node ->
+        Tree.Dir.node root path >|= fun node ->
         if not (equal_ty node !current) then (
           current := node;
           Lwt_condition.broadcast cond ()
@@ -435,9 +434,9 @@ module Make (Store : I9p_tree.STORE) = struct
     in
     let pp ppf = function
       | `None -> Fmt.string ppf "\n"
-      | `File h -> Fmt.pf ppf "F-%s\n" @@ Store.Private.Contents.Key.to_hum h
+      | `File h -> Fmt.pf ppf "F-%a\n" Tree.File.pp_hash h
       | `Directory dir ->
-        match Tree.hash dir with
+        match Tree.Dir.hash dir with
         | None   -> Fmt.string ppf "\n"
         | Some h -> Fmt.pf ppf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
     in
@@ -452,7 +451,7 @@ module Make (Store : I9p_tree.STORE) = struct
   let watch_tree store ~path =
     Vfs.File.of_stream (fun () ->
         Tree.snapshot store >>= fun snapshot ->
-        Tree.node snapshot path >|= fun init ->
+        Tree.Dir.node snapshot path >|= fun init ->
         watch_tree_stream store ~path ~init
       )
 
@@ -669,10 +668,10 @@ module Make (Store : I9p_tree.STORE) = struct
           | None      -> Vfs.Error.no_entry
         end
       | `None ->
-        let root = Tree.of_dir_hash repo None in
+        let root = Tree.Dir.of_hash repo None in
         ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
       | `Dir hash ->
-        let root = Tree.of_dir_hash repo (Some hash) in
+        let root = Tree.Dir.of_hash repo (Some hash) in
         ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
     in
     let cache = ref StringMap.empty in   (* Could use a weak map here *)

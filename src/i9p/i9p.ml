@@ -1,3 +1,4 @@
+open Astring
 open Rresult
 open Lwt.Infix
 open Vfs.Error.Infix
@@ -22,12 +23,10 @@ let err_invalid_hash h x =
   Vfs.error "invalid-hash %S: %s" h (Printexc.to_string x)
 let err_not_fast_forward = Vfs.error "not-fast-forward"
 
-module StringMap = Map.Make(String)
-
 module Make (Store : I9p_tree.STORE) = struct
 
   type repo = Store.Repo.t
-  let empty_inode_map: Vfs.Inode.t StringMap.t = StringMap.empty
+  let empty_inode_map: Vfs.Inode.t String.Map.t = String.Map.empty
 
   module Path = Irmin.Path.String_list
   module Tree = I9p_tree.Make(Store)
@@ -131,7 +130,7 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let remove_shadowed_by items map =
     List.fold_left (fun acc (_, name) ->
-        StringMap.remove name acc
+        String.Map.remove name acc
       ) map items
 
   let rec has_prefix ~prefix p =
@@ -178,7 +177,7 @@ module Make (Store : I9p_tree.STORE) = struct
           | Some dir -> Tree.Dir.ls dir
         end >>= fun items ->
         extra_dirs := remove_shadowed_by items !extra_dirs;
-        let extra_inodes = StringMap.bindings !extra_dirs |> List.map snd in
+        let extra_inodes = String.Map.bindings !extra_dirs |> List.map snd in
         ok (extra_inodes @ List.map (get ~dir:path) items)
       in
       let mkfile name =
@@ -201,21 +200,22 @@ module Make (Store : I9p_tree.STORE) = struct
         real_result >|= function
         | Ok _ as ok   -> ok
         | Error _ as e ->
-          try Ok (StringMap.find name !extra_dirs)
-          with Not_found -> e
+          match String.Map.find name !extra_dirs with
+          | Some x -> Ok x
+          | None   -> e
       in
       let mkdir name =
         lookup name >>= function
         | Ok _    -> err_already_exists name
         | Error _ ->
           let new_dir = get ~dir:path (`Directory, name) in
-          extra_dirs := StringMap.add name new_dir !extra_dirs;
+          extra_dirs := String.Map.add name new_dir !extra_dirs;
           remove_conflict (Irmin.Path.String_list.rcons path name);
           ok new_dir
       in
       let remove () =
         (* FIXME: is this correct? *)
-        extra_dirs := StringMap.empty;
+        extra_dirs := String.Map.empty;
         conflicts := PathSet.filter (has_prefix ~prefix:path) !conflicts;
         View.remove_rec view path >>= ok
       in
@@ -238,17 +238,16 @@ module Make (Store : I9p_tree.STORE) = struct
   let string_of_parents parents =
     parents
     |> List.map (fun h -> Store.Hash.to_hum h ^ "\n")
-    |> String.concat ""
+    |> String.concat ~sep:""
 
   let format_conflicts conflicts =
     let lines =
       conflicts
       |> PathSet.elements
-      |> List.map (fun n -> String.concat "/" n ^ "\n")
+      |> List.map (fun n -> String.concat ~sep:"/" n ^ "\n")
     in
-    Cstruct.of_string (String.concat "" lines)
+    Cstruct.of_string (String.concat ~sep:"" lines)
 
-  let re_newline = Str.regexp_string "\n"
   let make_instance store ~remover _name =
     let path = [] in
     let msg_file, get_msg = Vfs.File.rw_of_string "" in
@@ -262,7 +261,7 @@ module Make (Store : I9p_tree.STORE) = struct
       | e when not (PathSet.is_empty e) ->
         Lwt.return (Error "conflicts file is not empty")
       | _ ->
-        let parents = get_parents () |> Str.split re_newline in
+        let parents = String.cuts ~sep:"\n" (get_parents ()) in
         match List.map Store.Hash.of_hum parents with
         | exception Invalid_argument msg -> Lwt.return (Error msg)
         | parents ->
@@ -279,7 +278,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let contents = ref empty_inode_map in
     (* Files present in both normal and merge modes *)
     let stage = rw ~conflicts ~store view in
-    let add inode = StringMap.add (Vfs.Inode.basename inode) inode in
+    let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
     let ctl = Vfs.File.command (transactions_ctl ~merge ~remover) in
     let origin = Vfs.File.ro_of_string (Path.to_hum path) in
     let common =
@@ -458,13 +457,13 @@ module Make (Store : I9p_tree.STORE) = struct
   let rec watch_dir store ~path =
     let live = lazy (Vfs.Inode.file "tree.live" (watch_tree store ~path)) in
     let cache = ref empty_inode_map in   (* Could use a weak map here *)
-    let lookup name =
-      try StringMap.find name !cache
-      with Not_found ->
+    let lookup name = match String.Map.find name !cache with
+      | Some x -> x
+      | None   ->
         let new_path = Path.rcons path name in
         let dir = watch_dir store ~path:new_path in
         let inode = Vfs.Inode.dir (name ^ ".node") dir in
-        cache := StringMap.add name inode !cache;
+        cache := String.Map.add name inode !cache;
         inode
     in
     let ls () =
@@ -520,23 +519,23 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let transactions store =
     let lock = Lwt_mutex.create () in
-    let items = ref StringMap.empty in
-    let ls () = ok (StringMap.bindings !items |> List.map snd) in
-    let lookup name =
-      try ok (StringMap.find name !items)
-      with Not_found -> err_no_entry
+    let items = ref String.Map.empty in
+    let ls () = ok (String.Map.bindings !items |> List.map snd) in
+    let lookup name = match String.Map.find name !items with
+      | Some x -> ok x
+      | None   -> err_no_entry
     in
     let make = make_instance store in
     let remover name =
       lazy (
         Lwt_mutex.with_lock lock (fun () ->
-            items := StringMap.remove name !items;
+            items := String.Map.remove name !items;
             Lwt.return_unit
           ))
     in
     let mkdir name =
       Lwt_mutex.with_lock lock (fun () ->
-          if StringMap.mem name !items then Vfs.Dir.err_already_exists
+          if String.Map.mem name !items then Vfs.Dir.err_already_exists
           else (
             let remover = remover name in
             make ~remover name >>= function
@@ -544,7 +543,7 @@ module Make (Store : I9p_tree.STORE) = struct
             | Ok dir       ->
               if Lazy.is_val remover then err_no_entry else (
                 let inode = Vfs.Inode.dir name dir in
-                items := StringMap.add name inode !items;
+                items := String.Map.add name inode !items;
                 ok inode
               )))
     in
@@ -587,23 +586,23 @@ module Make (Store : I9p_tree.STORE) = struct
   module StringSet = Set.Make(String)
 
   let branch_dir make_task repo =
-    let cache = ref StringMap.empty in
+    let cache = ref String.Map.empty in
     let remove name =
       Store.Repo.remove_branch repo name >|= fun () ->
-      cache := StringMap.remove name !cache;
+      cache := String.Map.remove name !cache;
       Ok () in
-    let get_via_cache name =
-      try StringMap.find name !cache
-      with Not_found ->
+    let get_via_cache name = match String.Map.find name !cache with
+      | Some x -> x
+      | None   ->
         let entry = branch ~remove make_task repo name in
-        cache :=  StringMap.add name entry !cache;
+        cache :=  String.Map.add name entry !cache;
         entry
     in
     let ls () =
       Store.Repo.branches repo >|= fun names ->
       let names =
         let names = StringSet.of_list names in
-        StringMap.bindings !cache
+        String.Map.bindings !cache
         |> List.map fst
         |> StringSet.of_list
         |> StringSet.union names
@@ -611,9 +610,9 @@ module Make (Store : I9p_tree.STORE) = struct
       in
       Ok (List.map (fun n -> fst (get_via_cache n)) names)
     in
-    let lookup name =
-      try ok (StringMap.find name !cache |> fst)
-      with Not_found ->
+    let lookup name = match String.Map.find name !cache with
+      | Some (x, _) -> ok x
+      | None        ->
         Store.Private.Ref.mem (Store.Private.Repo.ref_t repo) name >>= function
         | true  -> ok (get_via_cache name |> fst)
         | false -> err_no_entry
@@ -633,13 +632,15 @@ module Make (Store : I9p_tree.STORE) = struct
           | Some head -> Store.Private.Ref.update refs new_name head end
         >>= fun () ->
         Store.Private.Ref.remove refs old_name >>= fun () ->
-        let entry = StringMap.find old_name !cache in
-        snd entry new_name;
-        cache :=
-          !cache
-          |> StringMap.remove old_name
-          |> StringMap.add new_name entry;
-        Lwt.return (Ok ())
+        match String.Map.find old_name !cache with
+        | None      -> err_no_entry
+        | Some entry ->
+          snd entry new_name;
+          cache :=
+            !cache
+            |> String.Map.remove old_name
+            |> String.Map.add new_name entry;
+          ok ()
     in
     Vfs.Dir.dir_only ~ls ~lookup ~mkdir ~remove ~rename
 
@@ -650,7 +651,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let dir h = `Dir (String.trim h |> Store.Private.Node.Key.of_hum) in
     try
       if h = "" then Ok `None
-      else match String.sub h 0 2, String.sub h 2 (String.length h - 2) with
+      else match String.span ~min:2 ~max:2 h with
         | "F-", hash -> Ok (file hash)
         | "D-", hash -> Ok (dir hash)
         | _ -> Vfs.Error.no_entry
@@ -674,13 +675,13 @@ module Make (Store : I9p_tree.STORE) = struct
         let root = Tree.Dir.of_hash repo (Some hash) in
         ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
     in
-    let cache = ref StringMap.empty in   (* Could use a weak map here *)
+    let cache = ref String.Map.empty in   (* Could use a weak map here *)
     let ls () = ok [] in
-    let lookup name =
-      try ok (StringMap.find name !cache)
-      with Not_found ->
+    let lookup name = match String.Map.find name !cache with
+      | Some x -> ok x
+      | None   ->
         inode_of_tree_hash name >>*= fun inode ->
-        cache := StringMap.add name inode !cache;
+        cache := String.Map.add name inode !cache;
         ok inode
     in
     let remove () = Vfs.Dir.err_read_only in
@@ -710,9 +711,9 @@ module Make (Store : I9p_tree.STORE) = struct
   let snapshots_dir make_task repo =
     let cache = ref empty_inode_map in   (* Could use a weak map here *)
     let ls () = ok [] in
-    let lookup name =
-      try ok (StringMap.find name !cache)
-      with Not_found ->
+    let lookup name = match String.Map.find name !cache with
+      | Some x ->  ok x
+      | None   ->
         begin
           try ok (Store.Hash.of_hum name)
           with _ex -> err_invalid_commit_id name
@@ -723,7 +724,7 @@ module Make (Store : I9p_tree.STORE) = struct
         | true  ->
           Store.of_commit_id make_task commit_id repo >|= fun store ->
           let inode = snapshot_dir store name in
-          cache := StringMap.add name inode !cache;
+          cache := String.Map.add name inode !cache;
           Ok inode
     in
     let remove () = Vfs.Dir.err_read_only in

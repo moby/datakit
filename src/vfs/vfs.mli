@@ -4,6 +4,7 @@
     {{!Dir}directoires}, {{!Inode}inodes} and {{!Error}error codes}.
 *)
 
+open Astring
 open Result
 
 (** Error codes. *)
@@ -190,7 +191,7 @@ module rec Dir: sig
       inodes [l]. The sub-directories are re-evaluated on every [ls]
       and [read]. *)
 
-  val of_map_ref: Inode.t Map.Make(String).t ref -> t
+  val of_map_ref: Inode.t String.Map.t ref -> t
   (** [of_map_ref m] is a read-only directory containing the inodes
       defined in [m]. The content of the directory is computed
       dynamically by accessing elements in the map on every access. *)

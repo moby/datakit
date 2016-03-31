@@ -5,6 +5,10 @@ open Vfs.Error.Infix
 
 module PathSet = I9p_merge.PathSet
 
+(* FIXME: remove 9p from the module name! *)
+let src = Logs.Src.create "i9p" ~doc:"Irmin to VFS"
+module Logs = (val Logs.src_log src: Logs.LOG)
+
 module type S = sig
   type repo
   val create:

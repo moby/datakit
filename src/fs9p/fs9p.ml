@@ -4,6 +4,9 @@ open Fs9p_error.Infix
 
 module P = Protocol_9p
 
+let src = Logs.Src.create "fs9p" ~doc:"VFS to 9p"
+module Logs = (val Logs.src_log src: Logs.LOG)
+
 let pp_fid =
   let str x = P.Types.Fid.sexp_of_t x |> Sexplib.Sexp.to_string in
   Fmt.of_to_string str
@@ -192,7 +195,7 @@ module Op9p = struct
 
 end
 
-module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
+module Make (Flow: V1_LWT.FLOW) = struct
 
   type flow = Flow.flow
 
@@ -361,7 +364,7 @@ module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW) = struct
 
   end
 
-  module Server = P.Server.Make(Log)(Flow)(Dispatcher)
+  module Server = P.Server.Make(Logs)(Flow)(Dispatcher)
 
   let accept ~root flow =
     Server.connect root flow () >>= function

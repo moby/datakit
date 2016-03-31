@@ -74,7 +74,8 @@ Executable test
   Build$:         flag(tests)
   CompiledObject: best
   Install:        false
-  BuildDepends:   i9p, alcotest, fmt, fs9p, irmin-io, irmin.git, irmin.mem
+  BuildDepends:   i9p, alcotest, fmt, fs9p, irmin-io, irmin.git, irmin.mem,
+                  mtime.os, fmt.tty, logs.fmt
 
 Test test
   Run$:             flag(tests)

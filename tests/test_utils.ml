@@ -53,29 +53,40 @@ end
 
 let log = ref []
 
-let () =
-  let buf = Buffer.create 200 in
-  let log_fmt = Format.formatter_of_buffer buf in
-  let report src _level ~over k msgf =
-    msgf @@ fun ?header:_ ?tags:_ fmt ->
-    let k _ =
-      Format.pp_print_flush log_fmt ();
-      let msg = Buffer.contents buf in
-      Buffer.clear buf;
-      log := msg :: !log;
-      over ();
-      k () in
-    Format.kfprintf k log_fmt ("[%s] " ^^ fmt) (Logs.Src.name src) in
-  Logs.set_reporter { Logs.report }
+let reporter () =
+  let pad n x =
+    if String.length x > n then x else x ^ String.make (n - String.length x) ' '
+  in
+  let report src level ~over k msgf =
+    let k _ = over (); k () in
+    let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
+    let with_stamp h _tags k fmt =
+      let dt = Mtime.to_us (Mtime.elapsed ()) in
+      Fmt.kpf k ppf ("%0+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
+        dt
+        Fmt.(styled `Magenta string) (pad 10 @@ Logs.Src.name src)
+        Logs_fmt.pp_header (level, h)
+    in
+    msgf @@ fun ?header ?tags fmt ->
+    with_stamp header tags k fmt
+  in
+  { Logs.report = report }
 
-let src = Logs.Src.create "datakit" ~doc:"Datakit tests"
-module Log = (val Logs.src_log src)
+let () =
+  Fmt_tty.setup_std_outputs ();
+  Logs.(set_level (Some Debug));
+  Logs.set_reporter (reporter ());
+  ()
 
 module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)
     (Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 
-module Server = Fs9p.Make(Log)(Test_flow)
+module Server = Fs9p.Make(Test_flow)
 module Filesystem = I9p.Make(Store)
+
+
+let src = Logs.Src.create "test" ~doc:"Datakit tests"
+module Log = (val Logs.src_log src)
 
 module Client = Protocol_9p.Client.Make(Log)(Test_flow)
 
@@ -95,7 +106,9 @@ let run fn =
     Lwt.finalize
       (fun () ->
          Lwt.catch
-           (fun () -> Client.connect for_client () >>*= fn repo)
+           (fun () ->
+              Client.connect for_client () >>*= fn repo >|= fun () ->
+              List.rev !log |> List.iter print_endline;)
            (fun ex ->
               List.rev !log |> List.iter print_endline;
               Lwt.fail ex))

@@ -17,6 +17,8 @@ setup.ml: _oasis
 	oasis setup
 	echo 'true: debug, bin_annot' >> _tags
 	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags
+	echo '"$(APP)": -traverse' >> _tags
+	echo '"$(EXE)": -traverse' >> _tags
 	echo 'Ocamlbuild_plugin.mark_tag_used "tests"' >> myocamlbuild.ml
 
 doc: setup.data build
@@ -42,7 +44,7 @@ clean:
 	rm -f src/*.odocl src/META setup.log
 	rm -f src/**/META src/**/*.mldylib src/**/*.mllib
 	rm -f $(VFILE)
-	rm -rf $(APP) _tests
+	rm -rf $(APP) $(EXE) _tests
 
 setup.data: setup.ml
 	$(SETUP) -configure --prefix $(PREFIX)

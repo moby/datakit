@@ -1,3 +1,4 @@
+open Astring
 open Rresult
 open Lwt.Infix
 
@@ -200,7 +201,7 @@ module File = struct
         ok result
       in
       let write buf =
-        handler (Cstruct.to_string buf |> String.trim) >>*= fun result ->
+        handler @@ String.trim (Cstruct.to_string buf) >>*= fun result ->
         data := Cstruct.of_string result;
         ok ()
       in
@@ -326,8 +327,6 @@ module Dir = struct
   let err_dir_only = error "Can only contain directories"
   let err_no_entry = Lwt.return Error.no_entry
 
-  module StringMap  = Map.Make(String)
-
   type t = {
     debug: string;
     ls: unit -> inode list or_err;
@@ -380,10 +379,10 @@ module Dir = struct
   let empty = of_list_aux ~debug:"empty" (fun () -> [])
 
   let of_map_ref m =
-    let ls () = ok (StringMap.bindings !m |> List.map snd) in
-    let lookup name =
-      try ok (StringMap.find name !m)
-      with Not_found -> err_no_entry
+    let ls () = ok (String.Map.bindings !m |> List.map snd) in
+    let lookup name = match String.Map.find name !m with
+      | Some x -> ok x
+      | None   -> err_no_entry
     in
     let remove () = err_read_only in
     read_only_aux ~debug:"of_map_ref" ~ls ~lookup ~remove

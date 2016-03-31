@@ -13,7 +13,7 @@ Library vfs
   Path:            src/vfs/
   Findlibname:     vfs
   Modules:         Vfs
-  BuildDepends:    lwt, rresult, cstruct, fmt, logs
+  BuildDepends:    lwt, rresult, cstruct, fmt, logs, astring
 
 Library fs9p
   Path:            src/fs9p/
@@ -27,7 +27,7 @@ Library i9p
   Findlibname:     i9p
   InternalModules: I9p_merge
   Modules:         I9p, I9p_tree, I9p_remote
-  BuildDepends:    lwt, irmin, rresult, vfs, str
+  BuildDepends:    lwt, irmin, rresult, vfs, astring
 
 Library vgithub
   Path:            src/vgithub

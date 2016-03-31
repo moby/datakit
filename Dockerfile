@@ -2,12 +2,12 @@ FROM ocaml/opam:alpine
 
 RUN opam depext lwt ssl &&  opam install lwt alcotest
 
-RUN opam pin add github https://github.com/samoht/ocaml-github.git#status-context
+RUN opam pin add github --dev
 RUN opam pin add protocol-9p --dev
 
 COPY . /home/opam/src/datakit
-RUN opam pin add i9p.dev /home/opam/src/datakit -n
-RUN opam depext i9p && opam install i9p --deps        # Install i9p deps
+RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam depext datakit && opam install datakit --deps # Install datakit deps
 
 RUN sudo chown -R opam.nogroup /home/opam/src
 WORKDIR /home/opam/src/datakit

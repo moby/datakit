@@ -265,7 +265,7 @@ module Make (Store : I9p_tree.STORE) = struct
       | e when not (PathSet.is_empty e) ->
         Lwt.return (Error "conflicts file is not empty")
       | _ ->
-        let parents = String.cuts ~sep:"\n" (get_parents ()) in
+        let parents = String.cuts ~empty:false ~sep:"\n" (get_parents ()) in
         match List.map Store.Hash.of_hum parents with
         | exception Invalid_argument msg -> Lwt.return (Error msg)
         | parents ->

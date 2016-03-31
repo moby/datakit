@@ -51,8 +51,6 @@ module Test_flow = struct
   let read t = Lwt_mvar.take t.from_remote >|= ok
 end
 
-let log = ref []
-
 let reporter () =
   let pad n x =
     if String.length x > n then x else x ^ String.make (n - String.length x) ' '
@@ -104,14 +102,7 @@ let run fn =
     let root = Filesystem.create make_task repo in
     let server_thread = Server.accept ~root for_server >>*= Lwt.return in
     Lwt.finalize
-      (fun () ->
-         Lwt.catch
-           (fun () ->
-              Client.connect for_client () >>*= fn repo >|= fun () ->
-              List.rev !log |> List.iter print_endline;)
-           (fun ex ->
-              List.rev !log |> List.iter print_endline;
-              Lwt.fail ex))
+      (fun () -> Client.connect for_client () >>*= fn repo)
       (fun () -> Lwt.cancel server_thread; Lwt.return ())
   end
 

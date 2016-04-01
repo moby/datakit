@@ -9,6 +9,25 @@ let run x = Lwt_main.run (Github.Monad.run x)
 
 let err_invalid_status s = Vfs.error "%S: invalid status" s
 
+module PRSet = struct
+  module X = struct
+      type t = pull
+      let compare p1 p2 =
+        match compare p1.pull_number p2.pull_number with
+        | i when i <> 0 -> i
+        | _  ->
+          match compare p1.pull_state p2.pull_state with
+          | i when i <> 0 -> i
+          | _ ->
+            match compare p1.pull_head.branch_sha p2.pull_head.branch_sha with
+            | i when i <> 0 -> i
+            | _ ->
+              compare p1.pull_updated_at p2.pull_updated_at
+  end
+  include Set.Make(X)
+  let of_list = List.fold_left (fun s e -> add e s) empty
+end
+
 module API = struct
 
   type t = {
@@ -32,7 +51,7 @@ module API = struct
     | "success" -> Some `Success
     | _         -> None
 
-  let pp_status ppf s =
+  let _pp_status ppf s =
     Fmt.pf ppf "%a:%a" pp_status_state
       s.status_state Fmt.(option string) s.status_description
 
@@ -80,11 +99,51 @@ module API = struct
     |> Stream.to_list
     |> run
 
-  let _pp_pr ppf (pr, status) =
-    Fmt.pf ppf "%d %s @[%a@]@."
-      pr.pull_number pr.pull_head.branch_sha Fmt.(list pp_status) status
+  let pp_pr ppf pr =
+    Fmt.pf ppf "@[%d %s@]" pr.pull_number pr.pull_head.branch_sha
 
   let create ~token ~user ~repo = { token = Lazy.force token; user; repo }
+
+  let prs_diff pr1 pr2 =
+    let pr1s = PRSet.of_list pr1 in
+    let pr2s = PRSet.of_list pr2 in
+    PRSet.diff pr1s pr2s
+
+  let on_new_issues t f =
+    let open Github.Monad in
+    let listen s () =
+      Logs.debug (fun l ->
+          l "listening for issue events on %s/%s" t.user t.repo);
+      let rec loop s old_prs =
+        Log.debug (fun l -> l "%s/%s: poll ..." t.repo t.user);
+        Log.debug (fun l -> l "old_prs=@[%a@]" Fmt.(list pp_pr) old_prs);
+        Stream.poll s >>= fun so ->
+        API.get_rate_remaining ~token:t.token () >>= fun remaining ->
+        match so with
+        | None   ->
+          Logs.debug (fun l ->
+              l "no new events on %s/%s (%d)" t.user t.repo remaining);
+          loop s old_prs
+        | Some s ->
+          Logs.debug (fun l ->
+              l "new events on %s/%s (%d)" t.user t.repo remaining);
+          let new_prs = prs t in
+          Log.debug (fun l -> l "new_prs=@[%a@]" Fmt.(list pp_pr) new_prs);
+          PRSet.iter (fun pr ->
+              Log.debug (fun l -> l "diff pr: %a" pp_pr pr);
+              f pr
+            ) (prs_diff new_prs old_prs);
+          loop s new_prs
+      in
+      Github.Monad.run @@ loop s (prs t)
+    in
+    let init () =
+      let events = Event.for_repo ~token:t.token ~user:t.user ~repo:t.repo () in
+      Stream.next events >|= function
+      | None        -> ()
+      | Some (_, s) -> Lwt.async (listen s)
+    in
+    Github.Monad.run @@ init ()
 
 end
 
@@ -175,14 +234,37 @@ let pr_dir t pr =
   ] in
   Vfs.Dir.of_list dirs
 
+
+(* /github.com/${USER}/${REPO}/updates *)
+let pr_updates t =
+  let open Lwt.Infix in
+  Logs.debug (fun l -> l "pr_updates %s/%s" t.API.user t.API.repo);
+  let stream, push = Lwt_stream.create () in
+  let current: pull option Pervasives.ref = ref None in
+  let wait old =
+    if old <> !current then Lwt.return !current
+    else Lwt_stream.get stream >|= fun s -> current := s; s
+  in
+  let pp ppf = function
+    | None    -> Fmt.string ppf ""
+    | Some pr -> Fmt.pf ppf "%d\n" pr.pull_number
+  in
+  let stream () = Vfs.File.Stream.watch pp ~init:!current ~wait in
+  let file = Vfs.File.of_stream @@ fun () ->
+    API.on_new_issues t (fun pr -> push @@ Some pr) >>= fun () ->
+    Lwt.return (stream ())
+  in
+  file
+
 (* /github.com/${USER}/${REPO}/pr *)
 let pr_root t =
   Logs.debug (fun l -> l "pr_root %s/%s" t.API.user t.API.repo);
   let prs () =
-    API.prs t
-    |> List.map (fun pr ->
+    let prs = API.prs t in
+    Vfs.Inode.file "updates" (pr_updates t) ::
+    List.map (fun pr ->
         Vfs.Inode.dir (string_of_int pr.pull_number) @@ pr_dir t pr
-      )
+      ) prs
   in
   Vfs.Dir.of_list prs
 

@@ -5,10 +5,11 @@ RUN opam depext lwt ssl &&  opam install lwt alcotest
 RUN opam pin add github --dev
 RUN opam pin add protocol-9p --dev
 
-COPY . /home/opam/src/datakit
+COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
 RUN opam depext datakit && opam install datakit --deps # Install datakit deps
 
+COPY . /home/opam/src/datakit/
 RUN sudo chown -R opam.nogroup /home/opam/src
 WORKDIR /home/opam/src/datakit
 

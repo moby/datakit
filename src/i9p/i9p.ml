@@ -1,7 +1,6 @@
 open Astring
 open Rresult
 open Lwt.Infix
-open Vfs.Error.Infix
 
 module PathSet = I9p_merge.PathSet
 
@@ -15,9 +14,15 @@ module type S = sig
     ?subdirs:Vfs.Inode.t list -> string Irmin.Task.f -> repo -> Vfs.Dir.t
 end
 
+let ( >>*= ) x f =
+  x >>= function
+  | Ok y -> f y
+  | Error _ as e -> Lwt.return e
+
 let ok = Vfs.ok
 let err_no_entry = Lwt.return Vfs.Error.no_entry
 let err_is_dir = Lwt.return Vfs.Error.is_dir
+let err_not_dir = Lwt.return Vfs.Error.not_dir
 let err_read_only = Lwt.return Vfs.Error.read_only_file
 let err_already_exists name = Vfs.error "Entry %S already exists" name
 let err_conflict msg = Vfs.error "Merge conflict: %s" msg
@@ -34,36 +39,50 @@ module Make (Store : I9p_tree.STORE) = struct
 
   module Path = Irmin.Path.String_list
   module Tree = I9p_tree.Make(Store)
-  module View = Irmin.View(Store)
-  module Merge = I9p_merge.Make(Store)(View)
+  module RW = I9p_rw.Make(Tree)
+  module Merge = I9p_merge.Make(Store)(RW)
   module Remote = I9p_remote.Make(Store)
+
+  let empty_file = Cstruct.create 0
 
   let irmin_ro_file ~get_root path =
     let read () =
       get_root () >>= fun root ->
-      Tree.Dir.node root path >>= function
+      Tree.Dir.lookup_path root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
       | `File f       ->
           Tree.File.content f >|= fun content ->
-          Ok (Some (Cstruct.of_string content))
+          Ok (Some content)
     in
     Vfs.File.of_kvro ~read
 
   let irmin_rw_file ~remove_conflict ~view path =
+    match Irmin.Path.String_list.rdecons path with
+    | None -> assert false
+    | Some (dir, leaf) ->
     let read () =
-      View.read view path >|= function
-      | None         -> Ok None
-      | Some content -> Ok (Some (Cstruct.of_string content))
+      let root = RW.root view in
+      Tree.Dir.lookup_path root path >>= function
+      | `None         -> Lwt.return (Ok None)
+      | `Directory _  -> err_is_dir
+      | `File f       ->
+          Tree.File.content f >|= fun content ->
+          Ok (Some content)
     in
     let write data =
-      View.update view path (Cstruct.to_string data) >|= fun () ->
+      RW.update view dir leaf data >>= function
+      | Error `Is_a_directory -> err_is_dir
+      | Error `Not_a_directory -> err_not_dir
+      | Ok () ->
       remove_conflict path;
-      Ok ()
+      Lwt.return (Ok ())
     in
     let remove () =
-      View.remove view path >|= fun () ->
-      remove_conflict path; Ok ()
+      RW.remove view dir leaf >>= function
+      | Error `Not_a_directory -> err_not_dir
+      | Ok () ->
+      remove_conflict path; Lwt.return (Ok ())
     in
     Vfs.File.of_kv ~read ~write ~remove
 
@@ -121,17 +140,6 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let read_only store = ro_tree ~get_root:(fun () -> Tree.snapshot store)
 
-  (* Ugly! *)
-  let snapshot ~store view =
-    let task () = Irmin.Task.empty in
-    let repo = Store.repo (store "snapshot") in
-    Store.empty task repo >>= fun dummy_store ->
-    let dummy_store = dummy_store () in
-    View.make_head dummy_store Irmin.Task.empty ~parents:[] ~contents:view
-    >>= fun commit_id ->
-    Store.of_commit_id task commit_id repo >>= fun store ->
-    Tree.snapshot (store ())
-
   let remove_shadowed_by items map =
     List.fold_left (fun acc (_, name) ->
         String.Map.remove name acc
@@ -146,7 +154,7 @@ module Make (Store : I9p_tree.STORE) = struct
     | _, [] -> false
 
   (* Note: writing to a path removes it from [conflicts], if present *)
-  let rw ~conflicts ~store view =
+  let rw ~conflicts view =
     let remove_conflict path = conflicts := PathSet.remove path !conflicts in
     let name_of_irmin_path = name_of_irmin_path ~root:"rw" in
     (* Keep track of which qids we're still using. We need to give the
@@ -175,7 +183,7 @@ module Make (Store : I9p_tree.STORE) = struct
          that list in the server's memory. Meet [extra_dirs]. *)
       let extra_dirs = ref empty_inode_map in
       let ls () =
-        snapshot ~store view >>= fun root ->
+        let root = RW.root view in
         begin Tree.Dir.get root path >>= function
           | None     -> Lwt.return []   (* in parent's extra_dirs? *)
           | Some dir -> Tree.Dir.ls dir
@@ -185,14 +193,17 @@ module Make (Store : I9p_tree.STORE) = struct
         ok (extra_inodes @ List.map (get ~dir:path) items)
       in
       let mkfile name =
+        RW.update view path name empty_file >>= function
+        | Error `Not_a_directory -> err_not_dir
+        | Error `Is_a_directory -> err_is_dir
+        | Ok () ->
         let new_path = Path.rcons path name in
-        View.update view new_path "" >|= fun () ->
         remove_conflict new_path;
-        Ok (get ~dir:path (`File, name))
+        Lwt.return (Ok (get ~dir:path (`File, name)))
       in
       let lookup name =
         let real_result =
-          snapshot ~store view >>= fun snapshot ->
+          let snapshot = RW.root view in
           Tree.Dir.get snapshot path >>= function
           | None -> err_no_entry
           | Some dir ->
@@ -218,10 +229,16 @@ module Make (Store : I9p_tree.STORE) = struct
           ok new_dir
       in
       let remove () =
+        match Irmin.Path.String_list.rdecons path with
+        | None -> err_read_only
+        | Some (dir, leaf) ->
         (* FIXME: is this correct? *)
+        RW.remove view dir leaf >>= function
+        | Error `Not_a_directory -> err_not_dir
+        | Ok () ->
         extra_dirs := String.Map.empty;
         conflicts := PathSet.filter (has_prefix ~prefix:path) !conflicts;
-        View.remove_rec view path >>= ok
+        Lwt.return (Ok ())
       in
       let rename _ = failwith "TODO" in
       Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename |>
@@ -252,15 +269,31 @@ module Make (Store : I9p_tree.STORE) = struct
     in
     Cstruct.of_string (String.concat ~sep:"" lines)
 
+  let make_commit root task ~parents =
+    let repo = Tree.Dir.repo root in
+    Tree.Dir.hash root >>= fun node ->
+    let commit = Store.Private.Commit.Val.create task ~parents ?node in
+    Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
+
   let make_instance store ~remover _name =
     let path = [] in
     let msg_file, get_msg = Vfs.File.rw_of_string "" in
-    View.of_path (store "view") path >|= fun view ->
-    let parents = View.parents view |> string_of_parents in
+    let store1 = store "snapshot" in
+    let repo = Store.repo store1 in
+    Store.head store1 >>= fun orig_head ->
+    begin match orig_head with
+    | None -> Lwt.return (Tree.Dir.empty repo, [])
+    | Some commit_id ->
+        Store.Private.Commit.read_exn (Store.Private.Repo.commit_t repo) commit_id >|= fun commit ->
+        Tree.Dir.of_hash repo (Store.Private.Commit.Val.node commit),
+        [commit_id]
+    end >>= fun (orig_root, parents) ->
+    let view = RW.of_dir orig_root in
+    let parents = string_of_parents parents in
     let parents_file, get_parents = Vfs.File.rw_of_string parents in
     let conflicts = ref PathSet.empty in
-    (* Commit transaction *)
-    let merge () =
+    (* Make a commit based on "rw", "parents" and "msg" *)
+    let commit_of_view () =
       match !conflicts with
       | e when not (PathSet.is_empty e) ->
         Lwt.return (Error "conflicts file is not empty")
@@ -274,14 +307,18 @@ module Make (Store : I9p_tree.STORE) = struct
             | x -> x
           in
           let store = store msg in
-          View.make_head store (Store.task store) ~parents ~contents:view
-          >>= fun head ->
-          Store.merge_head store head >|= fun x -> Ok x
+          let root = RW.root view in
+          make_commit root (Store.task store) ~parents >|= fun c -> Ok (c, msg)
+    in
+    (* Commit transaction *)
+    let merge () =
+      commit_of_view () >>*= fun (head, msg) ->
+      Store.merge_head (store msg) head >|= fun x -> Ok x
     in
     (* Current state (will finish initialisation below) *)
     let contents = ref empty_inode_map in
     (* Files present in both normal and merge modes *)
-    let stage = rw ~conflicts ~store view in
+    let stage = rw ~conflicts view in
     let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
     let ctl = Vfs.File.command (transactions_ctl ~merge ~remover) in
     let origin = Vfs.File.ro_of_string (Path.to_hum path) in
@@ -312,15 +349,10 @@ module Make (Store : I9p_tree.STORE) = struct
           let unit_task () = Irmin.Task.empty in
           Store.of_commit_id unit_task their_commit repo >>= fun theirs ->
           let theirs = theirs () in
-          (* Add to parents *)
-          let data = Cstruct.of_string (commit_id ^ "\n") in
-          Vfs.File.size parents_file >>*= fun size ->
-          Vfs.File.open_ parents_file >>*= fun fd ->
-          Vfs.File.write fd ~offset:size data >>*= fun () ->
           (* Grab current "rw" dir as "ours" *)
-          View.make_head store (Store.task store)
-            ~parents:(View.parents view) ~contents:view
-          >>= fun our_commit ->
+          commit_of_view () >>= function
+          | Error e -> Vfs.error "Can't start merge: %s" e
+          | Ok (our_commit, _msg) ->
           Store.of_commit_id unit_task our_commit repo >>= fun ours ->
           let ours = ours () in
           let ours_ro = read_only ~name:"ours" ours in
@@ -333,6 +365,12 @@ module Make (Store : I9p_tree.STORE) = struct
               let s = s () in
               (Some s, read_only ~name:"base" s)
           end >>= fun (base, base_ro) ->
+          (* Add to parents *)
+          let data = Cstruct.of_string (commit_id ^ "\n") in
+          Vfs.File.size parents_file >>*= fun size ->
+          Vfs.File.open_ parents_file >>*= fun fd ->
+          Vfs.File.write fd ~offset:size data >>*= fun () ->
+          (* Do the merge *)
           Merge.merge ~ours ~theirs ~base view >>= fun merge_conflicts ->
           conflicts := PathSet.union !conflicts merge_conflicts;
           let conflicts_file =
@@ -349,7 +387,7 @@ module Make (Store : I9p_tree.STORE) = struct
           Lwt.return (Ok "ok")
     in
     contents := normal_mode ();
-    Ok (Vfs.Dir.of_map_ref contents)
+    Lwt.return (Ok (Vfs.Dir.of_map_ref contents))
 
   let static_dir name items = Vfs.Inode.dir name (Vfs.Dir.of_list items)
 
@@ -414,47 +452,40 @@ module Make (Store : I9p_tree.STORE) = struct
   let reflog store =
     Vfs.File.of_stream (fun () -> Lwt.return (reflog_stream store))
 
-  let equal_ty a b =
-    match a, b with
-    | `None, `None -> true
-    | `File a, `File b -> Tree.File.equal a b
-    | `Directory a, `Directory b -> Tree.Dir.equal a b
-    | _ -> false
+  let hash_line store path =
+    Tree.snapshot store >>= fun snapshot ->
+    Tree.Dir.lookup_path snapshot path >>= function
+    | `None -> Lwt.return "\n"
+    | `File f -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash
+    | `Directory dir ->
+      Tree.Dir.hash dir >|= function
+      | None   -> "\n"
+      | Some h -> Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
 
   let watch_tree_stream store ~path ~init =
     let cond = Lwt_condition.create () in
     let current = ref init in
     let () =
       let cb _diff =
-        Tree.snapshot store >>= fun root ->
-        Tree.Dir.node root path >|= fun node ->
-        if not (equal_ty node !current) then (
-          current := node;
+        hash_line store path >|= fun line ->
+        if line <> !current then (
+          current := line;
           Lwt_condition.broadcast cond ()
         ) in
       let remove_watch = Store.watch_head store cb in
       ignore remove_watch (* TODO *)
     in
-    let pp ppf = function
-      | `None -> Fmt.string ppf "\n"
-      | `File h -> Fmt.pf ppf "F-%a\n" Tree.File.pp_hash h
-      | `Directory dir ->
-        match Tree.Dir.hash dir with
-        | None   -> Fmt.string ppf "\n"
-        | Some h -> Fmt.pf ppf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
-    in
     let rec wait old =
-      if not (equal_ty old !current) then Lwt.return !current
+      if old <> !current then Lwt.return !current
       else (
         Lwt_condition.wait cond >>= fun () ->
         wait old
       ) in
-    Vfs.File.Stream.watch pp ~init ~wait
+    Vfs.File.Stream.watch Fmt.string ~init ~wait
 
   let watch_tree store ~path =
     Vfs.File.of_stream (fun () ->
-        Tree.snapshot store >>= fun snapshot ->
-        Tree.Dir.node snapshot path >|= fun init ->
+        hash_line store path >|= fun init ->
         watch_tree_stream store ~path ~init
       )
 

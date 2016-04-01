@@ -11,6 +11,7 @@ let error ?(errno=0l) fmt =
 
 let enoent = error "No such file or directory"
 let eisdir = error "Is a directory"
+let enotdir = error "Is not a directory"
 let ero = error "Read-only file"
 let eperm = error "Operation not permitted"
 
@@ -19,6 +20,7 @@ let of_error x =
   match x with
   | Noent          -> enoent
   | Isdir          -> eisdir
+  | Notdir         -> enotdir
   | Read_only_file -> ero
   | Perm           -> eperm
   | Other err      -> error ?errno:err.errno "%s" err.descr

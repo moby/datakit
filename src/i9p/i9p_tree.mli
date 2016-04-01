@@ -5,7 +5,9 @@
     that information.
 *)
 
-type leaf = string
+open Astring
+
+type step = string
 type path = string list
 
 module type STORE = Irmin.S
@@ -20,20 +22,31 @@ module type S = sig
   type store
   (** The type for Irmin stores. *)
 
+  type repo
+  (** The type for Irmin repositories. *)
+
   module File : sig
     type t
     (** The type for file contents. *)
 
-    val content : t -> string Lwt.t
+    type hash
+    (** The type for file IDs (hashes). *)
+
+    val of_data : repo -> Cstruct.t -> t
+    (** [of_data repo data] is a file containing [data], which may later
+        be stored in [repo]. *)
+
+    val hash : t -> hash Lwt.t
+    (** [hash f] is the hash of the contents of [f]. If [f] is not yet in [repo], calling this
+        will cause it to be written. *)
+
+    val content : t -> Cstruct.t Lwt.t
 
     val equal : t -> t -> bool
     (** Quick equality check (compares hashes). *)
 
-    val pp_hash : Format.formatter -> t -> unit
+    val pp_hash : Format.formatter -> hash -> unit
   end
-
-  type repo
-  (** The type for Irmin repositories. *)
 
   module Dir : sig
     type t
@@ -46,30 +59,40 @@ module type S = sig
 
     val empty : repo -> t
 
-    val ty : t -> leaf -> [`File | `Directory | `None] Lwt.t
+    val ty : t -> step -> [`File | `Directory | `None] Lwt.t
     (** Check the type of a path. *)
 
-    val node : t -> path -> [`File of File.t | `Directory of t | `None ] Lwt.t
+    val lookup : t -> step -> [`File of File.t | `Directory of t | `None ] Lwt.t
+    (** Look up an immediate child by name. *)
+
+    val lookup_path : t -> path -> [`File of File.t | `Directory of t | `None ] Lwt.t
     (** Look up an item by path. *)
 
     val get : t -> path -> t option Lwt.t
     (** Look up a sub-directory node. *)
 
-    val ls : t -> ([`File | `Directory] * leaf) list Lwt.t
-    (** List the contents of a directory with the type of each item. *)
+    val map : t -> [`File of File.t | `Directory of t] String.Map.t Lwt.t
+    (** The contents of the directory. *)
 
-    val equal : t -> t -> bool
-    (** Quick equality check (compares hashes). *)
+    val ls : t -> ([`File | `Directory] * step) list Lwt.t
+    (** List the contents of a directory with the type of each item. *)
 
     val of_hash : repo -> hash option -> t
     (** [of_hash repo h] is the directory whose hash is [h] in
         [repo]. *)
 
-    val hash : t -> hash option
-    (** [hash dir] is the [dir]'s hash. *)
+    val hash : t -> hash option Lwt.t
+    (** [hash dir] is [dir]'s hash. This writes [dir] to the repository if it's not
+        yet stored. *)
 
     val repo : t -> repo
     (** [repo dir] is the repository in which [dir] lives. *)
+
+    val with_child : t -> step -> [`File of File.t | `Directory of t] -> t Lwt.t
+    (** [with_child dir name child] is a copy of [dir] except that [name] links to [child]. *)
+
+    val without_child : t -> step -> t Lwt.t
+    (** [without_child dir name] is a copy of [dir] except that it has no child called [name]. *)
 
   end
 

@@ -12,12 +12,14 @@ module Error = struct
   type t =
     | Noent
     | Isdir
+    | Notdir
     | Read_only_file
     | Perm
     | Other of err
 
   let no_entry = Error Noent
   let is_dir = Error Isdir
+  let not_dir = Error Notdir
   let read_only_file = Error Read_only_file
   let perm = Error Perm
 
@@ -122,6 +124,7 @@ module File = struct
          the application. To Linux, two "" in a row means end-of-file.
          Other systems will probably interpret a single "" as end-of-file.
          Oh well. *)
+      (* TODO: prevent concurrent reads/writes *)
       let read ~offset ~count =
         if offset <> !current_offset then err_stream_seek
         else if !need_flush then (

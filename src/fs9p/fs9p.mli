@@ -13,5 +13,4 @@ module type S = sig
 end
 
 (** Server builder. *)
-module Make (Log: Protocol_9p.S.LOG) (Flow: V1_LWT.FLOW):
-  S with type flow = Flow.flow
+module Make (Flow: V1_LWT.FLOW): S with type flow = Flow.flow

@@ -1,6 +1,7 @@
 VERSION = $(shell grep 'Version:' _oasis | sed 's/Version: *//')
 VFILE   = src/bin/version.ml
 APP     = Datakit.app
+EXE     = Datakit.win
 PREFIX ?= $(shell opam config var prefix)
 
 SETUP = ocaml setup.ml
@@ -16,6 +17,8 @@ setup.ml: _oasis
 	oasis setup
 	echo 'true: debug, bin_annot' >> _tags
 	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags
+	echo '"$(APP)": -traverse' >> _tags
+	echo '"$(EXE)": -traverse' >> _tags
 	echo 'Ocamlbuild_plugin.mark_tag_used "tests"' >> myocamlbuild.ml
 
 doc: setup.data build
@@ -41,7 +44,7 @@ clean:
 	rm -f src/*.odocl src/META setup.log
 	rm -f src/**/META src/**/*.mldylib src/**/*.mllib
 	rm -f $(VFILE)
-	rm -rf $(APP) _tests
+	rm -rf $(APP) $(EXE) _tests
 
 setup.data: setup.ml
 	$(SETUP) -configure --prefix $(PREFIX)
@@ -55,6 +58,12 @@ bundle: build
 	 -x $(APP)/Contents/MacOS/com.docker.db \
 	 -d $(APP)/Contents/Resources/lib \
 	 -p @executable_path/../Resources/lib
+
+exe: build
+	rm -rf $(EXE)
+	mkdir -p $(EXE)
+	cp _build/src/bin/main.native $(EXE)/datakit.exe
+	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)
 
 ifeq ($(wildcard .git/refs/heads/master),)
 $(VFILE):

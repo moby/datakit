@@ -17,6 +17,7 @@ module Error: sig
   type t =
     | Noent                                    (** No such file or directory. *)
     | Isdir                                     (** The entry is a directory. *)
+    | Notdir                                (** The entry is not a directory. *)
     | Read_only_file                               (** The file is read-only. *)
     | Perm                                (** The operation is not permitted. *)
     | Other of err                                (** Generic error function. *)
@@ -32,6 +33,9 @@ module Error: sig
 
   val is_dir: ('a, t) result
   (** [is_dir] is [Error Isdir]. *)
+
+  val not_dir: ('a, t) result
+  (** [not_dir] is [Error Notdir]. *)
 
   val read_only_file: ('a, t) result
   (** [read_only_file] is [Error Read_only_file]. *)

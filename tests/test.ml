@@ -53,12 +53,13 @@ let test_parents _repo conn =
       >|= fun parents ->
       Alcotest.(check string) "Parents" expected parents in
   let check_fails name parents =
-    Lwt.catch
+    Lwt.try_bind
       (fun () ->
          with_transaction conn ~branch:"dev" name (fun dir ->
              write_file conn (dir @ ["parents"]) parents >>*= Lwt.return
-           ) >>= fun () ->
-         Alcotest.fail "Should have been rejected")
+           )
+      )
+      (fun () -> Alcotest.fail "Should have been rejected")
       (fun _ex -> Lwt.return_unit)
   in
 
@@ -163,6 +164,7 @@ let test_conflicts _repo conn =
       "e", "e-from-base";
       "f", "f-from-base";
       "dir/a", "a-from-base";
+      "dir2/b", "b-from-base";
     ]
     ~ours:[
       "a", "a-ours";          (* edit a *)
@@ -174,6 +176,7 @@ let test_conflicts _repo conn =
       "g", "g-same";          (* create g *)
       "h", "h-ours";          (* create h *)
       "dir", "ours-now-file"; (* convert dir to file *)
+      "dir2/b", "b-theirs";   (* edit dir2/b *)
     ]
     ~theirs:[
       "a", "a-theirs";     (* edit a *)
@@ -185,6 +188,7 @@ let test_conflicts _repo conn =
       "g", "g-same";          (* create g *)
       "h", "h-theirs";        (* create h *)
       "dir/a", "a-theirs";    (* edit dir/a *)
+      "dir2", "theirs-now-file"; (* convert dir2 to file *)
     ]
     (fun t ->
        write_file conn (t @ ["ctl"]) "commit" >>= function
@@ -199,7 +203,7 @@ let test_conflicts _repo conn =
            |> List.sort String.compare
          in
          Alcotest.(check (list string)) "Resolved files"
-           ["a"; "b"; "c"; "dir"; "f"; "g"; "h"] items;
+           ["a"; "b"; "c"; "dir"; "dir2"; "f"; "g"; "h"] items;
          check_file conn (t @ ["rw"; "a"]) "a"
            "** Conflict **\nChanged on both branches\n"
          >>= fun () ->
@@ -213,10 +217,11 @@ let test_conflicts _repo conn =
          >>= fun () ->
          check_file conn (t @ ["rw"; "dir"]) "dir" "** Conflict **\nFile vs dir\n"
          >>= fun () ->
-         check_file conn (t @ ["conflicts"]) "conflicts" "a\ndir\nf\nh\n"
+         check_file conn (t @ ["conflicts"]) "conflicts" "a\ndir\ndir2\nf\nh\n"
          >>= fun () ->
          Client.remove conn (t @ ["rw"; "a"]) >>*= fun () ->
          Client.remove conn (t @ ["rw"; "dir"]) >>*= fun () ->
+         Client.remove conn (t @ ["rw"; "dir2"]) >>*= fun () ->
          read_file conn (t @ ["theirs"; "f"]) >>=
          write_file ~truncate:true conn (t @ ["rw"; "f"]) >>*= fun () ->
          check_file conn (t @ ["conflicts"]) "conflicts" "h\n" >>= fun () ->
@@ -392,6 +397,66 @@ let test_writes () =
     Lwt.return_unit
   end
 
+module Unit = struct
+  type t = unit
+  let pp fmt () = Fmt.string fmt "()"
+  let equal = (=)
+end
+
+module RW_err = struct
+  type t = [`Not_a_directory | `Is_a_directory]
+  let pp fmt = function
+    | `Not_a_directory -> Fmt.string fmt "Not_a_directory"
+    | `Is_a_directory -> Fmt.string fmt "Is_a_directory"
+  let equal = (=)
+end
+
+module RW_err1 = struct
+  type t = [`Not_a_directory]
+  let pp fmt = function
+    | `Not_a_directory -> Fmt.string fmt "Not_a_directory"
+  let equal = (=)
+end
+
+let test_rw () =
+  let v = Cstruct.of_string in
+  let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
+  let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
+  let unit = (module Unit : Alcotest.TESTABLE with type t = unit) in
+  Lwt_main.run begin
+    Store.Repo.create config >>= fun repo ->
+    let rw = RW.of_dir (Tree.Dir.empty repo) in
+
+    RW.update rw [] "foo" (v "a")
+    >|= Alcotest.(check (result unit err)) "Write /a" (Ok ()) >>= fun () ->
+
+    RW.update rw ["sub"; "bar"] "baz" (v "b")
+    >|= Alcotest.(check (result unit err)) "Write /sub/bar/baz" (Ok ()) >>= fun () ->
+
+    (* /foo is a file *)
+    RW.update rw ["foo"; "bar"] "baz" (v "b")
+    >|= Alcotest.(check (result unit err)) "Write /foo/bar/baz" (Error `Not_a_directory) >>= fun () ->
+
+    RW.remove rw ["foo"] "bar"
+    >|= Alcotest.(check (result unit err1)) "rm /foo/bar" (Error `Not_a_directory) >>= fun () ->
+
+    RW.update_force rw ["foo"; "bar"] "baz" (v "b") >>= fun () ->
+
+    RW.update rw ["foo"] "bar" (v "b")
+    >|= Alcotest.(check (result unit err)) "Write /foo/bar" (Error `Is_a_directory) >>= fun () ->
+
+    RW.remove rw ["foo"; "bar"] "baz"
+    >|= Alcotest.(check (result unit err1)) "rm /foo/bar/baz" (Ok ()) >>= fun () ->
+
+    let root = RW.root rw in
+
+    Tree.Dir.ls root
+    >|= List.map snd
+    >|= Alcotest.(check (slist string String.compare)) "ls /" ["foo"; "sub"] >>= fun () ->
+
+    Lwt.return ()
+  end
+
 let run f () = Test_utils.run f
 
 let test_set = [
@@ -405,6 +470,7 @@ let test_set = [
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;
   "Conflicts"  , `Quick, run test_conflicts;
+  "RW"         , `Quick, test_rw;
   "Remotes"    , `Slow , run test_remotes;
 ]
 

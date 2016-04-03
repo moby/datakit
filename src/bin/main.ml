@@ -17,20 +17,7 @@ let make_task msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
   Irmin.Task.create ~date ~owner:"irmin9p" msg
 
-let token () =
-  let cookie = "datakit" in
-  Lwt_unix.run (
-    let open Lwt.Infix in
-    Github_cookie_jar.init () >>= fun jar ->
-    Github_cookie_jar.get jar ~name:cookie >|= function
-    | Some t -> Github.Token.of_string t.Github_t.auth_token
-    | None   ->
-      Printf.eprintf "Missing cookie: use git-jar to create cookie `%s`.\n%!"
-        cookie;
-      exit 1
-  )
-
-let subdirs = [Vgithub.create token]
+let subdirs = Main_pp.subdirs
 
 module Git_fs_store = struct
   open Irmin

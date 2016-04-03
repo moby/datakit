@@ -53,17 +53,24 @@ clean:
 setup.data: setup.ml
 	$(SETUP) -configure --prefix $(PREFIX) --$(GITHUB)-github
 
-bundle: build
+bundle:
+	opam remove tls ssl -y
+	$(MAKE) clean
+	$(MAKE) GITHUB=disable
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS/
 	mkdir -p $(APP)/Contents/Resources/lib/
 	cp _build/src/bin/main.native $(APP)/Contents/MacOS/com.docker.db
+	./scripts/check-dylib.sh
 	dylibbundler -od -b \
 	 -x $(APP)/Contents/MacOS/com.docker.db \
 	 -d $(APP)/Contents/Resources/lib \
 	 -p @executable_path/../Resources/lib
 
-exe: build
+exe:
+	opam remove tls ssl -y
+	$(MAKE) clean
+	$(MAKE) GITHUB=disable
 	rm -rf $(EXE)
 	mkdir -p $(EXE)
 	cp _build/src/bin/main.native $(EXE)/datakit.exe

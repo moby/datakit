@@ -263,4 +263,8 @@ end and Inode: sig
   val kind: t -> kind
   (** [kind t] is [t]'s kind. *)
 
+  val ino: t -> int64
+  (** [ino t] is a unique "inode number" for the file. If two files have the
+      same inode number, then they are the same file. *)
+
 end

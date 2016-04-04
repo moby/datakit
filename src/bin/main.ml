@@ -161,8 +161,15 @@ let setup_log style_renderer level =
   Logs.set_reporter (reporter ());
   ()
 
+let env_docs = "ENVIRONMENT VARIABLES"
+
 let setup_log =
-  Term.(const setup_log $ Fmt_cli.style_renderer () $ Logs_cli.level ())
+  let env =
+    Arg.env_var ~docs:env_docs
+      ~doc:"Be more or less verbose. See $(b,--verbose)."
+      "DATAKIT_VERBOSE"
+  in
+  Term.(const setup_log $ Fmt_cli.style_renderer () $ Logs_cli.level ~env ())
 
 let git =
   let doc =

@@ -342,14 +342,14 @@ module Dir = struct
 
   and kind = [`File of File.t | `Dir of t]
 
-  and inode = { mutable basename: string; kind: kind }
+  and inode = { mutable basename: string; kind: kind; ino: int64 }
 
   let pp ppf t = Fmt.pf ppf "Vfs.Dir.%s" t.debug
 
   let pp_kind ppf k =
     Fmt.string ppf (match k with `Dir _ -> "dir" | `File _ -> "file")
 
-  let pp_inode ppf t = Fmt.pf ppf "%s:%a" t.basename pp_kind t.kind
+  let pp_inode ppf t = Fmt.pf ppf "%s:%a[%Ld]" t.basename pp_kind t.kind t.ino
 
   let ls t = t.ls ()
   let mkfile t = t.mkfile
@@ -403,9 +403,18 @@ module Inode = struct
   type t = Dir.inode
   let pp = Dir.pp_inode
   type kind = Dir.kind
-  let file basename file = { Dir.basename; kind = `File file }
-  let dir basename dir = { Dir.basename; kind = `Dir dir }
+
+  let mint_ino =
+    let last = ref 0L in
+    fun () ->
+      let next = Int64.succ !last in
+      last := next;
+      next
+
+  let file basename file = { Dir.basename; kind = `File file; ino = mint_ino () }
+  let dir basename dir = { Dir.basename; kind = `Dir dir; ino = mint_ino () }
   let basename t = t.Dir.basename
   let set_basename t b = t.Dir.basename <- b
+  let ino t = t.Dir.ino
   let kind t = t.Dir.kind
 end

@@ -397,6 +397,17 @@ let test_writes () =
     Lwt.return_unit
   end
 
+let test_stable_inodes _repo conn =
+  let inode x = Int64.to_string Protocol_9p.(x.Types.Stat.qid.Types.Qid.id) in
+  make_branch conn "master" >>= fun () ->
+  with_transaction conn ~branch:"master" "stable" (fun t ->
+    create_file conn (t @ ["rw"]) "file" "data" >>= fun () ->
+    Client.stat conn ["branch"; "master"; "transactions"; "stable"; "rw"; "file"] >>*= fun info1 ->
+    Client.stat conn ["branch"; "master"; "transactions"; "stable"; "rw"; "file"] >>*= fun info2 ->
+    Alcotest.(check string) "Inode same" (inode info1) (inode info2);
+    Lwt.return (Ok ())
+  ) >>*= Lwt.return
+
 module Unit = struct
   type t = unit
   let pp fmt () = Fmt.string fmt "()"
@@ -470,6 +481,7 @@ let test_set = [
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;
   "Conflicts"  , `Quick, run test_conflicts;
+  "Stable inodes", `Quick, run test_stable_inodes;
   "RW"         , `Quick, test_rw;
   "Remotes"    , `Slow , run test_remotes;
 ]

@@ -11,10 +11,6 @@ let pp_fid =
   let str x = P.Types.Fid.sexp_of_t x |> Sexplib.Sexp.to_string in
   Fmt.of_to_string str
 
-let pp_qid =
-  let str x = P.Types.Qid.sexp_of_t x |> Sexplib.Sexp.to_string in
-  Fmt.of_to_string str
-
 type 'a or_err = 'a Protocol_9p.Error.t Lwt.t
 
 let ok x = Lwt.return (Ok x)
@@ -45,13 +41,7 @@ end
 
 (* 9p inodes: wrap VFS inodes with Qids. *)
 module Inode = struct
-
-  type t = {
-    qid  : Protocol_9p.Types.Qid.t;    (* Unique id (similar to inode number) *)
-    inode: Vfs.Inode.t;
-  }
-
-  let pp ppf t = Fmt.pf ppf "%a:%a" pp_qid t.qid Vfs.Inode.pp t.inode
+  include Vfs.Inode
 
   (* All you can do with an open dir is list it *)
   type open_dir = { offset: int64; unread: t list }
@@ -66,34 +56,10 @@ module Inode = struct
     [ `OpenFile of Vfs.File.fd
     | `OpenDir of open_dir ]
 
-  let mint_qid =
-    let last = ref 0L in
-    fun () ->
-      let next = Int64.succ !last in
-      last := next;
-      next
-
-  let dir basename dir =
-    let qid = P.Types.Qid.dir ~id:(mint_qid ()) ~version:0l () in
-    let inode = Vfs.Inode.dir basename dir in
-    { qid; inode }
-
-  let file basename obj =
-    let qid = P.Types.Qid.file ~id:(mint_qid ()) ~version:0l () in
-    let inode = Vfs.Inode.file basename obj in
-    { qid; inode }
-
-  let qid t = t.qid
-  let kind t = Vfs.Inode.kind t.inode
-  let inode t = t.inode
-  let basename t = Vfs.Inode.basename t.inode
-  let set_basename t n = Vfs.Inode.set_basename t.inode n
-
-  let create inode =
-    let name = Vfs.Inode.basename inode in
-    match Vfs.Inode.kind inode with
-    | `Dir d  -> dir name d
-    | `File f -> file name f
+  let qid t =
+    match kind t with
+    | `File _ -> P.Types.Qid.file ~id:(ino t) ~version:0l ()
+    | `Dir _ -> P.Types.Qid.dir ~id:(ino t) ~version:0l ()
 
 end
 
@@ -130,7 +96,7 @@ module Op9p = struct
     match Inode.kind dir with
     | `File _ -> assert false
     | `Dir d ->
-      Vfs.Dir.rename d (Inode.inode inode) new_name >>= map_error
+      Vfs.Dir.rename d inode new_name >>= map_error
       >>*= fun () ->
       Inode.set_basename inode new_name;
       ok ()
@@ -148,7 +114,6 @@ module Op9p = struct
       ok (`OpenFile o)
     | `Dir dir ->
       Vfs.Dir.ls dir >>= map_error >>*= fun items ->
-      let items = List.map Inode.create items in
       ok (`OpenDir { Inode.offset = 0L; unread = items })
 
   let read_dir ~info ~offset ~count state =
@@ -183,7 +148,6 @@ module Op9p = struct
         else Vfs.Dir.mkfile d name
       in
       inode >>= map_error >>*= fun inode ->
-      let inode = Inode.create inode in
       read inode >>*= fun open_file ->
       ok (inode, open_file)
     | `File _ -> err_not_a_dir (Inode.basename parent)
@@ -251,7 +215,6 @@ module Make (Flow: V1_LWT.FLOW) = struct
               end
             | x ->
               Vfs.Dir.lookup dir x >>= map_error >>*= fun x_inode ->
-              let x_inode = Inode.create x_inode in
               ok (x_inode, inode :: parents)
           end >>*= fun (inode, parents) ->
           let wqids = Inode.qid inode :: wqids in
@@ -309,7 +272,7 @@ module Make (Flow: V1_LWT.FLOW) = struct
       | `Ready ->
         Op9p.read fd.inode >>*= fun state ->
         fd.state <- state;
-        ok { P.Response.Open.qid = fd.inode.Inode.qid; iounit = 0l }
+        ok { P.Response.Open.qid = Inode.qid fd.inode; iounit = 0l }
 
     let create connection ~cancel:_ { P.Request.Create.fid; perm; name; _ } =
       lookup connection fid >>*= fun fd ->
@@ -320,7 +283,7 @@ module Make (Flow: V1_LWT.FLOW) = struct
           { inode; parents = fd.inode :: fd.parents; state = open_file }
         in
         connection.fds <- P.Types.Fid.Map.add fid fd connection.fds;
-        ok { P.Response.Create.qid = inode.Inode.qid; iounit = 0l }
+        ok { P.Response.Create.qid = Inode.qid inode; iounit = 0l }
       )
 
     let write connection ~cancel:_ { P.Request.Write.fid; offset; data } =

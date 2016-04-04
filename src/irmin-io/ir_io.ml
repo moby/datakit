@@ -162,17 +162,15 @@ module FS = struct
     Lwt_pool.use mkdir_pool (fun () -> aux dirname)
 
   let list_files kind dir =
-    Lwt_pool.use openfile_pool (fun () ->
-        if Sys.file_exists dir then (
-          let s = Lwt_unix.files_of_directory dir in
-          let s = Lwt_stream.filter (fun s -> s <> "." && s <> "..") s in
-          let s = Lwt_stream.map (Filename.concat dir) s in
-          let s = Lwt_stream.filter kind s in
-          Lwt_stream.to_list s >>= fun l ->
-          Lwt.return l
-        ) else
-          Lwt.return_nil
-      )
+    if Sys.file_exists dir && Sys.is_directory dir then
+      let d = Sys.readdir dir in
+      let d = Array.to_list d in
+      let d = List.map (Filename.concat dir) d in
+      let d = List.filter kind d in
+      let d = List.sort String.compare d in
+      Lwt.return d
+    else
+      Lwt.return_nil
 
   let directories dir =
     list_files (fun f ->

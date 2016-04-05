@@ -1,3 +1,6 @@
+let src = Logs.Src.create "vgithub" ~doc:"Datakit Github bindings"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 #ifdef HAVE_GITHUB
 
 let token () =
@@ -13,10 +16,14 @@ let token () =
       exit 1
   )
 
-let subdirs = [Vgithub.create token]
+let subdirs () =
+  Log.debug (fun l -> l "Datakit uses the Github bindings");
+  [Vgithub.create token]
 
 #else
 
-let subdirs = []
+let subdirs () =
+  Log.debug (fun l -> l "Datakit does not use the Github bindings");
+  []
 
 #endif

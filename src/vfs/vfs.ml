@@ -80,6 +80,7 @@ module File = struct
       let last_seen = ref init in
       let data = ref (Cstruct.of_string (Fmt.to_to_string pp init)) in
       let read count =
+        Log.debug (fun f -> f "XXXX read");
         begin if Cstruct.len !data = 0 then (
             wait !last_seen >|= fun now ->
             last_seen := now;

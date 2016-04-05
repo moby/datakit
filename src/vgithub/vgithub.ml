@@ -86,6 +86,57 @@ module API = struct
 
   let create ~token ~user ~repo = { token = Lazy.force token; user; repo }
 
+  let on_new_issues { token; user; repo } f =
+    let open Github.Monad in
+    let listen s () =
+      Logs.debug (fun l -> l "listening for issue events on %s/%s" user repo);
+      let rec loop s =
+        Log.debug (fun l -> l "XXXX loop");
+        Stream.poll s >>= fun so ->
+        API.get_rate_remaining ~token () >>= fun remaining ->
+        match so with
+        | None   ->
+          Logs.debug (fun l ->
+              l "no new events on %s/%s (%d)" user repo remaining);
+          loop s
+        | Some s ->
+          Logs.debug (fun l ->
+              l "new events on %s/%s (%d)" user repo remaining);
+          let keep e =
+            if not e.event_public then None
+            else match e.event_payload with
+              | `PullRequest pr ->
+                begin match pr.pull_request_event_action with
+                  | `Opened
+                  | `Synchronize -> Some pr.pull_request_event_pull_request
+                  | _            -> None
+                end
+              | _ -> None
+          in
+          Log.debug (fun f -> f "XXXXXXX before iter");
+          Stream.iter (fun e -> match keep e with
+              | None    -> Log.debug (fun l -> l "XXX SKIP"); return ()
+              | Some pr -> Log.debug (fun l -> l "XXX SOME"); f pr; return ()
+            ) s >>= fun () ->
+          loop s
+      in
+      Github.Monad.run (loop s)
+    in
+    let init () =
+      let events = Event.for_repo ~token ~user ~repo () in
+      Log.debug (fun l -> l "SSDSDSDSDS stream 0");
+      Stream.next events >>= function
+      | None        ->
+        Log.debug (fun l -> l "SSDSDSDSDS stream NONE");
+        return ()
+      | Some (_, s) ->
+        Log.debug (fun l -> l "SSDSDSDSDS stream SOME");
+        Stream.poll s >|= function
+        | None   -> ()
+        | Some s -> Lwt.async (listen s)
+    in
+    Github.Monad.run @@ init ()
+
 end
 
 (* /github.com/${USER}/${REPO}/pr/${PR}/status/${CONTEXT} *)
@@ -175,14 +226,37 @@ let pr_dir t pr =
   ] in
   Vfs.Dir.of_list dirs
 
+
+(* /github.com/${USER}/${REPO}/updates *)
+let pr_updates t =
+  let open Lwt.Infix in
+  Logs.debug (fun l -> l "pr_updates %s/%s" t.API.user t.API.repo);
+  let stream, push = Lwt_stream.create () in
+  let current: pull option Pervasives.ref = ref None in
+  let wait old =
+    if old <> !current then Lwt.return !current
+    else Lwt_stream.get stream >|= fun s -> current := s; s
+  in
+  let pp ppf = function
+    | None    -> Fmt.string ppf ""
+    | Some pr -> Fmt.pf ppf "pr/%d\n" pr.pull_number
+  in
+  let stream () = Vfs.File.Stream.watch pp ~init:!current ~wait in
+  let file = Vfs.File.of_stream @@ fun () ->
+    API.on_new_issues t (fun pr -> push @@ Some pr) >>= fun () ->
+    Lwt.return (stream ())
+  in
+  file
+
 (* /github.com/${USER}/${REPO}/pr *)
 let pr_root t =
   Logs.debug (fun l -> l "pr_root %s/%s" t.API.user t.API.repo);
   let prs () =
-    API.prs t
-    |> List.map (fun pr ->
+    let prs = API.prs t in
+    Vfs.Inode.file "updates" (pr_updates t) ::
+    List.map (fun pr ->
         Vfs.Inode.dir (string_of_int pr.pull_number) @@ pr_dir t pr
-      )
+      ) prs
   in
   Vfs.Dir.of_list prs
 

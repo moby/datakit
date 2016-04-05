@@ -1,0 +1,27 @@
+FROM ocaml/opam:alpine
+
+RUN opam depext lwt ssl &&  opam install lwt alcotest
+
+RUN opam pin add github --dev
+RUN opam pin add protocol-9p --dev
+
+COPY opam /home/opam/src/datakit/opam
+RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam depext datakit ssl github && \
+    opam install ssl github datakit --deps # Install datakit deps
+
+COPY . /home/opam/src/datakit/
+RUN sudo chown -R opam.nogroup /home/opam/src
+WORKDIR /home/opam/src/datakit
+
+ENV GITHUB=enable
+RUN opam config exec -- make && make test && make install
+
+EXPOSE 5640
+
+RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
+    sudo cp /home/opam/.opam/system/bin/datakit /usr/bin/datakit
+
+ENV COHTTP_DEBUG 10
+
+CMD ["/usr/bin/datakit", "--url=tcp://0.0.0.0:5640", "--git=/data", "--verbose=debug"]

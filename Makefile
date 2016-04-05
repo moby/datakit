@@ -14,14 +14,13 @@ build: setup.data $(VFILE)
 all: setup.data
 	$(SETUP) -all $(ALLFLAGS)
 
-setup.ml: _oasis
+setup.ml: _oasis _myocamlbuild.ml
 	rm -f _tags myocamlbuild.ml
 	oasis setup
 	echo 'true: debug, bin_annot' >> _tags
 	echo 'true: warn_error(+1..49), warn(A-4-41-44)' >> _tags
 	echo '"$(APP)": -traverse' >> _tags
 	echo '"$(EXE)": -traverse' >> _tags
-	echo "true: pp_github" > src/bin/_tags
 	cat _myocamlbuild.ml >> myocamlbuild.ml
 
 doc: setup.data build

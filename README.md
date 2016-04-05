@@ -2,23 +2,35 @@
 
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](http://nuc1.local:1234)
 
-### Quick Setup
+### Quick Start
 
 At the root of the repository:
 
 ```
-docker build -t datakit .
-docker rm -f db                                      # Remove previous instances
-docker run -d -p 5650:5640 --name=db \
-  -v ${HOME}/.github:/home/opam/.github \
-  datakit                                             # Start the Datakit server
-docker run -it --privileged --rm --link db datakit sh        # Start a new shell
+./scripts/start-datakit.sh # Start datakit without the Github API bindings
+
+# In an other terminal
+./scripts/start-client.sh
 $ datakit-mount
 $ cd /db
 $ ls
+branch     remotes    snapshots  trees
 ```
 
 Now you can explore, edit and script `/db`.
+
+To start Datakit with the (experimental) Github bindings:
+
+```
+DATAKIT_GITHUB=1 ./scripts/start-datakit.sh # Start datakit without the Github API bindings
+
+# In an other terminal
+./scripts/start-client.sh
+$ datakit-mount
+$ cd /db
+$ ls
+branch      github.com  remotes     snapshots   trees
+```
 
 ### Build and Install
 

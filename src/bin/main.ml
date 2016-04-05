@@ -18,8 +18,6 @@ let make_task msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
   Irmin.Task.create ~date ~owner:"irmin9p" msg
 
-let subdirs = Main_pp.subdirs
-
 module Git_fs_store = struct
   open Irmin
   module Store =
@@ -33,6 +31,7 @@ module Git_fs_store = struct
     Log.debug (fun l -> l "Using Git-format store %S" path);
     let config = Irmin_git.config ~root:path ~bare () in
     Store.Repo.create config >|= fun repo ->
+    let subdirs = Main_pp.subdirs () in
     fun () -> Filesystem.create make_task repo ~subdirs
 end
 
@@ -46,6 +45,7 @@ module In_memory_store = struct
         l "Using in-memory store (use --git for a disk-backed store)");
     let config = Irmin_mem.config () in
     Store.Repo.create config >|= fun repo ->
+    let subdirs = Main_pp.subdirs () in
     fun () -> Filesystem.create make_task repo ~subdirs
 end
 

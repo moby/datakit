@@ -1,6 +1,6 @@
 PKG lwt result fmt protocol-9p irmin.unix launchd cmdliner
 PKG alcotest rresult github astring fmt irmin logs mtime.os
-PKG dolog
+PKG dolog camlzip
 S src/**
 S tests/
 B _build/src/**

@@ -12,7 +12,9 @@ fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
+docker rmi -f datakit || echo skip
 docker build -t datakit -f ${DOCKERFILE} ${REPO_ROOT}
+
 docker rm -f db || echo skip
 docker run -p 5650:5640 --name=db --rm \
   -v ${HOME}/.github:/home/opam/.github \

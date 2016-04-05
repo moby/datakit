@@ -86,40 +86,56 @@ module API = struct
 
   let create ~token ~user ~repo = { token = Lazy.force token; user; repo }
 
-  let iter_issues { token; user; repo } f: unit Lwt.t =
-    Logs.debug (fun l -> l "listening for issue events on %s/%s" user repo);
-    let s =  Event.for_repo_issues ~token ~user ~repo () in
-    let rec loop s =
-      let open Github.Monad in
-      Stream.poll s >>= fun so ->
-      API.get_rate_remaining ~token () >>= fun remaining ->
-      let now = Unix.gettimeofday () in
-      match so with
-      | None   ->
-        Logs.debug (fun l ->
-            l "%.2f no new events on %s/%s (%d)" now user repo remaining);
-        loop s
-      | Some s ->
-        Logs.debug (fun l ->
-            l "%.2f new events on %s/%s (%d)" now user repo remaining);
-        let keep e =
-          if not e.event_public then None
-          else match e.event_payload with
-            | `PullRequest pr ->
-              begin match pr.pull_request_event_action with
-                | `Opened | `Synchronize -> Some pr.pull_request_event_pull_request
-                | _ -> None
-              end
-            | _ -> None
-        in
-        Stream.iter (fun e -> match keep e with
-            | None    -> return ()
-            | Some pr -> f pr; return ()
-          ) s >>= fun () ->
-        loop s
+  let on_new_issues { token; user; repo } f =
+    let open Github.Monad in
+    let listen s () =
+      Logs.debug (fun l -> l "listening for issue events on %s/%s" user repo);
+      let rec loop s =
+        Log.debug (fun l -> l "XXXX loop");
+        Stream.poll s >>= fun so ->
+        API.get_rate_remaining ~token () >>= fun remaining ->
+        match so with
+        | None   ->
+          Logs.debug (fun l ->
+              l "no new events on %s/%s (%d)" user repo remaining);
+          loop s
+        | Some s ->
+          Logs.debug (fun l ->
+              l "new events on %s/%s (%d)" user repo remaining);
+          let keep e =
+            if not e.event_public then None
+            else match e.event_payload with
+              | `PullRequest pr ->
+                begin match pr.pull_request_event_action with
+                  | `Opened
+                  | `Synchronize -> Some pr.pull_request_event_pull_request
+                  | _            -> None
+                end
+              | _ -> None
+          in
+          Log.debug (fun f -> f "XXXXXXX before iter");
+          Stream.iter (fun e -> match keep e with
+              | None    -> Log.debug (fun l -> l "XXX SKIP"); return ()
+              | Some pr -> Log.debug (fun l -> l "XXX SOME"); f pr; return ()
+            ) s >>= fun () ->
+          loop s
+      in
+      Github.Monad.run (loop s)
     in
-    loop s
-    |> Github.Monad.run
+    let init () =
+      let events = Event.for_repo ~token ~user ~repo () in
+      Log.debug (fun l -> l "SSDSDSDSDS stream 0");
+      Stream.next events >>= function
+      | None        ->
+        Log.debug (fun l -> l "SSDSDSDSDS stream NONE");
+        return ()
+      | Some (_, s) ->
+        Log.debug (fun l -> l "SSDSDSDSDS stream SOME");
+        Stream.poll s >|= function
+        | None   -> ()
+        | Some s -> Lwt.async (listen s)
+    in
+    Github.Monad.run @@ init ()
 
 end
 
@@ -219,7 +235,7 @@ let pr_updates t =
   let current: pull option Pervasives.ref = ref None in
   let wait old =
     if old <> !current then Lwt.return !current
-    else Lwt_stream.next stream >|= fun s -> current := s; s
+    else Lwt_stream.get stream >|= fun s -> current := s; s
   in
   let pp ppf = function
     | None    -> Fmt.string ppf ""
@@ -227,7 +243,7 @@ let pr_updates t =
   in
   let stream () = Vfs.File.Stream.watch pp ~init:!current ~wait in
   let file = Vfs.File.of_stream @@ fun () ->
-    Lwt.async (fun () -> API.iter_issues t (fun pr -> push @@ Some (Some pr)));
+    API.on_new_issues t (fun pr -> push @@ Some pr) >>= fun () ->
     Lwt.return (stream ())
   in
   file

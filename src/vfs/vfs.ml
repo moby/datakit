@@ -5,6 +5,11 @@ open Lwt.Infix
 let src = Logs.Src.create "vfs" ~doc:"Datakit VFS"
 module Log = (val Logs.src_log src : Logs.LOG)
 
+type metadata = {
+  length: int64;
+  perm: [`Normal | `Exec | `Link]
+}
+
 module Error = struct
 
   type err = { errno: int32 option; descr: string }
@@ -154,7 +159,7 @@ module File = struct
 
   type t = {
     debug: string;
-    size: unit -> int64 or_err;
+    stat: unit -> metadata or_err;
     open_: unit -> fd or_err;
     remove: unit -> unit or_err;
     truncate: int64 -> unit or_err;
@@ -162,10 +167,11 @@ module File = struct
 
   let pp ppf t = Fmt.pf ppf "Vfs.File.%s" t.debug
 
-  let create_aux ~debug ~size ~open_ ~remove ~truncate =
-    { debug; size; open_; remove; truncate }
+  let create_aux ~debug ~stat ~open_ ~remove ~truncate =
+    { debug; stat; open_; remove; truncate }
 
-  let size t = t.size ()
+  let stat t = t.stat ()
+  let size t = stat t >>*= fun info -> Lwt.return (Ok info.length)
   let open_ t = t.open_ ()
   let remove t = t.remove ()
   let truncate t = t.truncate
@@ -174,18 +180,18 @@ module File = struct
     create_aux ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only)
 
   let ro_of_cstruct data =
-    let len = Cstruct.len data |> Int64.of_int in
-    let size () = ok len in
+    let length = Cstruct.len data |> Int64.of_int in
+    let stat () = ok {length; perm = `Normal} in
     let open_ () = Fd.static data in
-    read_only_aux ~size ~open_
+    read_only_aux ~stat ~open_
 
   let ro_of_string text =
     ro_of_cstruct ~debug:"ro_of_string" (Cstruct.of_string text)
 
   let of_stream stream =
-    let size () = ok 0L in
+    let stat () = ok {length = 0L; perm = `Normal} in
     let open_ () = stream () >>= fun s -> Fd.of_stream s in
-    read_only_aux ~debug:"of_stream" ~size ~open_
+    read_only_aux ~debug:"of_stream" ~stat ~open_
 
   let command ?(init="") handler =
     (* Value currently being returned to user. Note that this is
@@ -195,7 +201,7 @@ module File = struct
        this is used, you should create a fresh FS for each client
        connection at least). *)
     let data = ref (Cstruct.of_string init) in
-    let size () = ok 0L in
+    let stat () = ok {length = 0L; perm = `Normal} in
     let open_ () =
       let read count =
         let count = min count (Cstruct.len !data) in
@@ -216,12 +222,12 @@ module File = struct
       | 0L -> ok () (* For `echo cmd > file` *)
       | _  -> err_extend_cmd_file
     in
-    create_aux ~debug:"command" ~size ~open_ ~remove ~truncate
+    create_aux ~debug:"command" ~stat ~open_ ~remove ~truncate
 
   let status fn =
-    let size () =
-      fn () >|= fun data -> (Ok (String.length data |> Int64.of_int))
-    in
+    let stat () =
+      fn () >|= fun data ->
+      Ok {length = String.length data |> Int64.of_int; perm = `Normal} in
     let open_ () =
       let data = fn () >|= fun result -> ref (Cstruct.of_string result) in
       let read count =
@@ -235,7 +241,7 @@ module File = struct
       let stream = Stream.create ~read ~write in
       Fd.of_stream stream
     in
-    read_only_aux ~debug:"status" ~size ~open_
+    read_only_aux ~debug:"status" ~stat ~open_
 
   (* [overwrite orig (new, offset)] is a buffer [start; padding; new;
       end] where [new] is at position [offset], [start] and [end] are
@@ -264,9 +270,9 @@ module File = struct
     )
 
   let of_kv_aux ~read ~write =
-    let size () = read () >>*= function
+    let stat () = read () >>*= function
       | None          -> err_no_entry
-      | Some contents -> ok @@ Int64.of_int (Cstruct.len contents)
+      | Some contents -> ok {length = Int64.of_int (Cstruct.len contents); perm = `Normal}
     in
     let open_ () =
       let read ~offset ~count =
@@ -305,7 +311,7 @@ module File = struct
           write (Cstruct.append old padding)
         )
       ) in
-    create_aux ~size ~open_ ~truncate
+    create_aux ~stat ~open_ ~truncate
 
   let of_kvro ~read =
     let write _ = err_read_only in

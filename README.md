@@ -224,15 +224,30 @@ To  fetch `https://github.com/docker/datakit`'s master branch:
 
 ### Github PRs
 
-There is a rudimentary support for interacting with Github PRs.
+There is a basic support for interacting with Github PRs.
 
     ~/mnt $ ls github.com/docker/datakit
     41  42
     ~/mnt $ cat github.com/docker/datakit/pr/41/status/default
     pending
     ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default
+    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/test
 
-This will toggle the status of the pull request on the Github interface.
+
+This first query the status of the pull request on the Github interface,
+then update the `default` status to `success`. Finally it create a
+new `test` status.
+
+To subscribe to the stream of new PRS:
+
+    ~/mnt $ cat github.com/docker/datakit/updates
+
+This is a blocking read, and will produce a new line on every pull request
+with the number of the PR, so you can do:
+
+    while read PR; do
+      echo pending > github.com/docker/datakit/pr/status/test
+    done < github.com/docker/datakit/pr/41/updates
 
 ### How do I...
 

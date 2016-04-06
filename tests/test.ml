@@ -406,7 +406,7 @@ let test_writes () =
   let read () = Lwt.return (Ok (Some (Cstruct.of_string !v))) in
   let write x = v := Cstruct.to_string x; Lwt.return (Ok ()) in
   let remove _ = failwith "delete" in
-  let file = Vfs.File.of_kv ~read ~write ~remove in
+  let file = Vfs.File.of_kv ~read ~write ~remove ~stat:(Vfs.File.stat_of ~read) in
   Lwt_main.run begin
     Vfs.File.open_ file >>*= fun h ->
     let check src off expect =
@@ -457,7 +457,7 @@ module RW_err1 = struct
 end
 
 let test_rw () =
-  let v = Cstruct.of_string in
+  let v x = Cstruct.of_string x, `Normal in
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
   let unit = (module Unit : Alcotest.TESTABLE with type t = unit) in

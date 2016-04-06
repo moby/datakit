@@ -5,7 +5,7 @@ open Fs9p_error.Infix
 module P = Protocol_9p
 
 let src = Logs.Src.create "fs9p" ~doc:"VFS to 9p"
-module Logs = (val Logs.src_log src: Logs.LOG)
+module Log = (val Logs.src_log src: Logs.LOG)
 
 let pp_fid =
   let str x = P.Types.Fid.sexp_of_t x |> Sexplib.Sexp.to_string in
@@ -71,9 +71,10 @@ module Op9p = struct
   let r = [`Read]
 
   let stat ~info inode =
-    let u =
+    let ext ?extension () =
+      (* Note: we always need an extension for the Unix protocol, or mortdeus will crash *)
       if info.P.Info.version <> P.Types.Version.unix then None
-      else Some (P.Types.Stat.make_extension ()) (* or mortdeus will crash *)
+      else Some (P.Types.Stat.make_extension ?extension ~n_uid:0l ~n_gid:0l ~n_muid:0l ())
     in
     begin match Inode.kind inode with
       | `Dir _ ->
@@ -81,15 +82,18 @@ module Op9p = struct
           P.Types.FileMode.make
             ~owner:rwx ~group:rwx ~other:rx ~is_directory:true ()
         in
-        ok (0L, dir)
+        ok (0L, dir, ext ())
       | `File f ->
         Vfs.File.stat f >>= map_error >>*= fun info ->
-        let file = match info.Vfs.perm with
-          | `Normal -> P.Types.FileMode.make ~owner:rw ~group:rw ~other:r ()
-          | `Link -> P.Types.FileMode.make ~is_symlink:true ~owner:rw ~group:rw ~other:r ()
-          | `Exec -> P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx () in
-        ok (info.Vfs.length, file)
-    end >>*= fun (length, mode) ->
+        let file, u = match info.Vfs.perm with
+          | `Normal -> P.Types.FileMode.make ~owner:rw ~group:rw ~other:r (), ext ()
+          | `Exec -> P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx (), ext ()
+          | `Link target ->
+              let u = ext ~extension:target () in
+              P.Types.FileMode.make ~is_symlink:true ~owner:rwx ~group:rwx ~other:rx (), u
+        in
+        ok (info.Vfs.length, file, u)
+    end >>*= fun (length, mode, u) ->
     let qid = Inode.qid inode in
     let name = Inode.basename inode in
     ok (P.Types.Stat.make ~qid ~mode ~length ~name ?u ())
@@ -329,7 +333,7 @@ module Make (Flow: V1_LWT.FLOW) = struct
 
   end
 
-  module Server = P.Server.Make(Logs)(Flow)(Dispatcher)
+  module Server = P.Server.Make(Log)(Flow)(Dispatcher)
 
   let accept ~root flow =
     Server.connect root flow () >>= function

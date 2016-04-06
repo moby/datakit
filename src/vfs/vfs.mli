@@ -60,7 +60,7 @@ val error: ('a, unit, string, 'b or_err) format4 -> 'a
 
 type metadata = {
   length: int64;
-  perm: [`Normal | `Exec | `Link]
+  perm: [`Normal | `Exec | `Link of string]
 }
 
 (** File operations. *)
@@ -130,14 +130,23 @@ module File: sig
   val of_kv:
     read:(unit -> Cstruct.t option or_err) ->
     write:(Cstruct.t -> unit or_err) ->
-    remove:(unit -> unit or_err) -> t
-  (** [of_kv ~read ~write ~remove read] interprets values from a k/v
+    stat:(unit -> metadata or_err) ->
+    remove:(unit -> unit or_err) ->
+    t
+  (** [of_kv ~read ~write ~remove ~stat] interprets values from a k/v
       store as files. Handles reading and writing regions of the
       file. *)
 
-  val of_kvro: read:(unit -> Cstruct.t option or_err) -> t
-  (** [of_kvro ~read] is similar to {!of_kv} but for read-only
+  val of_kvro:
+    read:(unit -> Cstruct.t option or_err) ->
+    stat:(unit -> metadata or_err) ->
+    t
+  (** [of_kvro] is similar to {!of_kv} but for read-only
       values. *)
+
+  val stat_of: read:(unit -> Cstruct.t option or_err) -> (unit -> metadata or_err)
+  (** [stat_of ~read] makes a [stat] function from [read].
+      The function reads the file to get the length, and reports the type as [`Normal]. *)
 
   (** {1 Streams} *)
 

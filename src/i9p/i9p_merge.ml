@@ -5,7 +5,7 @@ module PathSet = Set.Make(Irmin.Path.String_list)
 
 module type RW = sig
   type t
-  val update_force : t -> I9p_tree.path -> string -> Cstruct.t -> unit Lwt.t
+  val update_force : t -> I9p_tree.path -> string -> Cstruct.t * I9p_tree.perm -> unit Lwt.t
   val remove_force : t -> I9p_tree.path -> string -> unit Lwt.t
 end
 
@@ -16,7 +16,7 @@ module Make
   module Tree = I9p_tree.Make(Store)
 
   let as_file = function
-    | `File f -> Tree.File.content f >|= fun c -> Some c
+    | `File (f, _perm) -> Tree.File.content f >|= fun c -> Some c       (* XXX *)
     | `Directory _ | `None -> Lwt.return None
 
   let merge_cstruct = Irmin.Merge.default (module Tc.Cstruct)
@@ -26,7 +26,8 @@ module Make
     let conflicts = ref PathSet.empty in
     let note_conflict path leaf msg =
       conflicts := !conflicts |> PathSet.add (Irmin.Path.String_list.rcons path leaf);
-      RW.update_force result path leaf (Cstruct.of_string (Printf.sprintf "** Conflict **\n%s\n" msg)) in
+      let f = Cstruct.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
+      RW.update_force result path leaf (f, `Normal) in
     let repo = Store.repo ours in
     let empty = Tree.Dir.empty repo in
     let as_dir = function
@@ -65,7 +66,7 @@ module Make
               as_file hash >|= fun f ->
               `Ok (Some f) in
             merge_file ~old ours theirs >>= function
-            | `Ok (Some x) -> RW.update_force result path leaf x
+            | `Ok (Some x) -> RW.update_force result path leaf (x, `Normal)     (* XXX *)
             | `Ok None -> RW.remove_force result path leaf
             | `Conflict "default" -> note_conflict path leaf "Changed on both branches"
             | `Conflict x -> note_conflict path leaf x

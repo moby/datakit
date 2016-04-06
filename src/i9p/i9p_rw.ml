@@ -48,28 +48,28 @@ module Make (Tree : I9p_tree.S) = struct
     t.root <- new_root;
     Lwt.return (Ok ())
 
-  let err_not_a_directory (_ : Tree.File.t) =
+  let err_not_a_directory (_ : Tree.File.t * _) =
     Lwt.return (Error `Not_a_directory)
 
-  let replace_with_dir (_ : Tree.File.t) =
+  let replace_with_dir (_ : Tree.File.t * _) =
     Lwt.return (Ok ())
 
-  let update t path leaf value =
+  let update t path leaf (value, perm) =
     let repo = Tree.Dir.repo t.root in
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
     Tree.Dir.lookup dir leaf >>= function
     | `Directory _ -> Lwt.return (Error `Is_a_directory)
     | `File _ | `None ->
-    Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value)) >|= fun new_dir -> Ok new_dir
+    Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value, perm)) >|= fun new_dir -> Ok new_dir
 
   let remove t path leaf =
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
     Tree.Dir.without_child dir leaf >|= fun new_dir -> Ok new_dir
 
-  let update_force t path leaf value =
+  let update_force t path leaf (value, perm) =
     let repo = Tree.Dir.repo t.root in
     update_dir ~file_on_path:replace_with_dir t path (fun dir ->
-      Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value)) >|= fun new_dir -> Ok new_dir
+      Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value, perm)) >|= fun new_dir -> Ok new_dir
     ) >|= doesnt_fail
 
   let remove_force t path leaf =

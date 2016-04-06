@@ -2,7 +2,7 @@ module PathSet : Set.S with type elt = Irmin.Path.String_list.t
 
 module type RW = sig
   type t
-  val update_force : t -> I9p_tree.path -> string -> Cstruct.t -> unit Lwt.t
+  val update_force : t -> I9p_tree.path -> string -> Cstruct.t * I9p_tree.perm -> unit Lwt.t
   val remove_force : t -> I9p_tree.path -> string -> unit Lwt.t
 end
 

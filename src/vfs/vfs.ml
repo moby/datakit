@@ -7,7 +7,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 type metadata = {
   length: int64;
-  perm: [`Normal | `Exec | `Link]
+  perm: [`Normal | `Exec | `Link of string]
 }
 
 module Error = struct
@@ -269,11 +269,7 @@ module File = struct
       ]
     )
 
-  let of_kv_aux ~read ~write =
-    let stat () = read () >>*= function
-      | None          -> err_no_entry
-      | Some contents -> ok {length = Int64.of_int (Cstruct.len contents); perm = `Normal}
-    in
+  let of_kv_aux ~read ~write ~stat =
     let open_ () =
       let read ~offset ~count =
         read () >>*= function
@@ -320,14 +316,22 @@ module File = struct
 
   let rw_of_string init =
     let data = ref (Cstruct.of_string init) in
+    let stat () =
+      let length = Int64.of_int (Cstruct.len !data) in
+      Lwt.return (Ok {length; perm = `Normal}) in
     let read () = ok (Some !data) in
     let write v = data := v; ok () in
     let remove () = err_read_only in
-    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove in
+    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove ~stat in
     (file, fun () -> Cstruct.to_string !data)
 
   let create = create_aux ~debug:"create"
   let of_kv = of_kv_aux ~debug:"of_kv"
+
+  let stat_of ~read () =
+    read () >>*= function
+    | None -> err_no_entry
+    | Some data -> ok {length = Int64.of_int (Cstruct.len data); perm = `Normal}
 
 end
 

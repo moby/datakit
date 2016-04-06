@@ -45,17 +45,30 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let empty_file = Cstruct.create 0
 
+  let stat path root =
+    Tree.Dir.lookup_path root path >>= function
+    | `None         -> err_no_entry
+    | `Directory _  -> err_is_dir
+    | `File (f, (`Normal | `Exec as perm)) ->
+        Tree.File.size f >|= fun length ->
+        Ok {Vfs.length; perm}
+    | `File (f, `Link) ->
+        Tree.File.content f >>= fun target ->
+        Tree.File.size f >|= fun length ->
+        Ok {Vfs.length; perm = `Link (Cstruct.to_string target)}
+
   let irmin_ro_file ~get_root path =
     let read () =
       get_root () >>= fun root ->
       Tree.Dir.lookup_path root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
-      | `File f       ->
+      | `File (f, _perm) ->
           Tree.File.content f >|= fun content ->
           Ok (Some content)
     in
-    Vfs.File.of_kvro ~read
+    let stat () = get_root () >>= stat path in
+    Vfs.File.of_kvro ~read ~stat
 
   let irmin_rw_file ~remove_conflict ~view path =
     match Irmin.Path.String_list.rdecons path with
@@ -66,12 +79,12 @@ module Make (Store : I9p_tree.STORE) = struct
       Tree.Dir.lookup_path root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
-      | `File f       ->
+      | `File (f, _perm) ->
           Tree.File.content f >|= fun content ->
           Ok (Some content)
     in
     let write data =
-      RW.update view dir leaf data >>= function
+      RW.update view dir leaf (data, `Normal) >>= function      (* XXX *)
       | Error `Is_a_directory -> err_is_dir
       | Error `Not_a_directory -> err_not_dir
       | Ok () ->
@@ -84,7 +97,8 @@ module Make (Store : I9p_tree.STORE) = struct
       | Ok () ->
       remove_conflict path; Lwt.return (Ok ())
     in
-    Vfs.File.of_kv ~read ~write ~remove
+    let stat () = RW.root view |> stat path in
+    Vfs.File.of_kv ~read ~write ~stat ~remove
 
   let name_of_irmin_path ~root path =
     match Path.rdecons path with
@@ -193,7 +207,7 @@ module Make (Store : I9p_tree.STORE) = struct
         ok (extra_inodes @ List.map (get ~dir:path) items)
       in
       let mkfile name =
-        RW.update view path name empty_file >>= function
+        RW.update view path name (empty_file, `Normal) >>= function     (* XXX *)
         | Error `Not_a_directory -> err_not_dir
         | Error `Is_a_directory -> err_is_dir
         | Ok () ->
@@ -386,7 +400,7 @@ module Make (Store : I9p_tree.STORE) = struct
           conflicts := PathSet.union !conflicts merge_conflicts;
           let conflicts_file =
             let read () = ok (Some (format_conflicts !conflicts)) in
-            Vfs.File.of_kvro ~read:read
+            Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
           in
           contents :=
             common
@@ -467,7 +481,7 @@ module Make (Store : I9p_tree.STORE) = struct
     Tree.snapshot store >>= fun snapshot ->
     Tree.Dir.lookup_path snapshot path >>= function
     | `None -> Lwt.return "\n"
-    | `File f -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash
+    | `File (f, _perm) -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash (* XXX *)
     | `Directory dir ->
       Tree.Dir.hash dir >|= function
       | None   -> "\n"
@@ -744,7 +758,7 @@ module Make (Store : I9p_tree.STORE) = struct
           Store.History.pred hist head
       end >|= fun parents ->
       Ok (Some (Cstruct.of_string (string_of_parents parents))) in
-    Vfs.File.of_kvro ~read
+    Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
 
   let snapshot_dir store name =
     let dirs = [

@@ -90,7 +90,7 @@ module File: sig
   (** [create] is the file [t] such that FIXME. *)
 
   val stat: t -> metadata or_err
-  (** [size t] is [t]'s metadata. *)
+  (** [stat t] is [t]'s metadata. *)
 
   val size: t -> int64 or_err
   (** [size t] is [t]'s size. *)

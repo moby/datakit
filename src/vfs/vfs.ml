@@ -219,7 +219,9 @@ module File = struct
     create_aux ~debug:"command" ~size ~open_ ~remove ~truncate
 
   let status fn =
-    let size () = fn () >|= fun data -> (Ok (String.length data |> Int64.of_int)) in
+    let size () =
+      fn () >|= fun data -> (Ok (String.length data |> Int64.of_int))
+    in
     let open_ () =
       let data = fn () >|= fun result -> ref (Cstruct.of_string result) in
       let read count =

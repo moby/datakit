@@ -228,26 +228,39 @@ There is a basic support for interacting with Github PRs.
 
     ~/mnt $ ls github.com/docker/datakit
     41  42
-    ~/mnt $ cat github.com/docker/datakit/pr/41/status/default
+    ~/mnt $ cat github.com/docker/datakit/pr/41/status/default/state
     pending
-    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default
-    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/test
+    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default/state
 
 
 This first query the status of the pull request on the Github interface,
-then update the `default` status to `success`. Finally it create a
-new `test` status.
+then update the `default` status to `success`.
+
+To create a new status and set its description, url and status:
+
+    ~/mnt $ PR=github.com/docker/datakit/pr/41
+    ~/mnt $ mkdir $PR/status/test
+    ~/mnt $ echo "My status" > $PR/status/test/descr
+    ~/mnt $ echo "http://example.com" > $PR/status/test/url
+    ~/mnt $ echo success > $PR/status/test/state
 
 To subscribe to the stream of new PRS:
 
-    ~/mnt $ cat github.com/docker/datakit/updates
+    ~/mnt $ cat github.com/docker/datakit/pr/updates
 
 This is a blocking read, and will produce a new line on every pull request
 with the number of the PR, so you can do:
 
     while read PR; do
-      echo pending > github.com/docker/datakit/pr/status/test
-    done < github.com/docker/datakit/pr/41/updates
+      mkdir github.com/docker/datakit/pr/$PR/status/test
+    done < github.com/docker/datakit/pr/updates
+
+To subscribe to the stream of build status updates for a given PR:
+
+    ~mnt $ cat github.com/docker/datakit/pr/${PR}/status/updates
+
+This is a blocking read and will produce a new line on every build
+status updates for that PR.
 
 ### How do I...
 

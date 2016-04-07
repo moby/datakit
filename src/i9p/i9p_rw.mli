@@ -24,4 +24,11 @@ module Make (Tree : I9p_tree.S) : sig
   (** [remove_force t path leaf] ensures that [path/leaf] does not exist.
       This will delete the entire subtree if [path/leaf] is a directory.
       It does nothing if  [path/leaf] does not exist. *)
+
+  val rename : t -> I9p_tree.path -> old_name:string -> new_name:string ->
+    (unit, [`Is_a_directory | `Not_a_directory | `No_such_item]) result Lwt.t
+  (** [rename t path ~old_name ~new_name] ensures that [path/new_name] points to whatever
+      [path/old_name] previously did, and that [path/old_name] no longer exists (atomically).
+      It is an error if [path/old_name] does not exist or if [path/new_name] already exists
+      as a directory. *)
 end

@@ -50,8 +50,6 @@ module Make (Store : STORE) = struct
   type store = Store.t
   type repo = Store.Repo.t
 
-  module Graph = Irmin.Private.Node.Graph(Store.Private.Contents)(Store.Private.Node)
-
   module File = struct
     type hash = Store.Private.Contents.Key.t
 

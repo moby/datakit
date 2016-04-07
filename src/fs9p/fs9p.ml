@@ -84,9 +84,12 @@ module Op9p = struct
         in
         ok (0L, dir)
       | `File f ->
-        Vfs.File.size f >>= map_error >>*= fun length ->
-        let file = P.Types.FileMode.make ~owner:rw ~group:rw ~other:r () in
-        ok (length, file)
+        Vfs.File.stat f >>= map_error >>*= fun info ->
+        let file = match info.Vfs.perm with
+          | `Normal -> P.Types.FileMode.make ~owner:rw ~group:rw ~other:r ()
+          | `Link -> P.Types.FileMode.make ~is_symlink:true ~owner:rw ~group:rw ~other:r ()
+          | `Exec -> P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx () in
+        ok (info.Vfs.length, file)
     end >>*= fun (length, mode) ->
     let qid = Inode.qid inode in
     let name = Inode.basename inode in

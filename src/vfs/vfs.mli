@@ -58,6 +58,11 @@ val ok: 'a -> 'a or_err
 val error: ('a, unit, string, 'b or_err) format4 -> 'a
 (** [error fmt] is [Lwt.return (Error <fmt>)]. *)
 
+type metadata = {
+  length: int64;
+  perm: [`Normal | `Exec | `Link]
+}
+
 (** File operations. *)
 module File: sig
 
@@ -77,12 +82,15 @@ module File: sig
   (** [pp] is the pretty-printer for files. *)
 
   val create:
-    size:(unit -> int64 or_err) ->
+    stat:(unit -> metadata or_err) ->
     open_:(unit -> fd or_err) ->
     remove:(unit -> unit or_err) ->
     truncate:(int64 -> unit or_err) ->
     t
   (** [create] is the file [t] such that FIXME. *)
+
+  val stat: t -> metadata or_err
+  (** [size t] is [t]'s metadata. *)
 
   val size: t -> int64 or_err
   (** [size t] is [t]'s size. *)

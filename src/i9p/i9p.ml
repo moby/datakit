@@ -240,7 +240,18 @@ module Make (Store : I9p_tree.STORE) = struct
         conflicts := PathSet.filter (has_prefix ~prefix:path) !conflicts;
         Lwt.return (Ok ())
       in
-      let rename _ = failwith "TODO" in
+      let rename inode new_name =
+        (* TODO: Probably some races here.
+           What if inode was previously deleted?
+           What if there are two renames at once?  *)
+        let old_name = Vfs.Inode.basename inode in
+        RW.rename view path ~old_name ~new_name >>= function
+        | Error `Is_a_directory -> err_is_dir
+        | Error `No_such_item -> err_no_entry
+        | Error `Not_a_directory -> err_not_dir
+        | Ok () ->
+            Vfs.Inode.set_basename inode new_name;
+            ok () in
       Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename |>
       Vfs.Inode.dir name
     in

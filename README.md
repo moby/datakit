@@ -246,7 +246,7 @@ To create a new status and set its description, url and status:
 
 To subscribe to the stream of new PRS:
 
-    ~/mnt $ cat github.com/docker/datakit/updates
+    ~/mnt $ cat github.com/docker/datakit/pr/updates
 
 This is a blocking read, and will produce a new line on every pull request
 with the number of the PR, so you can do:
@@ -254,6 +254,13 @@ with the number of the PR, so you can do:
     while read PR; do
       mkdir github.com/docker/datakit/pr/$PR/status/test
     done < github.com/docker/datakit/pr/updates
+
+To subscribe to the stream of build status updates for a given PR:
+
+    ~mnt $ cat github.com/docker/datakit/pr/${PR}/status/updates
+
+This is a blocking read and will produce a new line on every build
+status updates for that PR.
 
 ### How do I...
 

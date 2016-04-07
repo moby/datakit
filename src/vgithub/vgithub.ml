@@ -83,9 +83,9 @@ module API = struct
     |> Stream.to_list
     |> run
 
-  let set_status { token; user; repo } ?description ~context pr status =
+  let set_status { token; user; repo } ?url ?description ~context pr status =
     let status = {
-      new_status_target_url = None;
+      new_status_target_url = url;
       new_status_description = description;
       new_status_state = status;
       new_status_context = Some context;
@@ -148,23 +148,53 @@ module API = struct
 end
 
 (* /github.com/${USER}/${REPO}/pr/${PR}/status/${CONTEXT} *)
-let pr_status_file t pr context state =
+let pr_status_dir t pr context state =
   Logs.debug (fun l ->
       l "status_file %s/%s %d %a"
         t.API.user t.API.repo pr.pull_number API.pp_status_state state);
+  let current_descr = ref None in
+  let current_url = ref None in
   let current_state = ref state in
   let init = API.string_of_status_state state ^ "\n" in
-  Vfs.File.command ~init (fun str ->
+  let set_status () =
+    let state = !current_state in
+    let description = !current_descr in
+    let url = !current_url in
+    API.set_status t ~context ?description ?url pr state;
+  in
+  let state = Vfs.File.command ~init (fun str ->
       match API.status_state_of_string str with
       | None   -> err_invalid_status str
       | Some s ->
         if s = !current_state then Vfs.ok (str ^ "\n")
         else (
           current_state := s;
-          API.set_status t ~context pr s;
+          set_status ();
           Vfs.ok (API.string_of_status_state s ^ "\n");
         )
-    )
+    ) in
+  let descr = Vfs.File.command ~init:"" (fun str ->
+      if Some str = !current_descr then Vfs.ok (str ^ "\n")
+      else (
+        current_descr := Some str;
+        set_status ();
+        Vfs.ok (str ^ "\n")
+      )
+    ) in
+  let url = Vfs.File.command ~init:"" (fun str ->
+      if Some str = !current_url then Vfs.ok (str ^ "\n")
+      else (
+        current_url := Some str;
+        set_status ();
+        Vfs.ok (str ^ "\n")
+      )
+    ) in
+  let dir = [
+    Vfs.Inode.file "state" state;
+    Vfs.Inode.file "descr" descr;
+    Vfs.Inode.file "url"   url;
+  ] in
+  Vfs.Dir.of_list (fun () -> dir)
 
 let context_of_status s = match s.status_context with
   | None   -> ["default"]
@@ -179,8 +209,8 @@ let pr_status_root t pr =
     let rec aux = function
       | []     -> assert false
       | [name] ->
-        let file = pr_status_file t pr context_str status.status_state in
-        Vfs.Inode.file name file
+        let dir = pr_status_dir t pr context_str status.status_state in
+        Vfs.Inode.dir name dir
       | name :: rest ->
         Vfs.Inode.dir name @@ Vfs.Dir.of_list (fun () -> [aux rest])
     in
@@ -207,11 +237,11 @@ let pr_status_root t pr =
     with Not_found ->
       Vfs.File.err_no_entry
   in
-  let mkfile name =
+  let mkdir name =
     API.set_status t ~context:name pr `Pending;
-    Vfs.ok @@ Vfs.Inode.file name @@ pr_status_file t pr name `Pending
+    Vfs.ok @@ Vfs.Inode.dir name @@ pr_status_dir t pr name `Pending
   in
-  let mkdir _ = Vfs.error "TODO" in
+  let mkfile _ = Vfs.error "TODO" in
   let remove _ = Vfs.error "TODO" in
   let rename _ _ = Vfs.error "TODO" in
   Vfs.Dir.create ~ls ~lookup ~mkfile ~mkdir ~remove ~rename

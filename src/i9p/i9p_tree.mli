@@ -81,11 +81,10 @@ module type S = sig
     val ls : t -> ([`File | `Directory] * step) list Lwt.t
     (** List the contents of a directory with the type of each item. *)
 
-    val of_hash : repo -> hash option -> t
-    (** [of_hash repo h] is the directory whose hash is [h] in
-        [repo]. *)
+    val of_hash : repo -> hash -> t
+    (** [of_hash repo h] is the directory whose hash is [h] in [repo]. *)
 
-    val hash : t -> hash option Lwt.t
+    val hash : t -> hash Lwt.t
     (** [hash dir] is [dir]'s hash. This writes [dir] to the repository if it's not
         yet stored. *)
 

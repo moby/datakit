@@ -40,8 +40,8 @@ module type S = sig
     val get : t -> path -> t option Lwt.t
     val map : t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
     val ls : t -> ([`File | `Directory] * step) list Lwt.t
-    val of_hash : repo -> hash option -> t
-    val hash : t -> hash option Lwt.t
+    val of_hash : repo -> hash -> t
+    val hash : t -> hash Lwt.t
     val repo : t -> repo
     val with_child : t -> step -> [`File of File.t * perm | `Directory of t] -> t Lwt.t
     val without_child : t -> step -> t Lwt.t
@@ -126,21 +126,19 @@ module Make (Store : STORE) = struct
       | Map_only m -> Lwt.return m
       | Hash (_, lazy m) -> m
 
-    let rec of_hash repo = function
-      | None -> empty repo
-      | Some hash ->
-          let map = lazy (
-            let node_t = Store.Private.Repo.node_t repo in
-            Store.Private.Node.read_exn node_t hash >|= fun node ->
-            Store.Private.Node.Val.alist node |> List.fold_left (fun acc (name, item) ->
-              acc |> String.Map.add name (
-                match item with
-                | `Contents (h, perm) -> `File (File.of_hash repo h, perm)
-                | `Node h -> `Directory (of_hash repo (Some h))
-              )
-            ) String.Map.empty
-          ) in
-          { repo; value = Hash (hash, map) }
+    let rec of_hash repo hash =
+      let map = lazy (
+        let node_t = Store.Private.Repo.node_t repo in
+        Store.Private.Node.read_exn node_t hash >|= fun node ->
+        Store.Private.Node.Val.alist node |> List.fold_left (fun acc (name, item) ->
+          acc |> String.Map.add name (
+            match item with
+            | `Contents (h, perm) -> `File (File.of_hash repo h, perm)
+            | `Node h -> `Directory (of_hash repo h)
+          )
+        ) String.Map.empty
+      ) in
+      { repo; value = Hash (hash, map) }
 
     let ty dir step =
       map dir >|= fun m ->
@@ -180,20 +178,24 @@ module Make (Store : STORE) = struct
 
     let rec hash t =
       match t.value with
-      | Hash (h, _) -> Lwt.return (Some h)
-      | Map_only m when String.Map.is_empty m -> Lwt.return None
+      | Hash (h, _) -> Lwt.return h
       | Map_only m ->
           String.Map.bindings m
           |> Lwt_list.fold_left_s (fun acc item ->
             match item with
             | name, `File (f, perm) -> File.hash f >|= fun h -> (name, `Contents (h, perm)) :: acc
-            | name, `Directory d -> hash d >|= function
-              | Some h -> (name, `Node h) :: acc
-              | None -> acc (* Ignore empty directories *)
+            | name, `Directory d ->
+                map d >>= fun map ->
+                if String.Map.is_empty map then (
+                  (* Ignore empty directories *)
+                  Lwt.return acc
+                ) else (
+                  hash d >|= fun h ->
+                  (name, `Node h) :: acc
+                )
           ) []
           >|= Store.Private.Node.Val.create
           >>= Store.Private.Node.add (Store.Private.Repo.node_t t.repo)
-          >|= fun hash -> Some hash
 
 (*
     let rec equal a b =
@@ -227,6 +229,8 @@ module Make (Store : STORE) = struct
 
   let snapshot store =
     let repo = Store.repo store in
-    Store.Private.read_node store [] >|= Dir.of_hash repo
+    Store.Private.read_node store [] >|= function
+    | None -> Dir.empty repo
+    | Some hash -> Dir.of_hash repo hash
 
 end

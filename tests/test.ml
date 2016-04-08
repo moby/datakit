@@ -153,6 +153,21 @@ let test_merge _repo conn =
   Alcotest.(check string) "Merge result" "from-master+pr" merged;
   Lwt.return ()
 
+(* Irmin.Git.Commit: a commit with an empty filesystem... this is not supported by Git! *)
+let test_merge_empty _repo conn =
+  (* Put "from-master" on master branch *)
+  Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
+  with_transaction conn ~branch:"master" "init" (fun t ->
+      create_file conn (t @ ["rw"]) "file" "from-master"
+    ) >>= fun () ->
+  read_file conn ["branch"; "master"; "head"] >>= fun head ->
+  (* Create a new branch, and merge from this *)
+  Client.mkdir conn ["branch"] "new" rwxr_xr_x >>*= fun () ->
+  with_transaction conn ~branch:"new" "init" (fun t ->
+      write_file conn (t @ ["merge"]) head
+    ) >>*= fun () ->
+  check_dir conn ["branch"; "new"; "ro"] "Final result" ["file"]
+
 let test_conflicts _repo conn =
   try_merge conn
     ~base:[
@@ -271,7 +286,7 @@ let test_watch repo conn =
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
   with_stream conn ["branch"; "master"; "watch"; "tree.live"] @@ fun top ->
   read_line_exn top >>= fun top_init ->
-  Alcotest.(check string) "Root tree hash initially empty" "" top_init;
+  Alcotest.(check string) "Root tree initially empty" "D-4b825dc642cb6eb9a060e54bf8d69288fbee4904" top_init;
   with_stream conn ["branch"; "master"; "watch"; "doc.node"; "tree.live"]
   @@ fun doc ->
   read_line_exn doc >>= fun doc_init ->
@@ -508,6 +523,7 @@ let test_set = [
   "Truncate"   , `Quick, run test_truncate;
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;
+  "Merge empty", `Quick, run test_merge_empty;
   "Conflicts"  , `Quick, run test_conflicts;
   "Stable inodes", `Quick, run test_stable_inodes;
   "RW"         , `Quick, test_rw;

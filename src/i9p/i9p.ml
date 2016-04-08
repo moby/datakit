@@ -297,7 +297,7 @@ module Make (Store : I9p_tree.STORE) = struct
   let make_commit root task ~parents =
     let repo = Tree.Dir.repo root in
     Tree.Dir.hash root >>= fun node ->
-    let commit = Store.Private.Commit.Val.create task ~parents ?node in
+    let commit = Store.Private.Commit.Val.create task ~parents ~node in
     Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
 
   let make_instance store ~remover _name =
@@ -483,9 +483,8 @@ module Make (Store : I9p_tree.STORE) = struct
     | `None -> Lwt.return "\n"
     | `File (f, _perm) -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash (* XXX *)
     | `Directory dir ->
-      Tree.Dir.hash dir >|= function
-      | None   -> "\n"
-      | Some h -> Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
+      Tree.Dir.hash dir >|= fun h ->
+      Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
 
   let watch_tree_stream store ~path ~init =
     let cond = Lwt_condition.create () in
@@ -710,8 +709,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let file h = `File (String.trim h |> Store.Private.Contents.Key.of_hum) in
     let dir h = `Dir (String.trim h |> Store.Private.Node.Key.of_hum) in
     try
-      if h = "" then Ok `None
-      else match String.span ~min:2 ~max:2 h with
+      match String.span ~min:2 ~max:2 h with
         | "F-", hash -> Ok (file hash)
         | "D-", hash -> Ok (dir hash)
         | _ -> Vfs.Error.no_entry
@@ -728,11 +726,8 @@ module Make (Store : I9p_tree.STORE) = struct
           | Some data -> Ok (Vfs.File.ro_of_string data |> Vfs.Inode.file name)
           | None      -> Vfs.Error.no_entry
         end
-      | `None ->
-        let root = Tree.Dir.of_hash repo None in
-        ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
       | `Dir hash ->
-        let root = Tree.Dir.of_hash repo (Some hash) in
+        let root = Tree.Dir.of_hash repo hash in
         ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
     in
     let cache = ref String.Map.empty in   (* Could use a weak map here *)

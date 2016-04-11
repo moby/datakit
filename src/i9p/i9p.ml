@@ -6,7 +6,7 @@ module PathSet = I9p_merge.PathSet
 
 (* FIXME: remove 9p from the module name! *)
 let src = Logs.Src.create "i9p" ~doc:"Irmin to VFS"
-module Logs = (val Logs.src_log src: Logs.LOG)
+module Log = (val Logs.src_log src: Logs.LOG)
 
 module type S = sig
   type repo
@@ -333,11 +333,11 @@ module Make (Store : I9p_tree.STORE) = struct
           in
           let store = store msg in
           let root = RW.root view in
-          make_commit root (Store.task store) ~parents >|= fun c -> Ok (c, msg)
+          make_commit root (Store.task store) ~parents >|= fun c -> Ok (c, msg, parents)
     in
     (* Commit transaction *)
     let merge () =
-      commit_of_view () >>*= fun (head, msg) ->
+      commit_of_view () >>*= fun (head, msg, _parents) ->
       Store.merge_head (store msg) head >|= fun x -> Ok x
     in
     (* Current state (will finish initialisation below) *)
@@ -377,18 +377,25 @@ module Make (Store : I9p_tree.STORE) = struct
           (* Grab current "rw" dir as "ours" *)
           commit_of_view () >>= function
           | Error e -> Vfs.error "Can't start merge: %s" e
-          | Ok (our_commit, _msg) ->
+          | Ok (our_commit, _msg, our_parents) ->
           Store.of_commit_id unit_task our_commit repo >>= fun ours ->
           let ours = ours () in
           let ours_ro = read_only ~name:"ours" ours in
           let theirs_ro = read_only ~name:"theirs" theirs in
-          begin Store.lcas_head ours ~n:1 their_commit >>= function
-            | `Max_depth_reached | `Too_many_lcas -> assert false
-            | `Ok [] -> Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
-            | `Ok (base::_) ->
-              Store.of_commit_id unit_task base repo >|= fun s ->
-              let s = s () in
-              (Some s, read_only ~name:"base" s)
+          begin match our_parents with
+          | [] ->
+              (* Optimisation: if our new commit has no parents then we know there
+                 can be no LCA, so avoid searching (which would be slow, since Irmin
+                 would have to explore the entire history to check). *)
+              Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
+          | _ ->
+              Store.lcas_head ours ~n:1 their_commit >>= function
+                | `Max_depth_reached | `Too_many_lcas -> assert false
+                | `Ok [] -> Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
+                | `Ok (base::_) ->
+                  Store.of_commit_id unit_task base repo >|= fun s ->
+                  let s = s () in
+                  (Some s, read_only ~name:"base" s)
           end >>= fun (base, base_ro) ->
           (* Add to parents *)
           let data = Cstruct.of_string (commit_id ^ "\n") in

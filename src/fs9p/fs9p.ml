@@ -20,7 +20,6 @@ let err_not_a_dir name = error "%S is not a directory" name
 let err_can't_set_length_of_dir = error "Can't set length of a directory"
 let err_can't_walk_from_file = error "Can't walk from a file"
 let err_can't_seek_dir  = error "Can't seek in a directory"
-let err_buffer_too_small = error "Buffer too small"
 let err_unknown_fid fid = error "Unknown fid %a" pp_fid fid
 let err_fid_in_use fid = error "Fid %a already in use" pp_fid fid
 let err_dot = error "'.' is not valid in 9p"
@@ -125,22 +124,22 @@ module Op9p = struct
     else (
       let buffer = Cstruct.create count in
       let rec aux buf = function
-        | []      -> ok (buf, [])   (* Done *)
-        | x :: xs ->
+        | []               -> ok (buf, [])   (* Done *)
+        | x :: xs as items ->
           stat ~info x >>*= fun x_info ->
           match P.Types.Stat.write x_info buf with
           | Ok buf  -> aux buf xs
-          | Error _ -> ok (buf, xs) (* No more room *)
+          | Error _ -> ok (buf, items) (* No more room *)
       in
       aux buffer (Inode.unread state) >>*= fun (unused, remaining) ->
       let data = Cstruct.sub buffer 0 (count - Cstruct.len unused) in
       let len = Cstruct.len data in
-      if len = 0 && remaining <> [] then err_buffer_too_small
-      else (
-        let offset = Int64.add (Inode.offset state) (Int64.of_int len) in
-        let new_state = { Inode.offset;  unread = remaining } in
-        ok (new_state, data)
-      )
+      (* Linux will abort if we return an error. Instead, just return 0 items. Linux
+         will free up space in its buffer and try again. *)
+      (* if len = 0 && remaining <> [] then err_buffer_too_small *)
+      let offset = Int64.add (Inode.offset state) (Int64.of_int len) in
+      let new_state = { Inode.offset;  unread = remaining } in
+      ok (new_state, data)
     )
 
   let create ~parent ~perm name =

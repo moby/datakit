@@ -80,7 +80,7 @@ Executable test
   CompiledObject: best
   Install:        false
   BuildDepends:   i9p, alcotest, fmt, fs9p, irmin-io, irmin.git, irmin.mem,
-                  mtime.os, fmt.tty, logs.fmt
+                  mtime.os, fmt.tty, logs.fmt, str
 
 Test test
   Run$:             flag(tests)

@@ -40,7 +40,6 @@ let test_transaction repo conn =
   Alcotest.(check (list string)) "Message" ["My commit"] msg;
 
   Lwt.return_unit
-;;
 
 let test_parents _repo conn =
   let check_parents ~branch expected =
@@ -299,7 +298,7 @@ let test_watch repo conn =
     (Lwt.state next_make = Lwt.Sleep);
   Lwt.return_unit
 
-let test_rename repo conn =
+let test_rename_branch repo conn =
   Store.of_branch_id Irmin.Task.none "old" repo >>= fun old ->
   let old = old () in
   Store.update old ["key"] "value" >>= fun () ->
@@ -322,6 +321,34 @@ let test_rename repo conn =
   Store.Private.Ref.mem refs "new" >>= fun new_exists ->
   Alcotest.(check bool) "New gone" false new_exists;
   Lwt.return_unit
+
+let test_rename_file _repo conn =
+  make_branch conn "master" >>= fun () ->
+  with_transaction conn ~branch:"master" "rename" (fun t ->
+    create_file conn (t @ ["rw"]) "old" "data" >>= fun () ->
+    Client.with_fid conn (fun newfid ->
+      Client.walk_from_root conn newfid (t @ ["rw"; "old"]) >>*= fun _ ->
+      Client.LowLevel.update conn ~name:"new" newfid >>*= fun () ->
+      check_dir conn (t @ ["rw"]) "New files" ["new"] >>= fun () ->
+      (* Check rename detects errors
+         Note: we currently allow overwriting an empty directory *)
+      Client.mkdir conn (t @ ["rw"]) "dir" rwxr_xr_x >>*= fun () ->
+      create_file conn (t @ ["rw"; "dir"]) "precious" "data" >>= fun () ->
+      Client.LowLevel.update conn ~name:"dir" newfid >>= function
+      | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
+      | Error (`Msg e) ->
+      Alcotest.(check string) "Rename over dir" "Is a directory" e;
+      (* Rename when source has been deleted. Ideally, we should also check it hasn't
+         been replaced by something with the same name. *)
+      Client.remove conn (t @ ["rw"; "new"]) >>*= fun () ->
+      Client.LowLevel.update conn ~name:"reborn" newfid >>= function
+      | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
+      | Error (`Msg e) ->
+      Alcotest.(check string) "Source deleted" "No such file or directory" e;
+      Lwt.return (Ok ())
+    )
+  ) >>*= fun () ->
+  check_dir conn ["branch"; "master"; "ro"] "New files" ["dir"]
 
 let test_truncate _repo conn =
   let path = ["branch"; "master"; "transactions"; "init"; "rw"; "file"] in
@@ -476,7 +503,8 @@ let test_set = [
   "Watch"      , `Quick, run test_watch;
   "Range"      , `Quick, run test_bad_range;
   "Writes"     , `Quick, test_writes;
-  "Rename"     , `Quick, run test_rename;
+  "Rename branch", `Quick, run test_rename_branch;
+  "Rename file", `Quick, run test_rename_file;
   "Truncate"   , `Quick, run test_truncate;
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;

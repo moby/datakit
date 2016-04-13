@@ -115,6 +115,7 @@ let rx = [`Read; `Execute]
 let r = [`Read]
 let rwxr_xr_x = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ()
 let rw_r__r__ = Protocol_9p.Types.FileMode.make ~owner:rw ~group:r ~other:r ()
+let symlink = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
 
 let check_dir conn path msg expected =
   Client.readdir conn path >>*= fun items ->
@@ -171,14 +172,21 @@ let read_line_exn stream =
   | `Line l -> l
   | `Eof    -> Alcotest.fail "Unexpected end-of-stream"
 
-let create_file conn path leaf contents =
+let create_file ?(perm=rw_r__r__) conn path leaf contents =
   with_file conn path (fun fid ->
-      Client.LowLevel.create
-        conn fid leaf rw_r__r__ Protocol_9p.Types.OpenMode.write_only
-      >>*= fun _open ->
-      Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
-      >>*= fun _resp ->
-      Lwt.return_unit
+      if perm.Protocol_9p.Types.FileMode.is_symlink then (
+        Client.LowLevel.create ~extension:contents
+          conn fid leaf perm Protocol_9p.Types.OpenMode.write_only
+        >>*= fun _resp ->
+        Lwt.return_unit
+      ) else (
+        Client.LowLevel.create
+          conn fid leaf perm Protocol_9p.Types.OpenMode.write_only
+        >>*= fun _open ->
+        Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
+        >>*= fun _resp ->
+        Lwt.return_unit
+      )
     )
 
 let write_file conn ?(truncate=false) path contents =
@@ -194,14 +202,45 @@ let write_file conn ?(truncate=false) path contents =
       Lwt.return (Ok ())
     )
 
+let chmod conn path perm =
+  let mode =
+    match perm with
+    | `Normal -> rw_r__r__
+    | `Executable -> rwxr_xr_x
+    | `Link -> Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
+  in
+  with_file conn path (fun fid ->
+      Client.LowLevel.update ~mode conn fid >>*= Lwt.return
+  )
+
 let read_file conn path =
   Client.stat conn path >>*= fun info ->
   let len = info.Protocol_9p.Types.Stat.length |> Int64.to_int32 in
   Client.read conn path 0L len >>*= fun datav ->
   Cstruct.concat datav |> Cstruct.to_string |> Lwt.return
 
+let read_perm conn path =
+  Client.stat conn path >>*= fun info ->
+  let mode = info.Protocol_9p.Types.Stat.mode in
+  if mode.Protocol_9p.Types.FileMode.is_symlink then Lwt.return `Link
+  else if List.mem `Execute mode.Protocol_9p.Types.FileMode.owner then Lwt.return `Executable
+  else Lwt.return `Normal
+
 let check_file conn path msg expected =
   read_file conn path >|= Alcotest.(check string) msg expected
+
+module Perm = struct
+  type t = [`Normal | `Executable | `Link]
+  let pp fmt = function
+    | `Normal -> Fmt.string fmt "Normal"
+    | `Executable -> Fmt.string fmt "Executable"
+    | `Link -> Fmt.string fmt "Link"
+  let equal = (=)
+end
+let perm = (module Perm : Alcotest.TESTABLE with type t = Perm.t)
+
+let check_perm conn path msg expected =
+  read_perm conn path >|= Alcotest.(check perm) msg expected
 
 let echo conn str path =
   Client.with_fid conn (fun newfid ->

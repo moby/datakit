@@ -84,7 +84,7 @@ module Make (Store : I9p_tree.STORE) = struct
           Ok (Some content)
     in
     let write data =
-      RW.update view dir leaf (data, `Normal) >>= function      (* XXX *)
+      RW.update view dir leaf (data, `Keep) >>= function
       | Error `Is_a_directory -> err_is_dir
       | Error `Not_a_directory -> err_not_dir
       | Ok () ->
@@ -98,7 +98,14 @@ module Make (Store : I9p_tree.STORE) = struct
       remove_conflict path; Lwt.return (Ok ())
     in
     let stat () = RW.root view |> stat path in
-    Vfs.File.of_kv ~read ~write ~stat ~remove
+    let chmod perm =
+      RW.chmod view dir leaf perm >>= function
+      | Error `Is_a_directory -> err_is_dir
+      | Error `Not_a_directory -> err_not_dir
+      | Error `No_such_item -> err_no_entry
+      | Ok () -> Lwt.return (Ok ())
+    in
+    Vfs.File.of_kv ~read ~write ~stat ~remove ~chmod
 
   let name_of_irmin_path ~root path =
     match Path.rdecons path with
@@ -206,8 +213,11 @@ module Make (Store : I9p_tree.STORE) = struct
         let extra_inodes = String.Map.bindings !extra_dirs |> List.map snd in
         ok (extra_inodes @ List.map (get ~dir:path) items)
       in
-      let mkfile name =
-        RW.update view path name (empty_file, `Normal) >>= function     (* XXX *)
+      let mkfile name perm =
+        begin match perm with
+        | `Normal | `Exec as perm -> RW.update view path name (empty_file, perm)
+        | `Link target -> RW.update view path name (Cstruct.of_string target, `Link)
+        end >>= function
         | Error `Not_a_directory -> err_not_dir
         | Error `Is_a_directory -> err_is_dir
         | Ok () ->
@@ -613,7 +623,7 @@ module Make (Store : I9p_tree.STORE) = struct
                 ok inode
               )))
     in
-    let mkfile _ = Vfs.Dir.err_dir_only in
+    let mkfile _ _ = Vfs.Dir.err_dir_only in
     let rename _ _ = Vfs.Dir.err_read_only in   (* TODO *)
     let remove _ = Vfs.Dir.err_read_only in
     Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename

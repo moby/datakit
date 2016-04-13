@@ -5,9 +5,11 @@ open Lwt.Infix
 let src = Logs.Src.create "vfs" ~doc:"Datakit VFS"
 module Log = (val Logs.src_log src : Logs.LOG)
 
+type perm = [`Normal | `Exec | `Link of string]
+
 type metadata = {
   length: int64;
-  perm: [`Normal | `Exec | `Link of string]
+  perm: perm;
 }
 
 module Error = struct
@@ -62,6 +64,7 @@ module File = struct
   let err_bad_write_offset off = error "Bad write offset %d" off
   let err_stream_seek = error "Attempt to seek in stream"
   let err_extend_cmd_file = error "Can't extend command file"
+  let err_normal_only = error "Can't chmod special file"
 
   let ok x = Lwt.return (Ok x)
 
@@ -163,21 +166,23 @@ module File = struct
     open_: unit -> fd or_err;
     remove: unit -> unit or_err;
     truncate: int64 -> unit or_err;
+    chmod: perm -> unit or_err;
   }
 
   let pp ppf t = Fmt.pf ppf "Vfs.File.%s" t.debug
 
-  let create_aux ~debug ~stat ~open_ ~remove ~truncate =
-    { debug; stat; open_; remove; truncate }
+  let create_aux ~debug ~stat ~open_ ~remove ~truncate ~chmod =
+    { debug; stat; open_; remove; truncate; chmod }
 
   let stat t = t.stat ()
   let size t = stat t >>*= fun info -> Lwt.return (Ok info.length)
   let open_ t = t.open_ ()
   let remove t = t.remove ()
   let truncate t = t.truncate
+  let chmod t = t.chmod
 
   let read_only_aux =
-    create_aux ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only)
+    create_aux ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only) ~chmod:(fun _ -> err_read_only)
 
   let ro_of_cstruct data =
     let length = Cstruct.len data |> Int64.of_int in
@@ -192,6 +197,10 @@ module File = struct
     let stat () = ok {length = 0L; perm = `Normal} in
     let open_ () = stream () >>= fun s -> Fd.of_stream s in
     read_only_aux ~debug:"of_stream" ~stat ~open_
+
+  let normal_only = function
+    | `Normal -> ok ()
+    | `Exec | `Link _ -> err_normal_only
 
   let command ?(init="") handler =
     (* Value currently being returned to user. Note that this is
@@ -222,7 +231,7 @@ module File = struct
       | 0L -> ok () (* For `echo cmd > file` *)
       | _  -> err_extend_cmd_file
     in
-    create_aux ~debug:"command" ~stat ~open_ ~remove ~truncate
+    create_aux ~debug:"command" ~stat ~open_ ~remove ~truncate ~chmod:normal_only
 
   let status fn =
     let stat () =
@@ -269,7 +278,7 @@ module File = struct
       ]
     )
 
-  let of_kv_aux ~read ~write ~stat =
+  let of_kv_aux ~read ~write ~stat ~remove ~chmod =
     let open_ () =
       let read ~offset ~count =
         read () >>*= function
@@ -307,12 +316,13 @@ module File = struct
           write (Cstruct.append old padding)
         )
       ) in
-    create_aux ~stat ~open_ ~truncate
+    create_aux ~stat ~open_ ~truncate ~remove ~chmod
 
   let of_kvro ~read =
     let write _ = err_read_only in
     let remove () = err_read_only in
-    of_kv_aux ~debug:"of_kvro" ~read ~write ~remove
+    let chmod _ = err_read_only in
+    of_kv_aux ~debug:"of_kvro" ~read ~write ~remove ~chmod
 
   let rw_of_string init =
     let data = ref (Cstruct.of_string init) in
@@ -322,7 +332,7 @@ module File = struct
     let read () = ok (Some !data) in
     let write v = data := v; ok () in
     let remove () = err_read_only in
-    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove ~stat in
+    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove ~stat ~chmod:normal_only in
     (file, fun () -> Cstruct.to_string !data)
 
   let create = create_aux ~debug:"create"
@@ -345,7 +355,7 @@ module Dir = struct
   type t = {
     debug: string;
     ls: unit -> inode list or_err;
-    mkfile: string -> inode or_err;
+    mkfile: string -> perm -> inode or_err;
     lookup: string -> inode or_err;
     mkdir: string -> inode or_err;
     remove: unit -> unit or_err;
@@ -364,7 +374,7 @@ module Dir = struct
   let pp_inode ppf t = Fmt.pf ppf "%s:%a[%Ld]" t.basename pp_kind t.kind t.ino
 
   let ls t = t.ls ()
-  let mkfile t = t.mkfile
+  let mkfile t ?(perm=`Normal) name = t.mkfile name perm
   let lookup t = t.lookup
   let mkdir t = t.mkdir
   let remove t = t.remove ()
@@ -374,7 +384,7 @@ module Dir = struct
     { debug; ls; mkfile; mkdir; remove; lookup; rename }
 
   let read_only_aux =
-    let mkfile _ = err_read_only in
+    let mkfile _ _ = err_read_only in
     let mkdir _ = err_read_only in
     let rename _ _ = err_read_only in
     create_aux ~mkfile ~mkdir ~rename
@@ -403,7 +413,7 @@ module Dir = struct
     read_only_aux ~debug:"of_map_ref" ~ls ~lookup ~remove
 
   let dir_only =
-    let mkfile _ = err_dir_only in
+    let mkfile _ _ = err_dir_only in
     create_aux ~debug:"dir_only" ~mkfile
 
   let of_list = of_list_aux ~debug:"of_list"

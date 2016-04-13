@@ -77,4 +77,16 @@ module Make (Tree : I9p_tree.S) = struct
       Tree.Dir.without_child dir leaf >|= fun new_dir -> Ok new_dir
     ) >|= doesnt_fail
 
+  let rename t path ~old_name ~new_name =
+    update_dir ~file_on_path:err_not_a_directory t path (fun dir ->
+      Tree.Dir.lookup dir old_name >>= function
+      | `None -> Lwt.return (Error `No_such_item)
+      | `File _ | `Directory _ as value ->
+      Tree.Dir.lookup dir new_name >>= function
+      | `Directory _ -> Lwt.return (Error `Is_a_directory)
+      | `None | `File _ ->
+      Tree.Dir.without_child dir old_name >>= fun dir' ->
+      Tree.Dir.with_child dir' new_name value >|= fun new_dir ->
+      Ok new_dir
+    )
 end

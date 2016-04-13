@@ -14,13 +14,18 @@ module Make
     (RW : RW)
 = struct
   module Tree = I9p_tree.Make(Store)
+  module Metadata = Store.Private.Node.Val.Metadata
+  module ContentsMeta = Tc.Pair(Tc.Cstruct)(Metadata)
 
   let as_file = function
-    | `File (f, _perm) -> Tree.File.content f >|= fun c -> Some c       (* XXX *)
+    | `File (f, perm) -> Tree.File.content f >|= fun c -> Some (c, perm)
     | `Directory _ | `None -> Lwt.return None
 
   let merge_cstruct = Irmin.Merge.default (module Tc.Cstruct)
-  let merge_file = Irmin.Merge.option (module Tc.Cstruct) merge_cstruct
+
+  let merge_file =
+    Irmin.Merge.option (module ContentsMeta)
+      (Irmin.Merge.pair (module Tc.Cstruct) (module Metadata) merge_cstruct Metadata.merge)
 
   let merge ~ours ~theirs ~base result =
     let conflicts = ref PathSet.empty in
@@ -66,7 +71,7 @@ module Make
               as_file hash >|= fun f ->
               `Ok (Some f) in
             merge_file ~old ours theirs >>= function
-            | `Ok (Some x) -> RW.update_force result path leaf (x, `Normal)     (* XXX *)
+            | `Ok (Some x) -> RW.update_force result path leaf x
             | `Ok None -> RW.remove_force result path leaf
             | `Conflict "default" -> note_conflict path leaf "Changed on both branches"
             | `Conflict x -> note_conflict path leaf x

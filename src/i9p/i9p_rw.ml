@@ -57,10 +57,31 @@ module Make (Tree : I9p_tree.S) = struct
   let update t path leaf (value, perm) =
     let repo = Tree.Dir.repo t.root in
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
+    let update ~old_perm =
+      let perm = match perm with
+        | #I9p_tree.perm as p -> p
+        | `Keep -> old_perm in
+      Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value, perm)) >|= fun new_dir -> Ok new_dir
+    in
     Tree.Dir.lookup dir leaf >>= function
     | `Directory _ -> Lwt.return (Error `Is_a_directory)
-    | `File _ | `None ->
-    Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value, perm)) >|= fun new_dir -> Ok new_dir
+    | `File (_, old_perm) -> update ~old_perm
+    | `None -> update ~old_perm:`Normal
+
+  let chmod t path leaf perm =
+    let repo = Tree.Dir.repo t.root in
+    update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
+    Tree.Dir.lookup dir leaf >>= function
+    | `None -> Lwt.return (Error `No_such_item)
+    | `Directory _ when perm = `Exec -> Lwt.return (Ok dir)
+    | `Directory _ -> Lwt.return (Error `Is_a_directory)
+    | `File (f, _old_perm) ->
+        let file =
+          match perm with
+          | `Normal | `Exec as perm -> `File (f, perm)
+          | `Link target -> `File (Tree.File.of_data repo (Cstruct.of_string target), `Link)
+        in
+        Tree.Dir.with_child dir leaf file >|= fun new_dir -> Ok new_dir
 
   let remove t path leaf =
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->

@@ -7,7 +7,7 @@ module Make (Tree : I9p_tree.S) : sig
 
   val root : t -> Tree.Dir.t
 
-  val update : t -> I9p_tree.path -> string -> Cstruct.t * I9p_tree.perm ->
+  val update : t -> I9p_tree.path -> string -> Cstruct.t * [I9p_tree.perm | `Keep] ->
     (unit, [`Is_a_directory | `Not_a_directory]) result Lwt.t
   (** [update t dir leaf data] makes [dir/leaf] be the file [data].
       Missing directories may be created. If [dir/leaf] is a file then it is overwritten.
@@ -16,6 +16,12 @@ module Make (Tree : I9p_tree.S) : sig
   val remove : t -> I9p_tree.path -> string -> (unit, [`Not_a_directory]) result Lwt.t
   (** [remove t dir leaf] ensures that [dir/leaf] does not exist.
       Fails if any component of [dir] is not a directory. *)
+
+  val chmod : t -> I9p_tree.path -> string -> Vfs.perm -> 
+    (unit, [`Is_a_directory | `Not_a_directory | `No_such_item]) result Lwt.t
+  (** [chmod t dir leaf perm] changes the type of [dir/leaf] to [perm].
+      Fails if any component of [dir] is not a directory, or
+      [perm] is incompatible with the type of the item being changed. *)
 
   val update_force : t -> I9p_tree.path -> string -> Cstruct.t * I9p_tree.perm ->
     unit Lwt.t

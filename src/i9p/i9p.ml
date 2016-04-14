@@ -6,7 +6,7 @@ module PathSet = I9p_merge.PathSet
 
 (* FIXME: remove 9p from the module name! *)
 let src = Logs.Src.create "i9p" ~doc:"Irmin to VFS"
-module Logs = (val Logs.src_log src: Logs.LOG)
+module Log = (val Logs.src_log src: Logs.LOG)
 
 module type S = sig
   type repo
@@ -45,17 +45,30 @@ module Make (Store : I9p_tree.STORE) = struct
 
   let empty_file = Cstruct.create 0
 
+  let stat path root =
+    Tree.Dir.lookup_path root path >>= function
+    | `None         -> err_no_entry
+    | `Directory _  -> err_is_dir
+    | `File (f, (`Normal | `Exec as perm)) ->
+        Tree.File.size f >|= fun length ->
+        Ok {Vfs.length; perm}
+    | `File (f, `Link) ->
+        Tree.File.content f >>= fun target ->
+        Tree.File.size f >|= fun length ->
+        Ok {Vfs.length; perm = `Link (Cstruct.to_string target)}
+
   let irmin_ro_file ~get_root path =
     let read () =
       get_root () >>= fun root ->
       Tree.Dir.lookup_path root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
-      | `File f       ->
+      | `File (f, _perm) ->
           Tree.File.content f >|= fun content ->
           Ok (Some content)
     in
-    Vfs.File.of_kvro ~read
+    let stat () = get_root () >>= stat path in
+    Vfs.File.of_kvro ~read ~stat
 
   let irmin_rw_file ~remove_conflict ~view path =
     match Irmin.Path.String_list.rdecons path with
@@ -66,12 +79,12 @@ module Make (Store : I9p_tree.STORE) = struct
       Tree.Dir.lookup_path root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
-      | `File f       ->
+      | `File (f, _perm) ->
           Tree.File.content f >|= fun content ->
           Ok (Some content)
     in
     let write data =
-      RW.update view dir leaf data >>= function
+      RW.update view dir leaf (data, `Keep) >>= function
       | Error `Is_a_directory -> err_is_dir
       | Error `Not_a_directory -> err_not_dir
       | Ok () ->
@@ -84,7 +97,15 @@ module Make (Store : I9p_tree.STORE) = struct
       | Ok () ->
       remove_conflict path; Lwt.return (Ok ())
     in
-    Vfs.File.of_kv ~read ~write ~remove
+    let stat () = RW.root view |> stat path in
+    let chmod perm =
+      RW.chmod view dir leaf perm >>= function
+      | Error `Is_a_directory -> err_is_dir
+      | Error `Not_a_directory -> err_not_dir
+      | Error `No_such_item -> err_no_entry
+      | Ok () -> Lwt.return (Ok ())
+    in
+    Vfs.File.of_kv ~read ~write ~stat ~remove ~chmod
 
   let name_of_irmin_path ~root path =
     match Path.rdecons path with
@@ -192,8 +213,11 @@ module Make (Store : I9p_tree.STORE) = struct
         let extra_inodes = String.Map.bindings !extra_dirs |> List.map snd in
         ok (extra_inodes @ List.map (get ~dir:path) items)
       in
-      let mkfile name =
-        RW.update view path name empty_file >>= function
+      let mkfile name perm =
+        begin match perm with
+        | `Normal | `Exec as perm -> RW.update view path name (empty_file, perm)
+        | `Link target -> RW.update view path name (Cstruct.of_string target, `Link)
+        end >>= function
         | Error `Not_a_directory -> err_not_dir
         | Error `Is_a_directory -> err_is_dir
         | Ok () ->
@@ -283,7 +307,7 @@ module Make (Store : I9p_tree.STORE) = struct
   let make_commit root task ~parents =
     let repo = Tree.Dir.repo root in
     Tree.Dir.hash root >>= fun node ->
-    let commit = Store.Private.Commit.Val.create task ~parents ?node in
+    let commit = Store.Private.Commit.Val.create task ~parents ~node in
     Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
 
   let make_instance store ~remover _name =
@@ -319,11 +343,11 @@ module Make (Store : I9p_tree.STORE) = struct
           in
           let store = store msg in
           let root = RW.root view in
-          make_commit root (Store.task store) ~parents >|= fun c -> Ok (c, msg)
+          make_commit root (Store.task store) ~parents >|= fun c -> Ok (c, msg, parents)
     in
     (* Commit transaction *)
     let merge () =
-      commit_of_view () >>*= fun (head, msg) ->
+      commit_of_view () >>*= fun (head, msg, _parents) ->
       Store.merge_head (store msg) head >|= fun x -> Ok x
     in
     (* Current state (will finish initialisation below) *)
@@ -363,18 +387,25 @@ module Make (Store : I9p_tree.STORE) = struct
           (* Grab current "rw" dir as "ours" *)
           commit_of_view () >>= function
           | Error e -> Vfs.error "Can't start merge: %s" e
-          | Ok (our_commit, _msg) ->
+          | Ok (our_commit, _msg, our_parents) ->
           Store.of_commit_id unit_task our_commit repo >>= fun ours ->
           let ours = ours () in
           let ours_ro = read_only ~name:"ours" ours in
           let theirs_ro = read_only ~name:"theirs" theirs in
-          begin Store.lcas_head ours ~n:1 their_commit >>= function
-            | `Max_depth_reached | `Too_many_lcas -> assert false
-            | `Ok [] -> Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
-            | `Ok (base::_) ->
-              Store.of_commit_id unit_task base repo >|= fun s ->
-              let s = s () in
-              (Some s, read_only ~name:"base" s)
+          begin match our_parents with
+          | [] ->
+              (* Optimisation: if our new commit has no parents then we know there
+                 can be no LCA, so avoid searching (which would be slow, since Irmin
+                 would have to explore the entire history to check). *)
+              Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
+          | _ ->
+              Store.lcas_head ours ~n:1 their_commit >>= function
+                | `Max_depth_reached | `Too_many_lcas -> assert false
+                | `Ok [] -> Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
+                | `Ok (base::_) ->
+                  Store.of_commit_id unit_task base repo >|= fun s ->
+                  let s = s () in
+                  (Some s, read_only ~name:"base" s)
           end >>= fun (base, base_ro) ->
           (* Add to parents *)
           let data = Cstruct.of_string (commit_id ^ "\n") in
@@ -386,7 +417,7 @@ module Make (Store : I9p_tree.STORE) = struct
           conflicts := PathSet.union !conflicts merge_conflicts;
           let conflicts_file =
             let read () = ok (Some (format_conflicts !conflicts)) in
-            Vfs.File.of_kvro ~read:read
+            Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
           in
           contents :=
             common
@@ -467,11 +498,10 @@ module Make (Store : I9p_tree.STORE) = struct
     Tree.snapshot store >>= fun snapshot ->
     Tree.Dir.lookup_path snapshot path >>= function
     | `None -> Lwt.return "\n"
-    | `File f -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash
+    | `File (f, _perm) -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash (* XXX *)
     | `Directory dir ->
-      Tree.Dir.hash dir >|= function
-      | None   -> "\n"
-      | Some h -> Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
+      Tree.Dir.hash dir >|= fun h ->
+      Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
 
   let watch_tree_stream store ~path ~init =
     let cond = Lwt_condition.create () in
@@ -593,7 +623,7 @@ module Make (Store : I9p_tree.STORE) = struct
                 ok inode
               )))
     in
-    let mkfile _ = Vfs.Dir.err_dir_only in
+    let mkfile _ _ = Vfs.Dir.err_dir_only in
     let rename _ _ = Vfs.Dir.err_read_only in   (* TODO *)
     let remove _ = Vfs.Dir.err_read_only in
     Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename
@@ -696,8 +726,7 @@ module Make (Store : I9p_tree.STORE) = struct
     let file h = `File (String.trim h |> Store.Private.Contents.Key.of_hum) in
     let dir h = `Dir (String.trim h |> Store.Private.Node.Key.of_hum) in
     try
-      if h = "" then Ok `None
-      else match String.span ~min:2 ~max:2 h with
+      match String.span ~min:2 ~max:2 h with
         | "F-", hash -> Ok (file hash)
         | "D-", hash -> Ok (dir hash)
         | _ -> Vfs.Error.no_entry
@@ -714,11 +743,8 @@ module Make (Store : I9p_tree.STORE) = struct
           | Some data -> Ok (Vfs.File.ro_of_string data |> Vfs.Inode.file name)
           | None      -> Vfs.Error.no_entry
         end
-      | `None ->
-        let root = Tree.Dir.of_hash repo None in
-        ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
       | `Dir hash ->
-        let root = Tree.Dir.of_hash repo (Some hash) in
+        let root = Tree.Dir.of_hash repo hash in
         ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
     in
     let cache = ref String.Map.empty in   (* Could use a weak map here *)
@@ -744,7 +770,7 @@ module Make (Store : I9p_tree.STORE) = struct
           Store.History.pred hist head
       end >|= fun parents ->
       Ok (Some (Cstruct.of_string (string_of_parents parents))) in
-    Vfs.File.of_kvro ~read
+    Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
 
   let snapshot_dir store name =
     let dirs = [

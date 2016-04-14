@@ -5,6 +5,7 @@ open Lwt.Infix
 
 type step = string
 type path = string list
+type perm = [ `Normal | `Exec | `Link ]
 
 module Path = Irmin.Path.String_list
 
@@ -14,6 +15,7 @@ module type STORE = Irmin.S
    and type branch_id = string
    and module Key = Irmin.Path.String_list
    and type Private.Node.Val.step = string
+   and type Private.Node.Val.Metadata.t = perm
 
 module type S = sig
   type repo
@@ -26,21 +28,22 @@ module type S = sig
     val content : t -> Cstruct.t Lwt.t
     val equal : t -> t -> bool
     val pp_hash : Format.formatter -> hash -> unit
+    val size : t -> int64 Lwt.t
   end
   module Dir : sig
     type t
     type hash
     val empty : repo -> t
     val ty : t -> step -> [`File | `Directory | `None] Lwt.t
-    val lookup : t -> step -> [`File of File.t | `Directory of t | `None ] Lwt.t
-    val lookup_path : t -> path -> [`File of File.t | `Directory of t | `None ] Lwt.t
+    val lookup : t -> step -> [`File of File.t * perm | `Directory of t | `None ] Lwt.t
+    val lookup_path : t -> path -> [`File of File.t * perm | `Directory of t | `None ] Lwt.t
     val get : t -> path -> t option Lwt.t
-    val map : t -> [`File of File.t | `Directory of t] String.Map.t Lwt.t
+    val map : t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
     val ls : t -> ([`File | `Directory] * step) list Lwt.t
-    val of_hash : repo -> hash option -> t
-    val hash : t -> hash option Lwt.t
+    val of_hash : repo -> hash -> t
+    val hash : t -> hash Lwt.t
     val repo : t -> repo
-    val with_child : t -> step -> [`File of File.t | `Directory of t] -> t Lwt.t
+    val with_child : t -> step -> [`File of File.t * perm | `Directory of t] -> t Lwt.t
     val without_child : t -> step -> t Lwt.t
   end
   val snapshot : store -> Dir.t Lwt.t
@@ -56,7 +59,7 @@ module Make (Store : STORE) = struct
     (* For now, a value is either in memory or on disk. In future, we may want to support both at once for caching. *)
     type value =
       | Blob of Cstruct.t
-      | Hash of Store.Private.Node.Val.contents
+      | Hash of Store.Private.Contents.key
 
     type t = {
       repo : Store.Repo.t;
@@ -93,6 +96,11 @@ module Make (Store : STORE) = struct
           Store.Private.Contents.read_exn contents_t h >|= fun data ->
           Cstruct.of_string data
 
+    let size f =
+      (* TODO: provide a more efficient API in Irmin to get sizes *)
+      content f >|= fun data ->
+      Int64.of_int (Cstruct.len data)
+
     let pp_hash fmt hash =
       Fmt.string fmt (Store.Private.Contents.Key.to_hum hash)
   end
@@ -100,7 +108,7 @@ module Make (Store : STORE) = struct
   module Dir = struct
     type hash = Store.Private.Node.Key.t
 
-    type map = [`File of File.t | `Directory of t] String.Map.t
+    type map = [`File of File.t * perm | `Directory of t] String.Map.t
 
     and value =
       | Hash of hash * map Lwt.t Lazy.t
@@ -118,21 +126,19 @@ module Make (Store : STORE) = struct
       | Map_only m -> Lwt.return m
       | Hash (_, lazy m) -> m
 
-    let rec of_hash repo = function
-      | None -> empty repo
-      | Some hash ->
-          let map = lazy (
-            let node_t = Store.Private.Repo.node_t repo in
-            Store.Private.Node.read_exn node_t hash >|= fun node ->
-            Store.Private.Node.Val.alist node |> List.fold_left (fun acc (name, item) ->
-              acc |> String.Map.add name (
-                match item with
-                | `Contents h -> `File (File.of_hash repo h) 
-                | `Node h -> `Directory (of_hash repo (Some h))
-              )
-            ) String.Map.empty
-          ) in
-          { repo; value = Hash (hash, map) }
+    let rec of_hash repo hash =
+      let map = lazy (
+        let node_t = Store.Private.Repo.node_t repo in
+        Store.Private.Node.read_exn node_t hash >|= fun node ->
+        Store.Private.Node.Val.alist node |> List.fold_left (fun acc (name, item) ->
+          acc |> String.Map.add name (
+            match item with
+            | `Contents (h, perm) -> `File (File.of_hash repo h, perm)
+            | `Node h -> `Directory (of_hash repo h)
+          )
+        ) String.Map.empty
+      ) in
+      { repo; value = Hash (hash, map) }
 
     let ty dir step =
       map dir >|= fun m ->
@@ -172,20 +178,24 @@ module Make (Store : STORE) = struct
 
     let rec hash t =
       match t.value with
-      | Hash (h, _) -> Lwt.return (Some h)
-      | Map_only m when String.Map.is_empty m -> Lwt.return None
+      | Hash (h, _) -> Lwt.return h
       | Map_only m ->
           String.Map.bindings m
           |> Lwt_list.fold_left_s (fun acc item ->
             match item with
-            | name, `File f -> File.hash f >|= fun h -> (name, `Contents h) :: acc
-            | name, `Directory d -> hash d >|= function
-              | Some h -> (name, `Node h) :: acc
-              | None -> acc (* Ignore empty directories *)
+            | name, `File (f, perm) -> File.hash f >|= fun h -> (name, `Contents (h, perm)) :: acc
+            | name, `Directory d ->
+                map d >>= fun map ->
+                if String.Map.is_empty map then (
+                  (* Ignore empty directories *)
+                  Lwt.return acc
+                ) else (
+                  hash d >|= fun h ->
+                  (name, `Node h) :: acc
+                )
           ) []
           >|= Store.Private.Node.Val.create
           >>= Store.Private.Node.add (Store.Private.Repo.node_t t.repo)
-          >|= fun hash -> Some hash
 
 (*
     let rec equal a b =
@@ -219,6 +229,8 @@ module Make (Store : STORE) = struct
 
   let snapshot store =
     let repo = Store.repo store in
-    Store.Private.read_node store [] >|= Dir.of_hash repo
+    Store.Private.read_node store [] >|= function
+    | None -> Dir.empty repo
+    | Some hash -> Dir.of_hash repo hash
 
 end

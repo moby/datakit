@@ -9,6 +9,7 @@ open Astring
 
 type step = string
 type path = string list
+type perm = [ `Normal | `Exec | `Link ]
 
 module type STORE = Irmin.S
   with type key = string list
@@ -16,6 +17,7 @@ module type STORE = Irmin.S
    and type branch_id = string
    and module Key = Irmin.Path.String_list
    and type Private.Node.Val.step = string
+   and type Private.Node.Val.Metadata.t = perm
 
 module type S = sig
 
@@ -46,6 +48,8 @@ module type S = sig
     (** Quick equality check (compares hashes). *)
 
     val pp_hash : Format.formatter -> hash -> unit
+
+    val size : t -> int64 Lwt.t
   end
 
   module Dir : sig
@@ -62,33 +66,32 @@ module type S = sig
     val ty : t -> step -> [`File | `Directory | `None] Lwt.t
     (** Check the type of a path. *)
 
-    val lookup : t -> step -> [`File of File.t | `Directory of t | `None ] Lwt.t
+    val lookup : t -> step -> [`File of File.t * perm | `Directory of t | `None ] Lwt.t
     (** Look up an immediate child by name. *)
 
-    val lookup_path : t -> path -> [`File of File.t | `Directory of t | `None ] Lwt.t
+    val lookup_path : t -> path -> [`File of File.t * perm | `Directory of t | `None ] Lwt.t
     (** Look up an item by path. *)
 
     val get : t -> path -> t option Lwt.t
     (** Look up a sub-directory node. *)
 
-    val map : t -> [`File of File.t | `Directory of t] String.Map.t Lwt.t
+    val map : t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
     (** The contents of the directory. *)
 
     val ls : t -> ([`File | `Directory] * step) list Lwt.t
     (** List the contents of a directory with the type of each item. *)
 
-    val of_hash : repo -> hash option -> t
-    (** [of_hash repo h] is the directory whose hash is [h] in
-        [repo]. *)
+    val of_hash : repo -> hash -> t
+    (** [of_hash repo h] is the directory whose hash is [h] in [repo]. *)
 
-    val hash : t -> hash option Lwt.t
+    val hash : t -> hash Lwt.t
     (** [hash dir] is [dir]'s hash. This writes [dir] to the repository if it's not
         yet stored. *)
 
     val repo : t -> repo
     (** [repo dir] is the repository in which [dir] lives. *)
 
-    val with_child : t -> step -> [`File of File.t | `Directory of t] -> t Lwt.t
+    val with_child : t -> step -> [`File of File.t * perm | `Directory of t] -> t Lwt.t
     (** [with_child dir name child] is a copy of [dir] except that [name] links to [child]. *)
 
     val without_child : t -> step -> t Lwt.t

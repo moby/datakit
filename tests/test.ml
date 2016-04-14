@@ -153,6 +153,65 @@ let test_merge _repo conn =
   Alcotest.(check string) "Merge result" "from-master+pr" merged;
   Lwt.return ()
 
+let test_merge_metadata _repo conn =
+  (* Put "from-master" on master branch *)
+  Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
+  with_transaction conn ~branch:"master" "init" (fun t ->
+      create_file conn (t @ ["rw"]) "a" "from-master" ~perm:rwxr_xr_x >>= fun () ->
+      check_perm conn (t @ ["rw"; "a"]) "Create a" `Executable >>= fun () ->
+      create_file conn (t @ ["rw"]) "b" "from-master" ~perm:symlink >>= fun () ->
+      create_file conn (t @ ["rw"]) "c" "from-master" ~perm:rwxr_xr_x >>= fun () ->
+      (* Base: exec, link, exec *)
+      Lwt.return ()
+    ) >>= fun () ->
+  (* Fork and make some changes on pr branch *)
+  Client.mkdir conn ["branch"] "pr" rwxr_xr_x >>*= fun () ->
+  head conn "master" >>= fun merge_a ->
+  with_transaction conn ~branch:"pr" "mod" (fun t ->
+      write_file conn (t @ ["merge"]) merge_a >>*= fun () ->
+      check_perm conn (t @ ["rw"; "a"]) "pr/rw/a" `Executable >>= fun () ->
+      chmod conn (t @ ["rw"; "b"]) `Executable >>= fun () ->
+      Client.remove conn (t @ ["rw"; "c"]) >>*= fun () ->
+      create_file conn (t @ ["rw"]) "c" ~perm:symlink "foo" >>= fun () ->
+      Lwt.return ()
+    ) >>= fun () ->
+  head conn "pr" >>= fun merge_b ->
+  (* Merge pr into master *)
+  with_transaction conn ~branch:"master" "merge" (fun t ->
+      chmod conn (t @ ["rw"; "c"]) `Normal >>= fun () -> 
+      (* Begin the merge *)
+      write_file conn (t @ ["merge"]) merge_b >>*= fun () ->
+      (* Ours: exec, link, normal *)
+      check_perm conn (t @ ["ours"; "a"]) "ours/a" `Executable >>= fun () ->
+      check_perm conn (t @ ["ours"; "b"]) "ours/b" `Link >>= fun () ->
+      (* Theirs: exec, exec, link *)
+      check_perm conn (t @ ["theirs"; "b"]) "theirs/b" `Executable >>= fun () ->
+      (* RW: exec, exec, conflict(normal) *)
+      check_perm conn (t @ ["rw"; "b"]) "rw/b" `Executable >>= fun () ->
+      check_perm conn (t @ ["rw"; "c"]) "rw/c" `Normal >>= fun () ->
+      check_file conn (t @ ["rw"; "c"]) "Conflict" "** Conflict **\nChanged on both branches\n" >>= fun () ->
+      write_file conn (t @ ["rw"; "c"]) "Resolved" >>*= fun () ->
+      chmod conn (t @ ["rw"; "c"]) `Executable >>= fun () -> 
+      Lwt.return ()
+    ) >>= fun () ->
+  check_perm conn ["branch"; "master"; "ro"; "c"] "ro/c" `Executable >>= fun () ->
+  Lwt.return ()
+
+(* Irmin.Git.Commit: a commit with an empty filesystem... this is not supported by Git! *)
+let test_merge_empty _repo conn =
+  (* Put "from-master" on master branch *)
+  Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
+  with_transaction conn ~branch:"master" "init" (fun t ->
+      create_file conn (t @ ["rw"]) "file" "from-master"
+    ) >>= fun () ->
+  read_file conn ["branch"; "master"; "head"] >>= fun head ->
+  (* Create a new branch, and merge from this *)
+  Client.mkdir conn ["branch"] "new" rwxr_xr_x >>*= fun () ->
+  with_transaction conn ~branch:"new" "init" (fun t ->
+      write_file conn (t @ ["merge"]) head
+    ) >>*= fun () ->
+  check_dir conn ["branch"; "new"; "ro"] "Final result" ["file"]
+
 let test_conflicts _repo conn =
   try_merge conn
     ~base:[
@@ -271,7 +330,7 @@ let test_watch repo conn =
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
   with_stream conn ["branch"; "master"; "watch"; "tree.live"] @@ fun top ->
   read_line_exn top >>= fun top_init ->
-  Alcotest.(check string) "Root tree hash initially empty" "" top_init;
+  Alcotest.(check string) "Root tree initially empty" "D-4b825dc642cb6eb9a060e54bf8d69288fbee4904" top_init;
   with_stream conn ["branch"; "master"; "watch"; "doc.node"; "tree.live"]
   @@ fun doc ->
   read_line_exn doc >>= fun doc_init ->
@@ -406,7 +465,8 @@ let test_writes () =
   let read () = Lwt.return (Ok (Some (Cstruct.of_string !v))) in
   let write x = v := Cstruct.to_string x; Lwt.return (Ok ()) in
   let remove _ = failwith "delete" in
-  let file = Vfs.File.of_kv ~read ~write ~remove in
+  let chmod _ = failwith "chmod" in
+  let file = Vfs.File.of_kv ~read ~write ~remove ~stat:(Vfs.File.stat_of ~read) ~chmod in
   Lwt_main.run begin
     Vfs.File.open_ file >>*= fun h ->
     let check src off expect =
@@ -457,7 +517,7 @@ module RW_err1 = struct
 end
 
 let test_rw () =
-  let v = Cstruct.of_string in
+  let v x = Cstruct.of_string x, `Normal in
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
   let unit = (module Unit : Alcotest.TESTABLE with type t = unit) in
@@ -508,6 +568,8 @@ let test_set = [
   "Truncate"   , `Quick, run test_truncate;
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;
+  "Merge_metadata", `Quick, run test_merge_metadata;
+  "Merge empty", `Quick, run test_merge_empty;
   "Conflicts"  , `Quick, run test_conflicts;
   "Stable inodes", `Quick, run test_stable_inodes;
   "RW"         , `Quick, test_rw;

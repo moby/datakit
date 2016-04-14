@@ -1,6 +1,7 @@
 #!/bin/bash -eux
 while read HASH; do
   echo Testing $HASH...
+  docker pull ocaml/opam:alpine
   # Create branch for the result
   RESULT_BRANCH="/db/branch/ci-of-$HASH"
   mkdir "$RESULT_BRANCH" || echo Branch already exists

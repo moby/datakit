@@ -5,7 +5,7 @@ open Fs9p_error.Infix
 module P = Protocol_9p
 
 let src = Logs.Src.create "fs9p" ~doc:"VFS to 9p"
-module Logs = (val Logs.src_log src: Logs.LOG)
+module Log = (val Logs.src_log src: Logs.LOG)
 
 let pp_fid =
   let str x = P.Types.Fid.sexp_of_t x |> Sexplib.Sexp.to_string in
@@ -29,7 +29,7 @@ let err_create_open = error "Can't create in an opened fid"
 let err_write_not_open = error "Can't write to unopened fid"
 let err_write_dir = error "Can't write to directories"
 let err_rename_root = error "Can't rename /"
-let err_rename_truncate = error "Can't rename and truncate at the same time"
+let err_multiple_updates = error "Can't rename/truncate/chmod at the same time"
 
 let max_chunk_size = Int32.of_int (100 * 1024)
 
@@ -71,9 +71,10 @@ module Op9p = struct
   let r = [`Read]
 
   let stat ~info inode =
-    let u =
+    let ext ?extension () =
+      (* Note: we always need an extension for the Unix protocol, or mortdeus will crash *)
       if info.P.Info.version <> P.Types.Version.unix then None
-      else Some (P.Types.Stat.make_extension ()) (* or mortdeus will crash *)
+      else Some (P.Types.Stat.make_extension ?extension ~n_uid:0l ~n_gid:0l ~n_muid:0l ())
     in
     begin match Inode.kind inode with
       | `Dir _ ->
@@ -81,15 +82,18 @@ module Op9p = struct
           P.Types.FileMode.make
             ~owner:rwx ~group:rwx ~other:rx ~is_directory:true ()
         in
-        ok (0L, dir)
+        ok (0L, dir, ext ())
       | `File f ->
         Vfs.File.stat f >>= map_error >>*= fun info ->
-        let file = match info.Vfs.perm with
-          | `Normal -> P.Types.FileMode.make ~owner:rw ~group:rw ~other:r ()
-          | `Link -> P.Types.FileMode.make ~is_symlink:true ~owner:rw ~group:rw ~other:r ()
-          | `Exec -> P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx () in
-        ok (info.Vfs.length, file)
-    end >>*= fun (length, mode) ->
+        let file, u = match info.Vfs.perm with
+          | `Normal -> P.Types.FileMode.make ~owner:rw ~group:rw ~other:r (), ext ()
+          | `Exec -> P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx (), ext ()
+          | `Link target ->
+              let u = ext ~extension:target () in
+              P.Types.FileMode.make ~is_symlink:true ~owner:rwx ~group:rwx ~other:rx (), u
+        in
+        ok (info.Vfs.length, file, u)
+    end >>*= fun (length, mode, u) ->
     let qid = Inode.qid inode in
     let name = Inode.basename inode in
     ok (P.Types.Stat.make ~qid ~mode ~length ~name ?u ())
@@ -108,6 +112,24 @@ module Op9p = struct
     | `Dir _ when length = 0L -> ok ()
     | `Dir _  -> err_can't_set_length_of_dir
     | `File f -> Vfs.File.truncate f length >>= map_error
+
+  let mode_of_9p m ext =
+    if m.P.Types.FileMode.is_directory then Ok `Dir
+    else if m.P.Types.FileMode.is_symlink then (
+      match ext with
+      | Some target -> Ok (`Link target)
+      | None -> Fs9p_error.error "Missing target for symlink!"
+    )
+    else if List.mem `Execute m.P.Types.FileMode.owner then Ok `Exec
+    else Ok `Normal
+
+  let chmod inode mode extension =
+    Lwt.return (mode_of_9p mode extension) >>*= fun perm ->
+    begin match Inode.kind inode, perm with
+    | `Dir _, `Dir -> Lwt.return Vfs.Error.perm >>= map_error
+    | `File f, (#Vfs.perm as perm) -> Vfs.File.chmod f perm >>= map_error
+    | _ -> error "Incorrect is_directory flag for chmod"
+    end
 
   let read inode =
     match Inode.kind inode with
@@ -142,14 +164,13 @@ module Op9p = struct
       ok (new_state, data)
     )
 
-  let create ~parent ~perm name =
+  let create ~parent ~perm ~extension name =
     match Inode.kind parent with
     | `Dir d ->
-      let inode =
-        if perm.P.Types.FileMode.is_directory then Vfs.Dir.mkdir d name
-        else Vfs.Dir.mkfile d name
-      in
-      inode >>= map_error >>*= fun inode ->
+      begin Lwt.return (mode_of_9p perm extension) >>*= function
+      | `Dir -> Vfs.Dir.mkdir d name >>= map_error
+      | #Vfs.perm as perm -> Vfs.Dir.mkfile d ~perm name >>= map_error
+      end >>*= fun inode ->
       read inode >>*= fun open_file ->
       ok (inode, open_file)
     | `File _ -> err_not_a_dir (Inode.basename parent)
@@ -276,11 +297,11 @@ module Make (Flow: V1_LWT.FLOW) = struct
         fd.state <- state;
         ok { P.Response.Open.qid = Inode.qid fd.inode; iounit = 0l }
 
-    let create connection ~cancel:_ { P.Request.Create.fid; perm; name; _ } =
+    let create connection ~cancel:_ { P.Request.Create.fid; perm; name; extension; _ } =
       lookup connection fid >>*= fun fd ->
       if fd.state <> `Ready then err_create_open
       else (
-        Op9p.create ~parent:fd.inode ~perm name >>*= fun (inode, open_file) ->
+        Op9p.create ~parent:fd.inode ~perm ~extension name >>*= fun (inode, open_file) ->
         let fd =
           { inode; parents = fd.inode :: fd.parents; state = open_file }
         in
@@ -308,28 +329,33 @@ module Make (Flow: V1_LWT.FLOW) = struct
       | []   -> err_rename_root
       | p::_ -> Op9p.rename p fd.inode name
 
+    let get_ext = function
+      | None -> None
+      | Some ext -> Some ext.P.Types.Stat.extension
+
     let wstat connection ~cancel:_ { P.Request.Wstat.fid; stat } =
       lookup connection fid >>*= fun fd ->
-      let { P.Types.Stat.name; length; mtime; gid; mode; _ } = stat in
+      let { P.Types.Stat.name; length; mtime; gid; mode; u; _ } = stat in
       (* It's illegal to set [ty], [dev], [qid], [atime], [uid],
          [muid] and [u], but checking if we're setting to the current
          value is tedious, so ignore: *)
       ignore mtime;                               (* Linux needs to set mtime *)
       ignore gid;                          (* We don't care about permissions *)
-      ignore mode;                          (* TODO: reject changing dir bit? *)
       let name = if name = "" then None else Some name in
       let length = if P.Types.Int64.is_any length then None else Some length in
-      match name, length with
-      | Some n, None   -> rename fd n
-      | None  , Some l -> Op9p.truncate fd.inode l
-      | None  , None   -> ok ()
-      | Some _, Some _ ->
+      let mode = if P.Types.FileMode.is_any mode then None else Some mode in
+      match name, length, mode with
+      | Some n, None, None   -> rename fd n
+      | None  , Some l, None -> Op9p.truncate fd.inode l
+      | None  , None, Some m -> Op9p.chmod fd.inode m (get_ext u)
+      | None  , None, None   -> ok ()
+      | _ ->
         (* Hard to support atomically, and unlikely to be useful. *)
-        err_rename_truncate
+        err_multiple_updates
 
   end
 
-  module Server = P.Server.Make(Logs)(Flow)(Dispatcher)
+  module Server = P.Server.Make(Log)(Flow)(Dispatcher)
 
   let accept ~root flow =
     Server.connect root flow () >>= function

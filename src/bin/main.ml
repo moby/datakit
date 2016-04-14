@@ -4,7 +4,6 @@ open Result
 module Server = Fs9p.Make(Flow_lwt_unix)
 
 let src = Logs.Src.create "Datakit" ~doc:"Datakit 9p server"
-module Dolog = Log
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let error fmt = Printf.ksprintf (fun s ->
@@ -37,7 +36,7 @@ end
 
 module In_memory_store = struct
   open Irmin
-  module Store = Irmin_mem.Make(Contents.String)(Ref.String)(Hash.SHA1)
+  module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)(Contents.String)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = I9p.Make(Store)
   let connect () =
@@ -158,15 +157,6 @@ let reporter () =
 
 let setup_log style_renderer level =
   Fmt_tty.setup_std_outputs ?style_renderer ();
-  let dolog_level = match level with
-    | Some Logs.Debug   -> Dolog.DEBUG
-    | Some Logs.Info    -> Dolog.INFO
-    | Some Logs.Warning -> Dolog.WARN
-    | Some Logs.Error   -> Dolog.ERROR
-    | Some Logs.App     -> Dolog.INFO
-    | None              -> Dolog.INFO
-  in
-  Dolog.set_log_level dolog_level;
   Logs.set_level level;
   Logs.set_reporter (reporter ());
   ()

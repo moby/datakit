@@ -58,9 +58,11 @@ val ok: 'a -> 'a or_err
 val error: ('a, unit, string, 'b or_err) format4 -> 'a
 (** [error fmt] is [Lwt.return (Error <fmt>)]. *)
 
+type perm = [`Normal | `Exec | `Link of string]
+
 type metadata = {
   length: int64;
-  perm: [`Normal | `Exec | `Link]
+  perm: perm;
 }
 
 (** File operations. *)
@@ -86,6 +88,7 @@ module File: sig
     open_:(unit -> fd or_err) ->
     remove:(unit -> unit or_err) ->
     truncate:(int64 -> unit or_err) ->
+    chmod:(perm -> unit or_err) ->
     t
   (** [create] is the file [t] such that FIXME. *)
 
@@ -105,6 +108,9 @@ module File: sig
   (** [truncate t len] sets the length of [t] to [len].  If the new
        length is shorter, the file is truncated.  If longer, it is
        padded with zeroes. *)
+
+  val chmod: t -> perm -> unit or_err
+  (** [chmod t mode] changes the mode of [t]. *)
 
   (** {1 Basic constructors} *)
 
@@ -130,14 +136,24 @@ module File: sig
   val of_kv:
     read:(unit -> Cstruct.t option or_err) ->
     write:(Cstruct.t -> unit or_err) ->
-    remove:(unit -> unit or_err) -> t
-  (** [of_kv ~read ~write ~remove read] interprets values from a k/v
+    stat:(unit -> metadata or_err) ->
+    remove:(unit -> unit or_err) ->
+    chmod:(perm -> unit or_err) ->
+    t
+  (** [of_kv ~read ~write ~remove ~stat] interprets values from a k/v
       store as files. Handles reading and writing regions of the
       file. *)
 
-  val of_kvro: read:(unit -> Cstruct.t option or_err) -> t
-  (** [of_kvro ~read] is similar to {!of_kv} but for read-only
+  val of_kvro:
+    read:(unit -> Cstruct.t option or_err) ->
+    stat:(unit -> metadata or_err) ->
+    t
+  (** [of_kvro] is similar to {!of_kv} but for read-only
       values. *)
+
+  val stat_of: read:(unit -> Cstruct.t option or_err) -> (unit -> metadata or_err)
+  (** [stat_of ~read] makes a [stat] function from [read].
+      The function reads the file to get the length, and reports the type as [`Normal]. *)
 
   (** {1 Streams} *)
 
@@ -180,7 +196,7 @@ module rec Dir: sig
   val ls: t -> Inode.t list or_err
   (** The [ls] commands. *)
 
-  val mkfile: t -> string -> Inode.t or_err
+  val mkfile: t -> ?perm:perm -> string -> Inode.t or_err
   (** The [mkfile] command. *)
 
   val lookup: t -> string -> Inode.t or_err
@@ -228,7 +244,7 @@ module rec Dir: sig
   (** [creae] is a generic directory. *)
   val create:
     ls:(unit -> Inode.t list or_err) ->
-    mkfile:(string -> Inode.t or_err) ->
+    mkfile:(string -> perm -> Inode.t or_err) ->
     lookup:(string -> Inode.t or_err) ->
     mkdir:(string -> Inode.t or_err) ->
     remove:(unit -> unit or_err) ->

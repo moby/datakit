@@ -1,0 +1,24 @@
+general:
+  artifacts:
+    - Datakit.app
+machine:
+  xcode:
+    version: "7.3"
+  environment:
+    OPAMYES: "1"
+dependencies:
+  cache_directories:
+    - ~/.opam
+  override:
+  - brew install ocaml opam
+  - opam init -n
+  - opam pin add github --dev
+  - opam pin add protocol-9p --dev
+  - opam pin add irmin --dev
+  - opam pin add git --dev
+test:
+  override:
+  - opam config exec -- make clean
+  - opam config exec -- make
+  - opam config exec -- make test
+  - opam config exec -- make bundler

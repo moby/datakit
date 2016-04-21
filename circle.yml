@@ -1,24 +1,16 @@
-general:
-  artifacts:
-    - Datakit.app
 machine:
   xcode:
     version: "7.3"
   environment:
     OPAMYES: "1"
+    PINS: "github protocol-9p irmin git"
+    TRAVIS_OS_NAME: "osx"
 dependencies:
   cache_directories:
     - ~/.opam
   override:
-  - brew install ocaml opam
-  - opam init -n
-  - opam pin add github --dev
-  - opam pin add protocol-9p --dev
-  - opam pin add irmin --dev
-  - opam pin add git --dev
+  - brew install ocaml opam wget
+  - wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-opam.sh
 test:
   override:
-  - opam config exec -- make clean
-  - opam config exec -- make
-  - opam config exec -- make test
-  - opam config exec -- make bundler
+  - bash -ex .travis-opam.sh

@@ -4,7 +4,7 @@ let err_no_head =  Vfs.error "error: no head to fetch"
 let err_fetch_error = Vfs.error "error: cannot fetch %s"
 let err_no_url = Vfs.error "error: remote url is not defined"
 
-module Make (Store : I9p_tree.STORE) = struct
+module Make (Store : Ivfs_tree.STORE) = struct
 
   module Sync = Irmin.Sync(Store)
 

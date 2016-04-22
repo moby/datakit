@@ -1,4 +1,4 @@
-module Make (Store : I9p_tree.STORE): sig
+module Make (Store : Ivfs_tree.STORE): sig
 
   val create: ?init:(string * string) list ->
     string Irmin.Task.f -> Store.Repo.t -> Vfs.Dir.t

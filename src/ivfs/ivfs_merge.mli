@@ -2,11 +2,11 @@ module PathSet : Set.S with type elt = Irmin.Path.String_list.t
 
 module type RW = sig
   type t
-  val update_force : t -> I9p_tree.path -> string -> Cstruct.t * I9p_tree.perm -> unit Lwt.t
-  val remove_force : t -> I9p_tree.path -> string -> unit Lwt.t
+  val update_force : t -> Ivfs_tree.path -> string -> Cstruct.t * Ivfs_tree.perm -> unit Lwt.t
+  val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
 end
 
-module Make (Store : I9p_tree.STORE) (RW : RW) : sig
+module Make (Store : Ivfs_tree.STORE) (RW : RW) : sig
   val merge :
     ours:Store.t ->
     theirs:Store.t ->

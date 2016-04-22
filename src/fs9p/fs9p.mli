@@ -1,4 +1,4 @@
-(** Filesystem server. *)
+(** Expose a VFS directory over 9p. *)
 
 (** The server signature. *)
 module type S = sig

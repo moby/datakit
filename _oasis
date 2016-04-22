@@ -16,6 +16,7 @@ Flag github
 Library datakit
   Path:            src/
   Findlibname:     datakit
+  Modules:         Datakit
 
 Library vfs
   Path:            src/vfs/
@@ -89,7 +90,8 @@ Executable test
   Build$:         flag(tests)
   CompiledObject: best
   Install:        false
-  BuildDepends:   i9p, alcotest, fmt, fs9p, irmin-io, irmin.git, irmin.mem,
+  BuildDepends:   datakit.i9p, datakit.irmin-io, datakit.i9p, datakit.fs9p,
+                  alcotest, fmt, irmin.git, irmin.mem,
                   mtime.os, fmt.tty, logs.fmt, str
 
 Test test

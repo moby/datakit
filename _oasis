@@ -1,5 +1,5 @@
 OASISFormat: 0.4
-Name:        i9p
+Name:        datakit
 Version:     0.3.0
 Synopsis:    A Git-like database with a filesystem interface
 Authors:     Thomas Leonard, Magnus Skjegstad, Dave Scott, Thomas Gazagnaire
@@ -33,12 +33,12 @@ Library fs9p
   Modules:         Fs9p
   BuildDepends:    protocol-9p.unix, datakit.vfs
 
-Library i9p
-  Path:            src/i9p/
+Library ivfs
+  Path:            src/ivfs/
   Findlibparent:   datakit
-  Findlibname:     i9p
-  InternalModules: I9p_merge, I9p_rw
-  Modules:         I9p, I9p_tree, I9p_remote
+  Findlibname:     ivfs
+  InternalModules: Ivfs_merge, Ivfs_rw
+  Modules:         Ivfs, Ivfs_tree, Ivfs_remote
   BuildDepends:    lwt, irmin, rresult, datakit.vfs, astring
 
 Library vgithub
@@ -63,7 +63,7 @@ Document datakit
   BuildTools+:          ocamldoc
   Install:              true
   XOCamlbuildPath:      src
-  XOCamlbuildLibraries: datakit.vfs, datakit.fs9p, datakit.i9p
+  XOCamlbuildLibraries: datakit.vfs, datakit.fs9p, datakit.ivfs
   XOCamlbuildExtraArgs:
     "-docflags '-t Datakit -colorize-code -short-functors -charset utf-8'"
 
@@ -72,7 +72,7 @@ Executable datakit
   MainIs:         main.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   datakit.i9p, datakit.fs9p, datakit.irmin-io,
+  BuildDepends:   datakit.ivfs, datakit.fs9p, datakit.irmin-io,
                   irmin.mem, irmin.git,
                   cmdliner, fmt, logs.fmt, logs.cli, mtime.os, fmt.tty,
                   fmt.cli # see myocamlbuild.ml: vgithub, github.unix
@@ -82,7 +82,7 @@ Executable "datakit-mount"
   MainIs:         mount.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   datakit.i9p, cmdliner
+  BuildDepends:   datakit.ivfs, cmdliner
 
 Executable test
   Path:           tests
@@ -90,7 +90,7 @@ Executable test
   Build$:         flag(tests)
   CompiledObject: best
   Install:        false
-  BuildDepends:   datakit.i9p, datakit.irmin-io, datakit.i9p, datakit.fs9p,
+  BuildDepends:   datakit.ivfs, datakit.irmin-io, datakit.ivfs, datakit.fs9p,
                   alcotest, fmt, irmin.git, irmin.mem,
                   mtime.os, fmt.tty, logs.fmt, str
 

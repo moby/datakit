@@ -13,4 +13,4 @@ module type S = sig
 
 end
 
-module Make (Store : I9p_tree.STORE): S with type repo = Store.Repo.t
+module Make (Store : Ivfs_tree.STORE): S with type repo = Store.Repo.t

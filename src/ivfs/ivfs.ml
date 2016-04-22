@@ -2,7 +2,7 @@ open Astring
 open Rresult
 open Lwt.Infix
 
-module PathSet = I9p_merge.PathSet
+module PathSet = Ivfs_merge.PathSet
 
 (* FIXME: remove 9p from the module name! *)
 let src = Logs.Src.create "i9p" ~doc:"Irmin to VFS"
@@ -32,16 +32,16 @@ let err_invalid_hash h x =
   Vfs.error "invalid-hash %S: %s" h (Printexc.to_string x)
 let err_not_fast_forward = Vfs.error "not-fast-forward"
 
-module Make (Store : I9p_tree.STORE) = struct
+module Make (Store : Ivfs_tree.STORE) = struct
 
   type repo = Store.Repo.t
   let empty_inode_map: Vfs.Inode.t String.Map.t = String.Map.empty
 
   module Path = Irmin.Path.String_list
-  module Tree = I9p_tree.Make(Store)
-  module RW = I9p_rw.Make(Tree)
-  module Merge = I9p_merge.Make(Store)(RW)
-  module Remote = I9p_remote.Make(Store)
+  module Tree = Ivfs_tree.Make(Store)
+  module RW = Ivfs_rw.Make(Tree)
+  module Merge = Ivfs_merge.Make(Store)(RW)
+  module Remote = Ivfs_remote.Make(Store)
 
   let empty_file = Cstruct.create 0
 

@@ -11,7 +11,7 @@ let doesnt_fail = function
   | Ok x -> x
   | Error (_:impossible) -> assert false
 
-module Make (Tree : I9p_tree.S) = struct
+module Make (Tree : Ivfs_tree.S) = struct
   type t = {
     mutable root : Tree.Dir.t;
     mutex : Lwt_mutex.t;
@@ -59,7 +59,7 @@ module Make (Tree : I9p_tree.S) = struct
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
     let update ~old_perm =
       let perm = match perm with
-        | #I9p_tree.perm as p -> p
+        | #Ivfs_tree.perm as p -> p
         | `Keep -> old_perm in
       Tree.Dir.with_child dir leaf (`File (Tree.File.of_data repo value, perm)) >|= fun new_dir -> Ok new_dir
     in

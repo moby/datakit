@@ -4,6 +4,8 @@ RUN opam depext lwt ssl &&  opam install lwt alcotest
 
 RUN opam pin add github --dev
 RUN opam pin add protocol-9p --dev
+RUN opam pin add irmin --dev
+RUN opam pin add git --dev
 
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n

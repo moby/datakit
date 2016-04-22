@@ -79,11 +79,11 @@ let () =
 module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)
     (Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 
-module Tree = I9p_tree.Make(Store)
-module RW = I9p_rw.Make(Tree)
+module Tree = Ivfs_tree.Make(Store)
+module RW = Ivfs_rw.Make(Tree)
 
 module Server = Fs9p.Make(Test_flow)
-module Filesystem = I9p.Make(Store)
+module Filesystem = Ivfs.Make(Store)
 
 
 let src = Logs.Src.create "test" ~doc:"Datakit tests"

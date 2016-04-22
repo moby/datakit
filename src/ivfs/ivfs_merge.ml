@@ -5,15 +5,15 @@ module PathSet = Set.Make(Irmin.Path.String_list)
 
 module type RW = sig
   type t
-  val update_force : t -> I9p_tree.path -> string -> Cstruct.t * I9p_tree.perm -> unit Lwt.t
-  val remove_force : t -> I9p_tree.path -> string -> unit Lwt.t
+  val update_force : t -> Ivfs_tree.path -> string -> Cstruct.t * Ivfs_tree.perm -> unit Lwt.t
+  val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
 end
 
 module Make
-    (Store : I9p_tree.STORE)
+    (Store : Ivfs_tree.STORE)
     (RW : RW)
 = struct
-  module Tree = I9p_tree.Make(Store)
+  module Tree = Ivfs_tree.Make(Store)
   module Metadata = Store.Private.Node.Val.Metadata
   module ContentsMeta = Tc.Pair(Tc.Cstruct)(Metadata)
 

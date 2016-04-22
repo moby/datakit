@@ -8,7 +8,7 @@ SETUP = ocaml setup.ml
 
 GITHUB ?= disable
 
-build: setup.data $(VFILE)
+build: setup.data $(VFILE) src/datakit.ml
 	$(SETUP) -build $(BUILDFLAGS)
 
 all: setup.data
@@ -22,6 +22,9 @@ setup.ml: _oasis _myocamlbuild.ml
 	echo '"$(APP)": -traverse' >> _tags
 	echo '"$(EXE)": -traverse' >> _tags
 	cat _myocamlbuild.ml >> myocamlbuild.ml
+
+src/datakit.ml:
+	echo "let () = ()" > src/datakit.ml
 
 doc: setup.data build
 	$(SETUP) -doc $(DOCFLAGS)
@@ -48,6 +51,7 @@ clean:
 	rm -f src/**/META src/**/*.mldylib src/**/*.mllib
 	rm -f $(VFILE)
 	rm -rf $(APP) $(EXE) _tests
+	rm -rf src/datakit.ml
 
 setup.data: setup.ml
 	$(SETUP) -configure --prefix $(PREFIX) --$(GITHUB)-github

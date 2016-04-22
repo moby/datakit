@@ -13,35 +13,45 @@ Flag github
   Description:       build the Github APi bindings
   Default:           false
 
+Library datakit
+  Path:            src/
+  Findlibname:     datakit
+  Modules:         Datakit
+
 Library vfs
   Path:            src/vfs/
+  Findlibparent:   datakit
   Findlibname:     vfs
   Modules:         Vfs
   BuildDepends:    lwt, rresult, cstruct, fmt, logs, astring
 
 Library fs9p
   Path:            src/fs9p/
+  Findlibparent:   datakit
   Findlibname:     fs9p
   InternalModules: Fs9p_error
   Modules:         Fs9p
-  BuildDepends:    protocol-9p.unix, vfs
+  BuildDepends:    protocol-9p.unix, datakit.vfs
 
 Library i9p
   Path:            src/i9p/
+  Findlibparent:   datakit
   Findlibname:     i9p
   InternalModules: I9p_merge, I9p_rw
   Modules:         I9p, I9p_tree, I9p_remote
-  BuildDepends:    lwt, irmin, rresult, vfs, astring
+  BuildDepends:    lwt, irmin, rresult, datakit.vfs, astring
 
 Library vgithub
   Path:            src/vgithub
+  Findlibparent:   datakit
   Findlibname:     vgithub
   Modules:         Vgithub
   Build$:          flag(github)
-  BuildDepends:    lwt, github, vfs, astring
+  BuildDepends:    lwt, github, datakit.vfs, astring
 
 Library "irmin-io"
   Path:            src/irmin-io/
+  Findlibparent:   datakit
   Findlibname:     irmin-io
   Modules:         Ir_io
   BuildDepends:    zip, uri, lwt.unix, fmt, cstruct, git, tc, irmin,
@@ -53,7 +63,7 @@ Document datakit
   BuildTools+:          ocamldoc
   Install:              true
   XOCamlbuildPath:      src
-  XOCamlbuildLibraries: vfs, fs9p, i9p
+  XOCamlbuildLibraries: datakit.vfs, datakit.fs9p, datakit.i9p
   XOCamlbuildExtraArgs:
     "-docflags '-t Datakit -colorize-code -short-functors -charset utf-8'"
 
@@ -62,8 +72,9 @@ Executable datakit
   MainIs:         main.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   fmt, i9p, cmdliner, fs9p, irmin.mem, irmin.git, irmin-io,
-                  logs.fmt, logs.cli, mtime.os, fmt.tty,
+  BuildDepends:   datakit.i9p, datakit.fs9p, datakit.irmin-io,
+                  irmin.mem, irmin.git,
+                  cmdliner, fmt, logs.fmt, logs.cli, mtime.os, fmt.tty,
                   fmt.cli # see myocamlbuild.ml: vgithub, github.unix
 
 Executable "datakit-mount"
@@ -71,7 +82,7 @@ Executable "datakit-mount"
   MainIs:         mount.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   i9p, cmdliner
+  BuildDepends:   datakit.i9p, cmdliner
 
 Executable test
   Path:           tests
@@ -79,7 +90,8 @@ Executable test
   Build$:         flag(tests)
   CompiledObject: best
   Install:        false
-  BuildDepends:   i9p, alcotest, fmt, fs9p, irmin-io, irmin.git, irmin.mem,
+  BuildDepends:   datakit.i9p, datakit.irmin-io, datakit.i9p, datakit.fs9p,
+                  alcotest, fmt, irmin.git, irmin.mem,
                   mtime.os, fmt.tty, logs.fmt, str
 
 Test test

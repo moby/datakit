@@ -11,9 +11,9 @@ build: [make "PREFIX=%{prefix}" "GITHUB=%{github:enable}%"]
 build-test: [make "test"]
 install: [make "install"]
 remove: [
-  ["./configure" "--prefix" prefix "--%{github:enable}%-github"]
+  ["./configure" "--prefix" prefix]
   [make "uninstall"]
-  ["ocamlfind" "remove" "i9p"]
+  ["ocamlfind" "remove" "datakit"]
 ]
 
 depends: [

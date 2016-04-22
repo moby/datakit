@@ -16,3 +16,4 @@ src/*/META
 *.docdir
 *.mllib
 www/*.html
+src/datakit.ml

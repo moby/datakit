@@ -159,7 +159,7 @@ let pr_status_dir t pr context state =
   Logs.debug (fun l ->
       l "status_file %s/%s %d %a"
         t.API.user t.API.repo pr.pull_number API.pp_status_state state);
-  let update_cond = Lwt_condition.create () in
+  let update_session = Vfs.File.Stream.session `Pending in
   let current_descr = ref None in
   let current_url = ref None in
   let current_state = ref state in
@@ -178,7 +178,7 @@ let pr_status_dir t pr context state =
         else (
           current_state := s;
           set_status ();
-          Lwt_condition.broadcast update_cond s;
+          Vfs.File.Stream.publish update_session s;
           Vfs.ok (API.string_of_status_state s ^ "\n");
         )
     ) in
@@ -198,21 +198,10 @@ let pr_status_dir t pr context state =
         Vfs.ok (str ^ "\n")
       )
     ) in
+
   let updates =
-    let open Lwt.Infix in
-    let wait current old =
-      Log.debug (fun l -> l "wait");
-      if old <> !current then Lwt.return !current
-      else Lwt_condition.wait update_cond >|= fun s -> current := Some s; Some s
-    in
-    let pp ppf = function
-      | None   -> Fmt.pf ppf ""
-      | Some s -> Fmt.pf ppf "%a\n" API.pp_status_state s
-    in
     let stream () =
-      Log.debug (fun l -> l "create a new stream!");
-      let current = ref None in
-      Vfs.File.Stream.watch pp ~init:!current ~wait:(wait current)
+      Vfs.File.Stream.create API.pp_status_state update_session
       |> Lwt.return
     in
     Vfs.File.of_stream stream
@@ -298,20 +287,16 @@ let pr_dir t pr =
 let pr_updates t =
   let open Lwt.Infix in
   Logs.debug (fun l -> l "pr_updates %s/%s" t.API.user t.API.repo);
-  let stream, push = Lwt_stream.create () in
-  let current: pull option Pervasives.ref = ref None in
-  let wait old =
-    if old <> !current then Lwt.return !current
-    else Lwt_stream.get stream >|= fun s -> current := s; s
-  in
+  let session = Vfs.File.Stream.session None in
   let pp ppf = function
     | None    -> Fmt.string ppf ""
     | Some pr -> Fmt.pf ppf "%d\n" pr.pull_number
   in
-  let stream () = Vfs.File.Stream.watch pp ~init:!current ~wait in
+  let stream () = Vfs.File.Stream.create pp session in
   Vfs.File.of_stream @@ fun () ->
-  API.on_new_issues t (fun pr -> push @@ Some pr) >|= fun () ->
-  stream ()
+  API.on_new_issues t (fun pr ->
+      Vfs.File.Stream.publish session @@ Some pr
+    ) >|= stream
 
 (* /github.com/${USER}/${REPO}/pr *)
 let pr_root t =

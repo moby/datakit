@@ -152,31 +152,39 @@ module File: sig
       values. *)
 
   val stat_of: read:(unit -> Cstruct.t option or_err) -> (unit -> metadata or_err)
-  (** [stat_of ~read] makes a [stat] function from [read].
-      The function reads the file to get the length, and reports the type as [`Normal]. *)
+  (** [stat_of ~read] makes a [stat] function from [read].  The
+      function reads the file to get the length, and reports the type
+      as [`Normal]. *)
 
   (** {1 Streams} *)
 
   module Stream: sig
 
     type t
-    (** The type of streams.  *)
+    (** The type of typed streams.  *)
 
-    (** A stream is a reader and a writer. *)
-    val create:
-      read:(int -> Cstruct.t or_err) -> write:(Cstruct.t -> unit or_err) -> t
+    type 'a session
+    (** The type for stream sessions. *)
 
-    (** A watch stream file that initially Lwt.returns
-        [Fmt.to_to_string pp initial]. Further reads call [wait x],
-        where [x] is the value previously Lwt.returned and then
-        Lwt.return that, until the file is closed. *)
-    val watch: 'a Fmt.t -> init:'a -> wait:('a -> 'a Lwt.t) -> t
+    val session: 'a -> 'a session
+    (** [session init] creates a fresh session, whose initial value is
+        [init].  *)
+
+    val publish: 'a session -> 'a -> unit
+    (** [publish s v] publishes [v] in the session [s]. *)
+
+    val create: 'a Fmt.t -> 'a session -> t
+    (** [create pp session] is a fresh file stream. Readers of the
+        stream will first get an initial line, printed with [pp],
+        corresponding to the current session's value. Everytime the
+        session's state is changing, a new line -- formatted with [pp]
+        -- is broadcasted to all the current readers of the stream. *)
 
   end
 
-  val of_stream: (unit -> Stream.t Lwt.t) -> t
-  (** [of_stream s] is the file which will be, once opened, similar to
-      the stream [s ()]. *)
+    val of_stream: (unit -> Stream.t Lwt.t) -> t
+    (** [of_stream s] is the file which will be, once opened, similar to
+    the stream [s ()]. *)
 
   (** {1 Errors} *)
 

@@ -80,27 +80,36 @@ module File = struct
       read : int -> Cstruct.t or_err;
       write: Cstruct.t -> unit or_err;
     }
-    let create ~read ~write = { read; write }
     let read t = t.read
     let write t = t.write
 
-    let watch pp ~init ~wait =
-      let last_seen = ref init in
-      let data = ref (Cstruct.of_string (Fmt.to_to_string pp init)) in
+    type 'a session = { mutable v: 'a; c: 'a Lwt_condition.t }
+
+    let session v = { v; c = Lwt_condition.create () }
+
+    let publish session v =
+      session.v <- v;
+      Lwt_condition.broadcast session.c v
+
+    let create pp session =
+      let data = ref (Cstruct.of_string (Fmt.to_to_string pp session.v)) in
+      let read_line () =
+        Lwt_condition.wait session.c >|= fun s ->
+        let line = Fmt.to_to_string pp s in
+        data := Cstruct.of_string line
+      in
+      let refill () =
+        if Cstruct.len !data = 0 then read_line () else Lwt.return_unit
+      in
       let read count =
-        begin if Cstruct.len !data = 0 then (
-            wait !last_seen >|= fun now ->
-            last_seen := now;
-            data := Cstruct.of_string (Fmt.to_to_string pp now)
-          ) else Lwt.return ()
-        end >|= fun () ->
+        refill () >|= fun () ->
         let count = min count (Cstruct.len !data) in
         let response = Cstruct.sub !data 0 count in
         data := Cstruct.shift !data count;
         Ok (response)
       in
       let write _ = err_read_only in
-      create ~read ~write
+      { read; write }
 
   end
 
@@ -210,7 +219,10 @@ module File = struct
        this is used, you should create a fresh FS for each client
        connection at least). *)
     let data = ref (Cstruct.of_string init) in
-    let stat () = ok {length = 0L; perm = `Normal} in
+    let stat () =
+      let length = Int64.of_int @@ Cstruct.len !data in
+      ok {length; perm = `Normal}
+    in
     let open_ () =
       let read count =
         let count = min count (Cstruct.len !data) in
@@ -223,7 +235,7 @@ module File = struct
         data := Cstruct.of_string result;
         ok ()
       in
-      let stream = Stream.create ~read ~write in
+      let stream = { Stream.read; write } in
       Fd.of_stream stream
     in
     let remove () = err_perm in
@@ -236,7 +248,8 @@ module File = struct
   let status fn =
     let stat () =
       fn () >|= fun data ->
-      Ok {length = String.length data |> Int64.of_int; perm = `Normal} in
+      Ok {length = String.length data |> Int64.of_int; perm = `Normal}
+    in
     let open_ () =
       let data = fn () >|= fun result -> ref (Cstruct.of_string result) in
       let read count =
@@ -247,7 +260,7 @@ module File = struct
         ok result
       in
       let write _ = err_read_only in
-      let stream = Stream.create ~read ~write in
+      let stream = { Stream.read; write } in
       Fd.of_stream stream
     in
     read_only_aux ~debug:"status" ~stat ~open_

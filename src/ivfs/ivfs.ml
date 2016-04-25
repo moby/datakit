@@ -434,27 +434,17 @@ module Make (Store : Ivfs_tree.STORE) = struct
   let static_dir name items = Vfs.Inode.dir name (Vfs.Dir.of_list items)
 
   let head_stream store initial_head =
-    let cond = Lwt_condition.create () in
-    let current = ref initial_head in
-    let () =
-      let cb _diff =
-        Store.head store >|= fun commit_id ->
-        if commit_id <> !current then (
-          current := commit_id;
-          Lwt_condition.broadcast cond ()
-        ) in
-      let remove_watch = Store.watch_head store ?init:initial_head cb in
-      ignore remove_watch (* TODO *)
+    let session = Vfs.File.Stream.session initial_head in
+    let remove_watch =
+      let cb _ = Store.head store >|= Vfs.File.Stream.publish session in
+      Store.watch_head store ?init:initial_head cb
     in
     let pp ppf = function
       | None      -> Fmt.string ppf "\n"
       | Some hash -> Fmt.string ppf (Store.Hash.to_hum hash ^ "\n")
     in
-    let rec wait old =
-      if old <> !current then Lwt.return !current
-      else Lwt_condition.wait cond >>= fun () -> wait old
-    in
-    Vfs.File.Stream.watch pp ~init:initial_head ~wait
+    ignore remove_watch; (* TODO *)
+    Vfs.File.Stream.create pp session
 
   let head_live store =
     Vfs.File.of_stream (fun () ->
@@ -463,33 +453,20 @@ module Make (Store : Ivfs_tree.STORE) = struct
       )
 
   let reflog_stream store =
-    let stream, push = Lwt_stream.create () in
-    let () =
+    let session = Vfs.File.Stream.session None in
+    let remove_watch =
       let cb = function
-        | `Added x | `Updated (_, x) ->
-          push (Some (Store.Hash.to_hum x ^ "\n"));
-          Lwt.return ()
-        | `Removed _ ->
-          push (Some "\n");
-          Lwt.return ()
+        | `Added x | `Updated (_, x) -> Vfs.File.Stream.publish session (Some x)
+        | `Removed _                 -> Vfs.File.Stream.publish session None
       in
-      let remove_watch = Store.watch_head store cb in
-      ignore remove_watch (* TODO *)
+      Store.watch_head store (fun x -> Lwt.return @@ cb x)
     in
-    let data = ref (Cstruct.create 0) in
-    let read count =
-      begin if Cstruct.len !data = 0 then (
-          Lwt_stream.next stream >|= fun next ->
-          data := Cstruct.of_string next
-        ) else Lwt.return ()
-      end >|= fun () ->
-      let count = min count (Cstruct.len !data) in
-      let response = Cstruct.sub !data 0 count in
-      data := Cstruct.shift !data count;
-      Ok (response)
+    let pp ppf = function
+      | Some x -> Fmt.pf ppf "%s\n" (Store.Hash.to_hum x)
+      | None   -> Fmt.string ppf "\n"
     in
-    let  write _ = err_read_only in
-    Vfs.File.Stream.create ~read ~write
+    ignore remove_watch; (* TODO *)
+    Vfs.File.Stream.create pp session
 
   let reflog store =
     Vfs.File.of_stream (fun () -> Lwt.return (reflog_stream store))
@@ -497,32 +474,27 @@ module Make (Store : Ivfs_tree.STORE) = struct
   let hash_line store path =
     Tree.snapshot store >>= fun snapshot ->
     Tree.Dir.lookup_path snapshot path >>= function
-    | `None -> Lwt.return "\n"
-    | `File (f, _perm) -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash (* XXX *)
-    | `Directory dir ->
+    | `None            -> Lwt.return "\n"
+    | `File (f, _perm) ->
+      Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash (* XXX *)
+    | `Directory dir   ->
       Tree.Dir.hash dir >|= fun h ->
       Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
 
   let watch_tree_stream store ~path ~init =
-    let cond = Lwt_condition.create () in
+    let session = Vfs.File.Stream.session init in
     let current = ref init in
-    let () =
-      let cb _diff =
+    let remove_watch =
+      let cb _ =
         hash_line store path >|= fun line ->
         if line <> !current then (
           current := line;
-          Lwt_condition.broadcast cond ()
+          Vfs.File.Stream.publish session !current
         ) in
-      let remove_watch = Store.watch_head store cb in
-      ignore remove_watch (* TODO *)
+      Store.watch_head store cb
     in
-    let rec wait old =
-      if old <> !current then Lwt.return !current
-      else (
-        Lwt_condition.wait cond >>= fun () ->
-        wait old
-      ) in
-    Vfs.File.Stream.watch Fmt.string ~init ~wait
+    ignore remove_watch; (* TODO *)
+    Vfs.File.Stream.create Fmt.string session
 
   let watch_tree store ~path =
     Vfs.File.of_stream (fun () ->

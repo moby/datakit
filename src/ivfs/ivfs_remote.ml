@@ -1,5 +1,8 @@
 open Lwt.Infix
 
+let src = Logs.Src.create "ivfs-remote" ~doc:"Irmin VFS: remote repositories"
+module Log = (val Logs.src_log src: Logs.LOG)
+
 let err_no_head =  Vfs.error "error: no head to fetch"
 let err_fetch_error = Vfs.error "error: cannot fetch %s"
 let err_no_url = Vfs.error "error: remote url is not defined"
@@ -10,23 +13,20 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   type t = {
     remote_url : unit -> string option;
-    update_head: string option -> unit;
+    update_head: Store.commit_id option -> unit;
   }
 
-  let mk_head () =
-    let stream, push = Lwt_stream.create () in
-    let current : string option ref = ref None in
-    let wait old =
-      if old <> !current then Lwt.return !current
-      else Lwt_stream.next stream >|= fun s -> current := s; s
+  let mk_head session =
+    let pp_o ppf = function
+      | None   -> Fmt.string ppf ""
+      | Some x -> Fmt.pf ppf "%s\n" (Store.Hash.to_hum x)
     in
-    let pp ppf = function
-      | None      -> Fmt.string ppf ""
-      | Some hash -> Fmt.pf ppf "%s\n" hash
+    let stream () =
+      Vfs.File.Stream.create pp_o session
+      |> Lwt.return
     in
-    let stream () = Vfs.File.Stream.watch pp ~init:!current ~wait in
-    let file = Vfs.File.of_stream @@ fun () -> Lwt.return (stream ()) in
-    file, fun x -> push (Some x)
+    let file = Vfs.File.of_stream stream in
+    file, fun x -> Vfs.File.Stream.publish session x
 
   (* /remotes/<name>/url *)
   let mk_url default =
@@ -35,7 +35,6 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   (* /remotes/<name>/fetch *)
   let mk_fetch t make_task repo =
-    let line h = Store.Hash.to_hum h ^ "\n" in
     let handler branch =
       match t.remote_url () with
       | None     -> err_no_url
@@ -45,14 +44,15 @@ module Make (Store : Ivfs_tree.STORE) = struct
         Sync.fetch (s "fetch") r >>= function
         | `No_head -> err_no_head
         | `Error   -> err_fetch_error url
-        | `Head h  -> t.update_head (Some (line h)); Vfs.ok ""
+        | `Head h  -> t.update_head (Some h); Vfs.ok ""
     in
     Vfs.File.command handler
 
   (* /remotes/<name>/ *)
   let mk_remote ?(url="") make_task repo =
+    let session = Vfs.File.Stream.session None in
     let url_file, remote_url = mk_url url in
-    let head_file, update_head = mk_head () in
+    let head_file, update_head = mk_head session in
     let t = { remote_url; update_head } in
     let fetch_file = mk_fetch t make_task repo in
     let files = [
@@ -63,7 +63,10 @@ module Make (Store : Ivfs_tree.STORE) = struct
     Vfs.Dir.of_list (fun () -> files)
 
   let create ?(init=[]) make_task repo =
-    let remote ?url name = Vfs.Inode.dir name (mk_remote ?url make_task repo) in
+    Log.debug (fun l -> l "create");
+    let remote ?url name =
+      Vfs.Inode.dir name (mk_remote ?url  make_task repo)
+    in
     let init = List.map (fun (name, url) -> name, remote ~url name) init in
     let remotes = ref init in
     let ls () = Vfs.ok (List.map snd !remotes) in

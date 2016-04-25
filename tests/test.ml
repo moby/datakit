@@ -128,6 +128,9 @@ let test_merge _repo conn =
   (* Fork and put "from-master+pr" on pr branch *)
   Client.mkdir conn ["branch"] "pr" rwxr_xr_x >>*= fun () ->
   head conn "master" >>= fun merge_a ->
+  write_file conn ["branch"; "pr"; "fast-forward"] "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35" >>= function
+  | Ok () -> Alcotest.fail "Commit not in store!"
+  | Error _ ->
   write_file conn ["branch"; "pr"; "fast-forward"] merge_a >>*= fun () ->
   with_transaction conn ~branch:"pr" "mod" (fun t ->
       read_file conn (t @ ["rw"; "file"]) >>= fun old ->

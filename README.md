@@ -22,7 +22,7 @@ Now you can explore, edit and script `/db`.
 To start Datakit with the (experimental) Github bindings:
 
 ```
-DATAKIT_GITHUB=1 ./scripts/start-datakit.sh # Start datakit without the Github API bindings
+DATAKIT_GITHUB=1 ./scripts/start-datakit.sh # Start datakit with the Github API bindings
 
 # In an other terminal
 ./scripts/start-client.sh

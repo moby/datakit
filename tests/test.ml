@@ -181,7 +181,7 @@ let test_merge_metadata _repo conn =
   head conn "pr" >>= fun merge_b ->
   (* Merge pr into master *)
   with_transaction conn ~branch:"master" "merge" (fun t ->
-      chmod conn (t @ ["rw"; "c"]) `Normal >>= fun () -> 
+      chmod conn (t @ ["rw"; "c"]) `Normal >>= fun () ->
       (* Begin the merge *)
       write_file conn (t @ ["merge"]) merge_b >>*= fun () ->
       (* Ours: exec, link, normal *)
@@ -194,7 +194,7 @@ let test_merge_metadata _repo conn =
       check_perm conn (t @ ["rw"; "c"]) "rw/c" `Normal >>= fun () ->
       check_file conn (t @ ["rw"; "c"]) "Conflict" "** Conflict **\nChanged on both branches\n" >>= fun () ->
       write_file conn (t @ ["rw"; "c"]) "Resolved" >>*= fun () ->
-      chmod conn (t @ ["rw"; "c"]) `Executable >>= fun () -> 
+      chmod conn (t @ ["rw"; "c"]) `Executable >>= fun () ->
       Lwt.return ()
     ) >>= fun () ->
   check_perm conn ["branch"; "master"; "ro"; "c"] "ro/c" `Executable >>= fun () ->
@@ -446,15 +446,15 @@ let test_remotes _repo conn =
   >>= fun () ->
   write_file conn ["remotes";"origin";"url"] "git://localhost/" >>*= fun () ->
   write_file conn ["remotes";"origin";"fetch"] "master" >>*= fun () ->
-  with_stream conn ["remotes"; "origin"; "head"] @@ fun head ->
-  read_line_exn head >>= fun head1 ->
   let remote_head = "ecf6b63a94681222b1be76c0f95159122ce80db1" in
-  Alcotest.(check string) "remote head 1" remote_head head1;
-  read_line_exn head >>= fun head1 ->
-  Alcotest.(check string) "empty head 1" "" head1;
-  with_stream conn ["remotes"; "origin"; "head"] @@ fun head ->
-  read_line_exn head >>= fun head2 ->
-  Alcotest.(check string) "remote head 2" remote_head head2;
+  with_stream conn ["remotes"; "origin"; "head"] (fun head ->
+      read_line_exn head >|= fun head ->
+      Alcotest.(check string) "remote head 1" remote_head head
+    ) >>= fun () ->
+  with_stream conn ["remotes"; "origin"; "head"] (fun head ->
+      read_line_exn head >|= fun head ->
+      Alcotest.(check string) "remote head 2" remote_head head;
+    ) >>= fun () ->
   check_dir conn ["snapshots"; remote_head; "ro"] "Remote entries"
     ["foo";"x"] >>= fun () ->
   Lwt.return_unit

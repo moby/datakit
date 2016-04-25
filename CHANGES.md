@@ -4,11 +4,11 @@
   (#63, @samoht)
 
     ```
-    while read PR do
-      echo New PR: $PR
-      echo pending > /db/github.com/docker/datakit/pr/status/test
-      ...
-    done < /db/github.com/docker/datakit/pr/updates
+while read PR do
+  echo New PR: $PR
+  echo pending > /db/github.com/docker/datakit/pr/status/test
+  ...
+done < /db/github.com/docker/datakit/pr/updates
     ```
 - Allow to set the description and urls for pull request status (#64, @samoht)
 - Update VFS to report file metadata (#66, @talex5)
@@ -57,18 +57,20 @@
   dangling commits (#16, #51 by @talex5)
 - Backport performance fixes from upstream `ocaml-git` (#43, #47 by @talex5)
 - Minimal integration with the Github PR API using 9p  (#42 by @samoht)
+
     ```
-    ~/mnt $ ls github.com/docker/datakit
-    41  42
-    ~/mnt $ cat github.com/docker/datakit/pr/41/status/default
-    pending
-    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default
+~/mnt $ ls github.com/docker/datakit
+41  42
+~/mnt $ cat github.com/docker/datakit/pr/41/status/default
+pending
+~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default
     ```
 - Use Astring and Logs (#50, #43 by @talex5 and @samoht)
 
 ### 0.2.0 (2016-03-18)
 
 - Add support for "Git remotes" in the filesystem (#21, @samoht). Now you can:
+
     ```
     ~/mnt $ cd remotes
     ~/mnt/remotes $ mkdir origin

@@ -1,3 +1,47 @@
+### 0.4.0 (2016-04-25)
+
+- Bindings to the Github events API to get notification on new pull requests
+  (#63, @samoht)
+    ```
+    while read PR do
+      echo New PR: $PR
+      echo pending > /db/github.com/docker/datakit/pr/status/test
+      ...
+    done < /db/github.com/docker/datakit/pr/updates
+    ```
+- Allow to set the description and urls for pull request status (#64, @samoht)
+- Update VFS to report file metadata (#66, @talex5)
+- Add `stats` to file metadata (#66, @talex5)
+- Replace "Buffer to small" error with a read of 0 items (#71, @talex5)
+  Linux reads a directory like like:
+    - Linux asks us to fill an 8K buffer.
+    - We return nearly 8K (must return a whole number of items).
+    - Linux asks us to fill the remaining few bytes.
+    - We return nothing.
+    - Linux flushes its buffer and asks for the next 8K.
+    ...
+  This means we get roughly twice as many roundtrips as needed, but it
+  does work.
+- Allow renaming files in a transaction (#73, @talex5)
+- Metadata support (executable files and symlinks):
+    - creation of executable files
+    - creation of symlinks
+    - chmod +x works
+    - writing preserves the executable flag
+    - merging now also merges metadata
+  This appears to be sufficient to build Docker under Datakit  (#69, @talex5)
+- Don't allow fast-forward to missing commit (#81, @talex5)
+- Simplify the `Vfs.File.Stream` API and use it consistently through the
+  codebase (#83, @samoht)
+    - stream files have a state
+    - when you open a stream file, you immediately get a line with the current
+      state
+    - as long as you keep the file open, you get a newline for every updates
+    - you can have multiple reader (e.g. concurrently open files)
+    - the writers as "publish" functions in the VFS API, you can have multiple
+      concurrent writers. In that case, the behaviour is similar to condition
+      broadcasts: every reader should receive the updates in the same order.
+
 ### 0.3.0 (2016-04-04)
 
 - Fix a memory leak. This was due to a missing `free` in the readdir

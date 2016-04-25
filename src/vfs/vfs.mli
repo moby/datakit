@@ -174,14 +174,11 @@ module File: sig
     (** [publish s v] publishes [v] in the session [s]. *)
 
     val create: 'a Fmt.t -> 'a session -> t
-    (** [create pp session] is a new file stream and a writer to that
-        stream.
-
-        Readers of the stream will first get an initial line, printed
-        with [pp], containing the session's value. Everytime an
-        element is published to the session, a new line, formatted
-        with [pp] is broadcasted to all the current readers of the
-        stream. *)
+    (** [create pp session] is a fresh file stream. Readers of the
+        stream will first get an initial line, printed with [pp],
+        corresponding to the current session's value. Everytime the
+        session's state is changing, a new line -- formatted with [pp]
+        -- is broadcasted to all the current readers of the stream. *)
 
   end
 

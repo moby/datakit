@@ -1,6 +1,6 @@
 FROM ocaml/opam:alpine
 
-RUN opam depext lwt ssl &&  opam install lwt alcotest
+RUN opam depext lwt ssl &&  opam install lwt alcotest oasis
 
 RUN opam pin add github --dev
 RUN opam pin add protocol-9p --dev

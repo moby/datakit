@@ -583,9 +583,13 @@ module Make (Store : Ivfs_tree.STORE) = struct
         match Store.Hash.of_hum hash with
         | exception ex -> err_invalid_hash hash ex
         | hash         ->
-          fast_forward store hash >>= function
-          | `Ok               -> ok ""
-          | `Not_fast_forward -> err_not_fast_forward
+          let commit_t = Store.Private.Repo.commit_t (Store.repo (store "commit_t")) in
+          Store.Private.Commit.mem commit_t hash >>= function
+          | false -> Vfs.error "Commit not in store"
+          | true ->
+            fast_forward store hash >>= function
+            | `Ok               -> ok ""
+            | `Not_fast_forward -> err_not_fast_forward
       )
 
   let status store () =

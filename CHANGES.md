@@ -2,6 +2,7 @@
 
 - Bindings to the Github events API to get notification on new pull requests
   (#63, @samoht)
+
     ```
     while read PR do
       echo New PR: $PR

@@ -270,7 +270,7 @@ let pr_status_root t pr =
     API.set_status t ~context:name pr `Pending;
     Vfs.ok @@ Vfs.Inode.dir name @@ pr_status_dir t pr name `Pending
   in
-  let mkfile _ = Vfs.error "TODO" in
+  let mkfile _ _ = Vfs.error "TODO" in
   let remove _ = Vfs.error "TODO" in
   let rename _ _ = Vfs.error "TODO" in
   Vfs.Dir.create ~ls ~lookup ~mkfile ~mkdir ~remove ~rename

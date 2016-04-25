@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        datakit
-Version:     0.3.0
+Version:     0.4.0
 Synopsis:    A Git-like database with a filesystem interface
 Authors:     Thomas Leonard, Magnus Skjegstad, Dave Scott, Thomas Gazagnaire
 License:     ISC

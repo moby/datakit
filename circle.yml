@@ -4,6 +4,7 @@ machine:
   environment:
     OPAMYES: "1"
     PINS: "github protocol-9p irmin git"
+    DEPOPTS: "github"
     TRAVIS_OS_NAME: "osx"
 dependencies:
   cache_directories:

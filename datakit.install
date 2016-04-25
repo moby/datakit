@@ -1,0 +1,6 @@
+bin: [
+  "?datakit.byte"   { "datakit" }
+  "?datakit.native" { "datakit" }
+  "?datakit-mount.byte"   { "datakit-mount" }
+  "?datakit-mount.native" { "datakit-mount" }
+]

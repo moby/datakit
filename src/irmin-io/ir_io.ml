@@ -235,33 +235,26 @@ module FS = struct
   let write_file file ?temp_dir b =
     with_write_file file ?temp_dir (fun fd -> write_cstruct fd b)
 
-  (* [read_into ~chunk_size ~off buf ch] reads from [ch] into [buf] until
-     either [buf] is full or [ch] is exhausted. It returns the
-     subset of [buf] that was filled. *)
-  let read_into ~chunk_size buf ch =
-    let data = Bytes.create chunk_size in
-    let rec aux off =
-      match Cstruct.len buf - off with
-      | 0     -> Lwt.return buf   (* Buffer full *)
-      | avail ->
-        Lwt_io.read_into ch data 0 (min chunk_size avail) >>= fun read ->
-        Cstruct.blit_from_string data 0 buf off read;
-        aux (off + read)
-    in
-    aux 0
-
   let read_file_with_read file size =
-    (* There are really too many buffers here. First we copy from
-       the FS to the Lwt_io buffer, then from there into our own
-       string buffer, then blit from there into a Cstruct. *)
     let chunk_size = max 4096 (min size 0x100000) in
-    let lwt_buffer = Lwt_bytes.create chunk_size in
-    Lwt_io.(with_file
-              ~buffer:lwt_buffer ~mode:input) ~flags:[Unix.O_RDONLY] file
-      (fun ch ->
-         let buf = Cstruct.create size in
-         read_into ~chunk_size buf ch
-      )
+    let buf = Cstruct.create size in
+    let flags = [Unix.O_RDONLY] in
+    let perm = 0o0 in
+    Lwt_unix.openfile file flags perm >>= fun fd ->
+    let rec aux off =
+      let read_size = min chunk_size (size - off) in
+      Lwt_bytes.read fd buf.Cstruct.buffer off read_size >>= fun read ->
+      (* It should test for read = 0 in case size is larger than the
+          real size of the file. This may happen for instance if the
+         file was truncated while reading. *)
+      let off = off + read in
+      if off >= size then
+        Lwt.return buf
+      else
+        aux off
+    in
+    Lwt.finalize (fun () -> aux 0)
+      (fun () -> Lwt_unix.close fd)
 
   let read_file_with_mmap file =
     let fd = Unix.(openfile file [O_RDONLY; O_NONBLOCK] 0o644) in

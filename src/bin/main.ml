@@ -103,6 +103,9 @@ let start url sandbox git ~bare =
          let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
          Lwt_unix.bind socket addr;
          Lwt.return socket
+       | Some "named-pipe" ->
+         if not Main_pp.named_pipe then failwith "Not linked"
+         else failwith "Not implemented"
        | _ ->
          Printf.fprintf stderr
            "Unknown URL schema. Please use file: or tcp:\n";

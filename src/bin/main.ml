@@ -73,13 +73,19 @@ let make_unix_socket path =
   Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path);
   Lwt.return s
 
+let set_signal_if_supported signal handler =
+  try
+    Sys.set_signal signal handler
+  with Invalid_argument "Sys.signal: unavailable signal" ->
+    ()
+
 let start url sandbox git ~bare =
-  Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
-  Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
+  set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
+  set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       Log.debug (fun l -> l "Caught SIGTERM, will exit");
       exit 1
     ));
-  Sys.set_signal Sys.sigint (Sys.Signal_handle (fun _ ->
+  set_signal_if_supported Sys.sigint (Sys.Signal_handle (fun _ ->
       Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));

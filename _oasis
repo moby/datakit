@@ -13,6 +13,10 @@ Flag github
   Description:       build the Github APi bindings
   Default:           false
 
+Flag "named-pipe"
+  Description:       build the named-pipe bindings on Windows
+  Default:           false
+
 Library datakit
   Path:            src/
   Findlibname:     datakit

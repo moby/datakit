@@ -6,7 +6,8 @@ PREFIX ?= $(shell opam config var prefix)
 
 SETUP = ocaml setup.ml
 
-GITHUB ?= disable
+GITHUB     ?= disable
+NAMED_PIPE ?= disable
 
 build: setup.data $(VFILE) src/datakit.ml
 	$(SETUP) -build $(BUILDFLAGS)
@@ -30,7 +31,8 @@ doc: setup.data build
 	$(SETUP) -doc $(DOCFLAGS)
 
 test:
-	$(SETUP) -configure --enable-tests --prefix $(PREFIX) --$(GITHUB)-github
+	$(SETUP) -configure --enable-tests --prefix $(PREFIX) \
+	  --$(GITHUB)-github --$(NAMED_PIPE)-named-pipe
 	$(MAKE) build
 	$(SETUP) -test $(TESTFLAGS)
 
@@ -54,12 +56,13 @@ clean:
 	rm -rf src/datakit.ml
 
 setup.data: setup.ml
-	$(SETUP) -configure --prefix $(PREFIX) --$(GITHUB)-github
+	$(SETUP) -configure --prefix $(PREFIX) \
+	  --$(GITHUB)-github --$(NAMED_PIPE)-named-pipe
 
 bundle:
 	opam remove tls ssl -y
 	$(MAKE) clean
-	$(MAKE) GITHUB=disable
+	$(MAKE) GITHUB=disable NAMED_PIPE=disable
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS/
 	mkdir -p $(APP)/Contents/Resources/lib/
@@ -73,7 +76,7 @@ bundle:
 exe:
 	opam remove tls ssl -y
 	$(MAKE) clean
-	$(MAKE) GITHUB=disable
+	$(MAKE) GITHUB=disable NAMED_PIPE=enable
 	rm -rf $(EXE)
 	mkdir -p $(EXE)
 	cp _build/src/bin/main.native $(EXE)/datakit.exe

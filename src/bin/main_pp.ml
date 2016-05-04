@@ -30,10 +30,25 @@ let subdirs () =
 
 #ifdef HAVE_NAMED_PIPE
 
-let named_pipe = true
+let rec named_pipe_accept_forever path callback =
+  let open Lwt.Infix in
+  let p = Named_pipe_lwt.Server.create path in
+  Named_pipe_lwt.Server.connect p
+  >>= function
+  | false ->
+    Log.err (fun f -> f "Named-pipe connection failed on %s" path);
+    Lwt.return ()
+  | true ->
+    let _ = (* background thread *)
+      let fd = Named_pipe_lwt.Server.to_fd p in
+      callback fd
+      >>= fun () ->
+      Named_pipe_lwt.Server.disconnect p;
+      Named_pipe_lwt.Server.destroy p;
+      Lwt.return () in
+    named_pipe_accept_forever path callback
 
 #else
 
-let named_pipe = false
-
+let named_pipe_accept_forever _ _ = failwith "Not linked"
 #endif

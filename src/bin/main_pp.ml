@@ -27,3 +27,13 @@ let subdirs () =
   []
 
 #endif
+
+#ifdef HAVE_NAMED_PIPE
+
+let named_pipe = true
+
+#else
+
+let named_pipe = false
+
+#endif

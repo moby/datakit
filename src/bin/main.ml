@@ -122,6 +122,12 @@ let start url sandbox git ~bare =
   let url = url |> default "file:///var/tmp/com.docker.db.socket" in
   Lwt.catch
     (fun () ->
+       (* Check if it looks like a UNC name before a URI *)
+       let is_unc =
+         String.length url > 2 && String.sub url 0 2 = "\\\\" in
+       if is_unc
+       then Main_pp.named_pipe_accept_forever url handle_flow
+       else
        let uri = Uri.of_string url in
        match Uri.scheme uri with
        | Some "file" ->
@@ -135,8 +141,6 @@ let start url sandbox git ~bare =
          let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
          Lwt_unix.bind socket addr;
          unix_accept_forever url socket handle_flow
-       | Some "named-pipe" ->
-         Main_pp.named_pipe_accept_forever (Uri.path uri) handle_flow
        | _ ->
          Printf.fprintf stderr
            "Unknown URL schema. Please use file: or tcp:\n";

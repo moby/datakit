@@ -41,4 +41,5 @@ let () =
     (MyOCamlbuildBase.dispatch_combine [
         dispatch_default;
         github_dispatch;
+        namedpipe_dispatch;
       ])

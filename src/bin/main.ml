@@ -112,9 +112,8 @@ let start url sandbox git ~bare =
     let rec aux () =
       Lwt_unix.accept socket >>= fun (client, _addr) ->
       let _ = (* background thread *)
-        callback client
-        >>= fun () ->
-        Lwt_unix.close client in
+        (* the callback will close the connection when its done *)
+        callback client in
       aux () in
     Log.debug (fun l -> l "Waiting for connections on socket %S" url);
     aux () in
@@ -130,11 +129,7 @@ let start url sandbox git ~bare =
     | true ->
       let _ = (* background thread *)
         let fd = Named_pipe_lwt.Server.to_fd p in
-        callback fd
-        >>= fun () ->
-        Named_pipe_lwt.Server.disconnect p;
-        Named_pipe_lwt.Server.destroy p;
-        Lwt.return () in
+        callback fd in
       named_pipe_accept_forever path callback in
 
   let url = url |> default "file:///var/tmp/com.docker.db.socket" in

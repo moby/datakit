@@ -41,11 +41,8 @@ let rec named_pipe_accept_forever path callback =
   | true ->
     let _ = (* background thread *)
       let fd = Named_pipe_lwt.Server.to_fd p in
-      callback fd
-      >>= fun () ->
-      Named_pipe_lwt.Server.disconnect p;
-      Named_pipe_lwt.Server.destroy p;
-      Lwt.return () in
+      (* The callback will close the fd when its done *)
+      callback fd in
     named_pipe_accept_forever path callback
 
 #else

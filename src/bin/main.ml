@@ -73,13 +73,19 @@ let make_unix_socket path =
   Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path);
   Lwt.return s
 
+let set_signal_if_supported signal handler =
+  try
+    Sys.set_signal signal handler
+  with Invalid_argument "Sys.signal: unavailable signal" ->
+    ()
+
 let start url sandbox git ~bare =
-  Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
-  Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ ->
+  set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
+  set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       Log.debug (fun l -> l "Caught SIGTERM, will exit");
       exit 1
     ));
-  Sys.set_signal Sys.sigint (Sys.Signal_handle (fun _ ->
+  set_signal_if_supported Sys.sigint (Sys.Signal_handle (fun _ ->
       Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));
@@ -89,20 +95,49 @@ let start url sandbox git ~bare =
     | None -> In_memory_store.connect ()
     | Some path -> Git_fs_store.connect ~bare (prefix ^ path)
   end >>= fun make_root ->
+  (* Wrapper which guarantees not to fail *)
+  let handle_flow client =
+    Lwt.catch
+      (fun () ->
+         let flow = Flow_lwt_unix.connect client in
+         handle_flow ~make_root flow
+      ) (fun e ->
+         Log.err (fun l ->
+           l "Caught %s: closing connection" (Printexc.to_string e));
+         Lwt.return ()
+      ) in
+
+  let unix_accept_forever url socket callback =
+    Lwt_unix.listen socket 5;
+    let rec aux () =
+      Lwt_unix.accept socket >>= fun (client, _addr) ->
+      let _ = (* background thread *)
+        (* the callback will close the connection when its done *)
+        callback client in
+      aux () in
+    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    aux () in
+
   let url = url |> default "file:///var/tmp/com.docker.db.socket" in
   Lwt.catch
     (fun () ->
+       (* Check if it looks like a UNC name before a URI *)
+       if Astring.String.is_prefix ~affix:"\\\\" url
+       then Main_pp.named_pipe_accept_forever url handle_flow
+       else
        let uri = Uri.of_string url in
        match Uri.scheme uri with
        | Some "file" ->
          make_unix_socket (prefix ^ Uri.path uri)
+         >>= fun socket ->
+         unix_accept_forever url socket handle_flow
        | Some "tcp" ->
          let host = Uri.host uri |> default "127.0.0.1" in
          let port = Uri.port uri |> default 5640 in
          let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string host, port) in
          let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
          Lwt_unix.bind socket addr;
-         Lwt.return socket
+         unix_accept_forever url socket handle_flow
        | _ ->
          Printf.fprintf stderr
            "Unknown URL schema. Please use file: or tcp:\n";
@@ -114,23 +149,6 @@ let start url sandbox git ~bare =
          url (Printexc.to_string ex);
        exit 1
     )
-  >>= fun socket ->
-  Lwt_unix.listen socket 5;
-  let rec aux () =
-    Lwt_unix.accept socket >>= fun (client, _addr) ->
-    let flow = Flow_lwt_unix.connect client in
-    Lwt.async (fun () ->
-        Lwt.catch
-          (fun () ->handle_flow ~make_root flow)
-          (fun e ->
-             Log.err (fun l ->
-                 l "Caught %s: closing connection" (Printexc.to_string e));
-             Lwt.return ()
-          )
-      );
-    aux () in
-  Log.debug (fun l -> l "Waiting for connections on socket %S" url);
-  aux ()
 
 let start () url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
 

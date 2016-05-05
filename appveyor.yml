@@ -4,7 +4,7 @@ platform:
 environment:
   CYG_ROOT: "C:\\cygwin"
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
-  PINS: "github:https://github.com/mirage/ocaml-github.git protocol-9p irmin git"
+  PINS: "named-pipe:https://github.com/djs55/ocaml-namedpipe.git git irmin"
   TESTS: "false"
 
 install:

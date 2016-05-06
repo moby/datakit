@@ -95,20 +95,70 @@ let start url sandbox git ~bare =
     | None -> In_memory_store.connect ()
     | Some path -> Git_fs_store.connect ~bare (prefix ^ path)
   end >>= fun make_root ->
+  (* Wrapper which guarantees not to fail *)
+  let handle_flow client =
+    Lwt.catch
+      (fun () ->
+         let flow = Flow_lwt_unix.connect client in
+         handle_flow ~make_root flow
+      ) (fun e ->
+         Log.err (fun l ->
+           l "Caught %s: closing connection" (Printexc.to_string e));
+         Lwt.return ()
+      ) in
+
+  let unix_accept_forever url socket callback =
+    Lwt_unix.listen socket 5;
+    let rec aux () =
+      Lwt_unix.accept socket >>= fun (client, _addr) ->
+      let _ = (* background thread *)
+        callback client
+        >>= fun () ->
+        Lwt_unix.close client in
+      aux () in
+    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    aux () in
+
+  let rec named_pipe_accept_forever path callback =
+    let open Lwt.Infix in
+    let p = Named_pipe_lwt.Server.create path in
+    Named_pipe_lwt.Server.connect p
+    >>= function
+    | false ->
+      Log.err (fun f -> f "Named-pipe connection failed on %s" path);
+      Lwt.return ()
+    | true ->
+      let _ = (* background thread *)
+        let fd = Named_pipe_lwt.Server.to_fd p in
+        callback fd
+        >>= fun () ->
+        Named_pipe_lwt.Server.disconnect p;
+        Named_pipe_lwt.Server.destroy p;
+        Lwt.return () in
+      named_pipe_accept_forever path callback in
+
   let url = url |> default "file:///var/tmp/com.docker.db.socket" in
   Lwt.catch
     (fun () ->
+       (* Check if it looks like a UNC name before a URI *)
+       let is_unc =
+         String.length url > 2 && String.sub url 0 2 = "\\\\" in
+       if is_unc
+       then named_pipe_accept_forever url handle_flow
+       else
        let uri = Uri.of_string url in
        match Uri.scheme uri with
        | Some "file" ->
          make_unix_socket (prefix ^ Uri.path uri)
+         >>= fun socket ->
+         unix_accept_forever url socket handle_flow
        | Some "tcp" ->
          let host = Uri.host uri |> default "127.0.0.1" in
          let port = Uri.port uri |> default 5640 in
          let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string host, port) in
          let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
          Lwt_unix.bind socket addr;
-         Lwt.return socket
+         unix_accept_forever url socket handle_flow
        | _ ->
          Printf.fprintf stderr
            "Unknown URL schema. Please use file: or tcp:\n";
@@ -120,23 +170,6 @@ let start url sandbox git ~bare =
          url (Printexc.to_string ex);
        exit 1
     )
-  >>= fun socket ->
-  Lwt_unix.listen socket 5;
-  let rec aux () =
-    Lwt_unix.accept socket >>= fun (client, _addr) ->
-    let flow = Flow_lwt_unix.connect client in
-    Lwt.async (fun () ->
-        Lwt.catch
-          (fun () ->handle_flow ~make_root flow)
-          (fun e ->
-             Log.err (fun l ->
-                 l "Caught %s: closing connection" (Printexc.to_string e));
-             Lwt.return ()
-          )
-      );
-    aux () in
-  Log.debug (fun l -> l "Waiting for connections on socket %S" url);
-  aux ()
 
 let start () url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
 

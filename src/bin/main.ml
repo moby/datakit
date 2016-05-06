@@ -79,7 +79,7 @@ let set_signal_if_supported signal handler =
   with Invalid_argument "Sys.signal: unavailable signal" ->
     ()
 
-let start url sandbox git ~bare =
+let start urls sandbox git ~bare =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       Log.debug (fun l -> l "Caught SIGTERM, will exit");
@@ -132,39 +132,40 @@ let start url sandbox git ~bare =
         callback fd in
       named_pipe_accept_forever path callback in
 
-  let url = url |> default "file:///var/tmp/com.docker.db.socket" in
-  Lwt.catch
-    (fun () ->
-       (* Check if it looks like a UNC name before a URI *)
-       let is_unc =
-         String.length url > 2 && String.sub url 0 2 = "\\\\" in
-       if is_unc
-       then named_pipe_accept_forever url handle_flow
-       else
-       let uri = Uri.of_string url in
-       match Uri.scheme uri with
-       | Some "file" ->
-         make_unix_socket (prefix ^ Uri.path uri)
-         >>= fun socket ->
-         unix_accept_forever url socket handle_flow
-       | Some "tcp" ->
-         let host = Uri.host uri |> default "127.0.0.1" in
-         let port = Uri.port uri |> default 5640 in
-         let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string host, port) in
-         let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
-         Lwt_unix.bind socket addr;
-         unix_accept_forever url socket handle_flow
-       | _ ->
+  Lwt_list.iter_p (fun url ->
+    Lwt.catch
+      (fun () ->
+         (* Check if it looks like a UNC name before a URI *)
+         let is_unc =
+           String.length url > 2 && String.sub url 0 2 = "\\\\" in
+         if is_unc
+         then named_pipe_accept_forever url handle_flow
+         else
+         let uri = Uri.of_string url in
+         match Uri.scheme uri with
+         | Some "file" ->
+           make_unix_socket (prefix ^ Uri.path uri)
+           >>= fun socket ->
+           unix_accept_forever url socket handle_flow
+         | Some "tcp" ->
+           let host = Uri.host uri |> default "127.0.0.1" in
+           let port = Uri.port uri |> default 5640 in
+           let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string host, port) in
+           let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
+           Lwt_unix.bind socket addr;
+           unix_accept_forever url socket handle_flow
+         | _ ->
+           Printf.fprintf stderr
+             "Unknown URL schema. Please use file: or tcp:\n";
+           exit 1
+      )
+      (fun ex ->
          Printf.fprintf stderr
-           "Unknown URL schema. Please use file: or tcp:\n";
+           "Failed to set up server socket listening on %S: %s\n%!"
+           url (Printexc.to_string ex);
          exit 1
-    )
-    (fun ex ->
-       Printf.fprintf stderr
-         "Failed to set up server socket listening on %S: %s\n%!"
-         url (Printexc.to_string ex);
-       exit 1
-    )
+      )
+  ) urls
 
 let start () url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
 
@@ -214,10 +215,10 @@ let git =
 let url =
   let doc =
     Arg.info ~doc:
-      "The URL to listen on of the for file:///var/tmp/foo or \
-       tcp://host:port" ["url"]
+      "A comma-separated list of URLs to listen on of the form \
+      file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo" ["url"]
   in
-  Arg.(value & opt (some string) None doc)
+  Arg.(value & opt (list string) [ "tcp://127.0.0.1:5640" ] doc)
 
 let sandbox =
   let doc =

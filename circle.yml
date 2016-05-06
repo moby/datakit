@@ -10,7 +10,7 @@ dependencies:
   cache_directories:
     - ~/.opam
   override:
-  - brew install ocaml opam wget
+  - brew install wget
   - wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-opam.sh
 test:
   override:

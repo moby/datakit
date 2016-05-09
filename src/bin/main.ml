@@ -136,9 +136,7 @@ let start urls sandbox git ~bare =
     Lwt.catch
       (fun () ->
          (* Check if it looks like a UNC name before a URI *)
-         let is_unc =
-           String.length url > 2 && String.sub url 0 2 = "\\\\" in
-         if is_unc
+         if Astring.String.is_prefix ~affix:"\\\\" url
          then named_pipe_accept_forever url handle_flow
          else
          let uri = Uri.of_string url in

@@ -22,6 +22,7 @@ depends: [
   "camlzip"
   "lwt"
   "conduit"
+  "named-pipe"
   "protocol-9p" {>= "0.5.0"}
   "logs"        {>= "0.5.0"}
   "mtime"

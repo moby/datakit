@@ -360,6 +360,12 @@ module Make (Flow: V1_LWT.FLOW) = struct
   let accept ~root flow =
     Server.connect root flow () >>= function
     | Error _ as e -> Flow.close flow >|= fun () -> e
-    | Ok _         -> (* XXX: When to close flow? *) ok ()
+    | Ok t         ->
+      (* Close the flow when the 9P connection shuts down *)
+      let _ =
+        Server.after_disconnect t
+        >>= fun () ->
+        Flow.close flow in
+      ok ()
 
 end

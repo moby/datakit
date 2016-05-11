@@ -4,7 +4,7 @@ platform:
 environment:
   CYG_ROOT: "C:\\cygwin"
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
-  PINS: "named-pipe:https://github.com/djs55/ocaml-named-pipe.git irmin"
+  PINS: "named-pipe:https://github.com/djs55/ocaml-named-pipe.git hvsock:https://github.com/djs55/ocaml-hvsock.git irmin"
   TESTS: "false"
 
 install:

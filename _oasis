@@ -73,7 +73,7 @@ Executable datakit
   CompiledObject: best
   Install:        true
   BuildDepends:   datakit.ivfs, datakit.fs9p, datakit.irmin-io,
-                  irmin.mem, irmin.git, named-pipe.lwt,
+                  irmin.mem, irmin.git, named-pipe.lwt, hvsock.lwt,
                   cmdliner, fmt, logs.fmt, logs.cli, mtime.os, fmt.tty,
                   fmt.cli # see myocamlbuild.ml: vgithub, github.unix
 

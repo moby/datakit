@@ -3,7 +3,7 @@ machine:
     version: "7.3"
   environment:
     OPAMYES: "1"
-    PINS: "github protocol-9p irmin git"
+    PINS: "github protocol-9p irmin git hvsock:https://github.com/djs55/ocaml-hvsock.git"
     DEPOPTS: "github"
     TRAVIS_OS_NAME: "osx"
     INSTALL_XQUARTZ: "false"

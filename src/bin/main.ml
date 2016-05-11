@@ -118,6 +118,47 @@ let start urls sandbox git ~bare =
     Log.debug (fun l -> l "Waiting for connections on socket %S" url);
     aux () in
 
+  let hvsock_accept_forever url socket callback =
+    Lwt_unix.listen socket 5;
+    let rec aux () =
+      Lwt_hvsock.accept socket >>= fun (client, _addr) ->
+      let _ = (* background thread *)
+        (* the callback will close the connection when its done *)
+        callback client in
+      aux () in
+    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    aux () in
+
+  let hvsock_connect_forever url sockaddr callback =
+    let rec aux () =
+      let socket = Lwt_hvsock.create () in
+      Lwt.catch
+        (fun () ->
+          Lwt_hvsock.connect socket sockaddr
+          >>= fun () ->
+          let _ = (* background thread *)
+            (* the callback will close the connection when its done *)
+            callback socket in
+          Lwt.return ()
+        ) (fun _e ->
+          Lwt_unix.close socket
+          >>= fun () ->
+          Lwt_unix.sleep 1.
+        )
+      >>= fun () ->
+      aux () in
+    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    aux () in
+
+  let hvsock_addr_of_uri uri =
+    (* hyperv://vmid/servivceid *)
+    let vmid = match Uri.host uri with None -> Hvsock.Loopback | Some x -> Hvsock.Id x in
+    let serviceid =
+    let p = Uri.path uri in
+    (* trim leading / *)
+    if String.length p > 0 then String.sub p 1 (String.length p - 1) else p in
+    { Hvsock.vmid; serviceid } in
+
   let rec named_pipe_accept_forever path callback =
     let open Lwt.Infix in
     let p = Named_pipe_lwt.Server.create path in
@@ -152,6 +193,12 @@ let start urls sandbox git ~bare =
            let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
            Lwt_unix.bind socket addr;
            unix_accept_forever url socket handle_flow
+         | Some "hyperv-connect" ->
+           hvsock_connect_forever url (hvsock_addr_of_uri uri) handle_flow
+         | Some "hyperv-accept" ->
+           let socket = Lwt_hvsock.create () in
+           Lwt_hvsock.bind socket (hvsock_addr_of_uri uri);
+           hvsock_accept_forever url socket handle_flow
          | _ ->
            Printf.fprintf stderr
              "Unknown URL schema. Please use file: or tcp:\n";
@@ -214,7 +261,8 @@ let url =
   let doc =
     Arg.info ~doc:
       "A comma-separated list of URLs to listen on of the form \
-      file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo" ["url"]
+      file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
+      or hyperv-connect://vmid/serviceid or hyperv-accept://vmid/serviceid" ["url"]
   in
   Arg.(value & opt (list string) [ "tcp://127.0.0.1:5640" ] doc)
 

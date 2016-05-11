@@ -6,6 +6,7 @@ machine:
     PINS: "github protocol-9p irmin git"
     DEPOPTS: "github"
     TRAVIS_OS_NAME: "osx"
+    INSTALL_XQUARTZ: "false"
 dependencies:
   cache_directories:
     - ~/.opam

@@ -50,6 +50,8 @@ $ dkt clone REPO [--github-token=TOKEN] [--docker-token=TOKEN]
 
 ### Managing Data Sources
 
+### Adding a New Source
+
 To add a new source:
 
 ```
@@ -110,12 +112,18 @@ dmg    hockeyapp https://rink.hockeyapp.net/manage/apps/259320 -      -
 tests  path      /tmp/test-1234/                               -      -
 ```
 
-Data sources, when synced, generate new events. Events carry different
-attributes, depending on the source kind they come from. For instance
-events coming from Github sources will have a `COMMIT` attributes and
-might have a `PR` attribute as well. Note that, depending on the
-attribute, a different hash (sha1 for Git, sha256 for Docker) or
-digest (md5 for paths and hockeyapp) can be used.
+> NOTE(samoht): would be nice if we can attach filters to data-sources
+
+#### Source Events
+
+Once added, reading or writing to a data source generate source
+events. Events carry different attributes, depending on the kind of
+the source they come from. For instance events coming from Github
+sources will have a `COMMIT` attributes and might have `PR` related
+attributes as well (such as `PR/number`, `PR/state`, etc.) Note that,
+depending on the attribute, a different hash (sha1 for Git, sha256 for
+Docker) or digest (md5 for paths and hockeyapp) can be used.
+Attributes might be writable (such as `PR/state`).
 
 ```
 $ dkt source log

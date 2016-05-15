@@ -155,10 +155,7 @@ let start urls sandbox git ~bare =
         (fun () ->
           Lwt_hvsock.connect socket sockaddr
           >>= fun () ->
-          let _ = (* background thread *)
-            (* the callback will close the connection when its done *)
-            callback socket in
-          Lwt.return ()
+          callback socket
         ) (fun _e ->
           Lwt_hvsock.close socket
           >>= fun () ->

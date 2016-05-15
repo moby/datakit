@@ -112,8 +112,10 @@ let set_signal_if_supported signal handler =
 let start urls sandbox git ~bare =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
-      Log.debug (fun l -> l "Caught SIGTERM, will exit");
-      exit 1
+      (* On Win32 we receive this signal on every failed Hyper-V socket connection *)
+      if Sys.os_type <> "Win32" then begin
+        Log.debug (fun l -> l "Caught SIGTERM, will exit");
+      end
     ));
   set_signal_if_supported Sys.sigint (Sys.Signal_handle (fun _ ->
       Log.debug (fun l -> l "Caught SIGINT, will exit");

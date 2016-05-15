@@ -362,10 +362,10 @@ module Make (Flow: V1_LWT.FLOW) = struct
     | Error _ as e -> Flow.close flow >|= fun () -> e
     | Ok t         ->
       (* Close the flow when the 9P connection shuts down *)
-      let _ =
-        Server.after_disconnect t
-        >>= fun () ->
-        Flow.close flow in
+      Server.after_disconnect t
+      >>= fun () ->
+      Flow.close flow
+      >>= fun () ->
       ok ()
 
 end

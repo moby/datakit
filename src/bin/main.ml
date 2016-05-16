@@ -255,13 +255,24 @@ let reporter () =
   in
   { Logs.report = report }
 
-let setup_log style_renderer level =
-  Fmt_tty.setup_std_outputs ?style_renderer ();
-  Logs.set_level level;
-  Logs.set_reporter (reporter ());
-  ()
+let setup_log style_renderer eventlog level =
+  if eventlog then begin
+    let eventlog = Eventlog.register "Docker.exe" in
+    Logs.set_reporter (Log_eventlog.reporter ~eventlog ());
+  end else begin
+    Fmt_tty.setup_std_outputs ?style_renderer ();
+    Logs.set_level level;
+    Logs.set_reporter (reporter ());
+    ()
+  end
 
 let env_docs = "ENVIRONMENT VARIABLES"
+
+let eventlog =
+  let doc =
+    Arg.info ~doc:"Send logs to the Windows event log" [ "eventlog" ]
+  in
+  Arg.(value & flag & doc)
 
 let setup_log =
   let env =
@@ -269,7 +280,7 @@ let setup_log =
       ~doc:"Be more or less verbose. See $(b,--verbose)."
       "DATAKIT_VERBOSE"
   in
-  Term.(const setup_log $ Fmt_cli.style_renderer () $ Logs_cli.level ~env ())
+  Term.(const setup_log $ Fmt_cli.style_renderer () $ eventlog $ Logs_cli.level ~env ())
 
 let git =
   let doc =

@@ -8,7 +8,8 @@ module type S = sig
       the server. *)
 
   val accept: root:Vfs.Dir.t -> flow -> unit Protocol_9p.Error.t Lwt.t
-  (** [accept root f] accepts connection on [f]. *)
+  (** [accept root f] accepts connection on [f], processs requests
+      and returns when the connection has beenn closed. *)
 
 end
 

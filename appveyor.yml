@@ -4,7 +4,7 @@ platform:
 environment:
   CYG_ROOT: "C:\\cygwin"
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
-  PINS: "named-pipe:https://github.com/djs55/ocaml-named-pipe.git irmin"
+  PINS: "named-pipe:https://github.com/djs55/ocaml-named-pipe.git hvsock:https://github.com/djs55/ocaml-hvsock.git irmin"
   TESTS: "false"
 
 install:
@@ -13,3 +13,10 @@ install:
 
 build_script:
   - "%CYG_BASH% '${APPVEYOR_BUILD_FOLDER}/appveyor-opam.sh'"
+  - "%CYG_BASH% -c 'cd ${APPVEYOR_BUILD_FOLDER};make'"
+  - cmd: copy c:\cygwin\usr\x86_64-w64-mingw32\sys-root\mingw\bin\zlib1.dll c:\projects\datakit\zlib1.dll
+  - cmd: copy %APPVEYOR_BUILD_FOLDER%\_build\src\bin\main.native c:\projects\datakit\com.docker.db.exe
+
+artifacts:
+  - path: "com.docker.db.exe"
+  - path: "zlib1.dll"

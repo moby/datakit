@@ -73,8 +73,8 @@ Executable datakit
   CompiledObject: best
   Install:        true
   BuildDepends:   datakit.ivfs, datakit.fs9p, datakit.irmin-io,
-                  irmin.mem, irmin.git, named-pipe.lwt,
-                  cmdliner, fmt, logs.fmt, logs.cli, mtime.os, fmt.tty,
+                  irmin.mem, irmin.git, named-pipe.lwt, hvsock.lwt, threads,
+                  cmdliner, fmt, logs.fmt, logs.cli, win-eventlog, mtime.os, fmt.tty,
                   fmt.cli # see myocamlbuild.ml: vgithub, github.unix
 
 Executable "datakit-mount"

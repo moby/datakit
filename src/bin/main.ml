@@ -197,9 +197,10 @@ let start urls sandbox git ~bare =
     Lwt.catch
       (fun () ->
          (* Check if it looks like a UNC name before a URI *)
-         if Astring.String.is_prefix ~affix:"\\\\" url
-         then named_pipe_accept_forever url (handle_unix_flow ~make_root)
-         else
+         if Astring.String.is_prefix ~affix:"\\\\" url then begin
+           Log.info (fun f -> f "Accepting connections on named pipe %s" url);
+           named_pipe_accept_forever url (handle_unix_flow ~make_root)
+         end else
          let uri = Uri.of_string url in
          match Uri.scheme uri with
          | Some "file" ->

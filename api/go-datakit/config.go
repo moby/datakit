@@ -21,7 +21,7 @@ type Record struct {
 	schemaF  *IntField
 	fields   []*StringField // registered fields, for schema upgrades
 	branch   string
-	w        *watch
+	w        *Watch
 	onUpdate [](func(*Snapshot, Version))
 }
 

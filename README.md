@@ -314,8 +314,9 @@ status updates for that PR.
     meld --auto-merge ours base theirs --output rw
     echo commit > ctl
 
-## TODO
 
-- change user name and email in commit message
-- add support for Github hooks
-- add support for commit hooks
+## Licensing
+
+Datakit is licensed under the Apache License, Version 2.0. See
+[LICENSE](https://github.com/docker/datakit/blob/master/LICENSE) for the full
+license text.

@@ -4,13 +4,23 @@
 revisits the UNIX pipeline concept, with a modern twist: streams of
 tree-structured data instead of raw text. Datakit allows to  define
 complex build pipelines over version-controlled data, using shell
-scripts interacting with the filesystem. An [example](https://github.com/docker/datakit/blob/master/ci/ci.sh):
+scripts interacting with the filesystem. For instance to
+[trigger](https://github.com/docker/datakit/blob/master/ci/ci.sh)
+a build on every changes in the `master` branch:
 
-```sh
+```bash
+# The Git repository to test
+DB=/data
+
+# Load the `map` function.
+# `map fn branch` calls `fn` on the current head of `branch`, and then again
+# each time it changes. `fn` runs in a transaction directory on a new branch.
+# The transaction will be committed when `fn` returns.
+source ci/map.sh
+
 function build {
   echo 'BUILD FAILED' > msg
-  ((docker build rw && echo PASSED > "$TRANS/msg") \
-     || echo '*** BUILD FAILED ***') 2>&1 | tee "rw/log"
+  ((docker build rw && echo PASSED > "$TRANS/msg")  || echo '*** BUILD FAILED ***') 2>&1 | tee "rw/log"
 }
 
 map build master

@@ -2,23 +2,39 @@
 
 *Datakit* is tool to orchestrate applications using a 9P dataflow. It
 revisits the UNIX pipeline concept, with a modern twist: streams of
-tree-structured data instead of raw text.
+tree-structured data instead of raw text. Datakit allows to  define
+complex build pipelines over version-controlled data, using shell
+scripts interacting with the filesystem. An [example](https://github.com/docker/datakit/blob/master/ci/ci.sh):
 
-It is based on [Irmin](https://github.com/mirage/irmin), a
-version-controlled database fully compatible with Git, on top of which
-it adds a 9p interface. It is currently used as the coordination
+```sh
+function build {
+  echo 'BUILD FAILED' > msg
+  ((docker build rw && echo PASSED > "$TRANS/msg") \
+     || echo '*** BUILD FAILED ***') 2>&1 | tee "rw/log"
+}
+
+map build master
+```
+
+Datakit is currently used as the coordination
 layer for [Hyperkit](http://github.com/docker/hyperkit), the
 hypervisor component of
-[Docker For Mac](https://blog.docker.com/2016/03/docker-for-mac-windows-beta/).
+[Docker for Mac and Windows](https://blog.docker.com/2016/03/docker-for-mac-windows-beta/).
 
 
 ### Quick Start
 
-At the root of the repository:
+In order to start Datakit in a container exposing an 9p endpoint on port
+5640, just run:
 
 ```shell
-./scripts/start-datakit.sh # Start datakit without the Github API bindings
+$ ./scripts/start-datakit.sh
+```
 
+You can then start a Datakit client, which will mount the 9p endpoint and
+expose the database as a filesystem API:
+
+```
 # In an other terminal
 $ ./scripts/start-client.sh
 $ datakit-mount
@@ -27,12 +43,16 @@ $ ls
 branch     remotes    snapshots  trees
 ```
 
-Now you can explore, edit and script `/db`.
+Now you can explore, edit and script `/db`. See the
+[Filesystem API](https://github.com/docker/datakit#filesystem-api)
+for more details.
 
-To start Datakit with the (experimental) Github bindings:
+#### Experimental Github API bindings
+
+To start Datakit with the experimental Github bindings:
 
 ```shell
-DATAKIT_GITHUB=1 ./scripts/start-datakit.sh # Start datakit with the Github API bindings
+$ DATAKIT_GITHUB=1 ./scripts/start-datakit.sh
 
 # In an other terminal
 $ ./scripts/start-client.sh
@@ -44,14 +64,26 @@ branch      github.com  remotes     snapshots   trees
 
 ### Building
 
-You will need to install [ocaml](http://ocaml.org/) and
-[opam](http://opam.ocaml.org/). Then:
+The easiest way to build that project is to use [docker](https://docker.com),
+(which is what the
+[start-datakit.sh](https://github.com/docker/datakit/blob/master/scripts/start-datakit.sh)
+does under the hood):
 
 ```shell
-$ brew install opam
-$ opam pin add datakit .
-$ opam depext datakit
-$ opam install datakit
+$ docker build -t datakit .
+$ docker run datakit
+```
+This will expose the database's 9p endpoint on port 5640.
+
+If you really want to build the project from sources, you will need to install
+[ocaml](http://ocaml.org/) and [opam](http://opam.ocaml.org/). Then write:
+
+```shell
+$ opam pin add datakit . -n -y
+$ opam pin add hvsock https://github.com/djs55/ocaml-hvsock.git -n -y
+$ opam depext datakit -y
+$ opam install alcotest datakit --deps-only -y
+$ make && make test
 ```
 
 ### Usage

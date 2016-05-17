@@ -2,10 +2,7 @@ FROM ocaml/opam:alpine
 
 RUN opam depext lwt ssl &&  opam install lwt alcotest oasis
 
-RUN opam pin add github --dev
-RUN opam pin add protocol-9p --dev
-RUN opam pin add irmin --dev
-RUN opam pin add git --dev
+RUN opam pin add hvsock https://github.com/djs55/ocaml-hvsock.git
 
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n

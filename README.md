@@ -1,16 +1,26 @@
-## Datakit: a Git-like database with a 9p interface
+## [Datakit](http://github.com/docker/datakit)
 
-[![docs](https://img.shields.io/badge/doc-online-blue.svg)](http://nuc1.local:1234)
+*Datakit* is tool to orchestrate applications using a 9P dataflow. It
+revisits the UNIX pipeline concept, with a modern twist: streams of
+tree-structured data instead of raw text.
+
+It is based on [Irmin](https://github.com/mirage/irmin), a
+version-controlled database fully compatible with Git, on top of which
+it adds a 9p interface. It is currently used as the coordination
+layer for [Hyperkit](http://github.com/docker/hyperkit), the
+hypervisor component of
+[Docker For Mac](https://blog.docker.com/2016/03/docker-for-mac-windows-beta/).
+
 
 ### Quick Start
 
 At the root of the repository:
 
-```
+```shell
 ./scripts/start-datakit.sh # Start datakit without the Github API bindings
 
 # In an other terminal
-./scripts/start-client.sh
+$ ./scripts/start-client.sh
 $ datakit-mount
 $ cd /db
 $ ls
@@ -21,24 +31,36 @@ Now you can explore, edit and script `/db`.
 
 To start Datakit with the (experimental) Github bindings:
 
-```
+```shell
 DATAKIT_GITHUB=1 ./scripts/start-datakit.sh # Start datakit with the Github API bindings
 
 # In an other terminal
-./scripts/start-client.sh
+$ ./scripts/start-client.sh
 $ datakit-mount
 $ cd /db
 $ ls
 branch      github.com  remotes     snapshots   trees
 ```
 
-### Build and Install
+### Building
 
-If you want to compile and install from sources, at the root of this
-repository, type `make PREFIX=<prefix>` and `make install`. This will
-install `datakit` and `datakit-mount` in `PREFIX/bin`.
+You will need to install [ocaml](http://ocaml.org/) and
+[opam](http://opam.ocaml.org/). Then:
 
-### Filesystem API
+```shell
+$ brew install opam
+$ opam pin add datakit .
+$ opam depext datakit
+$ opam install datakit
+```
+
+### Usage
+
+```shell
+$ datakit -h
+```
+
+## Filesystem API
 
 The `/branch` directory contains one subdirectory for each branch. Use
 `mkdir` to create a new branch and `rm` to delete one.

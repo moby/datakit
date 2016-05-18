@@ -1,5 +1,9 @@
 ## [Datakit](http://github.com/docker/datakit)
 
+[![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
+[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/x36ff2iv16xihftb?svg=true)](https://ci.appveyor.com/project/samoht/datakit)
+[![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
+
 *Datakit* is tool to orchestrate applications using a 9P dataflow. It
 revisits the UNIX pipeline concept, with a modern twist: streams of
 tree-structured data instead of raw text. Datakit allows to  define

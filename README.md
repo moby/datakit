@@ -38,23 +38,33 @@ hypervisor component of
 
 ### Quick Start
 
-In order to start Datakit in a container exposing an 9p endpoint on port
-5640, just run:
+The easiest way to use Datakit is to start both the server and the client in a
+container.
+
+To expose a Git repository as a 9p endpoint on port 5640 on a private network,
+just run:
 
 ```shell
-$ docker run -it docker/datakit
+$ docker network create datakit-net # create a private network
+$ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit
 ```
+
+*Note*: The `--name datakit` option is mandatory, it will allow the client
+to connect to a known name on the private network.
 
 You can then start a Datakit client, which will mount the 9p endpoint and
 expose the database as a filesystem API:
 
 ```shell
 # In an other terminal
-$ docker run -it docker/datakit:client
+$ docker run -it --privileged --net datakit-net docker/datakit:client
 $ cd /db
 $ ls
 branch     remotes    snapshots  trees
 ```
+
+*Note*: the `--privileges` option is needed because the container will have
+to mount the 9p endpoint into its local filesystem.
 
 Now you can explore, edit and script `/db`. See the
 [Filesystem API](https://github.com/docker/datakit#filesystem-api)

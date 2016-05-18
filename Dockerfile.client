@@ -15,4 +15,5 @@ RUN opam config exec -- ocamlbuild -use-ocamlfind -pkgs cmdliner,unix src/bin/mo
 
 RUN sudo cp /home/opam/src/datakit/_build/src/bin/mount.native /usr/bin/datakit-mount
 
-CMD bash -C '/usr/bin/datakit-mount -h 127.0.0.1'; 'bash'
+CMD bash -c "/usr/bin/datakit-mount -h $(getent hosts datakit | awk '{print $1}')"; \
+    bash

@@ -1,15 +1,24 @@
 open Cmdliner
 
-let ip =
-  let doc = Arg.info ~doc:"The 9p server ip" ["port"] in
+let mopts = "MOUNT OPTIONS"
+
+let host =
+  let doc =
+    Arg.info ~doc:"The 9p server hostname (or ip)" ~docv:"HOST" ~docs:mopts
+      ["h"; "host"]
+  in
   Arg.(value & opt string "172.17.0.2" doc)
 
 let port =
-  let doc = Arg.info ~doc:"The 9p server port" ["port"] in
+  let doc =
+    Arg.info ~doc:"The 9p server port"~docv:"PORT" ~docs:mopts  ["p"; "port"]
+  in
   Arg.(value & opt int 5640 doc)
 
 let mnt =
-  let doc = Arg.info ~doc:"The destination mount point." [] in
+  let doc =
+    Arg.info ~doc:"The destination mount point." ~docv:"DIR" ~docs:mopts []
+  in
   Arg.(value & pos 0 string "/db" doc)
 
 let mount ip port mnt =
@@ -34,7 +43,7 @@ let term =
     `S "DESCRIPTION";
     `P "$(i, datakit-mount) mounts datakit volumes on the local filesystem."
   ] in
-  Term.(pure mount $ ip $ port $ mnt),
+  Term.(pure mount $ host $ port $ mnt),
   Term.info "datakit-mount" ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

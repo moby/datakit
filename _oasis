@@ -82,7 +82,7 @@ Executable "datakit-mount"
   MainIs:         mount.ml
   CompiledObject: best
   Install:        true
-  BuildDepends:   datakit.ivfs, cmdliner
+  BuildDepends:   unix, cmdliner
 
 Executable test
   Path:           tests

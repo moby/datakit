@@ -108,6 +108,7 @@ gh-pages: gh-pages/.git doc
 	cd gh-pages && (git checkout gh-pages || ok)
 	rm -f gh-pages/*.html
 	cp datakit.docdir/*.html gh-pages
+	cp www/style.css gh-pages
 	cd gh-pages && git add *.html
 	cd gh-pages && git commit -a -m "Doc updates"
 	cd gh-pages && git push origin gh-pages

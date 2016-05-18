@@ -1,7 +1,7 @@
 ## [Datakit](http://github.com/docker/datakit)
 
 [![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
-[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/x36ff2iv16xihftb?svg=true)](https://ci.appveyor.com/project/samoht/datakit)
+[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/x36ff2iv16xihftb/branch/master?svg=true)](https://ci.appveyor.com/project/samoht/datakit/branch/master)
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
 *Datakit* is tool to orchestrate applications using a 9P dataflow. It
@@ -42,16 +42,15 @@ In order to start Datakit in a container exposing an 9p endpoint on port
 5640, just run:
 
 ```shell
-$ ./scripts/start-datakit.sh
+$ docker run -it docker/datakit
 ```
 
 You can then start a Datakit client, which will mount the 9p endpoint and
 expose the database as a filesystem API:
 
-```
+```shell
 # In an other terminal
-$ ./scripts/start-client.sh
-$ datakit-mount
+$ docker run -it docker/datakit:client
 $ cd /db
 $ ls
 branch     remotes    snapshots  trees

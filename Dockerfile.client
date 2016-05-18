@@ -4,9 +4,13 @@ RUN opam depext oasis ocamlfind cmdliner && \
     opam install oasis cmdliner ocamlfind
 
 COPY src /home/opam/src/datakit/src/
+COPY .git /home/opam/src/datakit/.git
+COPY Makefile /home/opam/src/datakit/Makefile
+
 RUN sudo chown -R opam.nogroup /home/opam/src
 WORKDIR /home/opam/src/datakit
 
+RUN make src/bin/version.ml
 RUN opam config exec -- ocamlbuild -use-ocamlfind -pkgs cmdliner,unix src/bin/mount.native
 
 RUN sudo cp /home/opam/src/datakit/_build/src/bin/mount.native /usr/bin/datakit-mount

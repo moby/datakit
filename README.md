@@ -1,7 +1,7 @@
 ## [Datakit](http://github.com/docker/datakit)
 
 [![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
-[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/x36ff2iv16xihftb?svg=true)](https://ci.appveyor.com/project/samoht/datakit)
+[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/x36ff2iv16xihftb/branch/master?svg=true)](https://ci.appveyor.com/project/samoht/datakit/branch/master)
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
 *Datakit* is tool to orchestrate applications using a 9P dataflow. It

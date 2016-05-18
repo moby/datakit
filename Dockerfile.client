@@ -1,0 +1,14 @@
+FROM ocaml/opam:alpine
+
+RUN opam depext oasis ocamlfind cmdliner && \
+    opam install oasis cmdliner ocamlfind
+
+COPY src /home/opam/src/datakit/src/
+RUN sudo chown -R opam.nogroup /home/opam/src
+WORKDIR /home/opam/src/datakit
+
+RUN opam config exec -- ocamlbuild -use-ocamlfind -pkgs cmdliner,unix src/bin/mount.native
+
+RUN sudo cp /home/opam/src/datakit/_build/src/bin/mount.native /usr/bin/datakit-mount
+
+CMD bash -C '/usr/bin/datakit-mount -h 127.0.0.1'; 'bash'

@@ -96,4 +96,20 @@ www: doc
 	cd www && cp ../datakit.docdir/*.html .
 	if [ $(shell uname -s) == "Darwin" ]; then open www/index.html; fi
 
-.PHONY: build doc test all install uninstall reinstall clean distclean
+gh-pages/.git:
+	mkdir -p gh-pages
+	cd gh-pages && git init
+	cd gh-pages && git remote add origin git@github.com:docker/datakit.git
+	cd gh-pages && git fetch origin
+	cp www/style.css gh-pages
+	cd gh-pages && (git checkout -b gh-pages && git add style.css && git commit -a -m init || ok)
+
+gh-pages: gh-pages/.git doc
+	cd gh-pages && (git checkout gh-pages || ok)
+	rm -f gh-pages/*.html
+	cp datakit.docdir/*.html gh-pages
+	cd gh-pages && git add *.html
+	cd gh-pages && git commit -a -m "Doc updates"
+	cd gh-pages && git push origin gh-pages
+
+.PHONY: build doc test all install uninstall reinstall clean distclean gh-pages

@@ -1,0 +1,142 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Vfs.Error.html">
+<link rel="next" href="Vfs.Dir.html">
+<link rel="Up" href="Vfs.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><link title="Basic constructors" rel="Section" href="#1_Basicconstructors">
+<link title="K/V stores." rel="Section" href="#1_KVstores">
+<link title="Streams" rel="Section" href="#1_Streams">
+<link title="Errors" rel="Section" href="#1_Errors">
+<title>Datakit : Vfs.File</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Vfs.Error.html" title="Vfs.Error">Previous</a>
+&nbsp;<a class="up" href="Vfs.html" title="Vfs">Up</a>
+&nbsp;<a class="post" href="Vfs.Dir.html" title="Vfs.Dir">Next</a>
+</div>
+<h1>Module <a href="type_Vfs.File.html">Vfs.File</a></h1>
+
+<pre><span class="keyword">module</span> File: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.File.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+File operations.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEfd"><span class="keyword">type</span> <code class="type"></code>fd</span> </pre>
+<div class="info ">
+The type for open files, e.g. file descriptors.<br>
+</div>
+
+
+<pre><span id="VALread"><span class="keyword">val</span> read</span> : <code class="type"><a href="Vfs.File.html#TYPEfd">fd</a> -> offset:int64 -> count:int -> Cstruct.t <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">read f ~offset ~count</code> reads an open file.<br>
+</div>
+
+<pre><span id="VALwrite"><span class="keyword">val</span> write</span> : <code class="type"><a href="Vfs.File.html#TYPEfd">fd</a> -> offset:int64 -> Cstruct.t -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">write f ~offset</code> writes in a open file.<br>
+</div>
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+The type for files.<br>
+</div>
+
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp</code> is the pretty-printer for files.<br>
+</div>
+
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">stat:(unit -> <a href="Vfs.html#TYPEmetadata">Vfs.metadata</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       open_:(unit -> <a href="Vfs.File.html#TYPEfd">fd</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       remove:(unit -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       truncate:(int64 -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       chmod:(<a href="Vfs.html#TYPEperm">Vfs.perm</a> -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">create</code> is the file <code class="code">t</code> such that FIXME.<br>
+</div>
+
+<pre><span id="VALstat"><span class="keyword">val</span> stat</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> -> <a href="Vfs.html#TYPEmetadata">Vfs.metadata</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">stat t</code> is <code class="code">t</code>'s metadata.<br>
+</div>
+
+<pre><span id="VALsize"><span class="keyword">val</span> size</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> -> int64 <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">size t</code> is <code class="code">t</code>'s size.<br>
+</div>
+
+<pre><span id="VALopen_"><span class="keyword">val</span> open_</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> -> <a href="Vfs.File.html#TYPEfd">fd</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">open_ t</code> if a file-descriptor for <code class="code">t</code>.<br>
+</div>
+
+<pre><span id="VALremove"><span class="keyword">val</span> remove</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">remove t</code> removes <code class="code">t</code>.<br>
+</div>
+
+<pre><span id="VALtruncate"><span class="keyword">val</span> truncate</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> -> int64 -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">truncate t len</code> sets the length of <code class="code">t</code> to <code class="code">len</code>.  If the new
+       length is shorter, the file is truncated.  If longer, it is
+       padded with zeroes.<br>
+</div>
+
+<pre><span id="VALchmod"><span class="keyword">val</span> chmod</span> : <code class="type"><a href="Vfs.File.html#TYPEt">t</a> -> <a href="Vfs.html#TYPEperm">Vfs.perm</a> -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">chmod t mode</code> changes the mode of <code class="code">t</code>.<br>
+</div>
+<br>
+<h1 id="1_Basicconstructors">Basic constructors</h1><br>
+
+<pre><span id="VALro_of_string"><span class="keyword">val</span> ro_of_string</span> : <code class="type">string -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">ro_of_string s</code> is the static file containing <code class="code">s</code>.<br>
+</div>
+
+<pre><span id="VALrw_of_string"><span class="keyword">val</span> rw_of_string</span> : <code class="type">string -> <a href="Vfs.File.html#TYPEt">t</a> * (unit -> string)</code></pre><div class="info ">
+<code class="code">rw_of_string init</code> is a mutable file that initially contains
+        <code class="code">init</code> and a function which can be called to get the current
+        contents.<br>
+</div>
+
+<pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type">(unit -> string Lwt.t) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">status f</code> is the file containing the result of <code class="code">f</code>. <code class="code">f</code> is
+      evaluated everytime the file is open.<br>
+</div>
+
+<pre><span id="VALcommand"><span class="keyword">val</span> command</span> : <code class="type">?init:string -> (string -> string <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">command ?init f</code> is the file containing the result of <code class="code">f</code>. <code class="code">f</code>
+      is evaluated on every write, with the contents of the file as
+      argument. Initially the file contains <code class="code">init</code>.<br>
+</div>
+<br>
+<h1 id="1_KVstores">K/V stores.</h1><br>
+
+<pre><span id="VALof_kv"><span class="keyword">val</span> of_kv</span> : <code class="type">read:(unit -> Cstruct.t option <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       write:(Cstruct.t -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       stat:(unit -> <a href="Vfs.html#TYPEmetadata">Vfs.metadata</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       remove:(unit -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       chmod:(<a href="Vfs.html#TYPEperm">Vfs.perm</a> -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">of_kv ~read ~write ~remove ~stat</code> interprets values from a k/v
+      store as files. Handles reading and writing regions of the
+      file.<br>
+</div>
+
+<pre><span id="VALof_kvro"><span class="keyword">val</span> of_kvro</span> : <code class="type">read:(unit -> Cstruct.t option <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       stat:(unit -> <a href="Vfs.html#TYPEmetadata">Vfs.metadata</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">of_kvro</code> is similar to <a href="Vfs.File.html#VALof_kv"><code class="code"><span class="constructor">Vfs</span>.<span class="constructor">File</span>.of_kv</code></a> but for read-only
+      values.<br>
+</div>
+
+<pre><span id="VALstat_of"><span class="keyword">val</span> stat_of</span> : <code class="type">read:(unit -> Cstruct.t option <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> unit -> <a href="Vfs.html#TYPEmetadata">Vfs.metadata</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<code class="code">stat_of ~read</code> makes a <code class="code">stat</code> function from <code class="code">read</code>.  The
+      function reads the file to get the length, and reports the type
+      as <code class="code"><span class="keywordsign">`</span><span class="constructor">Normal</span></code>.<br>
+</div>
+<br>
+<h1 id="1_Streams">Streams</h1><br>
+
+<pre><span class="keyword">module</span> <a href="Vfs.File.Stream.html">Stream</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.File.Stream.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span id="VALof_stream"><span class="keyword">val</span> of_stream</span> : <code class="type">(unit -> <a href="Vfs.File.Stream.html#TYPEt">Stream.t</a> Lwt.t) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">of_stream s</code> is the file which will be, once opened, similar to
+    the stream <code class="code">s ()</code>.<br>
+</div>
+<br>
+<h1 id="1_Errors">Errors</h1><br>
+
+<pre><span id="VALerr_no_entry"><span class="keyword">val</span> err_no_entry</span> : <code class="type">'a <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre></body></html>

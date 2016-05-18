@@ -1,0 +1,55 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="next" href="Ivfs_tree.S.Dir.html">
+<link rel="Up" href="Ivfs_tree.S.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Ivfs_tree.S.File</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="Ivfs_tree.S.html" title="Ivfs_tree.S">Up</a>
+&nbsp;<a class="post" href="Ivfs_tree.S.Dir.html" title="Ivfs_tree.S.Dir">Next</a>
+</div>
+<h1>Module <a href="type_Ivfs_tree.S.File.html">Ivfs_tree.S.File</a></h1>
+
+<pre><span class="keyword">module</span> File: <code class="code"><span class="keyword">sig</span></code> <a href="Ivfs_tree.S.File.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+The type for file contents.<br>
+</div>
+
+
+<pre><span id="TYPEhash"><span class="keyword">type</span> <code class="type"></code>hash</span> </pre>
+<div class="info ">
+The type for file IDs (hashes).<br>
+</div>
+
+
+<pre><span id="VALof_data"><span class="keyword">val</span> of_data</span> : <code class="type"><a href="Ivfs_tree.S.html#TYPErepo">Ivfs_tree.S.repo</a> -> Cstruct.t -> <a href="Ivfs_tree.S.File.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">of_data repo data</code> is a file containing <code class="code">data</code>, which may later
+        be stored in <code class="code">repo</code>.<br>
+</div>
+
+<pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> <a href="Ivfs_tree.S.File.html#TYPEhash">hash</a> Lwt.t</code></pre><div class="info ">
+<code class="code">hash f</code> is the hash of the contents of <code class="code">f</code>. If <code class="code">f</code> is not yet in <code class="code">repo</code>, calling this
+        will cause it to be written.<br>
+</div>
+
+<pre><span id="VALcontent"><span class="keyword">val</span> content</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> Cstruct.t Lwt.t</code></pre>
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> <a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+Quick equality check (compares hashes).<br>
+</div>
+
+<pre><span id="VALpp_hash"><span class="keyword">val</span> pp_hash</span> : <code class="type">Format.formatter -> <a href="Ivfs_tree.S.File.html#TYPEhash">hash</a> -> unit</code></pre>
+<pre><span id="VALsize"><span class="keyword">val</span> size</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> int64 Lwt.t</code></pre></body></html>

@@ -1,0 +1,82 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="next" href="Fs9p.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Vfs</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Fs9p.html" title="Fs9p">Next</a>
+</div>
+<h1>Module <a href="type_Vfs.html">Vfs</a></h1>
+
+<pre><span class="keyword">module</span> Vfs: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+Virtual filesystem.
+<p>
+
+    A virtual filesystem is an abstract description of <a href="Vfs.File.html">files</a>,
+    <a href="Vfs.Dir.html">directoires</a>, <a href="Vfs.Inode.html">inodes</a> and <a href="Vfs.Error.html">error codes</a>.<br>
+</div>
+<hr width="100%">
+
+<pre><span class="keyword">module</span> <a href="Vfs.Error.html">Error</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.Error.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+Error codes.
+</div>
+
+<pre><span id="TYPEor_err"><span class="keyword">type</span> <code class="type">'a</code> or_err</span> = <code class="type">('a, <a href="Vfs.Error.html#TYPEt">Error.t</a>) Result.result Lwt.t</code> </pre>
+<div class="info ">
+The type of errors.<br>
+</div>
+
+
+<pre><span id="VALok"><span class="keyword">val</span> ok</span> : <code class="type">'a -> 'a <a href="Vfs.html#TYPEor_err">or_err</a></code></pre><div class="info ">
+<code class="code">ok x</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Ok</span> x)</code><br>
+</div>
+
+<pre><span id="VALerror"><span class="keyword">val</span> error</span> : <code class="type">('a, unit, string, 'b <a href="Vfs.html#TYPEor_err">or_err</a>) Pervasives.format4 -> 'a</code></pre><div class="info ">
+<code class="code">error fmt</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Error</span> &lt;fmt&gt;)</code>.<br>
+</div>
+
+<pre><span id="TYPEperm"><span class="keyword">type</span> <code class="type"></code>perm</span> = <code class="type">[ `Exec | `Link of string | `Normal ]</code> </pre>
+
+
+<pre><code><span id="TYPEmetadata"><span class="keyword">type</span> <code class="type"></code>metadata</span> = {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmetadata.length">length</span>&nbsp;: <code class="type">int64</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmetadata.perm">perm</span>&nbsp;: <code class="type"><a href="Vfs.html#TYPEperm">perm</a></code>;</code></td>
+
+</tr></table>
+}
+
+
+
+<pre><span class="keyword">module</span> <a href="Vfs.File.html">File</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.File.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+File operations.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Vfs.Dir.html">Dir</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.Dir.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+Directory operations.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Vfs.Inode.html">Inode</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.Inode.html">..</a> <code class="code"><span class="keyword">end</span></code></pre></body></html>

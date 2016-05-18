@@ -1,0 +1,71 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Vfs.Dir.html">
+<link rel="Up" href="Vfs.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Vfs.Inode</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Vfs.Dir.html" title="Vfs.Dir">Previous</a>
+&nbsp;<a class="up" href="Vfs.html" title="Vfs">Up</a>
+&nbsp;</div>
+<h1>Module <a href="type_Vfs.Inode.html">Vfs.Inode</a></h1>
+
+<pre><span class="keyword">module</span> Inode: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.Inode.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+<br>
+Inode.t operations.<br>
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+The type for inodes.<br>
+</div>
+
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp</code> is the pretty-printer for inodes.<br>
+</div>
+
+<pre><span id="TYPEkind"><span class="keyword">type</span> <code class="type"></code>kind</span> = <code class="type">[ `Dir of <a href="Vfs.Dir.html#TYPEt">Vfs.Dir.t</a> | `File of <a href="Vfs.File.html#TYPEt">Vfs.File.t</a> ]</code> </pre>
+<div class="info ">
+The type for inode kinds.<br>
+</div>
+
+
+<pre><span id="VALfile"><span class="keyword">val</span> file</span> : <code class="type">string -> <a href="Vfs.File.html#TYPEt">Vfs.File.t</a> -> <a href="Vfs.Inode.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">file name f</code> is the inode <code class="code">t</code> such that <code class="code">basename t</code> is <code class="code">name</code>
+      and <code class="code">kind t</code> is <code class="code"><span class="constructor">File</span> f</code>.<br>
+</div>
+
+<pre><span id="VALdir"><span class="keyword">val</span> dir</span> : <code class="type">string -> <a href="Vfs.Dir.html#TYPEt">Vfs.Dir.t</a> -> <a href="Vfs.Inode.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">dir name d</code> is the inode <code class="code">t</code> such that <code class="code">basename t</code> is <code class="code">name</code>
+      and <code class="code">kind t</code> is <code class="code"><span class="constructor">Dir</span> d</code>.<br>
+</div>
+
+<pre><span id="VALbasename"><span class="keyword">val</span> basename</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">basenane t</code> is <code class="code">t</code>'s basename.<br>
+</div>
+
+<pre><span id="VALset_basename"><span class="keyword">val</span> set_basename</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">t</a> -> string -> unit</code></pre><div class="info ">
+<code class="code">set_basename t name</code> changes <code class="code">t</code>'s basename to <code class="code">name</code>.<br>
+</div>
+
+<pre><span id="VALkind"><span class="keyword">val</span> kind</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">t</a> -> <a href="Vfs.Inode.html#TYPEkind">kind</a></code></pre><div class="info ">
+<code class="code">kind t</code> is <code class="code">t</code>'s kind.<br>
+</div>
+
+<pre><span id="VALino"><span class="keyword">val</span> ino</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">t</a> -> int64</code></pre><div class="info ">
+<code class="code">ino t</code> is a unique "inode number" for the file. If two files have the
+      same inode number, then they are the same file.<br>
+</div>
+</body></html>

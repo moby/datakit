@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Vfs.File.html">
+<link rel="next" href="Vfs.Inode.html">
+<link rel="Up" href="Vfs.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Vfs.Dir</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Vfs.File.html" title="Vfs.File">Previous</a>
+&nbsp;<a class="up" href="Vfs.html" title="Vfs">Up</a>
+&nbsp;<a class="post" href="Vfs.Inode.html" title="Vfs.Inode">Next</a>
+</div>
+<h1>Module <a href="type_Vfs.Dir.html">Vfs.Dir</a></h1>
+
+<pre><span class="keyword">module</span> Dir: <code class="code"><span class="keyword">sig</span></code> <a href="Vfs.Dir.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+Directory operations.<br>
+</div>
+<hr width="100%">
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+The type for directories.<br>
+</div>
+
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp</code> is a pretty-printer for directories.<br>
+</div>
+
+<pre><span id="VALls"><span class="keyword">val</span> ls</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+The <code class="code">ls</code> commands.<br>
+</div>
+
+<pre><span id="VALmkfile"><span class="keyword">val</span> mkfile</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> -> ?perm:<a href="Vfs.html#TYPEperm">Vfs.perm</a> -> string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+The <code class="code">mkfile</code> command.<br>
+</div>
+
+<pre><span id="VALlookup"><span class="keyword">val</span> lookup</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> -> string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+The <code class="code">lookup</code> command.<br>
+</div>
+
+<pre><span id="VALmkdir"><span class="keyword">val</span> mkdir</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> -> string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+The <code class="code">mkdir</code> command.<br>
+</div>
+
+<pre><span id="VALremove"><span class="keyword">val</span> remove</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+The <code class="code">remove</code> command. FIXME: shouldn't it be string -&gt; unit?<br>
+</div>
+
+<pre><span id="VALrename"><span class="keyword">val</span> rename</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a> -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> -> string -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+The <code class="code">rename</code> command.<br>
+</div>
+
+<pre><span id="VALempty"><span class="keyword">val</span> empty</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">empty</code> is the empty directory.<br>
+</div>
+
+<pre><span id="VALof_list"><span class="keyword">val</span> of_list</span> : <code class="type">(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">of_list l</code> is a read-only, static directory containing only the
+      inodes <code class="code">l</code>. The sub-directories are re-evaluated on every <code class="code">ls</code>
+      and <code class="code">read</code>.<br>
+</div>
+
+<pre><span id="VALof_map_ref"><span class="keyword">val</span> of_map_ref</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> Astring.String.Map.t Pervasives.ref -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">of_map_ref m</code> is a read-only directory containing the inodes
+      defined in <code class="code">m</code>. The content of the directory is computed
+      dynamically by accessing elements in the map on every access.<br>
+</div>
+
+<pre><span id="VALread_only"><span class="keyword">val</span> read_only</span> : <code class="type">ls:(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       lookup:(string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       remove:(unit -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">read_only</code> is a read-only directory. FIXME.<br>
+</div>
+
+<pre><span id="VALdir_only"><span class="keyword">val</span> dir_only</span> : <code class="type">ls:(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       lookup:(string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       mkdir:(string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       remove:(unit -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       rename:(<a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> -> string -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">dir_only</code> is a directory which contains only
+      directories. FIXME.<br>
+</div>
+
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">ls:(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       mkfile:(string -> <a href="Vfs.html#TYPEperm">Vfs.perm</a> -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       lookup:(string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       mkdir:(string -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       remove:(unit -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       rename:(<a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> -> string -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">creae</code> is a generic directory.<br>
+</div>
+
+<pre><span id="VALerr_read_only"><span class="keyword">val</span> err_read_only</span> : <code class="type">'a <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
+<h1 id="1_Errors">Errors</h1><br>
+</div>
+
+<pre><span id="VALerr_already_exists"><span class="keyword">val</span> err_already_exists</span> : <code class="type">'a <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre>
+<pre><span id="VALerr_dir_only"><span class="keyword">val</span> err_dir_only</span> : <code class="type">'a <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre>
+<pre><span id="VALerr_no_entry"><span class="keyword">val</span> err_no_entry</span> : <code class="type">'a <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre></body></html>

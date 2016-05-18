@@ -1,0 +1,39 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Vfs.html">
+<link rel="next" href="Ivfs.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Fs9p</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Vfs.html" title="Vfs">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Ivfs.html" title="Ivfs">Next</a>
+</div>
+<h1>Module <a href="type_Fs9p.html">Fs9p</a></h1>
+
+<pre><span class="keyword">module</span> Fs9p: <code class="code"><span class="keyword">sig</span></code> <a href="Fs9p.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+Expose a VFS directory over 9p.<br>
+</div>
+<hr width="100%">
+
+<pre><span class="keyword">module type</span> <a href="Fs9p.S.html">S</a> = <code class="code"><span class="keyword">sig</span></code> <a href="Fs9p.S.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+The server signature.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Fs9p.Make.html">Make</a> <code class="code">(</code><code class="code"><span class="constructor">Flow</span></code><code class="code"> : </code><code class="type">V1_LWT.FLOW</code><code class="code">) </code>: <code class="type"><a href="Fs9p.S.html">S</a></code><code class="type">  with type flow = Flow.flow</code></pre><div class="info">
+Server builder.
+</div>
+</body></html>

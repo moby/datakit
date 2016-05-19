@@ -178,9 +178,9 @@ contain:
 
 For example, to create a file `somefile`:
 
-    ~/mnt $ mkdir branch/master/transactions/foo
-    ~/mnt $ echo somedata > branch/master/transactions/foo/rw/somefile
-    ~/mnt $ echo commit > branch/master/transactions/foo/ctl
+    ~/db $ mkdir branch/master/transactions/foo
+    ~/db $ echo somedata > branch/master/transactions/foo/rw/somefile
+    ~/db $ echo commit > branch/master/transactions/foo/ctl
 
 If the branch has been updated since the transaction was created then,
 when you try to commit, Irmin will try to merge the changes.
@@ -222,14 +222,14 @@ the resulting merge commit difficult with most tools.
 A snapshots for a given commit can be opened by accessing the
 directory `/snapshots/COMMIT_ID`, which is created on demand.
 
-    ~/mnt $ cd snapshots/4b6557542ec9cc578d5fe09b664110ba3b68e2c2
-    ~/m/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $ ls
+    ~/db $ cd snapshots/4b6557542ec9cc578d5fe09b664110ba3b68e2c2
+    ~/d/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $ ls
     hash  ro/
-    ~/m/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $ cat hash
+    ~/d/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $ cat hash
     4b6557542ec9cc578d5fe09b664110ba3b68e2c2
-    ~/m/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $ ls ro
+    ~/d/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $ ls ro
     somefile
-    ~/m/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $
+    ~/d/s/4b6557542ec9cc578d5fe09b664110ba3b68e2c2 $
 
 The contents of a snapshot directory are:
 
@@ -287,22 +287,22 @@ to add a new configuration. Every configuration folder contains:
 
 To  fetch `https://github.com/docker/datakit`'s master branch:
 
-    ~/mnt $ cd remotes
-    ~/mnt/remotes $ mkdir origin
-    ~/mnt/remotes $ echo https://github.com/docker/datakit > origin/url
-    ~/mnt/remotes $ echo master > origin/fetch
-    ~/mnt/remotes $ cat origin/head
+    ~/db $ cd remotes
+    ~/db/remotes $ mkdir origin
+    ~/db/remotes $ echo https://github.com/docker/datakit > origin/url
+    ~/db/remotes $ echo master > origin/fetch
+    ~/db/remotes $ cat origin/head
     4b6557542ec9cc578d5fe09b664110ba3b68e2c2
 
 ### Github PRs
 
 There is a basic support for interacting with Github PRs.
 
-    ~/mnt $ ls github.com/docker/datakit
+    ~/db $ ls github.com/docker/datakit
     41  42
-    ~/mnt $ cat github.com/docker/datakit/pr/41/status/default/state
+    ~/db $ cat github.com/docker/datakit/pr/41/status/default/state
     pending
-    ~/mnt $ echo success > github.com/docker/datakit/pr/41/status/default/state
+    ~/db $ echo success > github.com/docker/datakit/pr/41/status/default/state
 
 
 This first query the status of the pull request on the Github interface,
@@ -310,15 +310,15 @@ then update the `default` status to `success`.
 
 To create a new status and set its description, url and status:
 
-    ~/mnt $ PR=github.com/docker/datakit/pr/41
-    ~/mnt $ mkdir $PR/status/test
-    ~/mnt $ echo "My status" > $PR/status/test/descr
-    ~/mnt $ echo "http://example.com" > $PR/status/test/url
-    ~/mnt $ echo success > $PR/status/test/state
+    ~/db $ PR=github.com/docker/datakit/pr/41
+    ~/db $ mkdir $PR/status/test
+    ~/db $ echo "My status" > $PR/status/test/descr
+    ~/db $ echo "http://example.com" > $PR/status/test/url
+    ~/db $ echo success > $PR/status/test/state
 
 To subscribe to the stream of new PRS:
 
-    ~/mnt $ cat github.com/docker/datakit/pr/updates
+    ~/db $ cat github.com/docker/datakit/pr/updates
 
 This is a blocking read, and will produce a new line on every pull request
 with the number of the PR, so you can do:

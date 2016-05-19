@@ -6,7 +6,7 @@
 
 *Datakit* is tool to orchestrate applications using a 9P dataflow. It
 revisits the UNIX pipeline concept, with a modern twist: streams of
-tree-structured data instead of raw text. Datakit allows to  define
+tree-structured data instead of raw text. Datakit allows you to define
 complex build pipelines over version-controlled data, using shell
 scripts interacting with the filesystem. For instance to
 [trigger](https://github.com/docker/datakit/blob/master/ci/ci.sh)
@@ -219,7 +219,7 @@ the resulting merge commit difficult with most tools.
 
 #### Snapshots
 
-A snapshots for a given commit can be opened by accessing the
+A snapshot for a given commit can be opened by accessing the
 directory `/snapshots/COMMIT_ID`, which is created on demand.
 
     ~/db $ cd snapshots/4b6557542ec9cc578d5fe09b664110ba3b68e2c2
@@ -317,7 +317,7 @@ To create a new status and set its description, url and status:
     ~/db $ echo "http://example.com" > $PR/status/test/url
     ~/db $ echo success > $PR/status/test/state
 
-To subscribe to the stream of new PRS:
+To subscribe to the stream of new PRs:
 
     ~/db $ cat github.com/docker/datakit/pr/updates
 

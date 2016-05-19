@@ -58,12 +58,11 @@ expose the database as a filesystem API:
 ```shell
 # In an other terminal
 $ docker run -it --privileged --net datakit-net docker/datakit:client
-$ cd /db
-$ ls
+$ ls /db
 branch     remotes    snapshots  trees
 ```
 
-*Note*: the `--privileges` option is needed because the container will have
+*Note*: the `--privileged` option is needed because the container will have
 to mount the 9p endpoint into its local filesystem.
 
 Now you can explore, edit and script `/db`. See the
@@ -75,13 +74,9 @@ for more details.
 To start Datakit with the experimental Github bindings:
 
 ```shell
-$ DATAKIT_GITHUB=1 ./scripts/start-datakit.sh
-
-# In an other terminal
-$ ./scripts/start-client.sh
-$ datakit-mount
-$ cd /db
-$ ls
+$ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit:github
+$ docker run -it --privileged --net datakit-net docker/datakit:client
+$ ls /db
 branch      github.com  remotes     snapshots   trees
 ```
 

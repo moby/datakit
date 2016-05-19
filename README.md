@@ -285,11 +285,12 @@ to add a new configuration. Every configuration folder contains:
   commit ID of the remote. On every fetch, a new line is added
   with the commit ID of the remote branch.
 
-To  fetch `https://github.com/docker/datakit`'s master branch:
+To fetch `https://github.com/docker/datakit`'s master branch using the
+git protocol:
 
     ~/db $ cd remotes
     ~/db/remotes $ mkdir origin
-    ~/db/remotes $ echo https://github.com/docker/datakit > origin/url
+    ~/db/remotes $ echo git://github.com/docker/datakit > origin/url
     ~/db/remotes $ echo master > origin/fetch
     ~/db/remotes $ cat origin/head
     4b6557542ec9cc578d5fe09b664110ba3b68e2c2

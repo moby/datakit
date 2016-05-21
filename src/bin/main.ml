@@ -256,24 +256,48 @@ let reporter () =
   in
   { Logs.report = report }
 
-let setup_log style_renderer eventlog level =
-  if eventlog then begin
+module Log_destination = struct
+  type t =
+    | Stderr
+    | Eventlog
+    | ASL
+
+  let parser x = match String.lowercase x with
+    | "stderr" -> `Ok Stderr
+    | "eventlog" -> `Ok Eventlog
+    | "asl" -> `Ok ASL
+    | _ -> `Error("Unknown log destination: expected stderr / eventlog / asl")
+
+  let printer fmt x = Format.pp_print_string fmt (match x with
+    | Stderr -> "stderr"
+    | Eventlog -> "eventlog"
+    | ASL -> "asl")
+
+  let conv = parser, printer
+end
+
+let setup_log style_renderer log_destination level =
+  Logs.set_level level;
+  let open Log_destination in
+  match log_destination with
+  | Eventlog ->
     let eventlog = Eventlog.register "Docker.exe" in
-    Logs.set_reporter (Log_eventlog.reporter ~eventlog ());
-  end else begin
+    Logs.set_reporter (Log_eventlog.reporter ~eventlog ())
+  | Stderr ->
     Fmt_tty.setup_std_outputs ?style_renderer ();
-    Logs.set_level level;
-    Logs.set_reporter (reporter ());
-    ()
-  end
+    Logs.set_reporter (reporter ())
+  | ASL ->
+    let facility = Filename.basename Sys.executable_name in
+    let client = Asl.Client.create ~ident:"Docker" ~facility () in
+    Logs.set_reporter (Log_asl.reporter ~client ())
 
 let env_docs = "ENVIRONMENT VARIABLES"
 
-let eventlog =
+let log_destination =
   let doc =
-    Arg.info ~doc:"Send logs to the Windows event log" [ "eventlog" ]
+    Arg.info ~doc:"Destination for the logs" [ "log-destination" ]
   in
-  Arg.(value & flag & doc)
+  Arg.(value & opt Log_destination.conv Log_destination.Stderr & doc)
 
 let setup_log =
   let env =
@@ -281,7 +305,7 @@ let setup_log =
       ~doc:"Be more or less verbose. See $(b,--verbose)."
       "DATAKIT_VERBOSE"
   in
-  Term.(const setup_log $ Fmt_cli.style_renderer () $ eventlog $ Logs_cli.level ~env ())
+  Term.(const setup_log $ Fmt_cli.style_renderer () $ log_destination $ Logs_cli.level ~env ())
 
 let git =
   let doc =

@@ -114,3 +114,10 @@ gh-pages: gh-pages/.git doc
 	cd gh-pages && git push origin gh-pages
 
 .PHONY: build doc test all install uninstall reinstall clean distclean gh-pages
+
+NAME    = $(shell grep 'Name:' _oasis    | sed 's/Name: *//')
+ARCHIVE = https://github.com/docker/$(NAME)/archive/$(VERSION).tar.gz
+
+pr:
+	opam publish prepare $(NAME).$(VERSION) $(ARCHIVE)
+	OPAMYES=1 opam publish submit $(NAME).$(VERSION) && rm -rf $(NAME).$(VERSION)

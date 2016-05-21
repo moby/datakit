@@ -155,7 +155,7 @@ module API = struct
 end
 
 (* /github.com/${USER}/${REPO}/pr/${PR}/status/${CONTEXT} *)
-let pr_status_dir t pr context state =
+let pr_status_dir t pr context ?(extra_dirs=fun () -> []) state =
   Logs.debug (fun l ->
       l "status_file %s/%s %d %a"
         t.API.user t.API.repo pr.pull_number API.pp_status_state state);
@@ -212,46 +212,81 @@ let pr_status_dir t pr context state =
     Vfs.Inode.file "url"     url;
     Vfs.Inode.file "updates" updates;
   ] in
-  Vfs.Dir.of_list (fun () -> dir)
+  Vfs.Dir.of_list (fun () -> dir @ extra_dirs ())
 
 let context_of_status s = match s.status_context with
   | None   -> ["default"]
   | Some c -> String.cuts ~empty:false ~sep:"/" c
 
+let rec compare_context x y =
+  match x, y with
+  | [], [] -> 0
+  | [], _  -> -1
+  | _ , [] -> 1
+  | h1::t1, h2::t2 ->
+    match String.compare h1 h2 with
+    | 0 -> compare_context t1 t2
+    | i -> i
+
+let sort_by_hd childs =
+  let childs = List.filter (fun (p, _) -> p <> []) childs in
+  let compare_child (c1, _) (c2, _) = compare_context c1 c2 in
+  let childs = List.sort compare_child childs in
+  let rec aux (root, current, acc) = function
+    | [] -> List.rev @@ (root, List.rev current) :: acc
+    | ([]  , _)::_ -> assert false
+    | (r::p, s)::t ->
+      if r = root then
+        let current = (p, s) :: current in
+        aux (root, current, acc) t
+      else
+        let acc = (root, List.rev current) :: acc in
+        let current = [ (p, s) ] in
+        let root = r in
+        aux (root, current, acc) t
+  in
+  match childs with
+  | []           -> []
+  | ([],_):: _   -> assert false
+  | (r::p, s)::t -> aux (r, [ (p, s) ], []) t
+
+let string_of_context context = String.concat ~sep:"/" context
+
 (* /github.com/${USER}/${REPO}/pr/${PR}/status *)
 let pr_status_root t pr =
   Log.debug (fun l ->
       l "status_dir %s/%s %d" t.API.user t.API.repo pr.pull_number);
-  let inode context status =
-    let context_str = String.concat ~sep:"/" context in
-    let rec aux = function
-      | []     -> assert false
-      | [name] ->
-        let dir = pr_status_dir t pr context_str status.status_state in
-        Vfs.Inode.dir name dir
-      | name :: rest ->
-        Vfs.Inode.dir name @@ Vfs.Dir.of_list (fun () -> [aux rest])
+  let rec inodes childs =
+    let root_status =
+      try Some (List.find (fun (p, _) -> p = []) childs |> snd)
+      with Not_found -> None
     in
-    aux context
+    let childs = sort_by_hd childs in
+    let childs () =
+      List.map (fun (n, childs) -> Vfs.Inode.dir n @@ inodes childs) childs
+    in
+    match root_status with
+    | None   -> Vfs.Dir.of_list childs
+    | Some s ->
+      let context_str = string_of_context @@ context_of_status s in
+      pr_status_dir t pr context_str ~extra_dirs:childs s.status_state
   in
   let ls () =
-    let status = API.status t pr in
-    List.fold_left (fun acc status ->
-        let context = context_of_status status in
-        let name = match context with h::_ -> h | [] -> assert false in
-        if List.mem_assoc name acc then acc
-        else (name, inode context status) :: acc
-      ) [] status
-    |> List.map snd
+    API.status t pr
+    |> List.map (fun s -> context_of_status s, s)
+    |> sort_by_hd
+    |> List.map (fun (name, childs) -> Vfs.Inode.dir name @@ inodes childs)
     |> Vfs.ok
   in
   let lookup name =
-    let status = API.status t pr in
     try
-      let s =
-        List.find (fun s -> List.hd (context_of_status s) = name) status
-      in
-      Vfs.ok @@ inode (context_of_status s) s
+      API.status t pr
+      |> List.map (fun s -> context_of_status s, s)
+      |> List.find_all (fun (c, _) -> List.hd c = name)
+      |> List.map (fun (c, s) -> List.tl c, s)
+      |> inodes
+      |> Vfs.Inode.dir name
+      |> Vfs.ok
     with Not_found ->
       Vfs.File.err_no_entry
   in

@@ -4,7 +4,7 @@ install: wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.t
 script: bash -ex .travis-opam.sh
 env:
   - DEPOPTS=github
-    PINS="github hvsock:https://github.com/djs55/ocaml-hvsock.git"
+    PINS="github"
 os:
   - linux
   - osx

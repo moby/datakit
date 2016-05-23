@@ -4,13 +4,13 @@
 [![Build status (Windows)](https://ci.appveyor.com/api/projects/status/6qrdgiqbhi4sehmy/branch/master?svg=true)](https://ci.appveyor.com/project/docker/datakit/branch/master)
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
-*Datakit* is tool to orchestrate applications using a 9P dataflow. It
+*Datakit* is a tool to orchestrate applications using a 9P dataflow. It
 revisits the UNIX pipeline concept, with a modern twist: streams of
 tree-structured data instead of raw text. Datakit allows you to define
 complex build pipelines over version-controlled data, using shell
 scripts interacting with the filesystem. For instance to
 [trigger](https://github.com/docker/datakit/blob/master/ci/ci.sh)
-a build on every changes in the `master` branch:
+a build on every change in the `master` branch:
 
 ```bash
 # The Git repository to test
@@ -49,7 +49,7 @@ $ docker network create datakit-net # create a private network
 $ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit
 ```
 
-*Note*: The `--name datakit` option is mandatory, it will allow the client
+*Note*: The `--name datakit` option is mandatory.  It will allow the client
 to connect to a known name on the private network.
 
 You can then start a Datakit client, which will mount the 9p endpoint and
@@ -69,9 +69,9 @@ Now you can explore, edit and script `/db`. See the
 [Filesystem API](https://github.com/docker/datakit#filesystem-api)
 for more details.
 
-#### Experimental Github API bindings
+#### Experimental GitHub API bindings
 
-To start Datakit with the experimental Github bindings:
+To start Datakit with the experimental GitHub bindings:
 
 ```shell
 $ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit:github
@@ -82,18 +82,18 @@ branch      github.com  remotes     snapshots   trees
 
 ### Building
 
-The easiest way to build that project is to use [docker](https://docker.com),
+The easiest way to build the Datakit project is to use [docker](https://docker.com),
 (which is what the
-[start-datakit.sh](https://github.com/docker/datakit/blob/master/scripts/start-datakit.sh)
+[start-datakit.sh](https://github.com/docker/datakit/blob/master/scripts/start-datakit.sh) script
 does under the hood):
 
 ```shell
 $ docker build -t datakit .
 $ docker run datakit
 ```
-This will expose the database's 9p endpoint on port 5640.
+These commands will expose the database's 9p endpoint on port 5640.
 
-If you really want to build the project from sources, you will need to install
+If you really want to build the project from source, you will need to install
 [ocaml](http://ocaml.org/) and [opam](http://opam.ocaml.org/). Then write:
 
 ```shell
@@ -124,21 +124,21 @@ Each branch directory contains:
   read (or the empty string if the branch is empty).
 
 - `head.live` is a stream which produces a list of commit IDs, one per
-  line, starting with the current one and returning new ones as the
-  branch is updated. When the branch does not have a commit, this is
+  line, starting with the current commit and returning new commits as the
+  branch is updated. A branch with no commits is
   represented by a blank line.
 
 - `reflog` is a stream which outputs a new line each time the current
-  HEAD is updated. The line gives the commit hash (or is blank if the branch
+  `HEAD` is updated. The line gives the commit hash (or is blank if the branch
   has been deleted). Unlike `head.live`, `reflog` does not start by outputting
   the current commit and it does not skip commits.
 
-- `ro` a live read-only view onto the current contents of the head of
+- `ro` is a live read-only view of the current contents of the head of
   the branch.
 
-- `transactions`, which is used to update the branch.
+- `transactions` is used to update the branch.
 
-- `watch`, which can be used to watch specific files or directories for changes.
+- `watch` can be used to watch specific files or directories for changes.
 
 Note that reading from `head.live` will skip directly to the latest
 commit: even if you read continuously from it, you will not
@@ -155,26 +155,26 @@ rather than by commit hashes.
 
 #### Transactions
 
-Read/write transactions can be created my making a new directory for
+Read/write transactions can be created by making a new directory for
 the transaction in `transactions`.  The newly created directory will
 contain:
 
-- `rw` a directory with the current contents of the
+- `rw`, a directory with the current contents of the
   transaction. Initially, this is a copy of the branch's `ro`
   directory. Modify this as desired.
 
-- `msg` is the commit message to use.
+- `msg`, the commit message to use.
 
-- `parents` is the list of commit hashes of the parents, one per line.
+- `parents`, the list of commit hashes of the parents, one per line.
   Initially, this is the single head commit at the time the transaction
   was created, but it can be modified to produce other effects.
   Simply appending another branch's 'head' here is equivalent to doing a Git
   merge with strategy 'ours' (which is *not* the same as "recursive/ours").
 
-- `ctl` can be used to commit the transaction (by writing `commit` to
+- `ctl`, which can be used to commit the transaction (by writing `commit` to
   it) or to cancel it (by writing `close`).
 
-- `merge` can be used to start a merge (see below).
+- `merge`, which can be used to start a merge (see below).
 
 For example, to create a file `somefile`:
 
@@ -190,12 +190,12 @@ will fail.  Merge errors are reported as 9p error strings.  When a
 commit succeeds the transaction directory is automatically removed.
 
 Each 9p connection has its own set of transactions, and the changes in
-a transaction cannot be seen by other clients until it is committed.
+a transaction cannot be seen by other clients until the transaction is committed.
 
 #### Merging
 
 Within a transaction, write a commit ID to the `merge` file to begin a merge.
-The transaction directory will change slighty:
+The transaction directory will change slightly:
 
 - `ours` is a read-only directory, containing whatever was previously in `rw`
 - `theirs` is the commit being merged
@@ -272,7 +272,7 @@ watch any path, whether it currently exists or not.
 ### Fetch
 
 To fetch from a remote repository, use the `/remotes` root directory.
-This directory is *not persisted* so will disapear accross reboots.
+This directory is *not persisted* so will disappear across reboots.
 
 Each directory under `/remotes/<name>` corresponds to the configuration
 of a remote server called `<name>`. Create a new directory (with `mkdir`)
@@ -281,7 +281,7 @@ to add a new configuration. Every configuration folder contains:
 - A writable file: `url`, which contains the remote url.
 - A control file: `fetch`, which is used to fetch branches from the
   remote server.
-- A read-only stream file: `head` which contains the last knowns
+- A read-only stream file: `head` which contains the last known
   commit ID of the remote. On every fetch, a new line is added
   with the commit ID of the remote branch.
 
@@ -295,9 +295,9 @@ git protocol:
     ~/db/remotes $ cat origin/head
     4b6557542ec9cc578d5fe09b664110ba3b68e2c2
 
-### Github PRs
+### GitHub PRs
 
-There is a basic support for interacting with Github PRs.
+There is basic support for interacting with GitHub PRs.
 
     ~/db $ ls github.com/docker/datakit
     41  42
@@ -306,8 +306,8 @@ There is a basic support for interacting with Github PRs.
     ~/db $ echo success > github.com/docker/datakit/pr/41/status/default/state
 
 
-This first query the status of the pull request on the Github interface,
-then update the `default` status to `success`.
+This first queries the status of the pull request on the GitHub interface,
+then updates the `default` status to `success`.
 
 To create a new status and set its description, url and status:
 

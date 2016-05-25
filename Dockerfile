@@ -1,5 +1,7 @@
 FROM ocaml/opam:alpine
 
+RUN cd /home/opam/repository && git pull && opam update
+
 RUN opam depext lwt ssl &&  opam install lwt alcotest oasis
 
 RUN opam pin add hvsock https://github.com/djs55/ocaml-hvsock.git

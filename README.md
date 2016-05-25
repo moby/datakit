@@ -353,7 +353,7 @@ status updates for that PR.
 
 #### Delete a branch
 
-    rm branch/foo
+    rmdir branch/foo
 
 #### Merge a branch
 

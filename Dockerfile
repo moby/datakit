@@ -1,6 +1,6 @@
 FROM ocaml/opam:alpine
 
-RUN cd /home/opam/repository && git pull && opam update
+RUN cd /home/opam/opam-repository && git pull && opam update
 
 RUN opam depext lwt ssl &&  opam install lwt alcotest oasis
 

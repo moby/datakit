@@ -7,7 +7,7 @@ module Make (Tree : Ivfs_tree.S) : sig
 
   val root : t -> Tree.Dir.t
 
-  val update : t -> Ivfs_tree.path -> string -> Cstruct.t * [Ivfs_tree.perm | `Keep] ->
+  val update : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * [Ivfs_tree.perm | `Keep] ->
     (unit, [`Is_a_directory | `Not_a_directory]) result Lwt.t
   (** [update t dir leaf data] makes [dir/leaf] be the file [data].
       Missing directories may be created. If [dir/leaf] is a file then it is overwritten.
@@ -23,7 +23,7 @@ module Make (Tree : Ivfs_tree.S) : sig
       Fails if any component of [dir] is not a directory, or
       [perm] is incompatible with the type of the item being changed. *)
 
-  val update_force : t -> Ivfs_tree.path -> string -> Cstruct.t * Ivfs_tree.perm ->
+  val update_force : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * Ivfs_tree.perm ->
     unit Lwt.t
   (** [update_force t path leaf value] ensures that [path/leaf] is a file containing [value].
       Any existing files and directories that are in the way are destroyed. *)

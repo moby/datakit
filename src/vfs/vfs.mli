@@ -47,6 +47,13 @@ module Error: sig
   (** [Other ~errno descr] is [Error { errno; descr }]. [errno] is 0
       if not set. *)
 
+  val negative_offset: int64 -> ('a, t) result
+  (** [negative_offset o] is an error saying that [o] is negative. *)
+
+  val offset_too_large: offset:int64 -> int64 -> ('a, t) result
+  (** [offset_too_large ~offset len] is an error saying that [offset] is beyond the end of the file ([len]). *)
+
+  val pp: t Fmt.t
 end
 
 type 'a or_err = ('a, Error.t) Result.result Lwt.t
@@ -70,6 +77,12 @@ module File: sig
 
   type fd
   (** The type for open files, e.g. file descriptors. *)
+
+  val create_fd:
+    read : (offset:int64 -> count:int -> Cstruct.t or_err) ->
+    write: (offset:int64 -> Cstruct.t -> unit or_err) ->
+    fd
+  (** Create an open file object. *)
 
   val read: fd -> offset:int64 -> count:int -> Cstruct.t or_err
   (** [read f ~offset ~count] reads an open file. *)

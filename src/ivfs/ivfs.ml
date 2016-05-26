@@ -43,7 +43,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
   module Merge = Ivfs_merge.Make(Store)(RW)
   module Remote = Ivfs_remote.Make(Store)
 
-  let empty_file = Cstruct.create 0
+  let empty_file = Ivfs_blob.empty
 
   let stat path root =
     Tree.Dir.lookup_path root path >>= function
@@ -55,7 +55,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     | `File (f, `Link) ->
         Tree.File.content f >>= fun target ->
         Tree.File.size f >|= fun length ->
-        Ok {Vfs.length; perm = `Link (Cstruct.to_string target)}
+        Ok {Vfs.length; perm = `Link (Ivfs_blob.to_string target)}
 
   let irmin_ro_file ~get_root path =
     let read () =
@@ -65,7 +65,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       | `Directory _  -> err_is_dir
       | `File (f, _perm) ->
           Tree.File.content f >|= fun content ->
-          Ok (Some content)
+          Ok (Some (Ivfs_blob.to_ro_cstruct content))
     in
     let stat () = get_root () >>= stat path in
     Vfs.File.of_kvro ~read ~stat
@@ -74,23 +74,17 @@ module Make (Store : Ivfs_tree.STORE) = struct
     match Irmin.Path.String_list.rdecons path with
     | None -> assert false
     | Some (dir, leaf) ->
-    let read () =
+    let blob () =
       let root = RW.root view in
       Tree.Dir.lookup_path root path >>= function
       | `None         -> Lwt.return (Ok None)
       | `Directory _  -> err_is_dir
-      | `File (f, _perm) ->
-          Tree.File.content f >|= fun content ->
-          Ok (Some content)
+      | `File (f, _perm) -> Tree.File.content f >|= fun b -> Ok (Some b)
     in
-    let write data =
-      RW.update view dir leaf (data, `Keep) >>= function
-      | Error `Is_a_directory -> err_is_dir
-      | Error `Not_a_directory -> err_not_dir
-      | Ok () ->
-      remove_conflict path;
-      Lwt.return (Ok ())
-    in
+    let blob_or_empty () =
+      blob () >>*= function
+      | None -> ok Ivfs_blob.empty
+      | Some b -> ok b in
     let remove () =
       RW.remove view dir leaf >>= function
       | Error `Not_a_directory -> err_not_dir
@@ -105,7 +99,31 @@ module Make (Store : Ivfs_tree.STORE) = struct
       | Error `No_such_item -> err_no_entry
       | Ok () -> Lwt.return (Ok ())
     in
-    Vfs.File.of_kv ~read ~write ~stat ~remove ~chmod
+    let update b =
+      RW.update view dir leaf (b, `Keep) >>= function
+      | Error `Is_a_directory -> err_is_dir
+      | Error `Not_a_directory -> err_not_dir
+      | Ok () ->
+      remove_conflict path;
+      Lwt.return (Ok ())
+    in
+    let open_ () =
+      let read ~offset ~count =
+        blob () >>*= function
+        | None -> err_no_entry
+        | Some b ->
+          Lwt.return (Ivfs_blob.read ~offset ~count b)
+      and write ~offset data =
+        blob_or_empty () >>*= fun b ->
+        Lwt.return (Ivfs_blob.write b ~offset data) >>*= update
+      in
+      ok @@ Vfs.File.create_fd ~read ~write
+    in
+    let truncate len =
+      blob_or_empty () >>*= fun b ->
+      Lwt.return (Ivfs_blob.truncate b len) >>*= update
+    in
+    Vfs.File.create ~stat ~open_ ~truncate ~remove ~chmod
 
   let name_of_irmin_path ~root path =
     match Path.rdecons path with
@@ -216,7 +234,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       let mkfile name perm =
         begin match perm with
         | `Normal | `Exec as perm -> RW.update view path name (empty_file, perm)
-        | `Link target -> RW.update view path name (Cstruct.of_string target, `Link)
+        | `Link target -> RW.update view path name (Ivfs_blob.of_string target, `Link)
         end >>= function
         | Error `Not_a_directory -> err_not_dir
         | Error `Is_a_directory -> err_is_dir

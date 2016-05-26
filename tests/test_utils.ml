@@ -7,6 +7,11 @@ let ( ++ ) = Int64.add
 
 let ok x = `Ok x
 
+let ( >>!= ) x f =
+  match x with
+  | Ok y -> f y
+  | Error vfs_error -> Alcotest.fail (Fmt.to_to_string Vfs.Error.pp vfs_error)
+
 let ( >>*= ) x f = x >>= function
   | Ok y -> f y
   | Error (`Msg msg) -> Alcotest.fail msg
@@ -352,3 +357,14 @@ let try_merge conn ~base ~ours ~theirs fn =
       write_file conn (t @ ["merge"]) theirs_head >>*= fun () ->
       fn t
     )
+
+let vfs_error = Alcotest.of_pp Vfs.Error.pp
+let vfs_result ok = Alcotest.result ok vfs_error
+
+let reject (type v) =
+  let module T = struct
+    type t = v
+    let pp fmt _ = Fmt.string fmt "reject-all"
+    let equal _ _ = false
+  end in
+  (module T : Alcotest.TESTABLE with type t = v)

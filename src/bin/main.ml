@@ -213,6 +213,7 @@ let start urls sandbox git ~bare =
            let port = Uri.port uri |> default 5640 in
            let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string host, port) in
            let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
+           Lwt_unix.setsockopt socket Lwt_unix.SO_REUSEADDR true;       (* Makes testing easier *)
            Lwt_unix.bind socket addr;
            unix_accept_forever url socket (handle_unix_flow ~make_root)
          | Some "hyperv-connect" ->

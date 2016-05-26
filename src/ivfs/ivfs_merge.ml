@@ -3,9 +3,15 @@ open Lwt.Infix
 
 module PathSet = Set.Make(Irmin.Path.String_list)
 
+let blob = Tc.biject (module Tc.Cstruct)
+    Ivfs_blob.of_ro_cstruct
+    Ivfs_blob.to_ro_cstruct
+
+module Blob = (val blob : Tc.S0 with type t = Ivfs_blob.t)
+
 module type RW = sig
   type t
-  val update_force : t -> Ivfs_tree.path -> string -> Cstruct.t * Ivfs_tree.perm -> unit Lwt.t
+  val update_force : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
   val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
 end
 
@@ -15,23 +21,23 @@ module Make
 = struct
   module Tree = Ivfs_tree.Make(Store)
   module Metadata = Store.Private.Node.Val.Metadata
-  module ContentsMeta = Tc.Pair(Tc.Cstruct)(Metadata)
+  module ContentsMeta = Tc.Pair(Blob)(Metadata)
 
   let as_file = function
     | `File (f, perm) -> Tree.File.content f >|= fun c -> Some (c, perm)
     | `Directory _ | `None -> Lwt.return None
 
-  let merge_cstruct = Irmin.Merge.default (module Tc.Cstruct)
+  let merge_blob = Irmin.Merge.default (module Blob)
 
   let merge_file =
     Irmin.Merge.option (module ContentsMeta)
-      (Irmin.Merge.pair (module Tc.Cstruct) (module Metadata) merge_cstruct Metadata.merge)
+      (Irmin.Merge.pair (module Blob) (module Metadata) merge_blob Metadata.merge)
 
   let merge ~ours ~theirs ~base result =
     let conflicts = ref PathSet.empty in
     let note_conflict path leaf msg =
       conflicts := !conflicts |> PathSet.add (Irmin.Path.String_list.rcons path leaf);
-      let f = Cstruct.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
+      let f = Ivfs_blob.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
       RW.update_force result path leaf (f, `Normal) in
     let repo = Store.repo ours in
     let empty = Tree.Dir.empty repo in

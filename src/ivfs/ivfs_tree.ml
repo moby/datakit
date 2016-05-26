@@ -23,9 +23,9 @@ module type S = sig
   module File : sig
     type t
     type hash
-    val of_data : repo -> Cstruct.t -> t
+    val of_data : repo -> Ivfs_blob.t -> t
     val hash : t -> hash Lwt.t
-    val content : t -> Cstruct.t Lwt.t
+    val content : t -> Ivfs_blob.t Lwt.t
     val equal : t -> t -> bool
     val pp_hash : Format.formatter -> hash -> unit
     val size : t -> int64 Lwt.t
@@ -58,7 +58,7 @@ module Make (Store : STORE) = struct
 
     (* For now, a value is either in memory or on disk. In future, we may want to support both at once for caching. *)
     type value =
-      | Blob of Cstruct.t
+      | Blob of Ivfs_blob.t
       | Hash of Store.Private.Contents.key
 
     type t = {
@@ -77,16 +77,19 @@ module Make (Store : STORE) = struct
       | Hash h -> Lwt.return h
       | Blob b ->
           let contents_t = Store.Private.Repo.contents_t f.repo in
-          Store.Private.Contents.add contents_t (Cstruct.to_string b) >|= fun hash ->
+          let data = Ivfs_blob.to_string b in
+          Store.Private.Contents.add contents_t data >|= fun hash ->
           f.value <- Hash hash;
           hash
+
+    let digest_blob b = Store.Private.Contents.Key.digest (Ivfs_blob.to_ro_cstruct b)
 
     let equal a b =
       match a.value, b.value with
       | Hash a, Hash b -> Store.Private.Contents.Key.equal a b
       | Blob a, Blob b -> a = b
-      | Hash a, Blob b -> Store.Private.Contents.Key.equal a (Store.Private.Contents.Key.digest b)
-      | Blob a, Hash b -> Store.Private.Contents.Key.equal b (Store.Private.Contents.Key.digest a)
+      | Hash a, Blob b -> Store.Private.Contents.Key.equal a (digest_blob b)
+      | Blob a, Hash b -> Store.Private.Contents.Key.equal b (digest_blob a)
 
     let content f =
       match f.value with
@@ -94,12 +97,11 @@ module Make (Store : STORE) = struct
       | Hash h ->
           let contents_t = Store.Private.Repo.contents_t f.repo in
           Store.Private.Contents.read_exn contents_t h >|= fun data ->
-          Cstruct.of_string data
+          Ivfs_blob.of_string data
 
     let size f =
       (* TODO: provide a more efficient API in Irmin to get sizes *)
-      content f >|= fun data ->
-      Int64.of_int (Cstruct.len data)
+      content f >|= Ivfs_blob.len
 
     let pp_hash fmt hash =
       Fmt.string fmt (Store.Private.Contents.Key.to_hum hash)

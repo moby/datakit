@@ -24,14 +24,19 @@ module Error = struct
     | Perm
     | Other of err
 
+  let otherk k ?errno fmt =
+    Printf.ksprintf (fun descr -> k (Error (Other { descr; errno }))) fmt
+
+  let other ?errno fmt = otherk (fun e -> e) ?errno fmt
+
   let no_entry = Error Noent
   let is_dir = Error Isdir
   let not_dir = Error Notdir
   let read_only_file = Error Read_only_file
   let perm = Error Perm
-
-  let other ?errno fmt =
-    Printf.ksprintf (fun descr -> Error (Other { descr; errno })) fmt
+  let negative_offset o = other "Negative offset %Ld" o
+  let offset_too_large ~offset l =
+    other "Offset %Ld beyond end-of-file (len = %Ld)" offset l
 
   module Infix = struct
 
@@ -44,12 +49,19 @@ module Error = struct
 
   end
 
+  let pp f = function
+    | Noent          -> Fmt.string f "No such file or directory"
+    | Isdir          -> Fmt.string f "The entry is a directory"
+    | Notdir         -> Fmt.string f "The entry is not a directory"
+    | Read_only_file -> Fmt.string f "The file is read-only"
+    | Perm           -> Fmt.string f "The operation is not permitted"
+    | Other err      -> Fmt.string f err.descr
+
 end
 
 open Error.Infix
-
 let ok x = Lwt.return (Ok x)
-let error fmt = Printf.ksprintf (fun s -> Lwt.return (Error.other "%s" s)) fmt
+let error fmt = Error.otherk Lwt.return fmt
 
 type 'a or_err = ('a, Error.t) Result.result Lwt.t
 
@@ -58,9 +70,6 @@ module File = struct
   let err_no_entry = Lwt.return Error.no_entry
   let err_read_only = Lwt.return Error.read_only_file
   let err_perm = Lwt.return Error.perm
-  let err_negative_offset o = error "Negative offset %Ld" o
-  let err_too_large_offset o l =
-    error "Offset %Ld beyond end-of-file (len = %d)" o l
   let err_bad_write_offset off = error "Bad write offset %d" off
   let err_stream_seek = error "Attempt to seek in stream"
   let err_extend_cmd_file = error "Can't extend command file"
@@ -69,8 +78,8 @@ module File = struct
   let ok x = Lwt.return (Ok x)
 
   let check_offset ~offset len =
-    if offset < 0L then err_negative_offset offset
-    else if offset > Int64.of_int len then err_too_large_offset offset len
+    if offset < 0L then Lwt.return (Error.negative_offset offset)
+    else if offset > Int64.of_int len then Lwt.return (Error.offset_too_large ~offset (Int64.of_int len))
     else ok ()
 
   let empty = Cstruct.create 0
@@ -165,6 +174,7 @@ module File = struct
   end
 
   type fd = Fd.t
+  let create_fd = Fd.create
 
   let read = Fd.read
   let write = Fd.write

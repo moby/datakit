@@ -1,5 +1,6 @@
 open Lwt.Infix
 open Result
+open Astring
 
 module UnixServer = Fs9p.Make(Flow_lwt_unix)
 module HyperVServer = Fs9p.Make(Flow_lwt_hvsock)
@@ -106,7 +107,7 @@ let make_unix_socket path =
 let set_signal_if_supported signal handler =
   try
     Sys.set_signal signal handler
-  with Invalid_argument "Sys.signal: unavailable signal" ->
+  with Invalid_argument _ ->
     ()
 
 let start urls sandbox git ~bare =
@@ -176,8 +177,8 @@ let start urls sandbox git ~bare =
       if p = "" then default_serviceid
       else
         (* trim leading / *)
-        if String.length p > 0 then String.sub p 1 (String.length p - 1) else p in
-        { Hvsock.vmid; serviceid } in
+        String.drop ~sat:((=) '/') ~max:1 p in
+    { Hvsock.vmid; serviceid } in
 
   let rec named_pipe_accept_forever path callback =
     let open Lwt.Infix in
@@ -237,9 +238,6 @@ let start () url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
 
 open Cmdliner
 
-let pad n x =
-  if String.length x > n then x else x ^ String.make (n - String.length x) ' '
-
 let reporter () =
   let report src level ~over k msgf =
     let k _ = over (); k () in
@@ -248,7 +246,7 @@ let reporter () =
       let dt = Mtime.to_us (Mtime.elapsed ()) in
       Fmt.kpf k ppf ("\r%0+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
         dt
-        Fmt.(styled `Magenta string) (pad 10 @@ Logs.Src.name src)
+        Fmt.(styled `Magenta string) (Printf.sprintf "%10s" @@ Logs.Src.name src)
         Logs_fmt.pp_header (level, h)
     in
     msgf @@ fun ?header ?tags fmt ->
@@ -262,7 +260,7 @@ module Log_destination = struct
     | Eventlog
     | ASL
 
-  let parser x = match String.lowercase x with
+  let parser x = match String.Ascii.lowercase x with
     | "stderr" -> `Ok Stderr
     | "eventlog" -> `Ok Eventlog
     | "asl" -> `Ok ASL

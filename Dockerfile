@@ -21,4 +21,5 @@ EXPOSE 5640
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp /home/opam/.opam/system/bin/datakit /usr/bin/datakit
 
-CMD ["/usr/bin/datakit", "--url=tcp://0.0.0.0:5640", "--git=/data", "--verbose=debug"]
+ENTRYPOINT ["/usr/bin/datakit"]
+CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-vv"]

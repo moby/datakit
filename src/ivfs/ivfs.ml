@@ -783,7 +783,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       Vfs.Inode.dir "branch"     (branch_dir make_task repo);
       Vfs.Inode.dir "trees"      (trees_dir make_task repo);
       Vfs.Inode.dir "snapshots"  (snapshots_dir make_task repo);
-      Vfs.Inode.dir "remotes"    (Remote.create make_task repo);
+      Vfs.Inode.dir "remotes"    Remote.(root @@ create repo);
     ] @ subdirs in
     Vfs.Dir.of_list (fun () -> dirs)
 

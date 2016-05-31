@@ -5,4 +5,4 @@ WORKDIR /go/src/github.com/docker/datakit/
 RUN go get -d ./hooks/datakit-gh/...
 WORKDIR /go/src/github.com/docker/datakit/hooks/datakit-gh
 RUN go build
-ENTRYPOINT ["gh", "--config", "/config.toml"]
+ENTRYPOINT ["./datakit-gh"]

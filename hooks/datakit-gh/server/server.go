@@ -2,17 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/google/go-github/github"
-	"golang.org/x/net/context"
-
-	datakit "github.com/docker/datakit/api/go"
 )
 
 const ROUTE = "/{user:.*}/{name:.*}/"
@@ -44,74 +39,6 @@ type Server struct {
 	branch  string
 	secret  string
 	logger  *logrus.Logger
-}
-
-type GithubHeaders struct {
-	GitHubEvent    string
-	GitHubDelivery string
-	HubSignature   string
-}
-
-func (h *Server) PRDir(e github.PullRequestEvent) ([]string, error) {
-	n := e.Number
-	if n == nil {
-		return nil, fmt.Errorf("Invalid PR number")
-	}
-
-	if e.Repo.Owner.Login == nil {
-		return nil, fmt.Errorf("Empty user")
-	}
-	user := *e.Repo.Owner.Login
-
-	if e.Repo.Name == nil {
-		return nil, fmt.Errorf("Empty repo")
-	}
-	repo := *e.Repo.Name
-
-	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	prDir := []string{user, repo, "pr", strconv.Itoa(*n)}
-	return prDir, nil
-}
-
-func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEvent) error {
-
-	// maybe we want to move Dial in the parent function
-	ctx := context.Background()
-	client, err := datakit.Dial(ctx, h.proto, h.address)
-	if err != nil {
-		return err
-	}
-
-	// create a new transaction in the DB
-	tr, err := datakit.NewTransaction(ctx, client, h.branch, h.branch+"-"+g.GitHubEvent)
-	if err != nil {
-		return err
-	}
-
-	// project the event in the the filesystem
-	dir, err := h.PRDir(e)
-	if err != nil {
-		return err
-	}
-
-	// store the head's SHA1
-	head := e.PullRequest.Head.SHA
-	if head == nil {
-		return fmt.Errorf("PR %d has an invalid head", *e.Number)
-	}
-	tr.Write(ctx, append(dir, "head"), *head)
-
-	// fetch the remote contents
-	// TODO
-
-	// commit the changes to the hook's branch
-	err = tr.Commit(ctx)
-	if err != nil {
-		return err
-	}
-
-	client.Close(ctx)
-	return nil
 }
 
 func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -148,6 +75,13 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal(data, &e); err != nil {
 			logrus.Error(err)
 		} else if err := h.HandlePullRequestEvent(g, e); err != nil {
+			logrus.Error(err)
+		}
+	} else if g.GitHubEvent == "status" {
+		var e github.StatusEvent
+		if err := json.Unmarshal(data, &e); err != nil {
+			logrus.Error(err)
+		} else if err := h.HandleStatusEvent(g, e); err != nil {
 			logrus.Error(err)
 		}
 	} else {

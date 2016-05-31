@@ -34,7 +34,7 @@ func (h *Server) PRDir(e github.PullRequestEvent) ([]string, error) {
 	repo := *e.Repo.Name
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	prDir := []string{user, repo, "pr", strconv.Itoa(*n)}
+	prDir := []string{user, repo, "prs", strconv.Itoa(*n)}
 	return prDir, nil
 }
 
@@ -94,7 +94,7 @@ func (h *Server) CommitDir(e github.StatusEvent) ([]string, error) {
 	sha := *e.SHA
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	commitDir := []string{user, repo, "commit", sha}
+	commitDir := []string{user, repo, "commits", sha}
 	return commitDir, nil
 }
 

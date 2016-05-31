@@ -1,0 +1,6 @@
+FROM golang:1.3
+
+COPY . /go/src/github.com/docker/datakit/
+WORKDIR /go/src/github.com/docker/datakit/hooks/gh
+RUN go get -d ./... && go install ./...
+ENTRYPOINT ["gh", "--config", "/config.toml"]

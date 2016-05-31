@@ -29,11 +29,15 @@ module Git_fs_store = struct
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
   let listener = lazy (Ir_io.Poll.install_dir_polling_listener 1.0)
+
+  let repo ~bare path =
+    let config = Irmin_git.config ~root:path ~bare () in
+    Store.Repo.create config
+
   let connect ~bare path =
     Lazy.force listener;
     Log.debug (fun l -> l "Using Git-format store %S" path);
-    let config = Irmin_git.config ~root:path ~bare () in
-    Store.Repo.create config >|= fun repo ->
+    repo ~bare path >|= fun repo ->
     let subdirs = Main_pp.subdirs () in
     fun () -> Filesystem.create make_task repo ~subdirs
 end
@@ -43,11 +47,15 @@ module In_memory_store = struct
   module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)(Contents.String)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
+
+  let repo () =
+    let config = Irmin_mem.config () in
+    Store.Repo.create config
+
   let connect () =
     Log.debug (fun l ->
         l "Using in-memory store (use --git for a disk-backed store)");
-    let config = Irmin_mem.config () in
-    Store.Repo.create config >|= fun repo ->
+    repo () >|= fun repo ->
     let subdirs = Main_pp.subdirs () in
     fun () -> Filesystem.create make_task repo ~subdirs
 end
@@ -233,7 +241,45 @@ let start urls sandbox git ~bare =
       )
   ) urls
 
-let start () url sandbox git bare = Lwt_main.run (start url sandbox git ~bare)
+let start () url sandbox git bare auto_push =
+  let start () = start url sandbox git ~bare in
+  Lwt_main.run begin
+    match auto_push with
+    | None        -> start ()
+    | Some remote ->
+      let watch () = match git with
+        | None      ->
+          In_memory_store.repo () >>= fun repo ->
+          In_memory_store.Store.Repo.watch_branches repo (fun _ _ ->
+              Lwt.fail_with "TOTO"
+            )
+        | Some path ->
+          Lazy.force Git_fs_store.listener;
+          let prefix = if sandbox then "." else "" in
+          let path = prefix ^ path in
+          let push () =
+            Logs.debug (fun l -> l "Pushing %s to %s" path remote);
+            let cmd =
+              Lwt_process.shell @@
+              Printf.sprintf "cd %s && git push %s --all" path remote
+            in
+            Lwt_process.exec cmd >|= function
+            | Unix.WEXITED 0   -> ()
+            | Unix.WEXITED i   ->
+              Logs.err (fun l -> l "auto-push to %s exited with code %d" remote i)
+            | Unix. WSIGNALED i ->
+              Logs.err (fun l -> l "auto-push to %s killed by signal %d)" remote i)
+            | Unix.WSTOPPED i  ->
+              Logs.err (fun l -> l "auto-push to %s stopped by signal %d" remote i)
+          in
+          push () >>= fun () ->
+          Git_fs_store.repo ~bare path >>= fun repo ->
+          Git_fs_store.Store.Repo.watch_branches repo (fun _ _ -> push ())
+      in
+      watch () >>= fun unwatch ->
+      start () >>= fun () ->
+      unwatch ()
+  end
 
 open Cmdliner
 
@@ -337,13 +383,20 @@ let bare =
   in
   Arg.(value & flag & doc)
 
+let auto_push =
+  let doc =
+    Arg.info ~doc:"Auto-push the local repository to a remote source."
+      ~docv:"URL" ["auto-push"]
+  in
+  Arg.(value & opt (some string) None doc)
+
 let term =
   let doc = "A git-like database with a 9p interface." in
   let man = [
     `S "DESCRIPTION";
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ setup_log $ url $ sandbox $ git $ bare),
+  Term.(pure start $ setup_log $ url $ sandbox $ git $ bare $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

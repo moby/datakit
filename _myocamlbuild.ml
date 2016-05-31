@@ -10,7 +10,6 @@ let main = "file:src/bin/main.ml"
 let github_dispatch =
   let pkg = "github" in
   let have_pkg = bool_of_string (BaseEnvLight.var_get pkg env) in
-  let pp_pkg = "pp_" ^ pkg in
   function
   | After_rules  ->
     begin match have_pkg with

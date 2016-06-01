@@ -40,6 +40,20 @@ func (h *Server) PRDir(e github.PullRequestEvent) ([]string, error) {
 
 func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEvent) error {
 
+	// do nothing if the pull request's head didn't change
+	if e.Action == nil {
+		return nil
+	}
+	h.logger.Debugf("action: %s", *e.Action)
+	switch *e.Action {
+	case "opened":
+	case "closed":
+	case "reopened":
+	case "synchronized":
+	default:
+		return nil
+	}
+
 	// maybe we want to move Dial in the parent function
 	ctx := context.Background()
 	client, err := datakit.Dial(ctx, h.proto, h.address)

@@ -41,15 +41,29 @@ func (t *transaction) Abort(ctx context.Context) {
 }
 
 // Commit merges the newBranch back into the fromBranch, or fails
-func (t *transaction) Commit(ctx context.Context) error {
-	path := []string{"branch", t.fromBranch, "transactions", t.newBranch, "ctl"}
-	file, err := t.client.Open(ctx, p9p.ORDWR, path...)
+func (t *transaction) Commit(ctx context.Context, msg string) error {
+	// msg
+	msgPath := []string{"branch", t.fromBranch, "transactions", t.newBranch, "msg"}
+	msgFile, err := t.client.Open(ctx, p9p.ORDWR, msgPath...)
+	if err != nil {
+		log.Println("Failed to Open msg", err)
+		return err
+	}
+	defer msgFile.Close(ctx)
+	_, err = msgFile.Write(ctx, []byte(msg), 0)
+	if err != nil {
+		log.Println("Failed to Write msg", err)
+	}
+
+	// ctl
+	ctlPath := []string{"branch", t.fromBranch, "transactions", t.newBranch, "ctl"}
+	ctlFile, err := t.client.Open(ctx, p9p.ORDWR, ctlPath...)
 	if err != nil {
 		log.Println("Failed to Open ctl", err)
 		return err
 	}
-	defer file.Close(ctx)
-	_, err = file.Write(ctx, []byte("commit"), 0)
+	defer ctlFile.Close(ctx)
+	_, err = ctlFile.Write(ctx, []byte("commit"), 0)
 	if err != nil {
 		log.Println("Failed to Write ctl", err)
 		return err

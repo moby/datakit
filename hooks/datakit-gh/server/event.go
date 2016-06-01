@@ -85,7 +85,7 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 	}
 
 	// commit the changes to the hook's branch
-	err = tr.Commit(ctx)
+	err = tr.Commit(ctx, fmt.Sprintf("Pull request event: %s", g.GitHubDelivery))
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 	}
 
 	// commit the changes to the hook's branch
-	err = tr.Commit(ctx)
+	err = tr.Commit(ctx, fmt.Sprintf("Status event: %s", g.GitHubDelivery))
 	if err != nil {
 		return err
 	}

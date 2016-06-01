@@ -76,7 +76,7 @@ func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
 	}
 
 	// Merge branch to master
-	err = t.Commit(ctx)
+	err = t.Commit(ctx, fmt.Sprintf("Upgrade to schema version %d", schemaVersion))
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (r *Record) fillInDefault(path []string, value string) error {
 	if err != nil {
 		return err
 	}
-	return t.Commit(ctx)
+	return t.Commit(ctx, fmt.Sprintf("fill-in default for %s", path))
 }
 
 // StringField is a key which is associated with a string value
@@ -137,7 +137,7 @@ func (f *StringField) Set(description string, value string) error {
 	if err != nil {
 		return err
 	}
-	return t.Commit(ctx)
+	return t.Commit(ctx, fmt.Sprintf("Unconditionally set %s", f.path))
 }
 
 // Get retrieves the current value of the key

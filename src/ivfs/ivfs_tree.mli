@@ -34,7 +34,7 @@ module type S = sig
     type hash
     (** The type for file IDs (hashes). *)
 
-    val of_data : repo -> Cstruct.t -> t
+    val of_data : repo -> Ivfs_blob.t -> t
     (** [of_data repo data] is a file containing [data], which may later
         be stored in [repo]. *)
 
@@ -42,7 +42,7 @@ module type S = sig
     (** [hash f] is the hash of the contents of [f]. If [f] is not yet in [repo], calling this
         will cause it to be written. *)
 
-    val content : t -> Cstruct.t Lwt.t
+    val content : t -> Ivfs_blob.t Lwt.t
 
     val equal : t -> t -> bool
     (** Quick equality check (compares hashes). *)

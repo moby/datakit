@@ -79,7 +79,7 @@ module Make (Tree : Ivfs_tree.S) = struct
         let file =
           match perm with
           | `Normal | `Exec as perm -> `File (f, perm)
-          | `Link target -> `File (Tree.File.of_data repo (Cstruct.of_string target), `Link)
+          | `Link target -> `File (Tree.File.of_data repo (Ivfs_blob.of_string target), `Link)
         in
         Tree.Dir.with_child dir leaf file >|= fun new_dir -> Ok new_dir
 

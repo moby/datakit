@@ -520,7 +520,7 @@ module RW_err1 = struct
 end
 
 let test_rw () =
-  let v x = Cstruct.of_string x, `Normal in
+  let v x = Ivfs_blob.of_string x, `Normal in
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
   let unit = (module Unit : Alcotest.TESTABLE with type t = unit) in
@@ -558,6 +558,57 @@ let test_rw () =
     Lwt.return ()
   end
 
+let test_blobs_fast_path () =
+  let correct = ref (Cstruct.create 0) in
+  let blob = ref Ivfs_blob.empty in
+  for _ = 1 to 100 do
+    let data = Cstruct.create (Random.int 10) in
+    for j = 0 to Cstruct.len data - 1 do Cstruct.set_uint8 data j (Random.int 26 + 65) done;
+    correct := Cstruct.append !correct data;
+    Ivfs_blob.write !blob ~offset:(Ivfs_blob.len !blob) data >>!= fun b ->
+    blob := b
+  done;
+  let correct = Cstruct.to_string !correct in
+  let actual = Ivfs_blob.to_string !blob in
+  Alcotest.(check string) "Fast-append worked" correct actual
+
+let test_blobs_random () =
+  let int64 = Alcotest.of_pp Fmt.int64 in
+  let str b = Ivfs_blob.to_string b in
+  let read_ok b ~offset ~count = Ivfs_blob.read b ~offset ~count >>!= Cstruct.to_string in
+  let write_ok b ~offset data = Ivfs_blob.write b ~offset (Cstruct.of_string data) >>!= fun x -> x in
+  let truncate_ok b len = Ivfs_blob.truncate b len >>!= fun x -> x in
+  (* Empty *)
+  let b = Ivfs_blob.empty in
+  Alcotest.check int64 "Empty" 0L (Ivfs_blob.len b);
+  (* Negative offset write *)
+  let bad_write = Ivfs_blob.write b ~offset:(-2L) (Cstruct.of_string "bad") in
+  Alcotest.check (vfs_result reject) "Negative offset" (Vfs.Error.negative_offset (-2L)) bad_write;
+  (* Write *)
+  let b = write_ok b ~offset:2L "1st" in
+  Alcotest.check int64 "1st write" 5L (Ivfs_blob.len b);
+  Alcotest.(check string) "Append with gap" "\x00\x001st" (str b);
+  let b = write_ok b ~offset:0L "AB" in
+  Alcotest.(check string) "Overwrite" "AB1st" (str b);
+  Alcotest.(check string) "Overwrite 2" "ABCDt" (str (write_ok b ~offset:2L "CD"));
+  Alcotest.(check string) "Overwrite extend" "AB1sEF" (str (write_ok b ~offset:4L "EF"));
+  (* Truncate *)
+  Alcotest.(check string) "Truncate extend" "AB1st\x00" (str (truncate_ok b 6L));
+  Alcotest.(check string) "Truncate same" "AB1st" (str (truncate_ok b 5L));
+  Alcotest.(check string) "Truncate short" "AB1" (str (truncate_ok b 3L));
+  Alcotest.(check string) "Truncate zero" "" (str (truncate_ok b 0L));
+  Alcotest.check (vfs_result reject) "Truncate negative" (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.truncate b (-1L));
+  (* Read *)
+  Alcotest.(check string) "Read neg" "" (read_ok b ~offset:2L ~count:(-3));
+  Alcotest.(check string) "Read zero" "" (read_ok b ~offset:2L ~count:0);
+  Alcotest.(check string) "Read short" "1s" (read_ok b ~offset:2L ~count:2);
+  Alcotest.(check string) "Read full" "1st" (read_ok b ~offset:2L ~count:3);
+  Alcotest.(check string) "Read long" "1st" (read_ok b ~offset:2L ~count:4);
+  Alcotest.(check string) "Read EOF" "" (read_ok b ~offset:5L ~count:4);
+  Alcotest.check (vfs_result reject) "Read negative" (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.read b ~offset:(-1L) ~count:1);
+  Alcotest.check (vfs_result reject) "Read after EOF" (Vfs.Error.offset_too_large ~offset:6L 5L) (Ivfs_blob.read b ~offset:6L ~count:1);
+  ()
+
 let run f () = Test_utils.run f
 
 let test_set = [
@@ -577,6 +628,8 @@ let test_set = [
   "Stable inodes", `Quick, run test_stable_inodes;
   "RW"         , `Quick, test_rw;
   "Remotes"    , `Slow , run test_remotes;
+  "Blobs fast" , `Quick , test_blobs_fast_path;
+  "Blobs random", `Quick , test_blobs_random;
 ]
 
 let () =

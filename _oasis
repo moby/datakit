@@ -38,7 +38,7 @@ Library ivfs
   Findlibparent:   datakit
   Findlibname:     ivfs
   InternalModules: Ivfs_merge, Ivfs_rw
-  Modules:         Ivfs, Ivfs_tree, Ivfs_remote
+  Modules:         Ivfs, Ivfs_tree, Ivfs_remote, Ivfs_blob
   BuildDepends:    lwt, irmin, rresult, datakit.vfs, astring
 
 Library vgithub

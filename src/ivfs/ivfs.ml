@@ -343,7 +343,8 @@ module Make (Store : Ivfs_tree.STORE) = struct
           in
           let store = store msg in
           let root = RW.root view in
-          make_commit root (Store.task store) ~parents >|= fun c -> Ok (c, msg, parents)
+          make_commit root (Store.task store) ~parents >|= fun c ->
+          Ok (c, "Merge", parents)
     in
     (* Commit transaction *)
     let merge () =

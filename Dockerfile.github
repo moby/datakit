@@ -1,5 +1,7 @@
 FROM ocaml/opam:alpine
 
+RUN cd /home/opam/opam-repository && git pull && opam update
+
 RUN opam depext lwt ssl &&  opam install lwt alcotest oasis
 
 RUN opam pin add hvsock https://github.com/djs55/ocaml-hvsock.git
@@ -23,5 +25,5 @@ RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp /home/opam/.opam/system/bin/datakit /usr/bin/datakit
 
 ENV GITHUB_DEBUG 1
-
-CMD ["/usr/bin/datakit", "--url=tcp://0.0.0.0:5640", "--git=/data", "--verbose=debug"]
+ENTRYPOINT ["/usr/bin/datakit"]
+CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-vv"]

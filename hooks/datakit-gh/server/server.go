@@ -46,7 +46,6 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		repo       = parseRepo(r)
 		requestLog = h.logger.WithFields(newFields(r, repo))
 	)
-	requestLog.Debug("web hook received")
 
 	data, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
@@ -69,7 +68,7 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		HubSignature:   r.Header.Get("X-Hub-Signature"),
 	}
 
-	requestLog.Infof("Received event: %s", g.GitHubEvent)
+	requestLog.Infof("Received event: %s %s", g.GitHubEvent, g.GitHubDelivery)
 	if g.GitHubEvent == "pull_request" {
 		var e github.PullRequestEvent
 		if err := json.Unmarshal(data, &e); err != nil {

@@ -67,18 +67,22 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 		return err
 	}
 
-	// project the event in the the filesystem
 	dir, err := h.PRDir(e)
 	if err != nil {
 		return err
 	}
 
-	// store the head's SHA1
-	head := e.PullRequest.Head.SHA
-	if head == nil {
-		return fmt.Errorf("PR %d has an invalid head", *e.Number)
+	if *e.Action == "closed" {
+		// we only store open PRs
+		tr.Remove(ctx, dir)
+	} else {
+		// the PR's head has changed, so store the new head
+		head := e.PullRequest.Head.SHA
+		if head == nil {
+			return fmt.Errorf("PR %d has an invalid head", *e.Number)
+		}
+		tr.Write(ctx, append(dir, "head"), *head)
 	}
-	tr.Write(ctx, append(dir, "head"), *head)
 
 	// commit the changes to the hook's branch
 	err = tr.Commit(ctx)

@@ -114,6 +114,27 @@ func (r *Record) fillInDefault(path []string, value string) error {
 	return t.Commit(ctx, fmt.Sprintf("fill-in default for %s", path))
 }
 
+func (r *Record) SetMultiple(description string, fields []*StringField, values []string) error {
+	if len(fields) != len(values) {
+		return fmt.Errorf("Length of fields and values is not equal")
+	}
+	ctx := context.Background()
+	t, err := NewTransaction(ctx, r.client, "master", description)
+	if err != nil {
+		return err
+	}
+	for i, k := range fields {
+		p := append(r.path, k.path...)
+		v := values[i]
+		log.Printf("Setting value in store: %#v=%s\n", p, v)
+		err = t.Write(ctx, p, v)
+		if err != nil {
+			return err
+		}
+	}
+	return t.Commit(ctx, "Set multiple fields")
+}
+
 // StringField is a key which is associated with a string value
 type StringField struct {
 	path         []string

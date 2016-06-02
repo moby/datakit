@@ -20,7 +20,7 @@ let max_chunk_size = Int32.of_int (100 * 1024)
 
 let make_task msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
-  Irmin.Task.create ~date ~owner:"irmin9p" msg
+  Irmin.Task.create ~date ~owner:"datakit <datakit@docker.com>" msg
 
 module Git_fs_store = struct
   open Irmin

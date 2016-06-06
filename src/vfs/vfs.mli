@@ -127,7 +127,7 @@ module File: sig
 
   (** {1 Basic constructors} *)
 
-  val ro_of_string: string -> t
+  val ro_of_string: ?perm:perm -> string -> t
   (** [ro_of_string s] is the static file containing [s]. *)
 
   val rw_of_string: string -> t * (unit -> string)

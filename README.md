@@ -1,12 +1,12 @@
-## [Datakit](http://github.com/docker/datakit)
+## [DataKit](http://github.com/docker/datakit)
 
 [![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
 [![Build status (Windows)](https://ci.appveyor.com/api/projects/status/6qrdgiqbhi4sehmy/branch/master?svg=true)](https://ci.appveyor.com/project/docker/datakit/branch/master)
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
-*Datakit* is a tool to orchestrate applications using a 9P dataflow. It
+*DataKit* is a tool to orchestrate applications using a 9P dataflow. It
 revisits the UNIX pipeline concept, with a modern twist: streams of
-tree-structured data instead of raw text. Datakit allows you to define
+tree-structured data instead of raw text. DataKit allows you to define
 complex build pipelines over version-controlled data, using shell
 scripts interacting with the filesystem. For instance to
 [trigger](https://github.com/docker/datakit/blob/master/ci/ci.sh)
@@ -30,15 +30,15 @@ function build {
 map build master
 ```
 
-Datakit is currently used as the coordination
-layer for [Hyperkit](http://github.com/docker/hyperkit), the
+DataKit is currently used as the coordination
+layer for [HyperKit](http://github.com/docker/hyperkit), the
 hypervisor component of
 [Docker for Mac and Windows](https://blog.docker.com/2016/03/docker-for-mac-windows-beta/).
 
 
 ### Quick Start
 
-The easiest way to use Datakit is to start both the server and the client in a
+The easiest way to use DataKit is to start both the server and the client in a
 container.
 
 To expose a Git repository as a 9p endpoint on port 5640 on a private network,
@@ -52,7 +52,7 @@ $ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data do
 *Note*: The `--name datakit` option is mandatory.  It will allow the client
 to connect to a known name on the private network.
 
-You can then start a Datakit client, which will mount the 9p endpoint and
+You can then start a DataKit client, which will mount the 9p endpoint and
 expose the database as a filesystem API:
 
 ```shell
@@ -71,7 +71,7 @@ for more details.
 
 #### Experimental GitHub API bindings
 
-To start Datakit with the experimental GitHub bindings:
+To start DataKit with the experimental GitHub bindings:
 
 ```shell
 $ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit:github
@@ -82,7 +82,7 @@ branch      github.com  remotes     snapshots   trees
 
 ### Building
 
-The easiest way to build the Datakit project is to use [docker](https://docker.com),
+The easiest way to build the DataKit project is to use [docker](https://docker.com),
 (which is what the
 [start-datakit.sh](https://github.com/docker/datakit/blob/master/scripts/start-datakit.sh) script
 does under the hood):
@@ -368,6 +368,6 @@ status updates for that PR.
 
 ## Licensing
 
-Datakit is licensed under the Apache License, Version 2.0. See
+DataKit is licensed under the Apache License, Version 2.0. See
 [LICENSE](https://github.com/docker/datakit/blob/master/LICENSE) for the full
 license text.

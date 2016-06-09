@@ -19,7 +19,7 @@ Library datakit
   Modules:         Datakit
 
 Library client
-  Path:            api/ocaml/lib
+  Path:            src/client
   Findlibparent:   datakit
   Findlibname:     client
   Modules:         Datakit_client_9p, Datakit_path, Datakit_S

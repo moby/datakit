@@ -1,3 +1,5 @@
+(** DataKit client API *)
+
 open Result
 
 type stat = {
@@ -58,6 +60,7 @@ module type CLIENT = sig
         the current contents of the branch. *)
 
     (** {2 Reading} *)
+
     include READABLE_TREE with type 'a or_error := 'a or_error
 
     (** {2 Writing} *)
@@ -157,7 +160,7 @@ module type CLIENT = sig
       ([`File of Cstruct.t | `Dir of Tree.t | `Link of string | `Exec of Cstruct.t] option ->
        [`Finish of 'a | `Again | `Abort] or_error Lwt.t) ->
       [`Abort | `Finish of 'a] or_error Lwt.t
-    (** [wait_for_path is similar to [wait_for_head], but waits for a particular sub-tree to change. *)
+    (** [wait_for_path] is similar to [wait_for_head], but waits for a particular sub-tree to change. *)
 
     val fast_forward : t -> Commit.t -> unit or_error Lwt.t
     (** [fast_forward t commit] changes [t] to point to [commit] if [t]'s head is an ancestor of [commit]

@@ -1,3 +1,5 @@
+(** Locate files and directories within a DataKit tree. *)
+
 open Result
 
 type t

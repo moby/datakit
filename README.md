@@ -373,7 +373,7 @@ status updates for that PR.
 ## Language bindings
 
 * **Go** bindings are in the `api/go` directory.
-* **OCaml** bindings are in the `src/client` directory. See `examples/ocaml-client` for an example.
+* **OCaml** bindings are in the `api/ocaml` directory. See `examples/ocaml-client` for an example.
 
 ## Licensing
 

@@ -1,3 +1,4 @@
+open Astring
 open Lwt.Infix
 open Result
 
@@ -64,7 +65,7 @@ end
 
 let reporter () =
   let pad n x =
-    if String.length x > n then x else x ^ String.make (n - String.length x) ' '
+    if String.length x > n then x else x ^ String.v ~len:(n - String.length x) (fun _ -> ' ')
   in
   let report src level ~over k msgf =
     let k _ = over (); k () in
@@ -155,14 +156,9 @@ let with_file conn path fn =
 let stream conn ?(off=0L) fid =
   let mvar = Lwt_mvar.create_empty () in
   let rec read_line ~saw_flush ~buf ~off =
-    let i =
-      try Some (String.index buf '\n')
-      with Not_found -> None in
-    match i with
-    | Some i ->
-      let line = String.sub buf 0 i in
+    match String.cut ~sep:"\n" buf with
+    | Some (line, buf) ->
       Lwt_mvar.put mvar (`Line line) >>= fun () ->
-      let buf = String.sub buf (i + 1) (String.length buf - i - 1) in
       read_line ~saw_flush ~buf ~off
     | None ->
       Client.LowLevel.read conn fid off 256l >>*= fun resp ->
@@ -297,7 +293,7 @@ let with_transaction conn ~branch name fn =
             in
             failwith err))
 
-let head conn branch = read_file conn ["branch"; branch; "head"] >|= String.trim
+let head conn branch = read_file conn ["branch"; branch; "head"] >|= fun s -> String.trim s
 
 type history_node = {
   id : string;

@@ -237,6 +237,8 @@ The contents of a snapshot directory are:
 
 - `hash` contains the commit hash.
 
+- `msg` contains the commit message.
+
 - `parents` contains the hashes of the parent commits, one per line.
 
 
@@ -258,6 +260,8 @@ state of the path.  This can be:
 - A blank line, if the path does not currently exist.
 - `D-HASH` if the path is a directory (the hash is the tree hash).
 - `F-HASH` if the path is a file (the hash is the hash of the blob).
+- `X-HASH` if the path is an executable file (the hash is the hash of the blob).
+- `L-HASH` if the path is a symlink (the hash is the hash of the blob containing the target string).
 
 When the branch head changes so that the path has a different output,
 a new line will be produced, in the same format. As with `head.live`,
@@ -365,6 +369,11 @@ status updates for that PR.
     meld --auto-merge ours base theirs --output rw
     echo commit > ctl
 
+
+## Language bindings
+
+* **Go** bindings are in the `api/go` directory.
+* **OCaml** bindings are in the `api/ocaml` directory. See `examples/ocaml-client` for an example.
 
 ## Licensing
 

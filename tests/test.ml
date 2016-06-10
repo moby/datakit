@@ -65,20 +65,20 @@ let test_parents _repo conn =
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
   check_parents ~branch:"master" "no-commit" >>= fun () ->
 
-  with_transaction conn ~branch:"master" "test1" (fun dir ->
+  with_transaction conn ~branch:"master" "commit1" (fun dir ->
       create_file conn (dir @ ["rw"]) "file" "data"
     ) >>= fun () ->
   check_parents ~branch:"master" "" >>= fun () ->
   read_file conn ["branch"; "master"; "head"] >>= fun master_head ->
 
-  with_transaction conn ~branch:"master" "test1" (fun dir ->
+  with_transaction conn ~branch:"master" "commit2" (fun dir ->
       create_file conn (dir @ ["rw"]) "file" "data2"
     ) >>= fun () ->
   check_parents ~branch:"master" master_head >>= fun () ->
   read_file conn ["branch"; "master"; "head"] >>= fun master_head ->
 
   Client.mkdir conn ["branch"] "dev" rwxr_xr_x >>*= fun () ->
-  with_transaction conn ~branch:"dev" "test2" (fun dir ->
+  with_transaction conn ~branch:"dev" "commit3" (fun dir ->
       create_file conn (dir @ ["rw"]) "file" "dev" >>= fun () ->
       write_file conn (dir @ ["parents"]) master_head >>*= Lwt.return
     ) >>= fun () ->
@@ -89,8 +89,8 @@ let test_parents _repo conn =
   >>= fun () ->
 
   read_file conn ["branch"; "dev"; "head"] >>= fun dev_head ->
-  with_transaction conn ~branch:"master" "test3" (fun t1 ->
-      with_transaction conn ~branch:"master" "test4" (fun t2 ->
+  with_transaction conn ~branch:"master" "From outer" (fun t1 ->
+      with_transaction conn ~branch:"master" "From inner" (fun t2 ->
           create_file conn (t2 @ ["rw"]) "from_inner" "inner"
         ) >>= fun () ->
       read_file conn ["branch"; "master"; "head"] >>= fun after_inner ->
@@ -103,20 +103,21 @@ let test_parents _repo conn =
      and t1 is a merge of master and dev. *)
   read_file conn ["branch"; "master"; "head"] >|= String.trim >>= fun new_head ->
   history conn new_head >>= fun history ->
-  let a, b, c =
+  let inner, c2, c3 =
     match history with
-    | Commit (_, [
-        Commit (a, _);
-        Commit (_, [
-            Commit (b, _);
-            Commit (c, _)
-          ]);
-      ]) -> a, b, c
+    | {id = _; msg = _; parents = [
+        {id = inner; msg = "From inner"; parents = [_]};
+        {id = _; msg = "From outer"; parents = [
+             {id = c2; msg = "commit2"; parents = [_]};
+             {id = c3; msg = "commit3"; parents = [_]};
+           ]
+        };
+      ]} -> inner, c2, c3
     | x -> Alcotest.fail (Format.asprintf "Bad history:@\n%a" pp_history x)
   in
-  Alcotest.(check string) "First parent" after_inner (a ^ "\n");
-  Alcotest.(check string) "Dev parent" dev_head (b ^ "\n");
-  Alcotest.(check string) "Orig parent" orig_parent (c ^ "\n");
+  Alcotest.(check string) "First parent" after_inner (inner ^ "\n");
+  Alcotest.(check string) "Dev parent" dev_head (c3 ^ "\n");
+  Alcotest.(check string) "Orig parent" orig_parent (c2 ^ "\n");
   Lwt.return ()
 
 let test_merge _repo conn =
@@ -634,5 +635,6 @@ let test_set = [
 
 let () =
   Alcotest.run "datakit" [
-    "all", test_set;
+    "server", test_set;
+    "client", Test_client.test_set;
   ]

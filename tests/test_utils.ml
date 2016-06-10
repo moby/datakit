@@ -1,7 +1,14 @@
+open Astring
 open Lwt.Infix
 open Result
 
 let () = Printexc.record_backtrace true
+
+let p = function
+  | "" -> Datakit_path.empty
+  | path -> Datakit_path.of_string_exn path
+
+let v = Cstruct.of_string
 
 let ( ++ ) = Int64.add
 
@@ -58,7 +65,7 @@ end
 
 let reporter () =
   let pad n x =
-    if String.length x > n then x else x ^ String.make (n - String.length x) ' '
+    if String.length x > n then x else x ^ String.v ~len:(n - String.length x) (fun _ -> ' ')
   in
   let report src level ~over k msgf =
     let k _ = over (); k () in
@@ -95,13 +102,23 @@ let src = Logs.Src.create "test" ~doc:"Datakit tests"
 module Log = (val Logs.src_log src)
 
 module Client = Protocol_9p.Client.Make(Log)(Test_flow)
+module DK = Datakit_client_9p.Make(Client)
+
+let expect_head branch =
+  DK.Branch.head branch >>*= function
+  | None -> Alcotest.fail "Expecting HEAD"
+  | Some head -> Lwt.return (Ok head)
 
 let config = Irmin_mem.config ()
 
 let run fn =
   Lwt_main.run begin
     Store.Repo.create config >>= fun repo ->
-    Store.Repo.remove_branch repo "master" >>= fun () ->
+    Store.Repo.branches repo >>= fun branches ->
+    Lwt_list.iter_s (fun branch ->
+      Store.Repo.remove_branch repo branch
+      ) branches
+    >>= fun () ->
     let for_client, for_server = Test_flow.create () in
     let make_task msg =
       let date = 0L in
@@ -139,14 +156,9 @@ let with_file conn path fn =
 let stream conn ?(off=0L) fid =
   let mvar = Lwt_mvar.create_empty () in
   let rec read_line ~saw_flush ~buf ~off =
-    let i =
-      try Some (String.index buf '\n')
-      with Not_found -> None in
-    match i with
-    | Some i ->
-      let line = String.sub buf 0 i in
+    match String.cut ~sep:"\n" buf with
+    | Some (line, buf) ->
       Lwt_mvar.put mvar (`Line line) >>= fun () ->
-      let buf = String.sub buf (i + 1) (String.length buf - i - 1) in
       read_line ~saw_flush ~buf ~off
     | None ->
       Client.LowLevel.read conn fid off 256l >>*= fun resp ->
@@ -281,20 +293,39 @@ let with_transaction conn ~branch name fn =
             in
             failwith err))
 
-let head conn branch = read_file conn ["branch"; branch; "head"] >|= String.trim
+let head conn branch = read_file conn ["branch"; branch; "head"] >|= fun s -> String.trim s
 
-type history = Commit of string * history list
+type history_node = {
+  id : string;
+  msg : string;
+  parents : history_node list;
+}
+
+let compare_history_node a b =
+  match compare a.msg b.msg with
+  | 0 -> compare a.id b.id
+  | x -> x
+
+(* Get the history starting from [commit] *)
+let rec history_client commit =
+  DK.Commit.parents commit >>*= fun parents ->
+  DK.Commit.message commit >>*= fun msg ->
+  Lwt_list.map_s history_client parents >|= fun parents ->
+  let parents = List.sort compare_history_node parents in
+  { id = DK.Commit.id commit; msg = String.trim msg; parents }
 
 (* Get the history starting from commit [hash] *)
-let rec history conn hash =
-  read_file conn ["snapshots"; hash; "parents"] >>= fun parents ->
+let rec history conn id =
+  read_file conn ["snapshots"; id; "parents"] >>= fun parents ->
+  read_file conn ["snapshots"; id; "msg"] >>= fun msg ->
   let parents = Str.(split (regexp "\n")) parents in
-  Lwt_list.map_s (history conn) parents >|= fun histories ->
-  Commit (hash, histories)
+  Lwt_list.map_s (history conn) parents >|= fun parents ->
+  let parents = List.sort compare_history_node parents in
+  { id; msg = String.trim msg; parents }
 
-let rec pp_history fmt (Commit (hash, parents)) =
-  Format.fprintf fmt "@[<v2>%s@\n%a@]"
-    hash (Format.pp_print_list pp_history) parents
+let rec pp_history fmt {id; msg; parents} =
+  Format.fprintf fmt "@[<v2>%s (%s)@\n%a@]"
+    id msg (Format.pp_print_list pp_history) parents
 
 (* Create a new branch. If [src] is given, use this as the starting commit. *)
 let make_branch conn ?src name =
@@ -340,6 +371,40 @@ let populate conn ~branch files =
         )
     )
 
+let populate_client branch files =
+  DK.Branch.with_transaction branch (fun t ->
+      DK.Transaction.read_dir t (p "") >>*= fun existing ->
+      existing |> Lwt_list.iter_s (fun name ->
+          DK.Transaction.remove t (p name) >>*= Lwt.return
+        ) >>= fun () ->
+      DK.Transaction.read_dir t (p "") >>*= fun existing ->
+      Alcotest.(check (list string)) "rw is empty" [] existing;
+      let dirs = Hashtbl.create 2 in
+      let rec ensure_dir d =
+        if Hashtbl.mem dirs d then Lwt.return_unit
+        else (
+          match Irmin.Path.String_list.rdecons d with
+          | None -> Lwt.return_unit
+          | Some (parent, name) ->
+            ensure_dir parent >>= fun () ->
+            Hashtbl.add dirs d ();
+            DK.Transaction.create_dir t ~dir:(Datakit_path.of_steps_exn parent) name >>*=
+            Lwt.return
+        ) in
+      files |> Lwt_list.iter_s (fun (path, value) ->
+          match
+            Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons
+          with
+          | None -> assert false
+          | Some (dir, name) ->
+            ensure_dir dir >>= fun () ->
+            let dir = Datakit_path.of_steps_exn dir in
+            DK.Transaction.create_file t ~dir name (Cstruct.of_string value) >>*=
+            Lwt.return
+        ) >>= fun () ->
+      DK.Transaction.commit t ~message:"init" 
+    )
+
 (* Commit [base] to master. Then fork a branch which replaces this
    with [theirs].  Replace [base] with [ours] on master, then merge
    [theirs]. Calls [fn trans] on the transaction after irmin9p has
@@ -358,6 +423,22 @@ let try_merge conn ~base ~ours ~theirs fn =
       fn t
     )
 
+let try_merge_client dk ~base ~ours ~theirs fn =
+  DK.branch dk "master" >>*= fun master ->
+  populate_client master base >>*= fun () ->
+  expect_head master >>*= fun base_head ->
+  DK.branch dk "theirs" >>*= fun their_branch ->
+  DK.Branch.fast_forward their_branch base_head >>*= fun () ->
+  populate_client master ours >>*= fun () ->
+  populate_client their_branch theirs >>*= fun () ->
+  DK.Branch.with_transaction master (fun t ->
+      expect_head their_branch >>*= fun theirs_head ->
+      DK.Transaction.merge t theirs_head >>*= fun (merge, _conflicts) ->
+      fn t merge >>*= fun () ->
+      DK.Transaction.commit t ~message:"try_merge_client"
+    )
+  >>*= Lwt.return
+
 let vfs_error = Alcotest.of_pp Vfs.Error.pp
 let vfs_result ok = Alcotest.result ok vfs_error
 
@@ -368,3 +449,32 @@ let reject (type v) =
     let equal _ _ = false
   end in
   (module T : Alcotest.TESTABLE with type t = v)
+
+let file_event =
+  let module T = struct
+    type t = [`File of Cstruct.t | `Link of string | `Exec of Cstruct.t | `Dir of DK.Tree.t]
+    let pp f = function
+      | `File contents -> Fmt.pf f "File:%s" (Cstruct.to_string contents)
+      | `Exec contents -> Fmt.pf f "Exec:%s" (Cstruct.to_string contents)
+      | `Link target   -> Fmt.pf f "Link:%s" target
+      | `Dir _         -> Fmt.pf f "Dir"
+    let equal a b =
+      match a, b with
+      | `File a, `File b -> Cstruct.equal a b
+      | `Exec a, `Exec b -> Cstruct.equal a b
+      | `Link a, `Link b -> String.equal a b
+      | _ -> false
+      (* (note: can't compare trees easily, so always false *)
+  end in
+  (module T : Alcotest.TESTABLE with type t = T.t)
+
+let commit =
+  let module T = struct
+    type t = DK.Commit.t
+    let pp fmt c = Fmt.string fmt (DK.Commit.id c)
+    let equal a b = (DK.Commit.id a = DK.Commit.id b)
+  end in
+  (module T : Alcotest.TESTABLE with type t = DK.Commit.t)
+
+let compare_commit a b =
+  String.compare (DK.Commit.id a) (DK.Commit.id b)

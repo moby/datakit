@@ -1,0 +1,2 @@
+true: warn(A), strict_sequence, safe_string
+true: package(datakit.client), package(protocol-9p.unix)

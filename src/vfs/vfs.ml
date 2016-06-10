@@ -203,14 +203,14 @@ module File = struct
   let read_only_aux =
     create_aux ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only) ~chmod:(fun _ -> err_read_only)
 
-  let ro_of_cstruct data =
+  let ro_of_cstruct ?(perm=`Normal) data =
     let length = Cstruct.len data |> Int64.of_int in
-    let stat () = ok {length; perm = `Normal} in
+    let stat () = ok {length; perm} in
     let open_ () = Fd.static data in
     read_only_aux ~stat ~open_
 
-  let ro_of_string text =
-    ro_of_cstruct ~debug:"ro_of_string" (Cstruct.of_string text)
+  let ro_of_string ?perm text =
+    ro_of_cstruct ~debug:"ro_of_string" ?perm (Cstruct.of_string text)
 
   let of_stream stream =
     let stat () = ok {length = 0L; perm = `Normal} in

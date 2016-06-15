@@ -145,7 +145,7 @@ let start urls sandbox git ~bare =
         (* the callback will close the connection when its done *)
         callback client in
       aux () in
-    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    Log.info (fun l -> l "Waiting for connections on Unix socket %a" Uri.pp_hum url);
     aux () in
 
   let hvsock_accept_forever url socket callback =
@@ -156,7 +156,7 @@ let start urls sandbox git ~bare =
         (* the callback will close the connection when its done *)
         callback client in
       aux () in
-    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    Log.info (fun l -> l "Waiting for connections on hv socket %a" Uri.pp_hum url);
     aux () in
 
   let hvsock_connect_forever url sockaddr callback =
@@ -174,7 +174,7 @@ let start urls sandbox git ~bare =
         )
       >>= fun () ->
       aux () in
-    Log.debug (fun l -> l "Waiting for connections on socket %S" url);
+    Log.info (fun l -> l "Waiting for connections on hv socket %a" Uri.pp_hum url);
     aux () in
 
   let hvsock_addr_of_uri uri =
@@ -215,21 +215,28 @@ let start urls sandbox git ~bare =
          | Some "file" ->
            make_unix_socket (prefix ^ Uri.path uri)
            >>= fun socket ->
-           unix_accept_forever url socket (handle_unix_flow ~make_root)
+           unix_accept_forever uri socket (handle_unix_flow ~make_root)
          | Some "tcp" ->
+           begin match Uri.path uri with
+             | "" | "/" -> ()
+             | path ->
+               Printf.fprintf stderr
+                 "tcp address should not have a path component (path=%S) - use tcp://addr:port" path;
+               exit 1;
+           end;
            let host = Uri.host uri |> default "127.0.0.1" in
            let port = Uri.port uri |> default 5640 in
            let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_of_string host, port) in
            let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
            Lwt_unix.setsockopt socket Lwt_unix.SO_REUSEADDR true;       (* Makes testing easier *)
            Lwt_unix.bind socket addr;
-           unix_accept_forever url socket (handle_unix_flow ~make_root)
+           unix_accept_forever uri socket (handle_unix_flow ~make_root)
          | Some "hyperv-connect" ->
-           hvsock_connect_forever url (hvsock_addr_of_uri uri) (handle_hyperv_flow ~make_root)
+           hvsock_connect_forever uri (hvsock_addr_of_uri uri) (handle_hyperv_flow ~make_root)
          | Some "hyperv-accept" ->
            let socket = Lwt_hvsock.create () in
            Lwt_hvsock.bind socket (hvsock_addr_of_uri uri);
-           hvsock_accept_forever url socket (handle_hyperv_flow ~make_root)
+           hvsock_accept_forever uri socket (handle_hyperv_flow ~make_root)
          | _ ->
            Printf.fprintf stderr
              "Unknown URL schema. Please use file: or tcp:\n";

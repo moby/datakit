@@ -516,6 +516,19 @@ let test_remove dk =
   Alcotest.(check (option reject)) "Aborted" None head;
   Lwt.return ()
 
+let test_large_write dk =
+  let data = Cstruct.create (1024 * 1024) in
+  DK.branch dk "master" >>*= fun master ->
+  DK.Branch.with_transaction master (fun t ->
+      DK.Transaction.create_file t ~dir:(p "") "test" data >>*= fun () ->
+      DK.Transaction.commit t ~message:"big-write"
+    )
+  >>*= fun () ->
+  expect_head master >>*= fun head ->
+  DK.Tree.read_file (DK.Commit.tree head) (p "test") >>*= fun actual ->
+  Alcotest.(check int) "Wrote large file" (Cstruct.len data) (Cstruct.len actual);
+  Lwt.return ()
+
 let run f () =
   Test_utils.run (fun _repo conn ->
       f (DK.connect conn)
@@ -534,6 +547,7 @@ let test_set = [
   "Merge_metadata", `Quick, run test_merge_metadata;
   "Merge empty", `Quick, run test_merge_empty;
   "Conflicts"  , `Quick, run test_conflicts;
+  "Large write", `Quick , run test_large_write;
   "Remove"     , `Quick , run test_remove;
   "Remotes"    , `Slow , run test_remotes;
 ]

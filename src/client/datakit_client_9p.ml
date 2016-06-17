@@ -123,14 +123,28 @@ module Make(P9p : Protocol_9p_client.S) = struct
       Log.debug (fun f -> f "create_dir %a" pp_path (dir / leaf));
       P9p.mkdir t.conn dir leaf rwxr_xr_x
 
+    let write_to_fid t fid ~offset data =
+      let maximum_payload = 8192 in     (* TODO: see https://github.com/mirage/ocaml-9p/pull/80 *)
+      let rec loop ~offset remaining =
+        let len = Cstruct.len remaining in
+        if len = 0 then ok ()
+        else (
+          let to_request = min len maximum_payload in
+          P9p.LowLevel.write t.conn fid offset (Cstruct.sub remaining 0 to_request)
+          >>*= fun { Protocol_9p_response.Write.count } ->
+          let count = Int32.to_int count in
+          let remaining = Cstruct.shift remaining count in
+          loop ~offset:Int64.(add offset (of_int count)) remaining
+        ) in
+      loop ~offset data
+
     let create_file ~executable t ~dir leaf data =
       Log.debug (fun f -> f "create_file %a" pp_path (dir / leaf));
       with_file t dir (fun fid ->
           let perm = if executable then rwxr_xr_x else rw_r__r__ in
-          P9p.LowLevel.create
-            t.conn fid leaf perm Protocol_9p.Types.OpenMode.write_only
+          P9p.LowLevel.create t.conn fid leaf perm Protocol_9p.Types.OpenMode.write_only
           >>*= fun _open ->
-          P9p.LowLevel.write t.conn fid 0L data
+          write_to_fid t fid ~offset:0L data
           >>*= fun _resp ->
           ok ()
         )
@@ -151,7 +165,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
           >>*= fun () ->
           P9p.LowLevel.openfid t.conn fid Protocol_9p.Types.OpenMode.write_only
           >>*= fun _open ->
-          P9p.LowLevel.write t.conn fid 0L data
+          write_to_fid t fid ~offset:0L data
           >>*= fun _resp ->
           ok ()
         )
@@ -161,7 +175,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       with_file t path (fun fid ->
           P9p.LowLevel.openfid t.conn fid Protocol_9p.Types.OpenMode.write_only
           >>*= fun _open ->
-          P9p.LowLevel.write t.conn fid 0L data
+          write_to_fid t fid ~offset:0L data
           >>*= fun _resp ->
           ok ()
         )

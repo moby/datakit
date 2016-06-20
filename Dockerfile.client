@@ -1,5 +1,7 @@
 FROM ocaml/opam:alpine
 
+RUN sudo apk add libev-dev
+
 RUN opam depext oasis ocamlfind cmdliner && \
     opam install oasis cmdliner ocamlfind
 

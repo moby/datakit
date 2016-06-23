@@ -1,7 +1,7 @@
 FROM ocaml/opam:alpine
 
 # Workaround for https://github.com/docker/datakit/issues/152
-RUN cd /home/opam/opam-repository && git reset --hard dd38f0690ff01c8e1ed0eed231307ba4d00c50df
+RUN cd /home/opam/opam-repository && git reset --hard dd38f0690ff01c8e1ed0eed231307ba4d00c50df && opam update
 RUN opam depext lwt ssl &&  opam install lwt alcotest oasis
 RUN opam pin add asl.dev https://github.com/mirage/ocaml-asl.git
 #RUN cd /home/opam/opam-repository && git pull && opam update

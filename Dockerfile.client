@@ -1,7 +1,10 @@
 FROM ocaml/opam:alpine
 
+# Workaround for https://github.com/docker/datakit/issues/152
+RUN cd /home/opam/opam-repository && git reset --hard dd38f0690ff01c8e1ed0eed231307ba4d00c50df
 RUN opam depext oasis ocamlfind cmdliner && \
     opam install oasis cmdliner ocamlfind
+RUN opam pin add asl.dev https://github.com/mirage/ocaml-asl.git
 
 COPY src /home/opam/src/datakit/src/
 COPY .git /home/opam/src/datakit/.git

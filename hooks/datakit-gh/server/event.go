@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-github/github"
 	"golang.org/x/net/context"
 
-	datakit "github.com/docker/datakit/api/go"
+	datakit "github.com/docker/datakit/api/go-datakit"
 )
 
 type GithubHeaders struct {

@@ -49,7 +49,7 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 	case "opened":
 	case "closed":
 	case "reopened":
-	case "synchronized":
+	case "synchronize":
 	default:
 		return nil
 	}
@@ -124,6 +124,7 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 	if err != nil {
 		return err
 	}
+	defer client.Close(ctx)
 
 	// create a new transaction in the DB
 	tr, err := datakit.NewTransaction(ctx, client, h.branch, h.branch+"-"+g.GitHubDelivery)
@@ -160,6 +161,5 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 		return err
 	}
 
-	client.Close(ctx)
 	return nil
 }

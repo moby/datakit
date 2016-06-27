@@ -96,12 +96,15 @@ func (t *transaction) Write(ctx context.Context, path []string, value string) er
 	return nil
 }
 
-// Remove a path (which can either be a key or a directory).
+// Remove deletes a key within the transaction.
 func (t *transaction) Remove(ctx context.Context, path []string) error {
 	p := []string{"branch", t.fromBranch, "transactions", t.newBranch, "rw"}
-	err := t.client.Remove(ctx, path...)
+	for _, dir := range path {
+		p = append(p, dir)
+	}
+	err := t.client.Remove(ctx, p...)
 	if err != nil {
-		log.Println("Failed to Remove", p)
+		log.Println("Failed to Remove ", p)
 	}
 	return nil
 }

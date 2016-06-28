@@ -7,6 +7,12 @@ type stat = {
   size : int64;
 }
 
+type status_state =
+  [ `Pending
+  | `Success
+  | `Error
+  | `Failure ]
+
 module type READABLE_TREE = sig
   type t
   type +'a or_error
@@ -14,7 +20,7 @@ module type READABLE_TREE = sig
   val read : t -> Datakit_path.t -> [`File of Cstruct.t | `Dir of string list | `Link of string] or_error Lwt.t
   (** [read t path] is the contents of the object at the [path]. *)
 
-  val stat : t -> Datakit_path.t -> stat or_error Lwt.t
+  val stat : t -> Datakit_path.t -> stat option or_error Lwt.t
   (** [stat t path] is the metadata of the object at [path]. *)
 
   val read_file : t -> Datakit_path.t -> Cstruct.t or_error Lwt.t
@@ -172,6 +178,46 @@ module type CLIENT = sig
         (and a warning is logged). Use [Transaction.abort] to avoid the warning. *)
   end
 
+  module GitHub : sig
+    type t
+
+    module Status : sig
+      type t
+      (** A PR status (e.g. CI build status). *)
+
+      val state : t -> status_state option or_error Lwt.t
+      val set_state : t -> status_state option -> unit or_error Lwt.t
+
+      val url : t -> Uri.t option or_error Lwt.t
+      val set_url : t -> Uri.t option -> unit or_error Lwt.t
+
+      val descr : t -> string option or_error Lwt.t
+      val set_descr : t -> string option -> unit or_error Lwt.t
+    end
+
+    module PR : sig
+      type t
+      (** A GitHub Pull Request *)
+
+      val id : t -> string
+      (** [id t] is the GitHub identifier for the PR. *)
+
+      val status : t -> Datakit_path.t -> Status.t or_error Lwt.t
+    end
+
+    val prs : t -> user:string -> project:string -> PR.t list or_error Lwt.t
+    (** [prs t ~user ~project] is the list of PRs under "github.com/user/project" *)
+
+    val pr : t -> user:string -> project:string -> string -> PR.t or_error Lwt.t
+    (** [pr t ~user ~project id] is PR [id] under "github.com/user/project" *)
+
+    (* TODO
+       val watch_prs : t -> ?switch:Lwt_switch.t -> (PR.t -> unit Lwt.t) -> unit Lwt.t
+       (** [watch_prs t ~switch fn] calls [fn pr] on each updated PR until the switch is
+           turned off. *)
+     *)
+  end
+
   val branches : t -> string list or_error Lwt.t
   (** [branches t] is the current set of branches. *)
 
@@ -190,6 +236,9 @@ module type CLIENT = sig
 
   val fetch : t -> url:string -> branch:string -> Commit.t or_error Lwt.t
   (** [fetch t ~url ~branch] fetches the given remote branch and returns its head commit. *)
+
+  val github : t -> GitHub.t option or_error Lwt.t
+  (** [github t] is the GitHub API client for [t], if [t] supports [GitHub] integration. *)
 
   val disconnect : t -> unit Lwt.t
   (** [disconnect t] closes the connection. [t] cannot be used after this. *)

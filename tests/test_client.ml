@@ -16,7 +16,9 @@ let test_transaction dk =
   | None -> Alcotest.fail "Branch does not exist!"
   | Some head ->
   let root = DK.Commit.tree head in
-  DK.Tree.stat root (p "src/Makefile") >>*= fun {Datakit_S.size; _} ->
+  DK.Tree.stat root (p "src/Makefile") >>*= function
+  | None -> Alcotest.fail "Missing Makefile!"
+  | Some {Datakit_S.size; _} ->
   Alcotest.(check int) "File size" 15 (Int64.to_int size);
   DK.Commit.message head >>*= fun msg ->
   Alcotest.(check string) "Message" "My commit\n" msg;
@@ -118,7 +120,9 @@ let pp_kind f = function
   | `Exec -> Fmt.string f "Exec"
 
 let check_kind msg expected stat =
-  stat >>*= fun actual ->
+  stat >>*= function
+  | None -> Alcotest.fail "Missing file"
+  | Some actual ->
   Alcotest.(check (of_pp pp_kind)) msg expected actual.Datakit_S.kind;
   Lwt.return ()
 

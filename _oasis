@@ -23,7 +23,7 @@ Library client
   Findlibparent:   datakit
   Findlibname:     client
   Modules:         Datakit_client_9p, Datakit_path, Datakit_S
-  BuildDepends:    lwt, result, cstruct, protocol-9p, logs, astring
+  BuildDepends:    lwt, result, cstruct, protocol-9p, logs, astring, uri
 
 Library vfs
   Path:            src/vfs/

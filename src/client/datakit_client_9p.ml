@@ -19,6 +19,8 @@ let ( / ) dir leaf = dir @ [leaf]
 let ( /@ ) dir user_path = dir @ Datakit_path.unwrap user_path
 let pp_path = Fmt.Dump.list String.dump
 
+let github_path = ["github.com"]
+
 let rec last = function
   | [] -> None
   | [x] -> Some x
@@ -240,7 +242,10 @@ module Make(P9p : Protocol_9p_client.S) = struct
       | `File _ -> Lwt.return (Error (`Msg ("Not a symlink")))
 
     let stat t path =
-      P9p.stat t.conn path >>*= fun info ->
+      P9p.stat t.conn path >>= function
+      | Error (`Msg "No such file or directory") -> ok None
+      | Error _ as e -> Lwt.return e
+      | Ok info ->
       let open Protocol_9p_types in
       let mode = info.Stat.mode in
       let kind =
@@ -248,10 +253,15 @@ module Make(P9p : Protocol_9p_client.S) = struct
         else if mode.FileMode.is_symlink then `Link
         else if List.mem `Execute mode.FileMode.owner then `Exec
         else `File in
-      ok {
+      ok (Some {
         Datakit_S.kind;
         size = info.Stat.length;
-      }
+      })
+
+    let exists t path =
+      stat t path >|*= function
+      | None -> false
+      | Some _ -> true
 
     let set_executable t path exec =
       Log.debug (fun f -> f "set_executable %a to %b" pp_path path exec);
@@ -304,6 +314,26 @@ module Make(P9p : Protocol_9p_client.S) = struct
           | ex -> Lwt.fail ex
         )
 
+    (* Ensure that [base @ path] exists (assuming that [base] already exists). *)
+    let make_dirs t ~base path =
+      let path = Datakit_path.unwrap path in
+      let rec aux user_path =
+        Log.info (fun f -> f "make_dirs.aux(%a)" (Fmt.Dump.list String.dump) user_path);
+        match rdecons user_path with
+        | None -> ok ()
+        | Some (dir, leaf) ->
+          create_dir t ~dir:(base @ dir) leaf >>= function
+          | Ok () | Error (`Msg "Already exists") -> ok ()
+          | Error (`Msg "No such file or directory") ->
+            (* Parent is missing too *)
+            aux dir >>*= fun () ->
+            create_dir t ~dir:(base @ dir) leaf >>= begin function
+            | Ok () | Error (`Msg "Already exists") -> ok ()
+            | Error _ as e -> Lwt.return e
+            end
+          | Error _ as e -> Lwt.return e
+      in
+      aux path
   end
 
   module Tree = struct
@@ -374,24 +404,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       FS.create_symlink t.fs ~dir:(rw_path t dir) leaf target
 
     let make_dirs t path =
-      let path = Datakit_path.unwrap path in
-      let rec aux user_path =
-        Log.info (fun f -> f "make_dirs.aux(%a)" (Fmt.Dump.list String.dump) user_path);
-        match rdecons user_path with
-        | None -> ok ()
-        | Some (dir, leaf) ->
-          FS.create_dir t.fs ~dir:(t.path / "rw" @ dir) leaf >>= function
-          | Ok () | Error (`Msg "Already exists") -> ok ()
-          | Error (`Msg "No such file or directory") ->
-            (* Parent is missing too *)
-            aux dir >>*= fun () ->
-            FS.create_dir t.fs ~dir:(t.path / "rw" @ dir) leaf >>= begin function
-            | Ok () | Error (`Msg "Already exists") -> ok ()
-            | Error _ as e -> Lwt.return e
-            end
-          | Error _ as e -> Lwt.return e
-      in
-      aux path
+      FS.make_dirs t.fs ~base:(t.path / "rw") path
 
     let create_dir t ~dir leaf =
       FS.create_dir t.fs ~dir:(rw_path t dir) leaf
@@ -555,6 +568,89 @@ module Make(P9p : Protocol_9p_client.S) = struct
         )
   end
 
+  module GitHub = struct
+    type t = FS.t
+
+    module Status = struct
+      type t = {
+        fs : FS.t;
+        dir : string list;
+      }
+
+      let string_of_state = function
+        | `Pending -> "pending"
+        | `Success -> "success"
+        | `Failure -> "failure"
+        | `Error -> "error"
+
+      let state_of_string = function
+        | "pending" -> Ok `Pending
+        | "success" -> Ok `Success
+        | "failure" -> Ok `Failure
+        | "error"   -> Ok `Error
+        | s -> Error (`Msg ("Invalid GitHub state: " ^ s))
+
+      let url_of_string s =
+        try Ok (Uri.of_string s)
+        with ex -> Error (`Msg (Printexc.to_string ex))
+
+      let create_or_replace t leaf f value =
+        let path = t.dir / leaf in
+        FS.exists t.fs path >>*= fun exists ->
+        match exists, value with
+        | true, None -> FS.remove t.fs path
+        | true, Some v -> FS.replace_file t.fs t.dir leaf (Cstruct.of_string (f v))
+        | false, None -> ok ()
+        | false, Some v -> FS.create_file t.fs ~executable:false ~dir:t.dir leaf (Cstruct.of_string (f v))
+
+      let set_descr t = create_or_replace t "descr" (fun x -> x)
+      let set_state t = create_or_replace t "state" string_of_state
+      let set_url   t = create_or_replace t "url"   Uri.to_string
+
+      let read_file t leaf f =
+        FS.read_file (FS.read_node t.fs (t.dir / leaf)) >|= function
+        | Error (`Msg "XXX") -> Ok None
+        | Error _ as e -> e
+        | Ok x ->
+          match f (String.trim (Cstruct.to_string x)) with
+          | Ok x -> Ok (Some x)
+          | Error _ as e -> e
+
+      let descr t = read_file t "descr" (fun x -> Ok x)
+      let state t = read_file t "state" state_of_string
+      let url t   = read_file t "url"   url_of_string
+    end
+
+    module PR = struct
+      type t = {
+        fs : FS.t;
+        prs_dir : string list;
+        id : string;
+      }
+
+      let id t = t.id
+
+      let pr_dir t = t.prs_dir @ [t.id]
+
+      let status t path =
+        FS.make_dirs t.fs ~base:(pr_dir t / "status") path >>*= fun () ->
+        ok { Status.fs = t.fs; dir = pr_dir t / "status" /@ path }
+    end
+
+    let pr_path ~user ~project = github_path / user / project / "pr"
+
+    let prs t ~user ~project =
+      let prs_dir = pr_path ~user ~project in
+      FS.read_dir (FS.read_node t prs_dir) >|*=
+      List.map (fun id -> { PR.fs = t; prs_dir; id })
+
+    let pr t ~user ~project id =
+      let prs_dir = pr_path ~user ~project in
+      FS.exists t (prs_dir / id) >>*= function
+      | false -> Lwt.return (Error (`Msg (Printf.sprintf "PR %S not found" id)))
+      | true -> ok { PR.fs = t; prs_dir; id }
+  end
+
   let branch t name =
     Branch.create t name
 
@@ -585,6 +681,11 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
   let tree t id =
     Tree.of_id t id
+
+  let github t =
+    FS.exists t github_path >|*= function
+    | true -> Some t
+    | false -> None
 
   let connect conn = { FS.conn }
 

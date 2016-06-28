@@ -13,7 +13,9 @@ let opam =
   Pkg.describe ~opams:[opam] "datakit" @@ fun c ->
   let github = Conf.value c github in
   Ok [
-    Pkg.mllib "src/client/client.mllib";
+    Pkg.mllib "src/client/datakit-client.mllib";
+    Pkg.lib "src/client/datakit_S.mli";
+    Pkg.lib "src/client/datakit_S.cmi";
     Pkg.mllib "src/fs9p/fs9p.mllib";
     Pkg.mllib "src/irmin-io/irmin-io.mllib";
     Pkg.mllib "src/ivfs/ivfs.mllib";

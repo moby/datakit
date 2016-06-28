@@ -1,2 +1,5 @@
 true: warn(A), strict_sequence, safe_string
-true: package(datakit.client), package(protocol-9p.unix)
+
+true: package(protocol-9p.unix), package(uri)
+# When using the client library uncomment the following line instead:
+# true: package(datakit.client)

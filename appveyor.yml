@@ -13,9 +13,9 @@ install:
 
 build_script:
   - "%CYG_BASH% '${APPVEYOR_BUILD_FOLDER}/appveyor-opam.sh'"
-  - "%CYG_BASH% -c 'cd ${APPVEYOR_BUILD_FOLDER};make'"
-  - cmd: copy c:\cygwin\usr\x86_64-w64-mingw32\sys-root\mingw\bin\zlib1.dll c:\projects\datakit\zlib1.dll
-  - cmd: copy %APPVEYOR_BUILD_FOLDER%\_build\src\bin\main.native c:\projects\datakit\com.docker.db.exe
+  - "%CYG_BASH% -c 'cd ${APPVEYOR_BUILD_FOLDER}; make exe'"
+  - cmd: copy %APPVEYOR_BUILD_FOLDER%\Datakit\datakit.exe c:\projects\datakit\com.docker.db.exe
+  - cmd: copy %APPVEYOR_BUILD_FOLDER%\Datakit\zlib1.dll c:\projects\datakit\zlib1.dll
 
 artifacts:
   - path: "com.docker.db.exe"

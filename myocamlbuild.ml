@@ -1,6 +1,4 @@
-Ocamlbuild_plugin.mark_tag_used "tests";;
-
-let env = BaseEnvLight.load () (* setup.data *)
+open Ocamlbuild_plugin
 
 let src_vgithub = "src/vgithub"
 let src_bin = "src/bin"
@@ -9,11 +7,15 @@ let main = "file:src/bin/main.ml"
 
 let github_dispatch =
   let pkg = "github" in
-  let have_pkg = bool_of_string (BaseEnvLight.var_get pkg env) in
+  let have_pkg =
+    run_and_read ("opam config var " ^ pkg ^ ":installed")
+    |> String.trim
+    |> bool_of_string
+  in
   function
   | After_rules  ->
     begin match have_pkg with
-      | false -> Ocamlbuild_plugin.mark_tag_used ("pkg_" ^ pkg)
+      | false -> ()
       | true  ->
         let flags = S [ A "-package"; A "github.unix" ] in
         Pathname.define_context src_bin [src_vgithub];
@@ -31,9 +33,4 @@ let github_dispatch =
     flag [main_pp; "ocaml"; "compile"] pp;
   | _ -> ()
 
-let () =
-  Ocamlbuild_plugin.dispatch
-    (MyOCamlbuildBase.dispatch_combine [
-        dispatch_default;
-        github_dispatch;
-      ])
+let () = Ocamlbuild_plugin.dispatch github_dispatch

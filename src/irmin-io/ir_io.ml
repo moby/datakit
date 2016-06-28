@@ -51,31 +51,6 @@ module Sync = struct
              | Unix.Unix_error _ -> Lwt.return_unit
              | e -> Lwt.fail e))
 
-  module IC = struct
-    type t = Lwt_io.input_channel
-    let make ?close perform_io =
-      let perform_io buf = perform_io (Cstruct.of_bigarray buf) in
-      Lwt_io.make ~mode:Lwt_io.Input ?close perform_io
-  end
-
-  module OC = struct
-    type t = Lwt_io.output_channel
-    let make ?close perform_io =
-      let perform_io buf = perform_io (Cstruct.of_bigarray buf) in
-      Lwt_io.make ~mode:Lwt_io.Output ?close perform_io
-  end
-
-  (*
-  module Client = struct
-    (* FIXME in cohttp *)
-    module IO = Cohttp_lwt_unix_io
-    let close_in x = Lwt.ignore_result (Lwt_io.close x)
-    let close_out x = Lwt.ignore_result (Lwt_io.close x)
-  end
-
-  module HTTP = Git_http.Flow(Client)(IC)(OC)
-  *)
-
   let with_connection ?ctx:_ uri ?init fn =
     match Git.Sync.protocol uri with
     | `Ok `SSH -> with_ssh_process ?init uri fn
@@ -96,7 +71,7 @@ module Sync = struct
       Lwt_io.read_into ic buf 0 len >>= function
       | 0 -> return acc
       | i ->
-        let buf = Bytes.sub buf 0 i in
+        let buf = Bytes.sub buf 0 i |> Bytes.unsafe_to_string in
         if len = i then return (buf :: acc)
         else aux (buf :: acc)
     in
@@ -105,7 +80,7 @@ module Sync = struct
   let read_exactly ic n =
     let res = Bytes.create n in
     Lwt_io.read_into_exactly ic res 0 n >>= fun () ->
-    Lwt.return res
+    Lwt.return (Bytes.unsafe_to_string res)
 
 end
 
@@ -546,15 +521,5 @@ module Poll = struct
         stop_watchdog dir
     in
     Irmin.Private.Watch.set_listen_dir_hook listen_dir
-
-  let polling_threads () = Hashtbl.length watchdogs
-
-  let task msg =
-    let date = Int64.of_float (Unix.gettimeofday ()) in
-    let owner =
-      (* XXX: get "git config user.name" *)
-      Printf.sprintf "Irmin %s.[%d]" (Unix.gethostname()) (Unix.getpid())
-    in
-    Irmin.Task.create ~date ~owner msg
 
 end

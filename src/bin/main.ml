@@ -425,7 +425,7 @@ let term =
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
   Term.(pure start $ setup_log $ url $ sandbox $ git $ bare $ auto_push),
-  Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
+  Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 
 let () = match Term.eval term with
   | `Error _ -> exit 1

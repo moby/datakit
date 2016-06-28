@@ -44,7 +44,7 @@ let term =
     `P "$(i, datakit-mount) mounts datakit volumes on the local filesystem."
   ] in
   Term.(pure mount $ host $ port $ mnt),
-  Term.info "datakit-mount" ~version:Version.v ~doc ~man
+  Term.info "datakit-mount" ~version:"%%VERSION%%" ~doc ~man
 
 let () = match Term.eval term with
   | `Error _ -> exit 1

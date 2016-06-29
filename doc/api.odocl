@@ -1,0 +1,9 @@
+src/vfs/Vfs
+src/fs9p/Fs9p
+src/ivfs/Ivfs
+src/ivfs/Ivfs_tree
+src/ivfs/Ivfs_remote
+src/ivfs/Ivfs_blob
+src/client/Datakit_client_9p
+src/client/Datakit_path
+src/client/Datakit_S

@@ -1,0 +1,47 @@
+true : bin_annot, safe_string, package(bytes)
+true: warn_error(+1..49), warn(A-3-4-41-44)
+
+## Libraries
+
+<src/vfs> : include
+<src/ivfs> : include
+<src/fs9p> : include
+
+true: package(lwt), package(astring), package(logs), package(result)
+true: package(cstruct), package(fmt), package(rresult)
+
+### Client
+
+<src/client/*>: package(protocol-9p), package(uri)
+
+### Server
+
+<src/ivfs/*>: package(irmin), package(tc)
+<src/fs9p/*>: package(protocol-9p.unix)
+<src/vgithub/*>: package(github)
+
+<src/irmin-io> : include
+<src/irmin-io/*>: package(conduit.lwt-unix), package(irmin), package(lwt.unix)
+<src/irmin-io/*>: package(uri), package(camlzip), package(git), package(tc)
+
+## Binaries
+
+<src/bin/*>: package(cmdliner), package(fmt.cli), package(fmt.tty)
+<src/bin/*>: package(logs.cli), package(logs.fmt), package(mtime.os)
+
+<src/bin/main.*>: package(threads), thread
+<src/bin/main.*>: package(asl), package(win-eventlog)
+<src/bin/main.*>: package(conduit.lwt-unix), package(hvsock.lwt), package(uri)
+<src/bin/main.*>: package(named-pipe.lwt)
+<src/bin/main.*>: package(git), package(irmin), package(irmin.git)
+<src/bin/main.*>: package(irmin.mem), package(protocol-9p.unix)
+<src/bin/main.*>: package(camlzip)
+
+### Tests
+
+<src/client>: include
+<tests/*>: package(alcotest), package(conduit.lwt-unix)
+<tests/*>: package(str), package(logs.fmt), package(fmt.tty), package(mtime.os)
+<tests/*>: package(mirage-types.lwt), package(protocol-9p.unix)
+<tests/*>: package(irmin), package(irmin.mem), package(camlzip)
+<tests/*>: package(git), package(irmin.git)

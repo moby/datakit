@@ -7,20 +7,28 @@ homepage:     "https://github.com/docker/datakit"
 bug-reports:  "https://github.com/docker/datakit"
 dev-repo:     "https://github.com/docker/datakit.git"
 
-build: [make "PREFIX=%{prefix}" "GITHUB=%{github:enable}%"]
-build-test: [make "test"]
-install: [make "install"]
-remove: ["ocamlfind" "remove" "datakit"]
+build: [
+  "ocaml" "pkg/pkg.ml" "build" "--pinned" pinned
+    "--with-github" github:installed
+]
+build-test: [
+  ["ocaml" "pkg/pkg.ml" "build" "--pinned" pinned
+    "--with-github" github:installed
+    "--tests" "true"]
+  ["ocaml" "pkg/pkg.ml" "test"]
+]
 
 depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
-  "oasis"      {build}
+  "topkg"      {build}
+  "cmdliner"
   "rresult" "astring" "fmt"
-  "git"
+  "git" "mirage-tc" "uri"
+  "mirage-types"
   "irmin"       {>= "0.10.1"}
   "camlzip"
-  "lwt"
+  "cstruct" "result" "lwt"
   "conduit"
   "named-pipe"
   "hvsock"

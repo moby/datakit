@@ -318,7 +318,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let make_dirs t ~base path =
       let path = Datakit_path.unwrap path in
       let rec aux user_path =
-        Log.info (fun f -> f "make_dirs.aux(%a)" (Fmt.Dump.list String.dump) user_path);
+        Log.debug (fun f -> f "make_dirs.aux(%a)" (Fmt.Dump.list String.dump) user_path);
         match rdecons user_path with
         | None -> ok ()
         | Some (dir, leaf) ->
@@ -334,6 +334,17 @@ module Make(P9p : Protocol_9p_client.S) = struct
           | Error _ as e -> Lwt.return e
       in
       aux path
+
+    let remove_if_exists t path =
+      exists t path >>*= function
+      | true -> remove t path
+      | false -> ok ()
+
+    let create_or_replace t ~dir leaf value =
+      let path = dir / leaf in
+      exists t path >>*= function
+      | true -> replace_file t dir leaf value
+      | false -> create_file t ~executable:false ~dir:dir leaf value
   end
 
   module Tree = struct
@@ -347,6 +358,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let read t path = FS.read_node t.fs (t.path /@ path)
     let stat t path = FS.stat t.fs (t.path /@ path)
+    let exists t path = FS.exists t.fs (t.path /@ path)
 
     let read_file t path = FS.read_file (read t path)
     let read_dir t path = FS.read_dir (read t path)
@@ -477,6 +489,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let read t path = FS.read_node t.fs (t.path / "rw" /@ path)
     let stat t path = FS.stat t.fs (t.path / "rw" /@ path)
+    let exists t path = FS.exists t.fs (t.path / "rw" /@ path)
+
+    let create_or_replace_file t ~dir = FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)
 
     let read_file t path = FS.read_file (read t path)
     let read_dir t path = FS.read_dir (read t path)
@@ -594,22 +609,17 @@ module Make(P9p : Protocol_9p_client.S) = struct
         try Ok (Uri.of_string s)
         with ex -> Error (`Msg (Printexc.to_string ex))
 
-      let create_or_replace t leaf f value =
-        let path = t.dir / leaf in
-        FS.exists t.fs path >>*= fun exists ->
-        match exists, value with
-        | true, None -> FS.remove t.fs path
-        | true, Some v -> FS.replace_file t.fs t.dir leaf (Cstruct.of_string (f v))
-        | false, None -> ok ()
-        | false, Some v -> FS.create_file t.fs ~executable:false ~dir:t.dir leaf (Cstruct.of_string (f v))
+      let update t leaf fn = function
+        | None -> FS.remove_if_exists t.fs (t.dir / leaf)
+        | Some v -> FS.create_or_replace t.fs ~dir:t.dir leaf (Cstruct.of_string (fn v))
 
-      let set_descr t = create_or_replace t "descr" (fun x -> x)
-      let set_state t = create_or_replace t "state" string_of_state
-      let set_url   t = create_or_replace t "url"   Uri.to_string
+      let set_descr t = update t "descr" (fun x -> x)
+      let set_state t = update t "state" string_of_state
+      let set_url   t = update t "url"   Uri.to_string
 
       let read_file t leaf f =
         FS.read_file (FS.read_node t.fs (t.dir / leaf)) >|= function
-        | Error (`Msg "XXX") -> Ok None
+        | Error (`Msg "No such file or directory") -> Ok None
         | Error _ as e -> e
         | Ok x ->
           match f (String.trim (Cstruct.to_string x)) with

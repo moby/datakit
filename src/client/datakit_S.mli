@@ -24,6 +24,9 @@ module type READABLE_TREE = sig
   val stat : t -> Datakit_path.t -> stat option or_error Lwt.t
   (** [stat t path] is the metadata of the object at [path]. *)
 
+  val exists : t -> Datakit_path.t -> bool or_error Lwt.t
+  (** [exists t path] is [true] if [stat t path] isn't [None]. *)
+
   val read_file : t -> Datakit_path.t -> Cstruct.t or_error Lwt.t
   (** [read_file t path] resolves [path] to a file, or returns an
       error if it isn't a file. *)
@@ -93,6 +96,11 @@ module type CLIENT = sig
       unit or_error Lwt.t
     (** [replace_file t ~dir name new_content] changes the content of
         the existing file [dir/name]. *)
+
+    val create_or_replace_file : t -> dir:Datakit_path.t -> string -> Cstruct.t ->
+      unit or_error Lwt.t
+    (** [create_or_replace_file t ~dir leaf content] uses either [create_file]
+        or [replace_file] as appropriate to set the contents. *)
 
     val set_executable : t -> Datakit_path.t -> bool -> unit or_error Lwt.t
     (** [set_executable t path flag] marks the file at [path] as

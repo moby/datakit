@@ -1,19 +1,14 @@
 FROM ocaml/opam:alpine
 
-# Workaround for https://github.com/docker/datakit/issues/152
-RUN cd /home/opam/opam-repository && git reset --hard dd38f0690ff01c8e1ed0eed231307ba4d00c50df && opam update
-RUN opam depext oasis ocamlfind cmdliner && \
-    opam install oasis cmdliner ocamlfind
-RUN opam pin add asl.dev https://github.com/mirage/ocaml-asl.git
+RUN sudo apk add ncurses-dev
+RUN opam depext ocamlfind && opam install ocamlfind
 
-COPY src /home/opam/src/datakit/src/
-COPY .git /home/opam/src/datakit/.git
-COPY Makefile /home/opam/src/datakit/Makefile
+COPY . /home/opam/src/datakit
 
 RUN sudo chown -R opam.nogroup /home/opam/src
 WORKDIR /home/opam/src/datakit
 
-RUN make src/bin/version.ml
+RUN rm _tags
 RUN opam config exec -- ocamlbuild -use-ocamlfind -pkgs cmdliner,unix src/bin/mount.native
 
 RUN sudo cp /home/opam/src/datakit/_build/src/bin/mount.native /usr/bin/datakit-mount

@@ -3,7 +3,6 @@ FROM ocaml/opam:alpine
 RUN sudo apk add ncurses-dev
 RUN opam depext lwt ssl &&  opam install lwt alcotest
 
-RUN opam pin add hvsock https://github.com/djs55/ocaml-hvsock.git
 RUN opam pin add github --dev
 
 COPY . /home/opam/src/datakit/

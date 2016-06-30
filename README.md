@@ -98,7 +98,6 @@ If you really want to build the project from source, you will need to install
 
 ```shell
 $ opam pin add datakit . -n -y
-$ opam pin add hvsock https://github.com/djs55/ocaml-hvsock.git -n -y
 $ opam depext datakit -y
 $ opam install alcotest datakit --deps-only -y
 $ make && make test

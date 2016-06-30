@@ -4,7 +4,6 @@ platform:
 environment:
   CYG_ROOT: "C:\\cygwin"
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
-  PINS: "hvsock:https://github.com/djs55/ocaml-hvsock.git"
   TESTS: "false"
 
 install:

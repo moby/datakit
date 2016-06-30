@@ -3,12 +3,16 @@ FROM ocaml/opam:alpine
 RUN sudo apk add ncurses-dev
 RUN opam depext lwt ssl &&  opam install lwt alcotest
 
-RUN opam pin add github --dev
+RUN opam pin add github --dev -n
+
+# cache opam install of dependencies
+COPY opam /home/opam/src/datakit/opam
+RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam depext github ssl datakit && opam install github ssl datakit --deps
 
 COPY . /home/opam/src/datakit/
 
-RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext datakit ssl github && opam install ssl github datakit
+RUN opam install ssl github datakit
 
 EXPOSE 5640
 

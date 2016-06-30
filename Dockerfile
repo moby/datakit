@@ -3,10 +3,14 @@ FROM ocaml/opam:alpine
 RUN sudo apk add ncurses-dev
 RUN opam depext lwt && opam install lwt alcotest
 
+# cache opam install of dependencies
+COPY opam /home/opam/src/datakit/opam
+RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam depext datakit && opam install datakit --deps
+
 COPY . /home/opam/src/datakit
 
-RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext datakit && opam install datakit
+RUN opam install datakit
 
 EXPOSE 5640
 

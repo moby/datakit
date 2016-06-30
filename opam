@@ -31,7 +31,7 @@ depends: [
   "cstruct" "result" "lwt"
   "conduit"
   "named-pipe"
-  "hvsock"
+  "hvsock"      {=  "0.7"}
   "protocol-9p" {>= "0.5.0"}
   "logs"        {>= "0.5.0"}
   "win-eventlog"

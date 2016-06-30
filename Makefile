@@ -3,14 +3,14 @@ APP=Datakit.app
 EXE=Datakit
 
 all:
-	topkg build --with-github $(GITHUB)
+	ocaml pkg/pkg.ml build --with-github $(GITHUB)
 
 clean:
-	topkg clean
+	rm -rf _build
 
 test:
-	topkg build --tests true -- --with-github $(GITHUB)
-	topkg test
+	ocaml pkg/pkg.ml build --tests true --with-github $(GITHUB)
+	ocaml pkg/pkg.ml test
 
 bundle:
 	opam remove tls ssl -y

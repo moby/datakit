@@ -533,6 +533,23 @@ let test_large_write dk =
   Alcotest.(check int) "Wrote large file" (Cstruct.len data) (Cstruct.len actual);
   Lwt.return ()
 
+let test_create_or_replace dk =
+  DK.branch dk "master" >>*= fun master ->
+  DK.Branch.with_transaction master (fun t ->
+      DK.Transaction.exists t (p "README") >>*= fun exists ->
+      Alcotest.(check bool) "Doesn't yet exist" false exists;
+      DK.Transaction.create_or_replace_file t ~dir:(p "") "README" (v "Data") >>*= fun () ->
+      DK.Transaction.exists t (p "README") >>*= fun exists ->
+      Alcotest.(check bool) "Now exists" true exists;
+      DK.Transaction.create_or_replace_file t ~dir:(p "") "README" (v "Data2") >>*= fun () ->
+      DK.Transaction.commit t ~message:"create-or-replace"
+    )
+  >>*= fun () ->
+  expect_head master >>*= fun head ->
+  DK.Tree.read_file (DK.Commit.tree head) (p "README") >>*= fun actual ->
+  Alcotest.(check string) "Updated" "Data2" (Cstruct.to_string actual);
+  Lwt.return ()
+
 let run f () =
   Test_utils.run (fun _repo conn ->
       f (DK.connect conn)
@@ -554,4 +571,5 @@ let test_set = [
   "Large write", `Quick , run test_large_write;
   "Remove"     , `Quick , run test_remove;
   "Remotes"    , `Slow , run test_remotes;
+  "Create_or_replace", `Slow , run test_create_or_replace;
 ]

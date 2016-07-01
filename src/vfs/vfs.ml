@@ -288,7 +288,6 @@ module File = struct
     if offset = 0 && data_len >= orig_len then data (* Common, fast case *)
     else (
       let padding = Cstruct.create (max 0 (offset - orig_len)) in
-      Cstruct.memset padding 0;
       let tail =
         let data_end = offset + data_len in
         if orig_len > data_end then Cstruct.sub orig data_end (orig_len - data_end)
@@ -335,7 +334,6 @@ module File = struct
         else if extra < 0 then write (Cstruct.sub old 0 len)
         else (
           let padding = Cstruct.create extra in
-          Cstruct.memset padding 0;
           write (Cstruct.append old padding)
         )
       ) in

@@ -1,3 +1,4 @@
+open Result
 open Github
 open Github_t
 open Astring
@@ -25,7 +26,6 @@ module PRSet = struct
               compare p1.pull_updated_at p2.pull_updated_at
   end
   include Set.Make(X)
-  let of_list = List.fold_left (fun s e -> add e s) empty
 end
 
 module API = struct
@@ -99,58 +99,13 @@ module API = struct
     |> Stream.to_list
     |> run
 
-  let pp_pr ppf pr =
-    Fmt.pf ppf "@[%d %s@]" pr.pull_number pr.pull_head.branch_sha
-
   let create ~token ~user ~repo = { token = Lazy.force token; user; repo }
 
-  let prs_diff pr1 pr2 =
-    let pr1s = PRSet.of_list pr1 in
-    let pr2s = PRSet.of_list pr2 in
-    PRSet.diff pr1s pr2s
+  let pp_event ppf e = Fmt.string ppf @@ Github_j.string_of_event e
 
-  let on_new_issues t f =
-    let open Github.Monad in
-    let listen s () =
-      Logs.debug (fun l ->
-          l "listening for issue events on %s/%s" t.user t.repo);
-      let rec loop s old_prs =
-        Log.debug (fun l -> l "%s/%s: poll ..." t.repo t.user);
-        Log.debug (fun l -> l "old_prs=@[%a@]" Fmt.(list pp_pr) old_prs);
-        Stream.poll s >>= fun so ->
-        API.get_rate_remaining ~token:t.token () >>= fun remaining ->
-        match so with
-        | None   ->
-          Logs.debug (fun l ->
-              l "no new events on %s/%s (%d)" t.user t.repo remaining);
-          loop s old_prs
-        | Some s ->
-          Logs.debug (fun l ->
-              l "new events on %s/%s (%d)" t.user t.repo remaining);
-          let new_prs = prs t in
-          Log.debug (fun l -> l "new_prs=@[%a@]" Fmt.(list pp_pr) new_prs);
-          PRSet.iter (fun pr ->
-              Log.debug (fun l -> l "diff pr: %a" pp_pr pr);
-              f pr
-            ) (prs_diff new_prs old_prs);
-          loop s new_prs
-      in
-      let prs = prs t in
-      (* FIXME: quick hack to iterate on issue with no status. *)
-      List.iter (fun pr ->
-          match status t pr with
-          | [] -> f pr
-          | _  -> ()
-        ) prs;
-      Github.Monad.run @@ loop s prs
-    in
-    let init () =
-      let events = Event.for_repo ~token:t.token ~user:t.user ~repo:t.repo () in
-      Stream.next events >|= function
-      | None        -> ()
-      | Some (_, s) -> Lwt.async (listen s)
-    in
-    Github.Monad.run @@ init ()
+  let events t =
+    let events = Event.for_repo ~token:t.token ~user:t.user ~repo:t.repo () in
+    Github.Monad.run @@ Stream.to_list events
 
 end
 
@@ -317,33 +272,128 @@ let pr_dir t pr =
   ] in
   Vfs.Dir.of_list dirs
 
-
-(* /github.com/${USER}/${REPO}/updates *)
-let pr_updates t =
-  let open Lwt.Infix in
-  Logs.debug (fun l -> l "pr_updates %s/%s" t.API.user t.API.repo);
-  let session = Vfs.File.Stream.session None in
-  let pp ppf = function
-    | None    -> Fmt.string ppf ""
-    | Some pr -> Fmt.pf ppf "%d\n" pr.pull_number
-  in
-  let stream () = Vfs.File.Stream.create pp session in
-  Vfs.File.of_stream @@ fun () ->
-  API.on_new_issues t (fun pr ->
-      Vfs.File.Stream.publish session @@ Some pr
-    ) >|= stream
-
 (* /github.com/${USER}/${REPO}/pr *)
 let pr_root t =
   Logs.debug (fun l -> l "pr_root %s/%s" t.API.user t.API.repo);
   let prs () =
     let prs = API.prs t in
-    Vfs.Inode.file "updates" (pr_updates t) ::
     List.map (fun pr ->
         Vfs.Inode.dir (string_of_int pr.pull_number) @@ pr_dir t pr
       ) prs
   in
   Vfs.Dir.of_list prs
+
+(* /github.com/${USER}/${REPO}/events *)
+let repo_events t =
+  let open Lwt.Infix in
+  Logs.debug (fun l -> l "repo_events %s/%s" t.API.user t.API.repo);
+  let f () =
+    let buf = Buffer.create 1024 in
+    let ppf = Format.formatter_of_buffer buf in
+    API.events t >|= fun events ->
+    List.iter (Fmt.pf ppf "%a\n" API.pp_event) events;
+    Buffer.contents buf
+  in
+  Vfs.File.status ~length:0 f
+
+module Hack = struct
+
+  (* NOTE(samoht): the proper way to handle this is to have a datakit
+     client working at the VFS level. We don't have that yet, so we
+     hook directly at the 9p level. This breaks the VFS abstraction
+     but as we just have one backend I guess that's fine... *)
+
+  let ( >>*= ) x f =
+    let open Lwt.Infix in
+    x >>= function
+    | Ok x -> f x
+    | Error _ as e -> Lwt.return e
+
+  type 'a state = (module Datakit_S.CLIENT with type t = 'a) * 'a
+
+  type t = E: 'a state -> t
+
+  let state = ref None
+
+  let init (s: unit -> (t, string) result Lwt.t) = state := Some s
+
+  (* /github.com/${USER}/${REPO}/sync *)
+  let repo_sync t =
+    Log.debug (fun l -> l "repo_ctl %s/%s" t.API.user t.API.repo);
+    let open Lwt.Infix in
+    let (/) = Datakit_path.(/) in
+    let ok = Lwt.return (Ok ()) in
+    let root = Datakit_path.empty / t.API.user / t.API.repo in
+    Vfs.File.command (fun branch ->
+        Logs.debug (fun l -> l "syncing GitHub with branch %s" branch);
+        API.events t >>= fun events ->
+        let init () = match !state with
+          | None   -> Lwt.fail_with "Vgithub Hack not initialized!"
+          | Some x -> x () >>= function
+            | Ok x    -> Lwt.return x
+            | Error s -> Lwt.fail_with ("Vgithub Hack failed: " ^ s)
+        in
+        init () >>= fun (E ((module DK), dk)) ->
+        let update_pr tr pr =
+          let dir =
+            root / "prs" / string_of_int pr.pull_request_event_number
+          in
+          Log.debug (fun l -> l "update_pr %s" @@ Datakit_path.to_hum dir);
+
+          let pr = pr.pull_request_event_pull_request in
+          match pr.pull_state with
+          | `Closed ->
+            DK.Transaction.exists tr dir >>*= fun exists ->
+            if exists then DK.Transaction.remove tr dir else ok
+          | `Open   ->
+            DK.Transaction.make_dirs tr dir >>*= fun () ->
+            let data = Cstruct.of_string pr.pull_head.branch_sha in
+            DK.Transaction.create_or_replace_file tr ~dir "head" data
+        in
+        let update_status tr s =
+          let dir = root / "commits" / s.status_event_sha in
+          Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
+          DK.Transaction.make_dirs tr dir >>*= fun () ->
+          let some = function None -> "" | Some s -> s in
+          let state = function
+            | `Error -> "error" | `Failure -> "failure"
+            | `Pending  -> "pending" | `Success -> "success"
+          in
+          let kvs = [
+            "description", some s.status_event_description;
+            "state"      , state s.status_event_state;
+            "target_url" , some s.status_event_target_url;
+          ] in
+          List.fold_left (fun acc (k, v) ->
+              acc >>*= fun () ->
+              let v = Cstruct.of_string v in
+              DK.Transaction.create_or_replace_file tr ~dir k v
+            ) ok kvs
+        in
+        let sync () =
+          DK.branch dk branch >>*= fun branch ->
+          DK.Branch.with_transaction branch (fun tr ->
+              Lwt_list.fold_left_s (fun acc e ->
+                  match acc with
+                  | Error e -> Lwt.return (Error e)
+                  | Ok ()   ->
+                    match e.event_payload with
+                    | `PullRequest pr -> update_pr tr pr
+                    | `Status s       -> update_status tr s
+                    | _               -> ok
+                ) (Ok ()) (List.rev events)
+              >>*= fun () ->
+              let message = Fmt.strf "Syncing %s/%s" t.API.user t.API.repo in
+              DK.Transaction.commit tr ~message >>= fun result ->
+              DK.disconnect dk >|= fun () ->
+              result
+            ) in
+        sync () >>= function
+        | Ok ()   -> Vfs.ok ""
+        | Error e -> Vfs.error "conflict: %s" @@ Fmt.to_to_string DK.pp_error e
+      )
+
+end
 
 (* /github.com/${USER}/${REPO} *)
 let repo_dir t =
@@ -352,7 +402,9 @@ let repo_dir t =
   | None   -> None
   | Some _ ->
     let files = [
-      Vfs.Inode.dir "pr" @@ pr_root t
+      Vfs.Inode.file "events" @@ repo_events t;
+      Vfs.Inode.dir  "pr"     @@ pr_root t;
+      Vfs.Inode.file "sync"   @@ Hack.repo_sync t;
     ] in
     let dir = Vfs.Dir.of_list (fun () -> files) in
     Some (Vfs.Inode.dir t.API.repo dir)

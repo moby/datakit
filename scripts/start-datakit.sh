@@ -12,7 +12,6 @@ fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
-docker rmi -f datakit || echo skip
 docker build -t datakit -f ${DOCKERFILE} ${REPO_ROOT}
 
 docker rm -f datakit || echo skip

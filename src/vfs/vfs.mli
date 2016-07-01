@@ -135,9 +135,10 @@ module File: sig
         [init] and a function which can be called to get the current
         contents. *)
 
-  val status: (unit -> string Lwt.t) -> t
+  val status: ?length:int -> (unit -> string Lwt.t) -> t
   (** [status f] is the file containing the result of [f]. [f] is
-      evaluated everytime the file is open. *)
+      evaluated everytime the file is open. If [length] is not set,
+      [f] will also be called during [stat] queries.*)
 
   val command: ?init:string -> (string -> string or_err) -> t
   (** [command ?init f] is the file containing the result of [f]. [f]

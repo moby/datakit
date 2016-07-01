@@ -45,3 +45,7 @@ true: package(cstruct), package(fmt), package(rresult)
 <tests/*>: package(mirage-types.lwt), package(protocol-9p.unix)
 <tests/*>: package(irmin), package(irmin.mem), package(camlzip)
 <tests/*>: package(git), package(irmin.git)
+
+# hack to make vgithub talk 9p directly
+<src/client>: include
+<src/bin/main_pp.*>: package(protocol-9p.unix)

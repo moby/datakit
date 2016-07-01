@@ -46,6 +46,9 @@ module type CLIENT = sig
 
   type error
 
+  val pp_error: error Fmt.t
+  (** [pp_error] pretty-prints error values. *)
+
   type 'a or_error = ('a, error) result
 
   module Tree : READABLE_TREE with type 'a or_error := 'a or_error

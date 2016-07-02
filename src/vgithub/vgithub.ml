@@ -169,9 +169,12 @@ let pr_status_dir t pr context ?(extra_dirs=fun () -> []) state =
   ] in
   Vfs.Dir.of_list (fun () -> dir @ extra_dirs ())
 
-let context_of_status s = match s.status_context with
+let context_of_string_opt = function
   | None   -> ["default"]
   | Some c -> String.cuts ~empty:false ~sep:"/" c
+
+let context_of_status s = context_of_string_opt s.status_context
+let context_of_status_event s = context_of_string_opt s.status_event_context
 
 let rec compare_context x y =
   match x, y with
@@ -322,6 +325,7 @@ module Hack = struct
     Log.debug (fun l -> l "repo_ctl %s/%s" t.API.user t.API.repo);
     let open Lwt.Infix in
     let (/) = Datakit_path.(/) in
+    let (/@) = Datakit_path.(/@) in
     let ok = Lwt.return (Ok ()) in
     let root = Datakit_path.empty / t.API.user / t.API.repo in
     Vfs.File.command (fun branch ->
@@ -351,7 +355,10 @@ module Hack = struct
             DK.Transaction.create_or_replace_file tr ~dir "head" data
         in
         let update_status tr s =
-          let dir = root / "commits" / s.status_event_sha in
+          let dir =
+            root / "commits" / s.status_event_sha /@
+            Datakit_path.of_steps_exn (context_of_status_event s)
+          in
           Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
           DK.Transaction.make_dirs tr dir >>*= fun () ->
           let some = function None -> "" | Some s -> s in

@@ -31,7 +31,8 @@ let pp = Fmt.(list ~sep:(const string "/") string)
 let of_steps_exn steps =
   match of_steps steps with
   | Ok x -> x
-  | Error msg -> raise (Invalid_argument (Fmt.strf "Bad path %a: %s" pp steps msg))
+  | Error msg ->
+    raise (Invalid_argument (Fmt.strf "Bad path %a: %s" pp steps msg))
 
 let ( / ) path s =
   match validate s with
@@ -43,3 +44,6 @@ let ( /@ ) = ( @ )
 let unwrap x = x
 
 let to_hum = Fmt.to_to_string pp
+
+module Set = Set.Make(struct type t = string list let compare = compare end)
+module Map = Map.Make(struct type t = string list let compare = compare end)

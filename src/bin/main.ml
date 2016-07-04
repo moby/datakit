@@ -36,8 +36,7 @@ module Git_fs_store = struct
     Lazy.force listener;
     Log.debug (fun l -> l "Using Git-format store %S" path);
     repo ~bare path >|= fun repo ->
-    let subdirs = Main_pp.subdirs () in
-    fun () -> Filesystem.create make_task repo ~subdirs
+    fun () -> Filesystem.create make_task repo
 end
 
 module In_memory_store = struct
@@ -55,8 +54,7 @@ module In_memory_store = struct
     Log.debug (fun l ->
         l "Using in-memory store (use --git for a disk-backed store)");
     repo () >|= fun repo ->
-    let subdirs = Main_pp.subdirs () in
-    fun () -> Filesystem.create make_task repo ~subdirs
+    fun () -> Filesystem.create make_task repo
 
 end
 
@@ -79,7 +77,7 @@ let start urls sandbox git ~bare =
       Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));
-  Log.app (fun l -> l "Starting com.docker.db...");
+  Log.app (fun l -> l "Starting %s..." @@ Filename.basename Sys.argv.(0));
   begin match git with
     | None      -> In_memory_store.connect ()
     | Some path ->
@@ -91,8 +89,7 @@ let start urls sandbox git ~bare =
     urls
 
 let start () url sandbox git bare auto_push =
-  let local_url = Main_pp.vgithub_hack () in
-  let start () = start (url @ local_url) sandbox git ~bare in
+  let start () = start url sandbox git ~bare in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()

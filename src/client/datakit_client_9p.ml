@@ -127,7 +127,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
       P9p.mkdir t.conn dir leaf rwxr_xr_x
 
     let write_to_fid t fid ~offset data =
-      let maximum_payload = 8192 in     (* TODO: see https://github.com/mirage/ocaml-9p/pull/80 *)
+      (* TODO: see https://github.com/mirage/ocaml-9p/pull/80 *)
+      let maximum_payload = 8192 in
       let rec loop ~offset remaining =
         let len = Cstruct.len remaining in
         if len = 0 then ok ()
@@ -162,7 +163,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
         )
 
     let replace_file t path leaf data =
-      Log.debug (fun f -> f "replace_file %a -> %S" pp_path (path / leaf) (Cstruct.to_string data));
+      Log.debug
+        (fun f -> f "replace_file %a -> %S"
+            pp_path (path / leaf) (Cstruct.to_string data));
       with_file t (path / leaf) (fun fid ->
           P9p.LowLevel.update ~length:0L t.conn fid
           >>*= fun () ->
@@ -174,7 +177,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
         )
 
     let write_stream t path data =
-      Log.debug (fun f -> f "write %S to %a" (Cstruct.to_string data) pp_path path);
+      Log.debug
+        (fun f -> f "write %S to %a" (Cstruct.to_string data) pp_path path);
       with_file t path (fun fid ->
           P9p.LowLevel.openfid t.conn fid Protocol_9p.Types.OpenMode.write_only
           >>*= fun _open ->
@@ -187,7 +191,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let read_all t path =
       P9p.read t.conn path 0L Int32.max_int >>*= fun data ->
       let data = Cstruct.concat data in
-      Log.debug (fun f -> f "read_all %s -> %S" (String.concat ~sep:"/" path) (Cstruct.to_string data));
+      Log.debug
+        (fun f -> f "read_all %s -> %S" (String.concat ~sep:"/" path)
+            (Cstruct.to_string data));
       ok data
 
     let remove t path =
@@ -207,21 +213,22 @@ module Make(P9p : Protocol_9p_client.S) = struct
       )
 
     let read_node t path =
+      let open Protocol_9p_types in
       with_file_full t path @@ fun _fid { Protocol_9p_response.Walk.wqids } ->
       (* Note: would be more efficient to use [_fid] here... *)
       match last wqids with
-      | Some qid when List.mem Protocol_9p_types.Qid.Symlink qid.Protocol_9p_types.Qid.flags ->
+      | Some qid when List.mem Qid.Symlink qid.Qid.flags ->
         (* Symlink *)
         read_all t path >>*= fun data ->
         ok (`Link (Cstruct.to_string data))
-      | Some qid when not (List.mem Protocol_9p_types.Qid.Directory qid.Protocol_9p_types.Qid.flags) ->
+      | Some qid when not (List.mem Qid.Directory qid.Qid.flags) ->
         (* File *)
         read_all t path >>*= fun data ->
         ok (`File data)
       | _ ->
         (* Directory *)
         P9p.readdir t.conn path >>*= fun items ->
-        let items = List.map (fun item -> item.Protocol_9p_types.Stat.name) items in
+        let items = List.map (fun item -> item.Stat.name) items in
         ok (`Dir items)
 
     let read_file read =
@@ -263,6 +270,16 @@ module Make(P9p : Protocol_9p_client.S) = struct
       stat t path >|*= function
       | None -> false
       | Some _ -> true
+
+    let exists_dir t path =
+      stat t path >|*= function
+      | Some { Datakit_S.kind = `Dir; _ } -> true
+      | _ -> false
+
+    let exists_file t path =
+      stat t path >|*= function
+      | None | Some { Datakit_S.kind = `Dir; _ } -> false
+      | _ -> true
 
     let set_executable t path exec =
       Log.debug (fun f -> f "set_executable %a to %b" pp_path path exec);
@@ -359,7 +376,10 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let read t path = FS.read_node t.fs (t.path /@ path)
     let stat t path = FS.stat t.fs (t.path /@ path)
+
     let exists t path = FS.exists t.fs (t.path /@ path)
+    let exists_dir t path = FS.exists_dir t.fs (t.path /@ path)
+    let exists_file t path = FS.exists_file t.fs (t.path /@ path)
 
     let read_file t path = FS.read_file (read t path)
     let read_dir t path = FS.read_dir (read t path)
@@ -461,7 +481,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let merge t commit =
       if t.closed then raise (Invalid_argument "Transaction is closed");
-      FS.write_stream t.fs (t.path / "merge") (Cstruct.of_string commit.Commit.id) >>*= fun () ->
+      FS.write_stream t.fs
+        (t.path / "merge") (Cstruct.of_string commit.Commit.id) >>*= fun () ->
       conflicts t >>*= fun confl ->
       let ours = { Tree.fs = t.fs; path = t.path / "ours" } in
       let theirs = { Tree.fs = t.fs; path = t.path / "theirs" } in
@@ -470,17 +491,21 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let commit t ~message =
       if t.closed then raise (Invalid_argument "Transaction is closed");
-      FS.write_stream t.fs (t.path / "msg") (Cstruct.of_string message) >>*= fun () ->
-      FS.write_stream t.fs (t.path / "ctl") (Cstruct.of_string "commit") >|= function
+      FS.write_stream t.fs (t.path / "msg") (Cstruct.of_string message)
+      >>*= fun () ->
+      FS.write_stream t.fs (t.path / "ctl") (Cstruct.of_string "commit")
+      >|= function
       | Ok () -> t.closed <- true; Ok ()
       | Error _ as e -> e
 
     let abort t =
       if t.closed then Lwt.return ()
       else (
-        FS.write_stream t.fs (t.path / "ctl") (Cstruct.of_string "close") >>= function
+        FS.write_stream t.fs (t.path / "ctl") (Cstruct.of_string "close")
+        >>= function
         | Error (`Msg msg) ->
-          Log.err (fun f -> f "Error aborting transaction %a: %s" pp_path t.path msg);
+          Log.err
+            (fun f -> f "Error aborting transaction %a: %s" pp_path t.path msg);
           t.closed <- true; (* Give up *)
           Lwt.return ()
         | Ok () ->
@@ -491,8 +516,11 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let read t path = FS.read_node t.fs (t.path / "rw" /@ path)
     let stat t path = FS.stat t.fs (t.path / "rw" /@ path)
     let exists t path = FS.exists t.fs (t.path / "rw" /@ path)
+    let exists_file t path = FS.exists t.fs (t.path / "rw" /@ path)
+    let exists_dir t path = FS.exists t.fs (t.path / "rw" /@ path)
 
-    let create_or_replace_file t ~dir = FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)
+    let create_or_replace_file t ~dir =
+      FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)
 
     let read_file t path = FS.read_file (read t path)
     let read_dir t path = FS.read_dir (read t path)
@@ -560,7 +588,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
         (fun hash -> node_of_hash t hash >>*= fn)
 
     let fast_forward t commit =
-      FS.write_stream t.fs (branch_dir t / "fast-forward") (Cstruct.of_string commit.Commit.id)
+      FS.write_stream t.fs
+        (branch_dir t / "fast-forward") (Cstruct.of_string commit.Commit.id)
 
     let with_transaction t fn =
       Transaction.create t.fs (branch_dir t) >>*= fun tr ->

@@ -37,3 +37,9 @@ val pp : t Fmt.t
 
 val to_hum : t -> string
 (** Convert to a string, in the same format as [pp]. *)
+
+module Set: Set.S with type elt = t
+(** Sets of paths. *)
+
+module Map: Map.S with type key = t
+(** Maps of paths. *)

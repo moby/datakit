@@ -10,8 +10,7 @@ module Log = (val Logs.src_log src: Logs.LOG)
 
 module type S = sig
   type repo
-  val create:
-    ?subdirs:Vfs.Inode.t list -> string Irmin.Task.f -> repo -> Vfs.Dir.t
+  val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
 end
 
 let ( >>*= ) x f =
@@ -821,13 +820,13 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let remove () = Vfs.Dir.err_read_only in
     Vfs.Dir.read_only ~ls ~lookup ~remove
 
-  let create ?(subdirs=[]) make_task repo =
+  let create make_task repo =
     let dirs = [
       Vfs.Inode.dir "branch"     (branch_dir make_task repo);
       Vfs.Inode.dir "trees"      (trees_dir make_task repo);
       Vfs.Inode.dir "snapshots"  (snapshots_dir make_task repo);
       Vfs.Inode.dir "remotes"    (Remote.create make_task repo);
-    ] @ subdirs in
+    ] in
     Vfs.Dir.of_list (fun () -> dirs)
 
 end

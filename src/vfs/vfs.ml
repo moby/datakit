@@ -359,7 +359,9 @@ module File = struct
     let read () = ok (Some !data) in
     let write v = data := v; ok () in
     let remove () = err_read_only in
-    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove ~stat ~chmod:normal_only in
+    let file = of_kv_aux
+        ~debug:"rw_of_string" ~read ~write ~remove ~stat ~chmod:normal_only
+    in
     (file, fun () -> Cstruct.to_string !data)
 
   let create = create_aux ~debug:"create"

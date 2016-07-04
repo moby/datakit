@@ -51,7 +51,8 @@ module Error: sig
   (** [negative_offset o] is an error saying that [o] is negative. *)
 
   val offset_too_large: offset:int64 -> int64 -> ('a, t) result
-  (** [offset_too_large ~offset len] is an error saying that [offset] is beyond the end of the file ([len]). *)
+  (** [offset_too_large ~offset len] is an error saying that [offset]
+      is beyond the end of the file ([len]). *)
 
   val pp: t Fmt.t
 end

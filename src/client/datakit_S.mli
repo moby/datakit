@@ -27,6 +27,14 @@ module type READABLE_TREE = sig
   val exists : t -> Datakit_path.t -> bool or_error Lwt.t
   (** [exists t path] is [true] if [stat t path] isn't [None]. *)
 
+  val exists_file : t -> Datakit_path.t -> bool or_error Lwt.t
+  (** [exists_file t path] is similar to {!exists} but for files
+      only. *)
+
+  val exists_dir : t -> Datakit_path.t -> bool or_error Lwt.t
+  (** [exists_dir t path] is similar to {!exists} but for directories
+      only. *)
+
   val read_file : t -> Datakit_path.t -> Cstruct.t or_error Lwt.t
   (** [read_file t path] resolves [path] to a file, or returns an
       error if it isn't a file. *)
@@ -289,8 +297,10 @@ module type CLIENT = sig
       returns its head commit. *)
 
   val github : t -> GitHub.t option or_error Lwt.t
-  (** [github t] is the GitHub API client for [t], if [t] supports [GitHub] integration. *)
+  (** [github t] is the GitHub API client for [t], if [t] supports
+      [GitHub] integration. *)
 
   val disconnect : t -> unit Lwt.t
-  (** [disconnect t] closes the connection. [t] cannot be used after this. *)
+  (** [disconnect t] closes the connection. [t] cannot be used after
+      this. *)
 end

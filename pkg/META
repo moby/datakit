@@ -4,7 +4,7 @@ requires = "lwt logs fmt astring rresult cstruct"
 
 package "vgithub" (
  version = "%%VERSION%%"
- description = "A Git-like database with a filesystem interface"
+ description = "GitHub API to VFS layer"
  requires = "github datakit.vfs"
  archive(byte) = "vgithub.cma"
  archive(native) = "vgithub.cmxa"
@@ -15,7 +15,7 @@ package "vgithub" (
 
 package "vfs" (
  version = "%%VERSION%%"
- description = "A Git-like database with a filesystem interface"
+ description = "Datakit's VFS description"
  requires = ""
  archive(byte) = "vfs.cma"
  archive(native) = "vfs.cmxa"
@@ -26,7 +26,7 @@ package "vfs" (
 
 package "ivfs" (
  version = "%%VERSION%%"
- description = "A Git-like database with a filesystem interface"
+ description = "Irmin to Datakit's VFS layer"
  requires = "irmin datakit.vfs"
  archive(byte) = "ivfs.cma"
  archive(native) = "ivfs.cmxa"
@@ -37,7 +37,7 @@ package "ivfs" (
 
 package "irmin-io" (
  version = "%%VERSION%%"
- description = "A Git-like database with a filesystem interface"
+ description = "Specialized I/O function for Irmin (do not depend on GMP)"
  requires = "camlzip uri lwt.unix git irmin conduit.lwt-unix"
  archive(byte) = "irmin-io.cma"
  archive(native) = "irmin-io.cmxa"
@@ -48,7 +48,7 @@ package "irmin-io" (
 
 package "fs9p" (
  version = "%%VERSION%%"
- description = "A Git-like database with a filesystem interface"
+ description = "Datakit's VFS to 9p layer"
  requires = "protocol-9p.unix datakit.vfs"
  archive(byte) = "fs9p.cma"
  archive(native) = "fs9p.cmxa"
@@ -59,7 +59,7 @@ package "fs9p" (
 
 package "client" (
  version = "%%VERSION%%"
- description = "A Git-like database with a filesystem interface"
+ description = "9p client for Datakit"
  requires = "protocol-9p uri"
  archive(byte) = "datakit-client.cma"
  archive(native) = "datakit-client.cmxa"

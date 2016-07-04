@@ -610,6 +610,38 @@ let test_blobs_random () =
   Alcotest.check (vfs_result reject) "Read after EOF" (Vfs.Error.offset_too_large ~offset:6L 5L) (Ivfs_blob.read b ~offset:6L ~count:1);
   ()
 
+let test_streams () =
+  let ( >>*= ) x f =
+    x >>= function
+    | Ok y -> f y
+    | Error _ -> Alcotest.fail "VFS error" in
+  Lwt_main.run begin
+    let session = Vfs.File.Stream.session 0 in
+    let s = Vfs.File.Stream.create Fmt.int session in
+    let f = Vfs.File.of_stream (fun () -> Lwt.return s) in
+    Vfs.File.open_ f >>*= fun fd ->
+    let offset = ref 0L in
+    let rec read ?(saw_flush=false) expect =
+      Vfs.File.read fd ~offset:!offset ~count:1000 >>*= fun data ->
+      match Cstruct.to_string data with
+      | "" when saw_flush -> Alcotest.fail "End-of-file!"
+      | "" -> read ~saw_flush:true expect
+      | data ->
+      offset := Int64.add !offset (Int64.of_int (String.length data));
+      Alcotest.(check string) "read" expect data;
+      Lwt.return () in
+    read "0" >>= fun () ->
+    Vfs.File.Stream.publish session 1;
+    read "1" >>= fun () ->
+    Vfs.File.Stream.publish session 2;
+    Vfs.File.Stream.publish session 3;
+    read "3" >>= fun () ->
+    let th = read "4" in
+    Vfs.File.Stream.publish session 4;
+    th >>= fun () ->
+    Lwt.return ()
+  end
+
 let run f () = Test_utils.run f
 
 let test_set = [
@@ -631,6 +663,7 @@ let test_set = [
   "Remotes"    , `Slow , run test_remotes;
   "Blobs fast" , `Quick , test_blobs_fast_path;
   "Blobs random", `Quick , test_blobs_random;
+  "Streams",    `Quick , test_streams;
 ]
 
 let () =

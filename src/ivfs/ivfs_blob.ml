@@ -33,7 +33,6 @@ let overwrite orig (data, offset) =
   if offset = 0 && data_len >= orig_len then data (* Common, fast case *)
   else (
     let padding = Cstruct.create (max 0 (offset - orig_len)) in
-    Cstruct.memset padding 0;
     let tail =
       let data_end = offset + data_len in
       if orig_len > data_end then Cstruct.sub orig data_end (orig_len - data_end)
@@ -78,7 +77,6 @@ let truncate old = function
       Ok (of_ro_cstruct (Cstruct.sub (to_ro_cstruct old) 0 new_len))
     ) else (
       let padding = Cstruct.create extra in
-      Cstruct.memset padding 0; (* Won't be needed with Cstruct >= 2.2 *)
       Ok (ref (padding :: !old))
     )
 

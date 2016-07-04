@@ -28,7 +28,8 @@ depends: [
   "mirage-types"
   "irmin"       {>= "0.10.1"}
   "camlzip"
-  "cstruct" "result" "lwt"
+  "cstruct"     {>= "2.2"}
+  "result" "lwt"
   "conduit"
   "named-pipe"
   "hvsock"      {=  "0.7"}

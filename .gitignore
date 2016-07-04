@@ -8,3 +8,4 @@ Datakit.app/
 *.install
 *.native
 *.byte
+hooks/datakit-gh/datakit-gh

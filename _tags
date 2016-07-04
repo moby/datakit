@@ -18,24 +18,42 @@ true: package(cstruct), package(fmt), package(rresult)
 
 <src/ivfs/*>: package(irmin), package(tc)
 <src/fs9p/*>: package(protocol-9p.unix)
-<src/vgithub/*>: package(github)
+
+<src/conduit/*>: package(threads), thread
+<src/conduit/*>: package(conduit.lwt-unix), package(hvsock.lwt)
+<src/conduit/*>: package(named-pipe.lwt), package(uri), package(mirage-flow)
+<src/conduit/*>: package(protocol-9p.unix)
+
+<src/log/*>: package(asl), package(win-eventlog), package(cmdliner)
+<src/log/*>: package(mtime.os), package(logs.cli)
 
 <src/irmin-io> : include
 <src/irmin-io/*>: package(conduit.lwt-unix), package(irmin), package(lwt.unix)
 <src/irmin-io/*>: package(uri), package(camlzip), package(git), package(tc)
 
+### Bridges
+
+<src/vgithub/*>: package(github)
+
 ## Binaries
 
-<src/bin/*>: package(cmdliner), package(fmt.cli), package(fmt.tty)
-<src/bin/*>: package(logs.cli), package(logs.fmt), package(mtime.os)
+<src/conduit>: include
+<src/log>: include
 
-<src/bin/main.*>: package(threads), thread
-<src/bin/main.*>: package(asl), package(win-eventlog)
-<src/bin/main.*>: package(conduit.lwt-unix), package(hvsock.lwt), package(uri)
-<src/bin/main.*>: package(named-pipe.lwt)
+<src/bin/*>: package(cmdliner), package(fmt.cli), package(fmt.tty)
+<src/bin/*>: package(logs.fmt)
+
 <src/bin/main.*>: package(git), package(irmin), package(irmin.git)
 <src/bin/main.*>: package(irmin.mem), package(protocol-9p.unix)
 <src/bin/main.*>: package(camlzip)
+# because of src/conduit
+<src/bin/main.*>: package(threads), thread
+<src/bin/main.*>: package(conduit.lwt-unix), package(hvsock.lwt)
+<src/bin/main.*>: package(named-pipe.lwt), package(uri), package(mirage-flow)
+<src/bin/main.*>: package(protocol-9p.unix)
+# because of src/log
+<src/bin/main.*>: package(asl), package(win-eventlog), package(cmdliner)
+<src/bin/main.*>: package(mtime.os), package(logs.cli)
 
 ### Tests
 

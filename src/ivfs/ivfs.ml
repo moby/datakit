@@ -639,7 +639,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
         Vfs.Inode.file "head.live"    (head_live @@ store "watch");
         Vfs.Inode.file "fast-forward" (fast_forward_merge store);
         Vfs.Inode.file "reflog"       (reflog @@ store "watch");
-        Vfs.Inode.file "head"         (Vfs.File.status @@ status store);
+        Vfs.Inode.file "head"         (Vfs.File.status (status store));
       ] in
     let contents = ref (make_contents !name) in
     let ls () = !contents >|= fun contents -> Ok contents in

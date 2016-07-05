@@ -274,10 +274,14 @@ module File = struct
     in
     create_aux ~debug:"command" ~stat ~open_ ~remove ~truncate ~chmod:normal_only
 
-  let status fn =
+  let status ?length fn =
     let stat () =
-      fn () >|= fun data ->
-      Ok {length = String.length data |> Int64.of_int; perm = `Normal}
+      let length = match length with
+        | None   -> fn () >|= fun data -> String.length data
+        | Some f -> f ()
+      in
+      length >|= fun length ->
+      Ok {length = length |> Int64.of_int; perm = `Normal}
     in
     let open_ () =
       let data = fn () >|= fun result -> ref (Cstruct.of_string result) in

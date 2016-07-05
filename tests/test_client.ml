@@ -7,7 +7,8 @@ let test_transaction dk =
   DK.Branch.with_transaction master (fun tr ->
       DK.Transaction.create_dir tr ~dir:(p "") "src" >>*= fun () ->
       let makefile = Cstruct.of_string "all: build test" in
-      DK.Transaction.create_file tr ~executable:false ~dir:(p "src") "Makefile" makefile >>*= fun () ->
+      DK.Transaction.create_file tr ~executable:false ~dir:(p "src")
+        "Makefile" makefile >>*= fun () ->
       DK.Transaction.parents tr >>*= fun parents ->
       Alcotest.(check (list pass)) "Parents" [] parents;
       DK.Transaction.commit tr ~message:"My commit"
@@ -49,37 +50,48 @@ let test_parents dk =
   check_parents "master empty" master [] >>= fun () ->
 
   DK.Branch.with_transaction master (fun tr ->
-      DK.Transaction.create_file tr ~executable:false ~dir:(p "") "file" (v "data") >>*= fun () ->
+      DK.Transaction.create_file tr ~executable:false ~dir:(p "")
+        "file" (v "data")
+      >>*= fun () ->
       DK.Transaction.commit tr ~message:"commit1"
     ) >>*= fun () ->
   check_parents "master no parent" master [] >>= fun () ->
   expect_head master >>*= fun master_commit1 ->
 
   DK.Branch.with_transaction master (fun tr ->
-      DK.Transaction.create_file tr ~executable:false ~dir: (p "") "file" (v "data2") >>*= fun () ->
+      DK.Transaction.create_file tr ~executable:false ~dir: (p "")
+        "file" (v "data2")
+      >>*= fun () ->
       DK.Transaction.commit tr ~message:"commit2"
     ) >>*= fun () ->
   check_parents "master second commit" master [master_commit1] >>= fun () ->
   expect_head master >>*= fun master_commit2 ->
 
   DK.Branch.with_transaction dev (fun tr ->
-      DK.Transaction.create_file tr ~executable:false ~dir: (p "") "file" (v "dev") >>*= fun () ->
+      DK.Transaction.create_file tr ~executable:false ~dir: (p "")
+        "file" (v "dev")
+      >>*= fun () ->
       DK.Transaction.set_parents tr [master_commit2] >>*= fun () ->
       DK.Transaction.commit tr ~message:"commit3"
     ) >>*= fun () ->
   check_parents "dev from master" dev [master_commit2] >>= fun () ->
 
   check_fails "Invalid hash" ["hello"] >>*= fun () ->
-  check_fails "Missing hash" ["a3827c5d1a2ba8c6a40eded5598dba8d3835fb35"] >>*= fun () ->
+  check_fails "Missing hash" ["a3827c5d1a2ba8c6a40eded5598dba8d3835fb35"]
+  >>*= fun () ->
 
   expect_head dev >>*= fun dev_head ->
   DK.Branch.with_transaction master (fun t1 ->
       DK.Branch.with_transaction master (fun t2 ->
-          DK.Transaction.create_file t2 ~executable:false ~dir: (p "") "from_inner" (v "inner") >>*= fun () ->
+          DK.Transaction.create_file t2 ~executable:false ~dir: (p "")
+            "from_inner" (v "inner")
+          >>*= fun () ->
           DK.Transaction.commit t2 ~message:"From inner"
         ) >>*= fun () ->
       expect_head master >>*= fun after_inner ->
-      DK.Transaction.create_file t1 ~executable:false ~dir: (p "") "from_outer" (v "outer") >>*= fun () ->
+      DK.Transaction.create_file t1 ~executable:false ~dir: (p "")
+        "from_outer" (v "outer")
+      >>*= fun () ->
       DK.Transaction.parents t1 >>*= function
       | [] | _::_::_ -> Alcotest.fail "Expected one parent"
       | [real_parent] ->
@@ -130,7 +142,8 @@ let test_merge dk =
   (* Put "from-master" on master branch *)
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun tr ->
-      DK.Transaction.create_file tr ~dir:(p "") "file" (v "from-master") >>*= fun () ->
+      DK.Transaction.create_file tr ~dir:(p "") "file" (v "from-master")
+      >>*= fun () ->
       DK.Transaction.commit tr ~message:"init"
     ) >>*= fun () ->
   (* Fork and put "from-master+pr" on pr branch *)
@@ -143,18 +156,24 @@ let test_merge dk =
   DK.Branch.fast_forward pr merge_a >>*= fun () ->
   DK.Branch.with_transaction pr (fun tr ->
       DK.Transaction.read_file tr (p "file") >>*= fun old ->
-      DK.Transaction.replace_file tr ~dir:(p "") "file" (Cstruct.append old (v "+pr")) >>*= fun () ->
+      DK.Transaction.replace_file tr ~dir:(p "") "file"
+        (Cstruct.append old (v "+pr"))
+      >>*= fun () ->
       DK.Transaction.commit tr ~message:"mod"
     ) >>*= fun () ->
   expect_head pr >>*= fun merge_b ->
   (* Merge pr into master *)
   DK.Branch.with_transaction master (fun tr ->
       DK.Transaction.create_file tr ~dir:(p "") "mine" (v "pre-merge") >>*= fun () ->
-      DK.Transaction.merge tr merge_b >>*= fun ({DK.Transaction.ours; theirs; base}, conflicts) ->
+      DK.Transaction.merge tr merge_b
+      >>*= fun ({DK.Transaction.ours; theirs; base}, conflicts) ->
       if conflicts <> [] then Alcotest.fail "Conflicts on merge!";
-      DK.Tree.read_file ours   (p "mine") |> check_file "Ours" "pre-merge" >>= fun () ->
-      DK.Tree.read_file theirs (p "file") |> check_file "Theirs" "from-master+pr" >>= fun () ->
-      DK.Tree.read_file base   (p "file") |> check_file "Base" "from-master" >>= fun () ->
+      DK.Tree.read_file ours   (p "mine") |> check_file "Ours" "pre-merge"
+      >>= fun () ->
+      DK.Tree.read_file theirs (p "file") |> check_file "Theirs" "from-master+pr"
+      >>= fun () ->
+      DK.Tree.read_file base   (p "file") |> check_file "Base" "from-master"
+      >>= fun () ->
       DK.Transaction.commit tr ~message:"merge"
     ) >>*= fun () ->
   expect_head master >>*= fun merge_commit ->
@@ -162,17 +181,24 @@ let test_merge dk =
   Alcotest.(check @@ slist commit compare_commit) "Merge parents"
     [merge_b; merge_a] parents;
   DK.Tree.read_file (DK.Commit.tree merge_commit) (p "file") >>*= fun merged ->
-  Alcotest.(check string) "Merge result" "from-master+pr" (Cstruct.to_string merged);
+  Alcotest.(check string) "Merge result"
+    "from-master+pr" (Cstruct.to_string merged);
   Lwt.return ()
 
 let test_merge_metadata dk =
   (* Put "from-master" on master branch *)
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun t ->
-      DK.Transaction.create_file t ~executable:true ~dir:(p "") "a" (v "from-master") >>*= fun () ->
-      DK.Transaction.stat t (p "a") |> check_kind "Should be executable" `Exec >>= fun () ->
-      DK.Transaction.create_symlink t ~dir:(p "") "b" "from-master" >>*= fun () ->
-      DK.Transaction.create_file t ~executable:true ~dir:(p "") "c" (v "from-master") >>*= fun () ->
+      DK.Transaction.create_file t ~executable:true ~dir:(p "")
+        "a" (v "from-master")
+      >>*= fun () ->
+      DK.Transaction.stat t (p "a") |> check_kind "Should be executable" `Exec
+      >>= fun () ->
+      DK.Transaction.create_symlink t ~dir:(p "") "b" "from-master"
+      >>*= fun () ->
+      DK.Transaction.create_file t ~executable:true ~dir:(p "")
+        "c" (v "from-master")
+      >>*= fun () ->
       (* Base: exec, link, exec *)
       DK.Transaction.commit t ~message:"init"
     ) >>*= fun () ->
@@ -181,7 +207,8 @@ let test_merge_metadata dk =
   expect_head master >>*= fun merge_a ->
   DK.Branch.with_transaction pr (fun t ->
       DK.Transaction.merge t merge_a >>*= fun _ ->
-      DK.Transaction.stat t (p "a") |> check_kind "Should be executable" `Exec >>= fun () ->
+      DK.Transaction.stat t (p "a") |> check_kind "Should be executable" `Exec
+      >>= fun () ->
       DK.Transaction.set_executable t (p "b") true >>*= fun () ->
       DK.Transaction.remove t (p "c") >>*= fun () ->
       DK.Transaction.create_symlink t ~dir:(p "") "c" "foo" >>*= fun () ->
@@ -192,7 +219,8 @@ let test_merge_metadata dk =
   DK.Branch.with_transaction master (fun t ->
       DK.Transaction.set_executable t (p "c") false >>*= fun () ->
       (* Begin the merge *)
-      DK.Transaction.merge t merge_b >>*= fun ({DK.Transaction.ours; theirs; base = _}, _) ->
+      DK.Transaction.merge t merge_b
+      >>*= fun ({DK.Transaction.ours; theirs; base = _}, _) ->
       (* Ours: exec, link, normal *)
       DK.Tree.stat ours (p "a") |> check_kind "ours/a" `Exec >>= fun () ->
       DK.Tree.stat ours (p "b") |> check_kind "ours/b" `Link >>= fun () ->
@@ -201,7 +229,9 @@ let test_merge_metadata dk =
       (* RW: exec, exec, conflict(normal) *)
       DK.Transaction.stat t (p "b") |> check_kind "rw/b" `Exec >>= fun () ->
       DK.Transaction.stat t (p "c") |> check_kind "rw/c" `File >>= fun () ->
-      DK.Transaction.read_file t (p "c") |> check_file "Conflict" "** Conflict **\nChanged on both branches\n" >>= fun () ->
+      DK.Transaction.read_file t (p "c")
+      |> check_file "Conflict" "** Conflict **\nChanged on both branches\n"
+      >>= fun () ->
       DK.Transaction.replace_file t ~dir:(p "") "c" (v "Resolved") >>*= fun () ->
       DK.Transaction.set_executable t (p "c") true >>*= fun () ->
       DK.Transaction.commit t ~message:"merge"
@@ -209,12 +239,14 @@ let test_merge_metadata dk =
   expect_head master >>*= fun head ->
   DK.Tree.stat (DK.Commit.tree head) (p "c") |> check_kind "ro/c" `Exec
 
-(* Irmin.Git.Commit: a commit with an empty filesystem... this is not supported by Git! *)
+(* Irmin.Git.Commit: a commit with an empty filesystem... this is not
+   supported by Git! *)
 let test_merge_empty dk =
   (* Put "from-master" on master branch *)
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun tr ->
-      DK.Transaction.create_file tr ~dir:(p "") "file" (v "from-master") >>*= fun () ->
+      DK.Transaction.create_file tr ~dir:(p "") "file" (v "from-master")
+      >>*= fun () ->
       DK.Transaction.commit tr ~message:"init"
     ) >>*= fun () ->
   expect_head master >>*= fun head ->
@@ -277,23 +309,30 @@ let test_conflicts dk =
          DK.Transaction.read_file t (p "a") |> check_file "a"
            "** Conflict **\nChanged on both branches\n"
          >>= fun () ->
-         DK.Transaction.read_file t (p "b") |> check_file "b" "b-theirs" >>= fun () ->
-         DK.Transaction.read_file t (p "c") |> check_file "c" "c-ours" >>= fun () ->
-         DK.Transaction.read_file t (p "f") |> check_file "f" "** Conflict **\noption: add/del\n"
+         DK.Transaction.read_file t (p "b") |> check_file "b" "b-theirs"
          >>= fun () ->
-         DK.Transaction.read_file t (p "g") |> check_file "g" "g-same" >>= fun () ->
+         DK.Transaction.read_file t (p "c") |> check_file "c" "c-ours"
+         >>= fun () ->
+         DK.Transaction.read_file t (p "f")
+         |> check_file "f" "** Conflict **\noption: add/del\n"
+         >>= fun () ->
+         DK.Transaction.read_file t (p "g") |> check_file "g" "g-same"
+         >>= fun () ->
          DK.Transaction.read_file t (p "h") |> check_file "f"
            "** Conflict **\ndefault: add/add and no common ancestor\n"
          >>= fun () ->
-         DK.Transaction.read_file t (p "dir") |> check_file "dir" "** Conflict **\nFile vs dir\n"
+         DK.Transaction.read_file t (p "dir")
+         |> check_file "dir" "** Conflict **\nFile vs dir\n"
          >>= fun () ->
          DK.Transaction.conflicts t >>*= fun conflicts ->
          let conflicts = List.map Datakit_path.to_hum conflicts in
-         Alcotest.(check (list string)) "conflicts" ["a"; "dir"; "dir2"; "f"; "h"] conflicts;
+         Alcotest.(check (list string)) "conflicts"
+           ["a"; "dir"; "dir2"; "f"; "h"] conflicts;
          DK.Transaction.remove t (p "a") >>*= fun () ->
          DK.Transaction.remove t (p "dir") >>*= fun () ->
          DK.Transaction.remove t (p "dir2") >>*= fun () ->
-         DK.Tree.read_file theirs (p "f") >>*= DK.Transaction.replace_file t ~dir:(p "") "f" >>*= fun () ->
+         DK.Tree.read_file theirs (p "f") >>*=
+         DK.Transaction.replace_file t ~dir:(p "") "f" >>*= fun () ->
          DK.Transaction.conflicts t >>*= fun conflicts ->
          let conflicts = List.map Datakit_path.to_hum conflicts in
          Alcotest.(check (list string)) "conflicts" ["h"] conflicts;
@@ -311,9 +350,11 @@ let test_make_dirs dk =
   DK.Branch.with_transaction master (fun tr ->
       DK.Transaction.make_dirs tr (p "") >>*= fun () ->
       DK.Transaction.make_dirs tr (p "foo/bar/baz") >>*= fun () ->
-      DK.Transaction.stat tr (p "foo/bar/baz") |> check_kind "Dir exists" `Dir >>= fun () ->
+      DK.Transaction.stat tr (p "foo/bar/baz") |> check_kind "Dir exists" `Dir
+      >>= fun () ->
       DK.Transaction.make_dirs tr (p "foo/bar/baz/new") >>*= fun () ->
-      DK.Transaction.stat tr (p "foo/bar/baz/new") |> check_kind "Dir exists" `Dir >>= fun () ->
+      DK.Transaction.stat tr (p "foo/bar/baz/new") |> check_kind "Dir exists" `Dir
+      >>= fun () ->
       DK.Transaction.make_dirs tr (p "foo/bar/baz") >>*= fun () ->
       DK.Transaction.commit tr ~message:"mkdirs"
     ) >>*= Lwt.return
@@ -326,7 +367,9 @@ let watch_thread ~switch branch path =
         push (Some node);
         Lwt.return (Ok `Again)
       ) >>*= Lwt.return in
-  Lwt.on_failure th (fun ex -> Logs.err (fun f -> f "Watch thread failed: %s" (Printexc.to_string ex)));
+  Lwt.on_failure th (fun ex ->
+      Logs.err (fun f -> f "Watch thread failed: %s" (Printexc.to_string ex))
+    );
   (events, th)
 
 let with_events branch path fn =
@@ -368,9 +411,11 @@ let test_watch dk =
   (* Start monitoring / *)
   with_events master (p "") @@ fun root_events ->
   Lwt_stream.next root_events >>= begin function
-    | Some (`Dir tree) ->        (* XXX: should this be None? compare with other tests. *)
+    | Some (`Dir tree) ->
+      (* XXX: should this be None? compare with other tests. *)
       DK.Tree.read_dir tree (p "") >>*= fun init ->
-      Alcotest.(check (list string)) "Root tree should initially be empty" [] init;
+      Alcotest.(check (list string)) "Root tree should initially be empty"
+        [] init;
       Lwt.return ()
     | _ ->
       Alcotest.fail "Root tree should initially be Dir"
@@ -385,7 +430,8 @@ let test_watch dk =
   expect_dir_event "Top event" root_events ["src"] >>= fun () ->
   (* Start monitoring /src/Makefile *)
   with_events master (p "src/Makefile") @@ fun makefile_events ->
-  expect_file_event "Makefile" makefile_events (Some (`File (v "all: build"))) >>= fun () ->
+  expect_file_event "Makefile" makefile_events (Some (`File (v "all: build")))
+  >>= fun () ->
   (* Modify file under doc *)
   create_in_trans master (p "doc") "README" (v "Instructions") >>*= fun () ->
   expect_dir_event "Doc event" doc_events ["README"] >>= fun () ->
@@ -400,15 +446,18 @@ let test_watch dk =
     )
   >>*= fun () ->
   next_makefile_event >>= fun event ->
-  Alcotest.(check (option file_event)) "Makefile" (Some (`Exec (v "all: build"))) event;
+  Alcotest.(check (option file_event)) "Makefile"
+    (Some (`Exec (v "all: build"))) event;
   (* Make symlink *)
   DK.Branch.with_transaction master (fun t ->
       DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
-      DK.Transaction.create_symlink t ~dir:(p "src") "Makefile" "my-target" >>*= fun () ->
+      DK.Transaction.create_symlink t ~dir:(p "src") "Makefile" "my-target"
+      >>*= fun () ->
       DK.Transaction.commit t ~message:"symlink"
     )
   >>*= fun () ->
-  expect_file_event "Makefile" makefile_events (Some (`Link "my-target")) >>= fun () ->
+  expect_file_event "Makefile" makefile_events (Some (`Link "my-target"))
+  >>= fun () ->
   (* Remove *)
   DK.Branch.with_transaction master (fun t ->
       DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
@@ -426,7 +475,8 @@ let test_rename_branch dk =
   Alcotest.(check (list string)) "New branches" ["new"] branches;
   DK.branch dk "new" >>*= fun new_branch ->
   expect_head new_branch >>*= fun head ->
-  DK.Tree.read_file (DK.Commit.tree head) (p "key") |> check_file "Moved" "value" >>= fun () ->
+  DK.Tree.read_file (DK.Commit.tree head) (p "key")
+  |> check_file "Moved" "value" >>= fun () ->
   DK.Branch.remove branch >>*= fun () ->
   DK.branches dk >>*= fun branches ->
   Alcotest.(check (list string)) "New gone" [] branches;
@@ -454,13 +504,15 @@ let test_rename_file dk =
     (* Check rename detects errors
        Note: we currently allow overwriting an empty directory *)
     DK.Transaction.create_dir t ~dir:(p "") "dir" >>*= fun () ->
-    DK.Transaction.create_file t ~dir:(p "dir") "precious" (v "data") >>*= fun () ->
+    DK.Transaction.create_file t ~dir:(p "dir") "precious" (v "data")
+    >>*= fun () ->
     DK.Transaction.rename t (p "new") "dir" >>= function
     | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
     | Error (`Msg e) ->
     Alcotest.(check string) "Rename over dir" "Is a directory" e;
-    (* Rename when source has been deleted. Ideally, we should also check it hasn't
-       been replaced by something with the same name. *)
+    (* Rename when source has been deleted. Ideally, we should also
+       check it hasn't been replaced by something with the same
+       name. *)
     DK.Transaction.remove t (p "new") >>*= fun () ->
     DK.Transaction.rename t (p "new") "reborn" >>= function
     | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
@@ -479,7 +531,9 @@ let test_truncate dk =
       let check msg expected =
         DK.Transaction.read_file t (p "file") |> check_file msg expected
       in
-      DK.Transaction.create_file t ~executable:true ~dir:(p "") "file" (v "Hello") >>*= fun () ->
+      DK.Transaction.create_file t ~executable:true ~dir:(p "")
+        "file" (v "Hello")
+      >>*= fun () ->
       DK.Transaction.truncate t (p "file") 4L >>*= fun () ->
       check "Truncate to 4" "Hell" >>= fun () ->
       DK.Transaction.truncate t (p "file") 4L >>*= fun () ->
@@ -504,7 +558,8 @@ let test_remove dk =
   DK.Branch.with_transaction master (fun t ->
       DK.Transaction.make_dirs t (p "foo/bar/baz") >>*= fun () ->
       DK.Transaction.create_file t ~dir:(p "foo") "file1" (v "1") >>*= fun () ->
-      DK.Transaction.create_file t ~dir:(p "foo/bar") "file2" (v "2") >>*= fun () ->
+      DK.Transaction.create_file t ~dir:(p "foo/bar") "file2" (v "2")
+      >>*= fun () ->
 
       (* XXX: hack to make the test pass until we fix
          https://github.com/docker/datakit/issues/147 *)
@@ -538,10 +593,12 @@ let test_create_or_replace dk =
   DK.Branch.with_transaction master (fun t ->
       DK.Transaction.exists t (p "README") >>*= fun exists ->
       Alcotest.(check bool) "Doesn't yet exist" false exists;
-      DK.Transaction.create_or_replace_file t ~dir:(p "") "README" (v "Data") >>*= fun () ->
+      DK.Transaction.create_or_replace_file t ~dir:(p "") "README" (v "Data")
+      >>*= fun () ->
       DK.Transaction.exists t (p "README") >>*= fun exists ->
       Alcotest.(check bool) "Now exists" true exists;
-      DK.Transaction.create_or_replace_file t ~dir:(p "") "README" (v "Data2") >>*= fun () ->
+      DK.Transaction.create_or_replace_file t ~dir:(p "") "README" (v "Data2")
+      >>*= fun () ->
       DK.Transaction.commit t ~message:"create-or-replace"
     )
   >>*= fun () ->

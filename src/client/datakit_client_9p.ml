@@ -62,6 +62,7 @@ let abort_if_off switch fn =
 
 module Make(P9p : Protocol_9p_client.S) = struct
   type error = Protocol_9p_error.error
+  let pp_error ppf (`Msg e) = Fmt.string ppf e
 
   type 'a or_error = ('a, error) result
 
@@ -705,4 +706,3 @@ module Make(P9p : Protocol_9p_client.S) = struct
   type t = FS.t
 
 end
-

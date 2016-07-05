@@ -59,6 +59,7 @@ module In_memory_store = struct
     repo () >|= fun repo ->
     let subdirs = Main_pp.subdirs () in
     fun () -> Filesystem.create make_task repo ~subdirs
+
 end
 
 let handle_unix_flow ~make_root fd =
@@ -251,7 +252,8 @@ let start urls sandbox git ~bare =
   ) urls
 
 let start () url sandbox git bare auto_push =
-  let start () = start url sandbox git ~bare in
+  let local_url = Main_pp.vgithub_hack () in
+  let start () = start (url @ local_url) sandbox git ~bare in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()

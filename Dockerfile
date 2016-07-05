@@ -10,13 +10,13 @@ RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit
 
-RUN opam install datakit
+RUN opam install datakit.dev -vv
 
 EXPOSE 5640
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
-    sudo cp /home/opam/.opam/system/bin/datakit /usr/bin/datakit && \
-    sudo cp /home/opam/.opam/system/bin/datakit-mount /usr/bin/datakit-mount
+    sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \
+    sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
 
 ENTRYPOINT ["/usr/bin/datakit"]
 CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-vv"]

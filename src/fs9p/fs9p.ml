@@ -72,9 +72,11 @@ module Op9p = struct
 
   let stat ~info inode =
     let ext ?extension () =
-      (* Note: we always need an extension for the Unix protocol, or mortdeus will crash *)
+      (* Note: we always need an extension for the Unix protocol, or
+         mortdeus will crash *)
       if info.P.Info.version <> P.Types.Version.unix then None
-      else Some (P.Types.Stat.make_extension ?extension ~n_uid:0l ~n_gid:0l ~n_muid:0l ())
+      else Some (P.Types.Stat.make_extension
+                   ?extension ~n_uid:0l ~n_gid:0l ~n_muid:0l ())
     in
     begin match Inode.kind inode with
       | `Dir _ ->
@@ -86,11 +88,15 @@ module Op9p = struct
       | `File f ->
         Vfs.File.stat f >>= map_error >>*= fun info ->
         let file, u = match info.Vfs.perm with
-          | `Normal -> P.Types.FileMode.make ~owner:rw ~group:rw ~other:r (), ext ()
-          | `Exec -> P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx (), ext ()
+          | `Normal ->
+            P.Types.FileMode.make ~owner:rw ~group:rw ~other:r (), ext ()
+          | `Exec ->
+            P.Types.FileMode.make ~owner:rwx ~group:rwx ~other:rx (), ext ()
           | `Link target ->
-              let u = ext ~extension:target () in
-              P.Types.FileMode.make ~is_symlink:true ~owner:rwx ~group:rwx ~other:rx (), u
+            let u = ext ~extension:target () in
+            P.Types.FileMode.make
+              ~is_symlink:true ~owner:rwx ~group:rwx ~other:rx (),
+            u
         in
         ok (info.Vfs.length, file, u)
     end >>*= fun (length, mode, u) ->

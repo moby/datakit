@@ -92,30 +92,45 @@ module File = struct
     let read t = t.read
     let write t = t.write
 
-    type 'a session = { mutable v: 'a; c: 'a Lwt_condition.t }
+    type 'a session = { mutable v: 'a; c: unit Lwt_condition.t }
 
     let session v = { v; c = Lwt_condition.create () }
 
     let publish session v =
       session.v <- v;
-      Lwt_condition.broadcast session.c v
+      Lwt_condition.broadcast session.c ()
 
     let create pp session =
-      let data = ref (Cstruct.of_string (Fmt.to_to_string pp session.v)) in
-      let read_line () =
-        Lwt_condition.wait session.c >|= fun s ->
-        let line = Fmt.to_to_string pp s in
-        data := Cstruct.of_string line
-      in
+      (* [buffer] is the remainder of the line we're currently sending to the client.
+         [last] is the whole line (to avoid sending the same line twice).
+         When [data] is empty, we wait until [session]'s value is no longer [last] and
+         use that as the next [buffer].
+         [!buffer] is a thread in case the client does two reads at the same time,
+         although that doesn't make much sense for streams anyway. *)
+      let last = ref (Fmt.to_to_string pp session.v) in
+      let buffer = ref (Lwt.return (Cstruct.of_string !last)) in
       let refill () =
-        if Cstruct.len !data = 0 then read_line () else Lwt.return_unit
+        let rec next () =
+          let current = Fmt.to_to_string pp session.v in
+          if current = !last then Lwt_condition.wait session.c >>= next
+          else (
+            last := current;
+            Lwt.return (Cstruct.of_string current)
+          )
+        in
+        buffer := next ()
       in
-      let read count =
-        refill () >|= fun () ->
-        let count = min count (Cstruct.len !data) in
-        let response = Cstruct.sub !data 0 count in
-        data := Cstruct.shift !data count;
-        Ok (response)
+      let rec read count =
+        !buffer >>= fun avail ->
+        if Cstruct.len avail = 0 then (
+          refill ();
+          read count
+        ) else (
+          let count = min count (Cstruct.len avail) in
+          let response = Cstruct.sub avail 0 count in
+          buffer := Lwt.return (Cstruct.shift avail count);
+          Lwt.return (Ok (response))
+        )
       in
       let write _ = err_read_only in
       { read; write }

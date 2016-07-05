@@ -79,7 +79,8 @@ module File = struct
 
   let check_offset ~offset len =
     if offset < 0L then Lwt.return (Error.negative_offset offset)
-    else if offset > Int64.of_int len then Lwt.return (Error.offset_too_large ~offset (Int64.of_int len))
+    else if offset > Int64.of_int len then
+      Lwt.return (Error.offset_too_large ~offset (Int64.of_int len))
     else ok ()
 
   let empty = Cstruct.create 0
@@ -216,7 +217,10 @@ module File = struct
   let chmod t = t.chmod
 
   let read_only_aux =
-    create_aux ~remove:(fun _ -> err_read_only) ~truncate:(fun _ -> err_read_only) ~chmod:(fun _ -> err_read_only)
+    create_aux
+      ~remove:(fun _ -> err_read_only)
+      ~truncate:(fun _ -> err_read_only)
+      ~chmod:(fun _ -> err_read_only)
 
   let ro_of_cstruct ?(perm=`Normal) data =
     let length = Cstruct.len data |> Int64.of_int in
@@ -368,7 +372,9 @@ module File = struct
     let read () = ok (Some !data) in
     let write v = data := v; ok () in
     let remove () = err_read_only in
-    let file = of_kv_aux ~debug:"rw_of_string" ~read ~write ~remove ~stat ~chmod:normal_only in
+    let file = of_kv_aux
+        ~debug:"rw_of_string" ~read ~write ~remove ~stat ~chmod:normal_only
+    in
     (file, fun () -> Cstruct.to_string !data)
 
   let create = create_aux ~debug:"create"

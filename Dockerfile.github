@@ -8,20 +8,21 @@ RUN opam pin add github --dev -n
 # cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext github ssl datakit && opam install github ssl datakit --deps
+RUN opam depext github ssl datakit && opam install github ssl && opam install datakit --deps
 
 COPY . /home/opam/src/datakit/
 
-RUN opam install ssl github datakit
+RUN opam install datakit.dev -vv
 
 EXPOSE 5640
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
-    sudo cp /home/opam/.opam/system/bin/datakit /usr/bin/datakit && \
-    sudo cp /home/opam/.opam/system/bin/datakit-mount /usr/bin/datakit-mount
+    sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \
+    sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
+
+RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 
 ENV GITHUB_DEBUG 1
 
-RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 ENTRYPOINT ["/usr/bin/datakit"]
 CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-vv"]

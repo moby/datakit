@@ -198,7 +198,6 @@ let pr_status_dir t pr context ?(extra_dirs=fun () -> []) state =
         Vfs.ok (str ^ "\n")
       )
     ) in
-
   let updates =
     let stream () =
       Vfs.File.Stream.create API.pp_status_state update_session

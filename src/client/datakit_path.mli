@@ -21,14 +21,6 @@ val of_string : string -> (t, string) result
 
 val of_string_exn : string -> t
 
-val ( / ) : t -> string -> t
-(** [a / b] is the path [a] with step [b] appended.
-    Raises an exception if [b] is not a valid step, so this should only be
-    used with string constants, not user input. *)
-
-val ( /@ ) : t -> t -> t
-(** [a /@ b] is the concatenation of paths [a] and [b]. *)
-
 val unwrap : t -> string list
 (** Cast to a list of strings *)
 
@@ -46,3 +38,15 @@ module Set: Set.S with type elt = t
 
 module Map: Map.S with type key = t
 (** Maps of paths. *)
+
+module Infix: sig
+
+  val ( / ) : t -> string -> t
+  (** [a / b] is the path [a] with step [b] appended. Raises an
+      exception if [b] is not a valid step, so this should only be
+      used with string constants, not user input. *)
+
+  val ( /@ ) : t -> t -> t
+  (** [a /@ b] is the concatenation of paths [a] and [b]. *)
+
+end

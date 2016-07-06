@@ -7,8 +7,9 @@ true: warn_error(+1..49), warn(A-3-4-41-44)
 <src/ivfs> : include
 <src/fs9p> : include
 
-true: package(lwt), package(astring), package(logs), package(result)
-true: package(cstruct), package(fmt), package(rresult)
+true: \
+  package(lwt), package(astring), package(logs), package(result), \
+  package(cstruct), package(fmt), package(rresult)
 
 ### Client
 
@@ -18,30 +19,65 @@ true: package(cstruct), package(fmt), package(rresult)
 
 <src/ivfs/*>: package(irmin), package(tc)
 <src/fs9p/*>: package(protocol-9p.unix)
-<src/vgithub/vgithub_api.*>: package(github)
+
+<src/conduit/*>: \
+  package(threads), thread, \
+  package(conduit.lwt-unix), package(hvsock.lwt), \
+  package(named-pipe.lwt), package(uri), package(mirage-flow), \
+  package(protocol-9p.unix)
+
+<src/log/*>: \
+  package(asl), package(win-eventlog), package(cmdliner), \
+  package(mtime.os), package(logs.cli)
 
 <src/irmin-io> : include
-<src/irmin-io/*>: package(conduit.lwt-unix), package(irmin), package(lwt.unix)
-<src/irmin-io/*>: package(uri), package(camlzip), package(git), package(tc)
+<src/irmin-io/*>: \
+  package(conduit.lwt-unix), package(irmin), package(lwt.unix), \
+  package(uri), package(camlzip), package(git), package(tc)
+
+### Bridges
+
+<src/vgithub/vgithub_api.*>: package(github)
 
 ## Binaries
 
-<src/bin/*>: package(cmdliner), package(fmt.cli), package(fmt.tty)
-<src/bin/*>: package(logs.cli), package(logs.fmt), package(mtime.os)
+<src/conduit>: include
+<src/log>: include
 
-<src/bin/main.*>: package(threads), thread
-<src/bin/main.*>: package(asl), package(win-eventlog)
-<src/bin/main.*>: package(conduit.lwt-unix), package(hvsock.lwt), package(uri)
-<src/bin/main.*>: package(named-pipe.lwt)
-<src/bin/main.*>: package(git), package(irmin), package(irmin.git)
-<src/bin/main.*>: package(irmin.mem), package(protocol-9p.unix)
-<src/bin/main.*>: package(camlzip)
+<src/bin/*>: \
+  package(cmdliner), package(fmt.cli), package(fmt.tty), package(logs.fmt)
+
+### datakit
+
+<src/bin/main.*>: \
+  package(git), package(irmin), package(irmin.git), package(irmin.mem), \
+  package(protocol-9p.unix), package(camlzip)
+
+### datakit-github-bridge
+
+<src/client>: include
+<src/vgithub>: include
+<src/bin/github_bridge.*>: package(github.unix)
+
+### because of src/conduit
+
+<src/bin/{main,github_bridge}.*>: \
+  package(threads), thread, \
+  package(conduit.lwt-unix), package(hvsock.lwt), package(named-pipe.lwt), \
+  package(uri), package(mirage-flow), package(protocol-9p.unix)
+
+### because of src/log
+
+<src/bin/{main,github_bridge}.*>: \
+  package(asl), package(win-eventlog), package(mtime.os), package(logs.cli)
+
 
 ### Tests
 
 <src/client>: include
-<tests/*>: package(alcotest), package(conduit.lwt-unix)
-<tests/*>: package(str), package(logs.fmt), package(fmt.tty), package(mtime.os)
-<tests/*>: package(mirage-types.lwt), package(protocol-9p.unix)
-<tests/*>: package(irmin), package(irmin.mem), package(camlzip)
-<tests/*>: package(git), package(irmin.git)
+<tests/*>: \
+  package(alcotest), package(conduit.lwt-unix), \
+  package(str), package(logs.fmt), package(fmt.tty), package(mtime.os), \
+  package(mirage-types.lwt), package(protocol-9p.unix), \
+  package(irmin), package(irmin.mem), package(camlzip), \
+  package(git), package(irmin.git)

@@ -12,7 +12,7 @@ let v = Cstruct.of_string
 
 let ( ++ ) = Int64.add
 
-let ok x = `Ok x
+let ok x = Lwt.return (Ok x)
 
 let ( >>!= ) x f =
   match x with
@@ -55,6 +55,8 @@ module Test_flow = struct
     let flow2 = { from_remote = b; to_remote = a } in
     (flow1, flow2)
 
+
+  let ok x = `Ok x
   let close _t = Lwt.return_unit
   let write1 t buf = Lwt_mvar.put t.to_remote buf
   let write t buf = write1 t buf >|= ok
@@ -65,7 +67,8 @@ end
 
 let reporter () =
   let pad n x =
-    if String.length x > n then x else x ^ String.v ~len:(n - String.length x) (fun _ -> ' ')
+    if String.length x > n then x
+    else x ^ String.v ~len:(n - String.length x) (fun _ -> ' ')
   in
   let report src level ~over k msgf =
     let k _ = over (); k () in
@@ -106,8 +109,8 @@ module DK = Datakit_client_9p.Make(Client)
 
 let expect_head branch =
   DK.Branch.head branch >>*= function
-  | None -> Alcotest.fail "Expecting HEAD"
-  | Some head -> Lwt.return (Ok head)
+  | None      -> Alcotest.fail "Expecting HEAD"
+  | Some head -> ok head
 
 let config = Irmin_mem.config ()
 
@@ -137,7 +140,8 @@ let rx = [`Read; `Execute]
 let r = [`Read]
 let rwxr_xr_x = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ()
 let rw_r__r__ = Protocol_9p.Types.FileMode.make ~owner:rw ~group:r ~other:r ()
-let symlink = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
+let symlink = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx
+    ~is_symlink:true ()
 
 let check_dir conn path msg expected =
   Client.readdir conn path >>*= fun items ->
@@ -150,7 +154,7 @@ let with_file conn path fn =
       Client.walk_from_root conn newfid path >>*= fun _resp ->
       fn newfid >>= fun result ->
       Client.LowLevel.clunk conn newfid >>*= fun () ->
-      Lwt.return (Ok result)
+      ok result
     ) >>*= Lwt.return
 
 let stream conn ?(off=0L) fid =
@@ -216,7 +220,7 @@ let write_file conn ?(truncate=false) path contents =
       >>**= fun _open ->
       Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
       >>**= fun _resp ->
-      Lwt.return (Ok ())
+      ok ()
     )
 
 let chmod conn path perm =
@@ -224,7 +228,8 @@ let chmod conn path perm =
     match perm with
     | `Normal -> rw_r__r__
     | `Executable -> rwxr_xr_x
-    | `Link -> Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
+    | `Link -> Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx
+                 ~is_symlink:true ()
   in
   with_file conn path (fun fid ->
       Client.LowLevel.update ~mode conn fid >>*= Lwt.return
@@ -240,7 +245,8 @@ let read_perm conn path =
   Client.stat conn path >>*= fun info ->
   let mode = info.Protocol_9p.Types.Stat.mode in
   if mode.Protocol_9p.Types.FileMode.is_symlink then Lwt.return `Link
-  else if List.mem `Execute mode.Protocol_9p.Types.FileMode.owner then Lwt.return `Executable
+  else if List.mem `Execute mode.Protocol_9p.Types.FileMode.owner
+  then Lwt.return `Executable
   else Lwt.return `Normal
 
 let check_file conn path msg expected =
@@ -267,7 +273,7 @@ let echo conn str path =
         conn newfid Protocol_9p.Types.OpenMode.write_only >>*= fun _ ->
       Client.LowLevel.write
         conn newfid 0L (Cstruct.of_string (str ^ "\n")) >>*= fun _ ->
-      Lwt.return (Ok ())
+      ok ()
     ) >>*= Lwt.return
 
 let with_transaction conn ~branch name fn =
@@ -293,7 +299,8 @@ let with_transaction conn ~branch name fn =
             in
             failwith err))
 
-let head conn branch = read_file conn ["branch"; branch; "head"] >|= fun s -> String.trim s
+let head conn branch =
+  read_file conn ["branch"; branch; "head"] >|= fun s -> String.trim s
 
 type history_node = {
   id : string;
@@ -388,8 +395,9 @@ let populate_client branch files =
           | Some (parent, name) ->
             ensure_dir parent >>= fun () ->
             Hashtbl.add dirs d ();
-            DK.Transaction.create_dir t ~dir:(Datakit_path.of_steps_exn parent) name >>*=
-            Lwt.return
+            DK.Transaction.create_dir t ~dir:(Datakit_path.of_steps_exn parent)
+              name
+            >>*= Lwt.return
         ) in
       files |> Lwt_list.iter_s (fun (path, value) ->
           match
@@ -399,10 +407,10 @@ let populate_client branch files =
           | Some (dir, name) ->
             ensure_dir dir >>= fun () ->
             let dir = Datakit_path.of_steps_exn dir in
-            DK.Transaction.create_file t ~dir name (Cstruct.of_string value) >>*=
-            Lwt.return
+            DK.Transaction.create_file t ~dir name (Cstruct.of_string value)
+            >>*= Lwt.return
         ) >>= fun () ->
-      DK.Transaction.commit t ~message:"init" 
+      DK.Transaction.commit t ~message:"init"
     )
 
 (* Commit [base] to master. Then fork a branch which replaces this
@@ -452,7 +460,12 @@ let reject (type v) =
 
 let file_event =
   let module T = struct
-    type t = [`File of Cstruct.t | `Link of string | `Exec of Cstruct.t | `Dir of DK.Tree.t]
+    type t = [
+      | `File of Cstruct.t
+      | `Link of string
+      | `Exec of Cstruct.t
+      | `Dir of DK.Tree.t
+    ]
     let pp f = function
       | `File contents -> Fmt.pf f "File:%s" (Cstruct.to_string contents)
       | `Exec contents -> Fmt.pf f "Exec:%s" (Cstruct.to_string contents)

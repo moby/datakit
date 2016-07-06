@@ -129,7 +129,9 @@ let test_merge _repo conn =
   (* Fork and put "from-master+pr" on pr branch *)
   Client.mkdir conn ["branch"] "pr" rwxr_xr_x >>*= fun () ->
   head conn "master" >>= fun merge_a ->
-  write_file conn ["branch"; "pr"; "fast-forward"] "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35" >>= function
+  write_file conn ["branch"; "pr"; "fast-forward"]
+    "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35"
+  >>= function
   | Ok () -> Alcotest.fail "Commit not in store!"
   | Error _ ->
   write_file conn ["branch"; "pr"; "fast-forward"] merge_a >>*= fun () ->
@@ -193,15 +195,19 @@ let test_merge_metadata _repo conn =
       (* RW: exec, exec, conflict(normal) *)
       check_perm conn (t @ ["rw"; "b"]) "rw/b" `Executable >>= fun () ->
       check_perm conn (t @ ["rw"; "c"]) "rw/c" `Normal >>= fun () ->
-      check_file conn (t @ ["rw"; "c"]) "Conflict" "** Conflict **\nChanged on both branches\n" >>= fun () ->
+      check_file conn (t @ ["rw"; "c"]) "Conflict"
+        "** Conflict **\nChanged on both branches\n"
+      >>= fun () ->
       write_file conn (t @ ["rw"; "c"]) "Resolved" >>*= fun () ->
       chmod conn (t @ ["rw"; "c"]) `Executable >>= fun () ->
       Lwt.return ()
     ) >>= fun () ->
-  check_perm conn ["branch"; "master"; "ro"; "c"] "ro/c" `Executable >>= fun () ->
+  check_perm conn ["branch"; "master"; "ro"; "c"] "ro/c" `Executable
+  >>= fun () ->
   Lwt.return ()
 
-(* Irmin.Git.Commit: a commit with an empty filesystem... this is not supported by Git! *)
+(* Irmin.Git.Commit: a commit with an empty filesystem... this is not
+   supported by Git! *)
 let test_merge_empty _repo conn =
   (* Put "from-master" on master branch *)
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
@@ -334,7 +340,9 @@ let test_watch repo conn =
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
   with_stream conn ["branch"; "master"; "watch"; "tree.live"] @@ fun top ->
   read_line_exn top >>= fun top_init ->
-  Alcotest.(check string) "Root tree initially empty" "D-4b825dc642cb6eb9a060e54bf8d69288fbee4904" top_init;
+  Alcotest.(check string)
+    "Root tree initially empty" "D-4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    top_init;
   with_stream conn ["branch"; "master"; "watch"; "doc.node"; "tree.live"]
   @@ fun doc ->
   read_line_exn doc >>= fun doc_init ->
@@ -401,8 +409,9 @@ let test_rename_file _repo conn =
       | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
       | Error (`Msg e) ->
       Alcotest.(check string) "Rename over dir" "Is a directory" e;
-      (* Rename when source has been deleted. Ideally, we should also check it hasn't
-         been replaced by something with the same name. *)
+      (* Rename when source has been deleted. Ideally, we should also
+         check it hasn't been replaced by something with the same
+         name. *)
       Client.remove conn (t @ ["rw"; "new"]) >>*= fun () ->
       Client.LowLevel.update conn ~name:"reborn" newfid >>= function
       | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
@@ -470,7 +479,9 @@ let test_writes () =
   let write x = v := Cstruct.to_string x; Lwt.return (Ok ()) in
   let remove _ = failwith "delete" in
   let chmod _ = failwith "chmod" in
-  let file = Vfs.File.of_kv ~read ~write ~remove ~stat:(Vfs.File.stat_of ~read) ~chmod in
+  let file =
+    Vfs.File.of_kv ~read ~write ~remove ~stat:(Vfs.File.stat_of ~read) ~chmod
+  in
   Lwt_main.run begin
     Vfs.File.open_ file >>*= fun h ->
     let check src off expect =
@@ -493,8 +504,12 @@ let test_stable_inodes _repo conn =
   make_branch conn "master" >>= fun () ->
   with_transaction conn ~branch:"master" "stable" (fun t ->
     create_file conn (t @ ["rw"]) "file" "data" >>= fun () ->
-    Client.stat conn ["branch"; "master"; "transactions"; "stable"; "rw"; "file"] >>*= fun info1 ->
-    Client.stat conn ["branch"; "master"; "transactions"; "stable"; "rw"; "file"] >>*= fun info2 ->
+    Client.stat conn
+      ["branch"; "master"; "transactions"; "stable"; "rw"; "file"]
+    >>*= fun info1 ->
+    Client.stat conn
+      ["branch"; "master"; "transactions"; "stable"; "rw"; "file"]
+    >>*= fun info2 ->
     Alcotest.(check string) "Inode same" (inode info1) (inode info2);
     Lwt.return (Ok ())
   ) >>*= Lwt.return
@@ -533,28 +548,37 @@ let test_rw () =
     >|= Alcotest.(check (result unit err)) "Write /a" (Ok ()) >>= fun () ->
 
     RW.update rw ["sub"; "bar"] "baz" (v "b")
-    >|= Alcotest.(check (result unit err)) "Write /sub/bar/baz" (Ok ()) >>= fun () ->
+    >|= Alcotest.(check (result unit err)) "Write /sub/bar/baz" (Ok ())
+    >>= fun () ->
 
     (* /foo is a file *)
     RW.update rw ["foo"; "bar"] "baz" (v "b")
-    >|= Alcotest.(check (result unit err)) "Write /foo/bar/baz" (Error `Not_a_directory) >>= fun () ->
+    >|= Alcotest.(check (result unit err)) "Write /foo/bar/baz"
+      (Error `Not_a_directory)
+    >>= fun () ->
 
     RW.remove rw ["foo"] "bar"
-    >|= Alcotest.(check (result unit err1)) "rm /foo/bar" (Error `Not_a_directory) >>= fun () ->
+    >|= Alcotest.(check (result unit err1)) "rm /foo/bar"
+      (Error `Not_a_directory)
+    >>= fun () ->
 
     RW.update_force rw ["foo"; "bar"] "baz" (v "b") >>= fun () ->
 
     RW.update rw ["foo"] "bar" (v "b")
-    >|= Alcotest.(check (result unit err)) "Write /foo/bar" (Error `Is_a_directory) >>= fun () ->
+    >|= Alcotest.(check (result unit err)) "Write /foo/bar"
+      (Error `Is_a_directory)
+    >>= fun () ->
 
     RW.remove rw ["foo"; "bar"] "baz"
-    >|= Alcotest.(check (result unit err1)) "rm /foo/bar/baz" (Ok ()) >>= fun () ->
+    >|= Alcotest.(check (result unit err1)) "rm /foo/bar/baz" (Ok ())
+    >>= fun () ->
 
     let root = RW.root rw in
 
     Tree.Dir.ls root
     >|= List.map snd
-    >|= Alcotest.(check (slist string String.compare)) "ls /" ["foo"; "sub"] >>= fun () ->
+    >|= Alcotest.(check (slist string String.compare)) "ls /" ["foo"; "sub"]
+    >>= fun () ->
 
     Lwt.return ()
   end
@@ -564,7 +588,9 @@ let test_blobs_fast_path () =
   let blob = ref Ivfs_blob.empty in
   for _ = 1 to 100 do
     let data = Cstruct.create (Random.int 10) in
-    for j = 0 to Cstruct.len data - 1 do Cstruct.set_uint8 data j (Random.int 26 + 65) done;
+    for j = 0 to Cstruct.len data - 1 do
+      Cstruct.set_uint8 data j (Random.int 26 + 65)
+    done;
     correct := Cstruct.append !correct data;
     Ivfs_blob.write !blob ~offset:(Ivfs_blob.len !blob) data >>!= fun b ->
     blob := b
@@ -576,15 +602,20 @@ let test_blobs_fast_path () =
 let test_blobs_random () =
   let int64 = Alcotest.of_pp Fmt.int64 in
   let str b = Ivfs_blob.to_string b in
-  let read_ok b ~offset ~count = Ivfs_blob.read b ~offset ~count >>!= Cstruct.to_string in
-  let write_ok b ~offset data = Ivfs_blob.write b ~offset (Cstruct.of_string data) >>!= fun x -> x in
+  let read_ok b ~offset ~count =
+    Ivfs_blob.read b ~offset ~count >>!= Cstruct.to_string
+  in
+  let write_ok b ~offset data =
+    Ivfs_blob.write b ~offset (Cstruct.of_string data) >>!= fun x -> x
+  in
   let truncate_ok b len = Ivfs_blob.truncate b len >>!= fun x -> x in
   (* Empty *)
   let b = Ivfs_blob.empty in
   Alcotest.check int64 "Empty" 0L (Ivfs_blob.len b);
   (* Negative offset write *)
   let bad_write = Ivfs_blob.write b ~offset:(-2L) (Cstruct.of_string "bad") in
-  Alcotest.check (vfs_result reject) "Negative offset" (Vfs.Error.negative_offset (-2L)) bad_write;
+  Alcotest.check (vfs_result reject) "Negative offset"
+    (Vfs.Error.negative_offset (-2L)) bad_write;
   (* Write *)
   let b = write_ok b ~offset:2L "1st" in
   Alcotest.check int64 "1st write" 5L (Ivfs_blob.len b);
@@ -592,13 +623,15 @@ let test_blobs_random () =
   let b = write_ok b ~offset:0L "AB" in
   Alcotest.(check string) "Overwrite" "AB1st" (str b);
   Alcotest.(check string) "Overwrite 2" "ABCDt" (str (write_ok b ~offset:2L "CD"));
-  Alcotest.(check string) "Overwrite extend" "AB1sEF" (str (write_ok b ~offset:4L "EF"));
+  Alcotest.(check string) "Overwrite extend" "AB1sEF"
+    (str (write_ok b ~offset:4L "EF"));
   (* Truncate *)
   Alcotest.(check string) "Truncate extend" "AB1st\x00" (str (truncate_ok b 6L));
   Alcotest.(check string) "Truncate same" "AB1st" (str (truncate_ok b 5L));
   Alcotest.(check string) "Truncate short" "AB1" (str (truncate_ok b 3L));
   Alcotest.(check string) "Truncate zero" "" (str (truncate_ok b 0L));
-  Alcotest.check (vfs_result reject) "Truncate negative" (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.truncate b (-1L));
+  Alcotest.check (vfs_result reject) "Truncate negative"
+    (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.truncate b (-1L));
   (* Read *)
   Alcotest.(check string) "Read neg" "" (read_ok b ~offset:2L ~count:(-3));
   Alcotest.(check string) "Read zero" "" (read_ok b ~offset:2L ~count:0);
@@ -606,8 +639,10 @@ let test_blobs_random () =
   Alcotest.(check string) "Read full" "1st" (read_ok b ~offset:2L ~count:3);
   Alcotest.(check string) "Read long" "1st" (read_ok b ~offset:2L ~count:4);
   Alcotest.(check string) "Read EOF" "" (read_ok b ~offset:5L ~count:4);
-  Alcotest.check (vfs_result reject) "Read negative" (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.read b ~offset:(-1L) ~count:1);
-  Alcotest.check (vfs_result reject) "Read after EOF" (Vfs.Error.offset_too_large ~offset:6L 5L) (Ivfs_blob.read b ~offset:6L ~count:1);
+  Alcotest.check (vfs_result reject) "Read negative"
+    (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.read b ~offset:(-1L) ~count:1);
+  Alcotest.check (vfs_result reject) "Read after EOF"
+    (Vfs.Error.offset_too_large ~offset:6L 5L) (Ivfs_blob.read b ~offset:6L ~count:1);
   ()
 
 let test_streams () =

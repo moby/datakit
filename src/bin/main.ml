@@ -39,8 +39,7 @@ module Git_fs_store = struct
     Lazy.force listener;
     Log.debug (fun l -> l "Using Git-format store %S" path);
     repo ~bare path >|= fun repo ->
-    let subdirs = Main_pp.subdirs () in
-    fun () -> Filesystem.create make_task repo ~subdirs
+    fun () -> Filesystem.create make_task repo
 end
 
 module In_memory_store = struct
@@ -57,8 +56,7 @@ module In_memory_store = struct
     Log.debug (fun l ->
         l "Using in-memory store (use --git for a disk-backed store)");
     repo () >|= fun repo ->
-    let subdirs = Main_pp.subdirs () in
-    fun () -> Filesystem.create make_task repo ~subdirs
+    fun () -> Filesystem.create make_task repo
 end
 
 let handle_unix_flow ~make_root fd =

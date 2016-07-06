@@ -18,7 +18,7 @@ true: package(cstruct), package(fmt), package(rresult)
 
 <src/ivfs/*>: package(irmin), package(tc)
 <src/fs9p/*>: package(protocol-9p.unix)
-<src/vgithub/*>: package(github)
+<src/vgithub/vgithub_api.*>: package(github)
 
 <src/irmin-io> : include
 <src/irmin-io/*>: package(conduit.lwt-unix), package(irmin), package(lwt.unix)

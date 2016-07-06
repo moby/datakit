@@ -195,6 +195,9 @@ module type CLIENT = sig
     type t
     (** A [t] is a named pointer to a commit. *)
 
+    val name : t -> string
+    (** [name t] is [t]'s name. *)
+
     val remove : t -> unit or_error Lwt.t
     (** [remove t] deletes branch [t]. If [t] does not exist, this
         does nothing. *)

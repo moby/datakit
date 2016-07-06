@@ -12,7 +12,7 @@ let v = Cstruct.of_string
 
 let ( ++ ) = Int64.add
 
-let ok x = `Ok x
+let ok x = Lwt.return (Ok x)
 
 let ( >>!= ) x f =
   match x with
@@ -55,6 +55,8 @@ module Test_flow = struct
     let flow2 = { from_remote = b; to_remote = a } in
     (flow1, flow2)
 
+
+  let ok x = `Ok x
   let close _t = Lwt.return_unit
   let write1 t buf = Lwt_mvar.put t.to_remote buf
   let write t buf = write1 t buf >|= ok
@@ -107,8 +109,8 @@ module DK = Datakit_client_9p.Make(Client)
 
 let expect_head branch =
   DK.Branch.head branch >>*= function
-  | None -> Alcotest.fail "Expecting HEAD"
-  | Some head -> Lwt.return (Ok head)
+  | None      -> Alcotest.fail "Expecting HEAD"
+  | Some head -> ok head
 
 let config = Irmin_mem.config ()
 
@@ -152,7 +154,7 @@ let with_file conn path fn =
       Client.walk_from_root conn newfid path >>*= fun _resp ->
       fn newfid >>= fun result ->
       Client.LowLevel.clunk conn newfid >>*= fun () ->
-      Lwt.return (Ok result)
+      ok result
     ) >>*= Lwt.return
 
 let stream conn ?(off=0L) fid =
@@ -218,7 +220,7 @@ let write_file conn ?(truncate=false) path contents =
       >>**= fun _open ->
       Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
       >>**= fun _resp ->
-      Lwt.return (Ok ())
+      ok ()
     )
 
 let chmod conn path perm =
@@ -271,7 +273,7 @@ let echo conn str path =
         conn newfid Protocol_9p.Types.OpenMode.write_only >>*= fun _ ->
       Client.LowLevel.write
         conn newfid 0L (Cstruct.of_string (str ^ "\n")) >>*= fun _ ->
-      Lwt.return (Ok ())
+      ok ()
     ) >>*= Lwt.return
 
 let with_transaction conn ~branch name fn =

@@ -1,5 +1,16 @@
 FROM ocaml/opam:alpine
 
+# setting-up Go env for datakit-gh
+RUN sudo apk add go
+ENV GOPATH /go/
+COPY hooks /go/src/github.com/docker/datakit/hooks
+COPY api /go/src/github.com/docker/datakit/api
+RUN sudo chown opam.nogroup -R /go/
+WORKDIR /go/src/github.com/docker/datakit/
+RUN go get -d ./hooks/datakit-gh/...
+WORKDIR /go/src/github.com/docker/datakit/hooks/datakit-gh
+RUN go build
+
 RUN opam update
 RUN sudo apk add ncurses-dev libev-dev
 RUN opam depext lwt ssl &&  opam install lwt alcotest conf-libev
@@ -14,12 +25,6 @@ RUN opam depext github ssl datakit && opam install github ssl && opam install da
 COPY . /home/opam/src/datakit/
 
 RUN opam install datakit.dev -vv
-
-COPY . /go/src/github.com/docker/datakit/
-WORKDIR /go/src/github.com/docker/datakit/
-RUN go get -d ./hooks/datakit-gh/...
-WORKDIR /go/src/github.com/docker/datakit/hooks/datakit-gh
-RUN go build
 
 EXPOSE 5640
 

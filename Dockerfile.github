@@ -40,4 +40,4 @@ ENV GITHUB_DEBUG 1
 
 USER root
 ENTRYPOINT ["/usr/bin/datakit-gh-bridge"]
-CMD ["--listen=tcp://0.0.0.0:5641", "-vv", "--datakit=tcp://127.0.0.1:5640"]
+CMD ["--listen=tcp://0.0.0.0:5641", "-v", "--datakit=tcp://127.0.0.1:5640"]

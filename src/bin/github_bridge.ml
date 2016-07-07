@@ -90,8 +90,8 @@ let start () urls sandbox datakit_url datakit_branch datakit_branch_write
       (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
       urls
   in
-  let start_datakit_gh () =
-    exec ~name:"datakit-gh"
+  let start_datakit_gh_hooks () =
+    exec ~name:"datakit-gh-hooks"
       (Lwt_process.shell @@ match webhook_secret with
         | None   -> Fmt.strf "%s -p %d" datakit_gh webhook_port
         | Some s -> Fmt.strf "%s -p %d -s %s" datakit_gh webhook_port s)
@@ -99,7 +99,7 @@ let start () urls sandbox datakit_url datakit_branch datakit_branch_write
   Lwt.join [
     connect_to_datakit ();
     accept_connections ();
-    start_datakit_gh ();
+    start_datakit_gh_hooks ();
   ]
 
 open Cmdliner
@@ -155,8 +155,8 @@ let datakit_branch_write =
   Arg.(value & opt string "github-hook-write" doc)
 
 let datakit_gh =
-  let doc = Arg.info ~doc:"Location of datakit-gh" ["datakit-gh"] in
-  Arg.(value & opt string "datakit-gh" doc)
+  let doc = Arg.info ~doc:"Location of datakit-gh-hooks" ["datakit-gh-hooks"] in
+  Arg.(value & opt string "datakit-gh-hooks" doc)
 
 let webhook_secret =
   let doc = Arg.info ~doc:"Webhook secret" ["s";"secret"] in

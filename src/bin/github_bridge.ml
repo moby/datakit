@@ -50,8 +50,8 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Logs.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () urls sandbox datakit_url datakit_branch datakit_gh
-    webhook_secret webhook_port =
+let start () urls sandbox datakit_url datakit_branch datakit_branch_write
+    datakit_gh webhook_secret webhook_port =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V
@@ -79,8 +79,11 @@ let start () urls sandbox datakit_url datakit_branch datakit_gh
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
       DK.branch dk datakit_branch >>= function
-      | Error e   -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-      | Ok branch -> VG.Sync.sync t branch token >|= ignore
+      | Error e         -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+      | Ok branch_write ->
+        DK.branch dk datakit_branch_write >>= function
+        | Error e   -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+        | Ok branch -> VG.Sync.sync t branch ~writes:branch_write token >|= ignore
   in
   let accept_connections () =
     Lwt_list.iter_p
@@ -133,7 +136,7 @@ let sandbox =
 
 let datakit_url =
   let doc = Arg.info ~doc:"URL of the DataKit server" ["datakit-url"] in
-  Arg.(value & opt string "tcp://127.0.0.1:5641" doc)
+  Arg.(value & opt string "tcp://127.0.0.1:5642" doc)
 
 let datakit_branch =
   let doc =
@@ -141,6 +144,15 @@ let datakit_branch =
       ["branch"]
   in
   Arg.(value & opt string "github-hook" doc)
+
+let datakit_branch_write =
+  let doc =
+    Arg.info
+      ~doc:"Writes to that DataKit branch will be translated into GitHub API \
+            calls."
+      ["branch-write"]
+  in
+  Arg.(value & opt string "github-hook-write" doc)
 
 let datakit_gh =
   let doc = Arg.info ~doc:"Location of datakit-gh" ["datakit-gh"] in
@@ -163,7 +175,7 @@ let term =
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ url $ sandbox $ datakit_url $ datakit_branch
-        $ datakit_gh $ webhook_secret $ webhook_port),
+        $ datakit_branch_write $ datakit_gh $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 
 let () = match Term.eval term with

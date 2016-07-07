@@ -686,7 +686,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | None   -> error "empty branch!"
     | Some c -> fn c
 
-  let sync ?switch ?(policy=`Repeat) t branch token =
+  let sync ?switch ?(policy=`Repeat) t branch ~writes token =
     Log.debug (fun l -> l "sync %s" @@ DK.Branch.name branch);
     let import_events last_t current =
       of_commit current >>*= fun current_t ->
@@ -705,15 +705,24 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       prune last_t branch >>*= fun () ->
       ok ()
     in
+    let merge_writes c =
+      DK.Branch.with_transaction writes (fun tr ->
+          DK.Transaction.merge tr c >>*= fun (_, conflicts) ->
+          if conflicts <> [] then failwith "TODO";
+          let msg = Fmt.strf "Merging with %s" @@ DK.Branch.name branch in
+          DK.Transaction.commit tr ~message:msg
+        ) >>*= fun _ ->
+      ok ()
+    in
     let run () =
-      with_head branch (fun c ->
-          (* 1. handle user requests since last iteration. *)
-          github_calls t c >>*= fun () ->
-          (* 2. import GitHub events for new repositories. *)
-          import_events t c
-        ) >>*= fun () ->
+      with_head branch merge_writes >>*= fun () ->
+      (* 1. handle user requests since last iteration. *)
+      with_head writes (github_calls t) >>*= fun () ->
+      (* 2. import GitHub events for new repositories. *)
+      with_head branch (import_events t) >>*= fun () ->
       (* 3. prune *)
       with_head branch prune >>*= fun () ->
+
       match policy with
       | `Once   -> ok (`Finish ())
       | `Repeat ->
@@ -723,6 +732,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             | Some c ->
               (* Note: we use the same commit [c] for import and
                  prune, so might need multiple calls to stabilise. *)
+              merge_writes c >>*= fun () ->
               github_calls !last c >>*= fun () ->
               import_events !last c >>*= fun () ->
               prune c >>*= fun () ->

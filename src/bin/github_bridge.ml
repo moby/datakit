@@ -18,7 +18,7 @@ let serviceid = "C378280D-DA14-42C8-A24E-0DE92A1028E3"
 
 let token () =
   let cookie = "datakit" in
-  Lwt_unix.run (
+  Lwt_main.run (
     let open Lwt.Infix in
     Github_cookie_jar.init () >>= fun jar ->
     Github_cookie_jar.get jar ~name:cookie >|= function
@@ -50,8 +50,9 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Logs.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () urls sandbox datakit_url datakit_branch datakit_branch_write
-    datakit_gh webhook_secret webhook_port =
+let start () sandbox listen_urls
+    datakit branch_mirror branch_write
+    gh_hooks webhook_secret webhook_port =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V
@@ -69,34 +70,35 @@ let start () urls sandbox datakit_url datakit_branch datakit_branch_write
   let root = VG.create token in
   let make_root () = Vfs.Dir.of_list (fun () -> [root]) in
   let connect_to_datakit () =
-    Log.info (fun l -> l "Connecting to %s" datakit_url);
-    let proto, address = parse_address datakit_url in
+    Log.info (fun l -> l "Connecting to %s" datakit);
+    let proto, address = parse_address datakit in
     Client9p.connect proto address () >>= function
     | Error (`Msg e) ->
       Log.err (fun l -> l "cannot connect: %s" e);
-      Lwt.fail_with "datakit-github-bridge"
+      Lwt.fail_with "connecting to datakit"
     | Ok conn        ->
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
-      DK.branch dk datakit_branch >>= function
-      | Error e         -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-      | Ok branch_write ->
-        DK.branch dk datakit_branch_write >>= function
-        | Error e   -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-        | Ok branch -> VG.Sync.sync t branch ~writes:branch_write token >|= ignore
+      DK.branch dk branch_mirror >>= function
+      | Error e          -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+      | Ok branch_mirror ->
+        DK.branch dk branch_write >>= function
+        | Error e         -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+        | Ok branch_write ->
+          VG.Sync.sync t branch_mirror ~writes:branch_write token >|= ignore
   in
   let accept_connections () =
     Lwt_list.iter_p
       (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
-      urls
+      listen_urls
   in
   let start_datakit_gh_hooks () =
     exec ~name:"datakit-gh-hooks"
       (Lwt_process.shell @@ match webhook_secret with
-        | None   -> Fmt.strf "%s -p %d" datakit_gh webhook_port
-        | Some s -> Fmt.strf "%s -p %d -s %s" datakit_gh webhook_port s)
+        | None   -> Fmt.strf "%s -l :%d" gh_hooks webhook_port
+        | Some s -> Fmt.strf "%s -l :%d -s %s" gh_hooks webhook_port s)
   in
-  Lwt.join [
+  Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();
     accept_connections ();
     start_datakit_gh_hooks ();
@@ -115,14 +117,15 @@ let setup_log =
   Term.(const Datakit_log.setup $ Fmt_cli.style_renderer ()
         $ Datakit_log.log_destination $ Logs_cli.level ~env ())
 
-let url =
+let listen_urls =
   let doc =
     Arg.info ~doc:
       "A comma-separated list of URLs to listen on of the form \
        file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
        or hyperv-connect://vmid/serviceid or hyperv-accept://vmid/serviceid"
-      ["url"]
+      ["l"; "listen"]
   in
+  (* FIXME: maybe we want to not listen by default *)
   Arg.(value & opt (list string) [ "tcp://127.0.0.1:5641" ] doc)
 
 let sandbox =
@@ -134,28 +137,31 @@ let sandbox =
   in
   Arg.(value & flag & doc)
 
-let datakit_url =
-  let doc = Arg.info ~doc:"URL of the DataKit server" ["datakit-url"] in
-  Arg.(value & opt string "tcp://127.0.0.1:5642" doc)
+let datakit =
+  let doc = Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"] in
+  Arg.(value & opt string "tcp://127.0.0.1:5640" doc)
 
-let datakit_branch =
+let branch_mirror =
   let doc =
     Arg.info ~doc:"DataKit branch where the GitHub API will be mirrored."
-      ["branch"]
+      ["m"; "branch-mirror"]
   in
   Arg.(value & opt string "github-hook" doc)
 
-let datakit_branch_write =
+let branch_write =
   let doc =
     Arg.info
       ~doc:"Writes to that DataKit branch will be translated into GitHub API \
             calls."
-      ["branch-write"]
+      ["w"; "branch-write"]
   in
-  Arg.(value & opt string "github-hook-write" doc)
+  Arg.(value & opt string "github-hook-x" doc)
 
-let datakit_gh =
-  let doc = Arg.info ~doc:"Location of datakit-gh-hooks" ["datakit-gh-hooks"] in
+let gh_hooks =
+  let doc =
+    Arg.info ~doc:"Location of the datakit-gh-hooks webhook command"
+      ["gh-hooks"]
+  in
   Arg.(value & opt string "datakit-gh-hooks" doc)
 
 let webhook_secret =
@@ -174,8 +180,9 @@ let term =
         filesystem. Also connect to a Datakit instance and ensure a \
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in
-  Term.(pure start $ setup_log $ url $ sandbox $ datakit_url $ datakit_branch
-        $ datakit_branch_write $ datakit_gh $ webhook_secret $ webhook_port),
+  Term.(pure start $ setup_log $ sandbox $ listen_urls $
+        datakit $ branch_mirror $ branch_write $
+        gh_hooks $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 
 let () = match Term.eval term with

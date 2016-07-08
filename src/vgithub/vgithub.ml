@@ -127,7 +127,7 @@ module Make (API: API) = struct
   (* /github.com/${USER}/${REPO}/commit/${SHA1}/status/${S} *)
   let commit_status_dir t ?(extra_dirs=fun () -> []) s =
     Logs.debug (fun l ->
-        l "status_file %s/%s %a" t.user t.repo Status_state.pp s.Status.state
+        l "commit_status_file %s/%s %a" t.user t.repo Status.pp s
       );
     let current_descr = ref None in
     let current_url = ref None in
@@ -140,10 +140,6 @@ module Make (API: API) = struct
       let new_status = { s with Status.description; url; state } in
       API.set_status t.token ~user:t.user ~repo:t.repo new_status;
     in
-    let ctl = Vfs.File.command ~init (function
-        | "update" -> set_status (); Vfs.ok ""
-        | s        -> Vfs.error "%s is not a valid command" s
-      ) in
     let state = Vfs.File.command ~init (fun str ->
         match Status_state.of_string str with
         | None   -> err_invalid_status str
@@ -151,6 +147,7 @@ module Make (API: API) = struct
           if s = !current_state then Vfs.ok (str ^ "\n")
           else (
             current_state := s;
+            set_status ();
             Vfs.ok (Status_state.to_string s ^ "\n");
           )
       ) in
@@ -158,6 +155,7 @@ module Make (API: API) = struct
         if Some str = !current_descr then Vfs.ok (str ^ "\n")
         else (
           current_descr := Some str;
+          set_status ();
           Vfs.ok (str ^ "\n")
         )
       ) in
@@ -165,6 +163,7 @@ module Make (API: API) = struct
         if Some str = !current_url then Vfs.ok (str ^ "\n")
         else (
           current_url := Some str;
+          set_status ();
           Vfs.ok (str ^ "\n")
         )
       ) in
@@ -172,7 +171,6 @@ module Make (API: API) = struct
       Vfs.Inode.file "state"  state;
       Vfs.Inode.file "descr"  descr;
       Vfs.Inode.file "url"    url;
-      Vfs.Inode.file "ctl"    ctl;
     ] in
     Vfs.Dir.of_list (fun () -> dir @ extra_dirs ())
 

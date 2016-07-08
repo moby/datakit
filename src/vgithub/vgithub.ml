@@ -207,8 +207,11 @@ module Make (API: API) = struct
     | (r::p, s)::t -> aux (r, [ (p, s) ], []) t
 
   (* /github.com/${USER}/${REPO}/commit/${SHA1}/status *)
-  let commit_status_dir t commit =
-    Log.debug (fun l -> l "commit_status_dir %s/%s %s" t.user t.repo commit);
+  let commit_status_root t commit =
+    Log.debug (fun l -> l "commit_status_root %s/%s %s" t.user t.repo commit);
+    let status =
+      ref @@ lazy (API.status t.token ~user:t.user ~repo:t.repo ~commit)
+    in
     let rec inodes childs =
       let root_status =
         try Some (List.find (fun (p, _) -> p = []) childs |> snd)
@@ -223,18 +226,19 @@ module Make (API: API) = struct
       | Some s -> commit_status_dir t ~extra_dirs:childs s
     in
     let ls () =
-      API.status t.token ~user:t.user ~repo:t.repo ~commit
+      Lazy.force !status
       |> List.map (fun s -> Status.path s, s)
       |> sort_by_hd
       |> List.map (fun (name, childs) -> Vfs.Inode.dir name @@ inodes childs)
       |> Vfs.ok
     in
     let lookup name =
+      Log.debug (fun l -> l "lookup %s" name);
       try
-        API.status t.token ~user:t.user ~repo:t.repo ~commit
+        Lazy.force !status
         |> List.map (fun s -> Status.path s, s)
-        |> List.find_all (fun (c, _) -> List.hd c = name)
-        |> List.map (fun (c, s) -> List.tl c, s)
+        |> sort_by_hd
+        |> List.assoc name
         |> inodes
         |> Vfs.Inode.dir name
         |> Vfs.ok
@@ -242,6 +246,7 @@ module Make (API: API) = struct
         Vfs.File.err_no_entry
     in
     let mkdir name =
+      Log.debug (fun l -> l "mkdir %s" name);
       let new_status = {
         Status.context = Some name;
         url = None;
@@ -250,6 +255,7 @@ module Make (API: API) = struct
         commit;
       } in
       API.set_status t.token ~user:t.user ~repo:t.repo new_status;
+      status := lazy (API.status t.token ~user:t.user ~repo:t.repo ~commit);
       Vfs.ok @@ Vfs.Inode.dir name @@ commit_status_dir t new_status
     in
     let mkfile _ _ = Vfs.error "TODO" in
@@ -261,7 +267,7 @@ module Make (API: API) = struct
     Logs.debug (fun l -> l "commit_root %s%s" t.user t.repo);
     let ls () = Vfs.ok [] in
     let lookup commit =
-      let status = Vfs.Inode.dir "status" @@ commit_status_dir t commit in
+      let status = Vfs.Inode.dir "status" @@ commit_status_root t commit in
       Vfs.Inode.dir commit @@ Vfs.Dir.of_list (fun () -> [status])
       |> Vfs.ok
     in

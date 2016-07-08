@@ -1,4 +1,4 @@
-  (* Implement API with direct GitHub API calls. *)
+(* Implement API with direct GitHub API calls. *)
 
 open Vgithub
 open Github_t
@@ -82,48 +82,48 @@ module Event = struct
 end
 
 let user_exists token ~user =
-    try
-      Github.User.info ~token ~user ()
-      |> run
-      |> fun _ -> true
-    with Github.Message _ ->
-      false
-
-  let repo_exists token ~user ~repo =
-    try
-      Github.Repo.info ~token ~user ~repo ()
-      |> run
-      |> fun _ -> true
-    with Github.Message _ ->
-      false
-
-  let repos token ~user =
-    Github.User.repositories ~token ~user ()
-    |> Github.Stream.to_list
+  try
+    Github.User.info ~token ~user ()
     |> run
-    |> List.map (fun r -> r.repository_name)
+    |> fun _ -> true
+  with Github.Message _ ->
+    false
 
-  let status token ~user ~repo ~commit =
-    Github.Status.for_ref ~token ~user ~repo ~git_ref:commit ()
-    |> Github.Stream.to_list
+let repo_exists token ~user ~repo =
+  try
+    Github.Repo.info ~token ~user ~repo ()
     |> run
-    |> List.map (Status.of_gh commit)
+    |> fun _ -> true
+  with Github.Message _ ->
+    false
 
-  let set_status token ~user ~repo status =
-    let new_status = Status.to_gh status in
-    Github.Status.create ~token ~user ~repo ~sha:status.Status.commit
-      ~status:new_status ()
-    |> run
-    |> ignore
+let repos token ~user =
+  Github.User.repositories ~token ~user ()
+  |> Github.Stream.to_list
+  |> run
+  |> List.map (fun r -> r.repository_name)
 
-  let prs token ~user ~repo =
-    Github.Pull.for_repo ~token ~state:`Open ~user ~repo ()
-    |> Github.Stream.to_list
-    |> run
-    |> List.map PR.of_gh
+let status token ~user ~repo ~commit =
+  Github.Status.for_ref ~token ~user ~repo ~git_ref:commit ()
+  |> Github.Stream.to_list
+  |> run
+  |> List.map (Status.of_gh commit)
 
-  let events token ~user ~repo =
-    let open Lwt.Infix in
-    let events = Github.Event.for_repo ~token ~user ~repo () in
-    Github.Monad.run @@ Github.Stream.to_list events >>= fun events ->
-    Lwt_list.map_p (fun e -> Lwt.return (Event.of_gh e)) events
+let set_status token ~user ~repo status =
+  let new_status = Status.to_gh status in
+  Github.Status.create ~token ~user ~repo ~sha:status.Status.commit
+    ~status:new_status ()
+  |> run
+  |> ignore
+
+let prs token ~user ~repo =
+  Github.Pull.for_repo ~token ~state:`Open ~user ~repo ()
+  |> Github.Stream.to_list
+  |> run
+  |> List.map PR.of_gh
+
+let events token ~user ~repo =
+  let open Lwt.Infix in
+  let events = Github.Event.for_repo ~token ~user ~repo () in
+  Github.Monad.run @@ Github.Stream.to_list events >>= fun events ->
+  Lwt_list.map_p (fun e -> Lwt.return (Event.of_gh e)) events

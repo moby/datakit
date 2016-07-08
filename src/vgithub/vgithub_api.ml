@@ -103,10 +103,20 @@ let repos token ~user =
   |> run
   |> List.map (fun r -> r.repository_name)
 
+let list_dedup f l =
+  let tbl = Hashtbl.create (List.length l) in
+  List.fold_left (fun acc s ->
+      let x = f s in
+      try let () = Hashtbl.find tbl x in acc
+      with Not_found -> Hashtbl.add tbl x (); s :: acc
+    ) [] l
+  |> List.rev
+
 let status token ~user ~repo ~commit =
   Github.Status.for_ref ~token ~user ~repo ~git_ref:commit ()
   |> Github.Stream.to_list
   |> run
+  |> list_dedup (fun s -> s.status_context)
   |> List.map (Status.of_gh commit)
 
 let set_status token ~user ~repo status =

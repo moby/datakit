@@ -9,3 +9,4 @@ Datakit.app/
 *.native
 *.byte
 hooks/datakit-gh/datakit-gh
+hooks/datakit-gh-hooks/datakit-gh-hooks

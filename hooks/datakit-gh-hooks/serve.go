@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/docker/datakit/hooks/datakit-gh/server"
+	"github.com/docker/datakit/hooks/datakit-gh-hooks/server"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 )

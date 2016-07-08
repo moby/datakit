@@ -1,5 +1,17 @@
 FROM ocaml/opam:alpine
 
+# setting-up Go env for datakit-gh-hooks
+RUN sudo apk add go
+ENV GOPATH /go/
+COPY hooks /go/src/github.com/docker/datakit/hooks
+COPY api /go/src/github.com/docker/datakit/api
+RUN sudo chown opam.nogroup -R /go/
+WORKDIR /go/src/github.com/docker/datakit/
+RUN go get -d ./hooks/datakit-gh-hooks/...
+WORKDIR /go/src/github.com/docker/datakit/hooks/datakit-gh-hooks
+RUN go build
+
+RUN opam update
 RUN sudo apk add ncurses-dev libev-dev
 RUN opam depext lwt ssl &&  opam install lwt alcotest conf-libev
 
@@ -17,12 +29,15 @@ RUN opam install datakit.dev -vv
 EXPOSE 5640
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
-    sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \
-    sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
+    sudo cp $(opam config exec -- which datakit)           /usr/bin/ && \
+    sudo cp $(opam config exec -- which datakit-mount)     /usr/bin/ && \
+    sudo cp $(opam config exec -- which datakit-gh-bridge) /usr/bin/ && \
+    sudo cp datakit-gh-hooks                               /usr/bin
 
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 
 ENV GITHUB_DEBUG 1
 
-ENTRYPOINT ["/usr/bin/datakit"]
-CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-vv"]
+USER root
+ENTRYPOINT ["/usr/bin/datakit-gh-bridge"]
+CMD ["--listen=tcp://0.0.0.0:5641", "-vv", "--datakit=tcp://127.0.0.1:5640"]

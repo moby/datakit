@@ -56,7 +56,8 @@ module Make (Store : STORE) = struct
   module File = struct
     type hash = Store.Private.Contents.Key.t
 
-    (* For now, a value is either in memory or on disk. In future, we may want to support both at once for caching. *)
+    (* For now, a value is either in memory or on disk. In future, we
+       may want to support both at once for caching. *)
     type value =
       | Blob of Ivfs_blob.t
       | Hash of Store.Private.Contents.key

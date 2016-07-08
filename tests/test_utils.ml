@@ -100,12 +100,36 @@ module RW = Ivfs_rw.Make(Tree)
 module Server = Fs9p.Make(Test_flow)
 module Filesystem = Ivfs.Make(Store)
 
+let src9p = Logs.Src.create "test9p" ~doc:"Datakit/9p tests"
+module Log9p = (val Logs.src_log src9p)
 
-let src = Logs.Src.create "test" ~doc:"Datakit tests"
-module Log = (val Logs.src_log src)
-
-module Client = Protocol_9p.Client.Make(Log)(Test_flow)
+module Client = Protocol_9p.Client.Make(Log9p)(Test_flow)
 module DK = Datakit_client_9p.Make(Client)
+
+let quiet_9p () =
+  Logs.Src.set_level src9p (Some Logs.Info);
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "fs9p" then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet_git () =
+  Logs.Src.set_level src9p (Some Logs.Info);
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "git.value" || Logs.Src.name src = "git.memory"
+      then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet_irmin () =
+  Logs.Src.set_level src9p (Some Logs.Info);
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "irmin.bc"
+      || Logs.Src.name src = "irmin.commit"
+      || Logs.Src.name src = "irmin.node"
+      then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
 
 let expect_head branch =
   DK.Branch.head branch >>*= function

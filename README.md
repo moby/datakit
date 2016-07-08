@@ -320,23 +320,12 @@ To create a new status and set its description, url and status:
     ~/db $ echo "http://example.com" > $PR/status/test/url
     ~/db $ echo success > $PR/status/test/state
 
-To subscribe to the stream of new PRs:
+To read the last GitHub events related to a repository:
 
-    ~/db $ cat github.com/docker/datakit/pr/updates
+    ~/db $ cat github.com/docker/datakit/events
 
-This is a blocking read, and will produce a new line on every pull request
-with the number of the PR, so you can do:
-
-    while read PR; do
-      mkdir github.com/docker/datakit/pr/$PR/status/test
-    done < github.com/docker/datakit/pr/updates
-
-To subscribe to the stream of build status updates for a given PR:
-
-    ~mnt $ cat github.com/docker/datakit/pr/${PR}/status/updates
-
-This is a blocking read and will produce a new line on every build
-status updates for that PR.
+This is a non-blocking read, and will produce a file where every line is a new
+event.
 
 ### How do I...
 

@@ -525,6 +525,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
       mutable name : string;
     }
 
+    let name t = t.name
+
     let branch_dir t = ["branch"; t.name]
 
     let create fs name =

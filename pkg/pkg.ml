@@ -23,6 +23,7 @@ let opam =
     Pkg.mllib ~cond:github "src/vgithub/vgithub.mllib";
     Pkg.bin ~dst:"datakit" "src/bin/main";
     Pkg.bin ~dst:"datakit-mount" "src/bin/mount";
+    Pkg.bin ~cond:github ~dst:"datakit-gh-bridge" "src/bin/github_bridge";
     Pkg.test "tests/test" ~args:(Cmd.v "-q");
     Pkg.test ~run:false "examples/ocaml-client/example";
   ]

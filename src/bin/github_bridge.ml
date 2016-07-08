@@ -95,8 +95,8 @@ let start () sandbox listen_urls
   let start_datakit_gh_hooks () =
     exec ~name:"datakit-gh-hooks"
       (Lwt_process.shell @@ match webhook_secret with
-        | None   -> Fmt.strf "%s -l :%d" gh_hooks webhook_port
-        | Some s -> Fmt.strf "%s -l :%d -s %s" gh_hooks webhook_port s)
+        | None   -> Fmt.strf "%s -v -l :%d" gh_hooks webhook_port
+        | Some s -> Fmt.strf "%s -v -l :%d -s %s" gh_hooks webhook_port s)
   in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();

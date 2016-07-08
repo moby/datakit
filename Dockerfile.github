@@ -38,7 +38,6 @@ RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 
 ENV GITHUB_DEBUG 1
 
+USER root
 ENTRYPOINT ["/usr/bin/datakit-gh-bridge"]
-CMD ["--url=tcp://0.0.0.0:5641", "-vv", \
-     "--datakit-url=tcp://127.0.0.1:5640", \
-     "--datakit-branch=github-hooks"]
+CMD ["--listen=tcp://0.0.0.0:5641", "-vv", "--datakit=tcp://127.0.0.1:5640"]

@@ -51,7 +51,7 @@ let exec ~name cmd =
     Logs.err (fun l -> l "%s stopped by signal %d" name i)
 
 let start () sandbox listen_urls
-    datakit branch_mirror branch_write
+    datakit private_branch public_branch
     gh_hooks webhook_secret webhook_port =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -79,13 +79,13 @@ let start () sandbox listen_urls
     | Ok conn        ->
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
-      DK.branch dk branch_mirror >>= function
-      | Error e          -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-      | Ok branch_mirror ->
-        DK.branch dk branch_write >>= function
-        | Error e         -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-        | Ok branch_write ->
-          VG.Sync.sync t branch_mirror ~writes:branch_write token >|= ignore
+      DK.branch dk private_branch >>= function
+      | Error e           -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+      | Ok private_branch ->
+        DK.branch dk public_branch >>= function
+        | Error e          -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+        | Ok public_branch ->
+          VG.Sync.sync t private_branch ~writes:public_branch token >|= ignore
   in
   let accept_connections () =
     Lwt_list.iter_p
@@ -141,21 +141,22 @@ let datakit =
   let doc = Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"] in
   Arg.(value & opt string "tcp://127.0.0.1:5640" doc)
 
-let branch_mirror =
+let private_branch =
   let doc =
-    Arg.info ~doc:"DataKit branch where the GitHub API will be mirrored."
-      ["m"; "branch-mirror"]
+    Arg.info ~doc:"Private DataKit branch where the GitHub events (persistent \
+                   and webhook) is be mirrored."
+      ["x"; "branch-x"]
   in
-  Arg.(value & opt string "github-hook" doc)
+  Arg.(value & opt string "github-metadata-events" doc)
 
-let branch_write =
+let public_branch =
   let doc =
     Arg.info
-      ~doc:"Writes to that DataKit branch will be translated into GitHub API \
-            calls."
-      ["w"; "branch-write"]
+      ~doc:"Public DataKit branch. Writes to this branch will be translated into \
+            GitHub API calls."
+      ["b"; "branch"]
   in
-  Arg.(value & opt string "github-hook-x" doc)
+  Arg.(value & opt string "github-metadata" doc)
 
 let gh_hooks =
   let doc =
@@ -181,7 +182,7 @@ let term =
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ sandbox $ listen_urls $
-        datakit $ branch_mirror $ branch_write $
+        datakit $ private_branch $ public_branch $
         gh_hooks $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 

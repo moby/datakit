@@ -15,11 +15,15 @@
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><link title="Basic constructors" rel="Section" href="#1_Basicconstructors">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><link title="Basic constructors" rel="Section" href="#1_Basicconstructors">
 <link title="K/V stores." rel="Section" href="#1_KVstores">
 <link title="Streams" rel="Section" href="#1_Streams">
 <link title="Errors" rel="Section" href="#1_Errors">
-<title>Datakit : Vfs.File</title>
+<title>Vfs.File</title>
 </head>
 <body>
 <div class="navbar"><a class="pre" href="Vfs.Error.html" title="Vfs.Error">Previous</a>
@@ -38,6 +42,10 @@ File operations.<br>
 The type for open files, e.g. file descriptors.<br>
 </div>
 
+
+<pre><span id="VALcreate_fd"><span class="keyword">val</span> create_fd</span> : <code class="type">read:(offset:int64 -> count:int -> Cstruct.t <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -><br>       write:(offset:int64 -> Cstruct.t -> unit <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.File.html#TYPEfd">fd</a></code></pre><div class="info ">
+Create an open file object.<br>
+</div>
 
 <pre><span id="VALread"><span class="keyword">val</span> read</span> : <code class="type"><a href="Vfs.File.html#TYPEfd">fd</a> -> offset:int64 -> count:int -> Cstruct.t <a href="Vfs.html#TYPEor_err">Vfs.or_err</a></code></pre><div class="info ">
 <code class="code">read f ~offset ~count</code> reads an open file.<br>
@@ -89,7 +97,7 @@ The type for files.<br>
 <br>
 <h1 id="1_Basicconstructors">Basic constructors</h1><br>
 
-<pre><span id="VALro_of_string"><span class="keyword">val</span> ro_of_string</span> : <code class="type">string -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALro_of_string"><span class="keyword">val</span> ro_of_string</span> : <code class="type">?perm:<a href="Vfs.html#TYPEperm">Vfs.perm</a> -> string -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">ro_of_string s</code> is the static file containing <code class="code">s</code>.<br>
 </div>
 
@@ -99,9 +107,10 @@ The type for files.<br>
         contents.<br>
 </div>
 
-<pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type">(unit -> string Lwt.t) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type">?length:(unit -> int Lwt.t) -> (unit -> string Lwt.t) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">status f</code> is the file containing the result of <code class="code">f</code>. <code class="code">f</code> is
-      evaluated everytime the file is open.<br>
+      evaluated everytime the file is open. If <code class="code">length</code> is not set,
+      <code class="code">f</code> will also be called during <code class="code">stat</code> queries.<br>
 </div>
 
 <pre><span id="VALcommand"><span class="keyword">val</span> command</span> : <code class="type">?init:string -> (string -> string <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.File.html#TYPEt">t</a></code></pre><div class="info ">

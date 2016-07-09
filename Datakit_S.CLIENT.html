@@ -1,0 +1,95 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Datakit_S.READABLE_TREE.html">
+<link rel="Up" href="Datakit_S.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Datakit_S.CLIENT</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Datakit_S.READABLE_TREE.html" title="Datakit_S.READABLE_TREE">Previous</a>
+&nbsp;<a class="up" href="Datakit_S.html" title="Datakit_S">Up</a>
+&nbsp;</div>
+<h1>Module type <a href="type_Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></h1>
+
+<pre><span class="keyword">module type</span> CLIENT = <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+A <code class="code">t</code> is a connection to a Datakit server.<br>
+</div>
+
+
+<pre><span id="TYPEerror"><span class="keyword">type</span> <code class="type"></code>error</span> </pre>
+
+
+<pre><span id="VALpp_error"><span class="keyword">val</span> pp_error</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEerror">error</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp_error</code> pretty-prints error values.<br>
+</div>
+
+<pre><span id="TYPEor_error"><span class="keyword">type</span> <code class="type">'a</code> or_error</span> = <code class="type">('a, <a href="Datakit_S.CLIENT.html#TYPEerror">error</a>) Result.result</code> </pre>
+
+
+<pre><span id="VALerror"><span class="keyword">val</span> error</span> : <code class="type">('a, unit, string, 'b <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t) Pervasives.format4 -><br>       'a</code></pre><div class="info ">
+<code class="code">error</code> raises user-defined errors.<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Tree.html">Tree</a>: <code class="type"><a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a></code><code class="type">  with type 'a or_error := 'a or_error</code></pre><div class="info">
+A read-only tree of files, directories and symlinks.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Commit.html">Commit</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Commit.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Transaction.html">Transaction</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Transaction.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Branch.html">Branch</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Branch.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.GitHub.html">GitHub</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.GitHub.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span id="VALbranches"><span class="keyword">val</span> branches</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> string list <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">branches t</code> is the current set of branches.<br>
+</div>
+
+<pre><span id="VALremove_branch"><span class="keyword">val</span> remove_branch</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">remove_branch t name</code> removes the branch named <code class="code">name</code> (unlike
+      <code class="code"><span class="constructor">Branch</span>.remove</code>, this method doesn't require creating the branch
+      directory first).<br>
+</div>
+
+<pre><span id="VALbranch"><span class="keyword">val</span> branch</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -><br>       string -> <a href="Datakit_S.CLIENT.Branch.html#TYPEt">Branch.t</a> <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">branch t name</code> is the branch named <code class="code">name</code> (which might not exist yet).<br>
+</div>
+
+<pre><span id="VALcommit"><span class="keyword">val</span> commit</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> string -> <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Commit.t</a></code></pre><div class="info ">
+<code class="code">commit t hash</code> is the commit with ID <code class="code">hash</code>.<br>
+</div>
+
+<pre><span id="VALtree"><span class="keyword">val</span> tree</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> string -> Tree.t</code></pre><div class="info ">
+<code class="code">tree t id</code> is the tree with ID <code class="code">id</code>.<br>
+</div>
+
+<pre><span id="VALfetch"><span class="keyword">val</span> fetch</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -><br>       url:string -><br>       branch:string -> <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Commit.t</a> <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">fetch t ~url ~branch</code> fetches the given remote branch and
+      returns its head commit.<br>
+</div>
+
+<pre><span id="VALgithub"><span class="keyword">val</span> github</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.GitHub.html#TYPEt">GitHub.t</a> option <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">github t</code> is the GitHub API client for <code class="code">t</code>, if <code class="code">t</code> supports
+      <code class="code"><span class="constructor">GitHub</span></code> integration.<br>
+</div>
+
+<pre><span id="VALdisconnect"><span class="keyword">val</span> disconnect</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> unit Lwt.t</code></pre><div class="info ">
+<code class="code">disconnect t</code> closes the connection. <code class="code">t</code> cannot be used after
+      this.<br>
+</div>
+</body></html>

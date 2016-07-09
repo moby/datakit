@@ -11,7 +11,11 @@
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Index of values</title>
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Index of values</title>
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
@@ -19,9 +23,24 @@
 <h1>Index of values</h1>
 <table>
 <tr><td align="left"><br></td></tr>
+<tr><td><a href="Datakit_path.Infix.html#VAL(/)">(/)</a> [<a href="Datakit_path.Infix.html">Datakit_path.Infix</a>]</td>
+<td><div class="info">
+<code class="code">a / b</code> is the path <code class="code">a</code> with step <code class="code">b</code> appended.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.Infix.html#VAL(/@)">(/@)</a> [<a href="Datakit_path.Infix.html">Datakit_path.Infix</a>]</td>
+<td><div class="info">
+<code class="code">a /@ b</code> is the concatenation of paths <code class="code">a</code> and <code class="code">b</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.Infix.html#VAL(>>*=)">(&gt;&gt;*=)</a> [<a href="Vfs.Error.Infix.html">Vfs.Error.Infix</a>]</td>
 <td></td></tr>
 <tr><td align="left"><br>A</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALabort">abort</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">abort t</code> aborts the transaction without committing it.
+</div>
+</td></tr>
 <tr><td><a href="Fs9p.S.html#VALaccept">accept</a> [<a href="Fs9p.S.html">Fs9p.S</a>]</td>
 <td><div class="info">
 <code class="code">accept root f</code> accepts connection on <code class="code">f</code>, processs requests
@@ -34,6 +53,16 @@
 <code class="code">basenane t</code> is <code class="code">t</code>'s basename.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALbranch">branch</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">branch t name</code> is the branch named <code class="code">name</code> (which might not exist yet).
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALbranches">branches</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">branches t</code> is the current set of branches.
+</div>
+</td></tr>
 <tr><td align="left"><br>C</td></tr>
 <tr><td><a href="Vfs.File.html#VALchmod">chmod</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
@@ -43,6 +72,35 @@
 <tr><td><a href="Vfs.File.html#VALcommand">command</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">command ?init f</code> is the file containing the result of <code class="code">f</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALcommit">commit</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">commit t ~message</code> creates a new commit with the given log
+        message and the current contents of the transaction and then
+        merges it into the branch from which the transaction was
+        created.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALcommit">commit</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">commit t hash</code> is the commit with ID <code class="code">hash</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALcompare">compare</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+<code class="code">compare</code> is the comparison function for paths.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALconflicts">conflicts</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">conflicts t</code> returns the current list of paths that had merge
+        conflicts and have not been written to since.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_client_9p.Make.html#VALconnect">connect</a> [<a href="Datakit_client_9p.Make.html">Datakit_client_9p.Make</a>]</td>
+<td><div class="info">
+<code class="code">connect c</code> is a Datakit connection using the 9p connection <code class="code">c</code>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALcontent">content</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
@@ -73,7 +131,37 @@ Create the /remotes/ virtual directory.
 <code class="code">create</code> is the file <code class="code">t</code> such that FIXME.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALcreate_dir">create_dir</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">create_dir t ~dir name</code> creates the directory <code class="code">dir/name</code>.
+</div>
+</td></tr>
+<tr><td><a href="Vfs.File.html#VALcreate_fd">create_fd</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
+<td><div class="info">
+Create an open file object.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALcreate_file">create_file</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">create_file t ~dir name ?executable content</code> creates the file
+        <code class="code">dir/name</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALcreate_or_replace_file">create_or_replace_file</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">create_or_replace_file t ~dir leaf content</code> uses either <code class="code">create_file</code>
+        or <code class="code">replace_file</code> as appropriate to set the contents.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALcreate_symlink">create_symlink</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">create_symlink t ~dir name target</code> creates the symlink
+        <code class="code">dir/name</code>.
+</div>
+</td></tr>
 <tr><td align="left"><br>D</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALdescr">descr</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.Inode.html#VALdir">dir</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
 <code class="code">dir name d</code> is the inode <code class="code">t</code> such that <code class="code">basename t</code> is <code class="code">name</code>
@@ -86,7 +174,22 @@ Create the /remotes/ virtual directory.
       directories.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALdisconnect">disconnect</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">disconnect t</code> closes the connection.
+</div>
+</td></tr>
 <tr><td align="left"><br>E</td></tr>
+<tr><td><a href="Datakit_path.html#VALempty">empty</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+The empty path.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALempty">empty</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+The empty blob.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALempty">empty</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td></td></tr>
 <tr><td><a href="Vfs.Dir.html#VALempty">empty</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
@@ -112,12 +215,47 @@ Quick equality check (compares hashes).
 Errors
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALerror">error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">error</code> raises user-defined errors.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.html#VALerror">error</a> [<a href="Vfs.html">Vfs</a>]</td>
 <td><div class="info">
 <code class="code">error fmt</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Error</span> &lt;fmt&gt;)</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALexists">exists</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">exists t path</code> is <code class="code"><span class="keyword">true</span></code> if <code class="code">stat t path</code> isn't <code class="code"><span class="constructor">None</span></code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALexists_dir">exists_dir</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">exists_dir t path</code> is similar to <a href="Datakit_S.READABLE_TREE.html#VALexists"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">READABLE_TREE</span>.exists</code></a> but for directories
+      only.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALexists_file">exists_file</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">exists_file t path</code> is similar to <a href="Datakit_S.READABLE_TREE.html#VALexists"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">READABLE_TREE</span>.exists</code></a> but for files
+      only.
+</div>
+</td></tr>
 <tr><td align="left"><br>F</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALfast_forward">fast_forward</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">fast_forward t commit</code> changes <code class="code">t</code> to point to <code class="code">commit</code> if
+        <code class="code">t</code>'s head is an ancestor of <code class="code">commit</code> (or returns an error if
+        not).
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALfetch">fetch</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">fetch t ~url ~branch</code> fetches the given remote branch and
+      returns its head commit.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Inode.html#VALfile">file</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
 <code class="code">file name f</code> is the inode <code class="code">t</code> such that <code class="code">basename t</code> is <code class="code">name</code>
@@ -128,6 +266,12 @@ Errors
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALget">get</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 Look up a sub-directory node.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALgithub">github</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">github t</code> is the GitHub API client for <code class="code">t</code>, if <code class="code">t</code> supports
+      <code class="code"><span class="constructor">GitHub</span></code> integration.
 </div>
 </td></tr>
 <tr><td align="left"><br>H</td></tr>
@@ -141,7 +285,23 @@ Look up a sub-directory node.
 <code class="code">hash f</code> is the hash of the contents of <code class="code">f</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALhead">head</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">head t</code> is the current head of the branch, or <code class="code"><span class="constructor">None</span></code> if it
+        doesn't currently exist.
+</div>
+</td></tr>
 <tr><td align="left"><br>I</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.PR.html#VALid">id</a> [<a href="Datakit_S.CLIENT.GitHub.PR.html">Datakit_S.CLIENT.GitHub.PR</a>]</td>
+<td><div class="info">
+<code class="code">id t</code> is the GitHub identifier for the PR.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALid">id</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">id t</code> is the unique ID of this commit.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Inode.html#VALino">ino</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
 <code class="code">ino t</code> is a unique "inode number" for the file.
@@ -159,6 +319,8 @@ Look up a sub-directory node.
 </div>
 </td></tr>
 <tr><td align="left"><br>L</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALlen">len</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td></td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALlookup">lookup</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 Look up an immediate child by name.
@@ -185,9 +347,26 @@ The <code class="code">ls</code> commands.
 </div>
 </td></tr>
 <tr><td align="left"><br>M</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALmake_dirs">make_dirs</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">make_dirs t path</code> ensures that <code class="code">path</code> exists and is a
+        directory, creating it and any missing parents as
+        necessary.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALmap">map</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 The contents of the directory.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALmerge">merge</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">merge t commit</code> merges <code class="code">commit</code> into the transaction.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALmessage">message</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">message t</code> is <code class="code">t</code>'s log message.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Dir.html#VALmkdir">mkdir</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
@@ -201,6 +380,16 @@ The <code class="code">mkfile</code> command.
 </div>
 </td></tr>
 <tr><td align="left"><br>N</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALname">name</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">name t</code> is <code class="code">t</code>'s name.
+</div>
+</td></tr>
+<tr><td><a href="Vfs.Error.html#VALnegative_offset">negative_offset</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
+<td><div class="info">
+<code class="code">negative_offset o</code> is an error saying that <code class="code">o</code> is negative.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.html#VALno_entry">no_entry</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">no_entry</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Noent</span></code>.
@@ -247,10 +436,43 @@ The <code class="code">mkfile</code> command.
       defined in <code class="code">m</code>.
 </div>
 </td></tr>
+<tr><td><a href="Ivfs_blob.html#VALof_ro_cstruct">of_ro_cstruct</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">of_ro_cstruct c</code> is a blob containing the data <code class="code">c</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALof_steps">of_steps</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+Converts a list of the form <code class="code"><span class="string">"a"</span>; <span class="string">"b"</span>; <span class="string">"c"</span></code> to a path.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALof_steps_exn">of_steps_exn</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+Converts a list of the form <code class="code"><span class="string">"a"</span>; <span class="string">"b"</span>; <span class="string">"c"</span></code> to a path.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALof_stream">of_stream</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">of_stream s</code> is the file which will be, once opened, similar to
     the stream <code class="code">s ()</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALof_string">of_string</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+Converts a path of the form <code class="code"><span class="string">"a/b/c"</span></code> to a path.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALof_string">of_string</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">of_string s</code> is a blob containing the same data as <code class="code">s</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALof_string_exn">of_string_exn</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td></td></tr>
+<tr><td><a href="Vfs.Error.html#VALoffset_too_large">offset_too_large</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
+<td><div class="info">
+<code class="code">offset_too_large ~offset len</code> is an error saying that <code class="code">offset</code>
+      is beyond the end of the file (<code class="code">len</code>).
 </div>
 </td></tr>
 <tr><td><a href="Vfs.html#VALok">ok</a> [<a href="Vfs.html">Vfs</a>]</td>
@@ -269,9 +491,25 @@ The <code class="code">mkfile</code> command.
 </div>
 </td></tr>
 <tr><td align="left"><br>P</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALparents">parents</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">parents t</code> is the parents of the transaction (that is, the parents of
+        the commit that would be generated if you committed now.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALparents">parents</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">parents t</code> is the list of <code class="code">t</code>'s parent commits.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.html#VALperm">perm</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">perm</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Perm</span></code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALpp">pp</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is a formatter for human-readable paths.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Inode.html#VALpp">pp</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
@@ -289,17 +527,62 @@ The <code class="code">mkfile</code> command.
 <code class="code">pp</code> is the pretty-printer for files.
 </div>
 </td></tr>
+<tr><td><a href="Vfs.Error.html#VALpp">pp</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALpp_error">pp_error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">pp_error</code> pretty-prints error values.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALpp_hash">pp_hash</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.html#VALpr">pr</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
+<td><div class="info">
+<code class="code">pr t ~user ~project id</code> is PR <code class="code">id</code> under "github.com/user/project"
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.html#VALprs">prs</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
+<td><div class="info">
+<code class="code">prs t ~user ~project</code> is the list of PRs under "github.com/user/project"
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.Stream.html#VALpublish">publish</a> [<a href="Vfs.File.Stream.html">Vfs.File.Stream</a>]</td>
 <td><div class="info">
 <code class="code">publish s v</code> publishes <code class="code">v</code> in the session <code class="code">s</code>.
 </div>
 </td></tr>
 <tr><td align="left"><br>R</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALread">read</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">read t path</code> is the contents of the object at the <code class="code">path</code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALread">read</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">read t ~offset ~count</code> is the <code class="code">count</code> bytes in <code class="code">t</code> starting at <code class="code">offset</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALread">read</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">read f ~offset ~count</code> reads an open file.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALread_dir">read_dir</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">read_dir t path</code> resolves <code class="code">path</code> to a directory, or returns an
+      error if it isn't one.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALread_file">read_file</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">read_file t path</code> resolves <code class="code">path</code> to a file, or returns an
+      error if it isn't a file.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALread_link">read_link</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">read_link t path</code> resolves <code class="code">path</code> to a symlink, or returns an
+      error if it isn't one.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Dir.html#VALread_only">read_only</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
@@ -312,6 +595,16 @@ The <code class="code">mkfile</code> command.
 <code class="code">read_only_file</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Read_only_file</span></code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALremove">remove</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">remove t</code> deletes branch <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALremove">remove</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">remove t path</code> removes <code class="code">path</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Dir.html#VALremove">remove</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
 <td><div class="info">
 The <code class="code">remove</code> command.
@@ -322,9 +615,33 @@ The <code class="code">remove</code> command.
 <code class="code">remove t</code> removes <code class="code">t</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALremove_branch">remove_branch</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">remove_branch t name</code> removes the branch named <code class="code">name</code> (unlike
+      <code class="code"><span class="constructor">Branch</span>.remove</code>, this method doesn't require creating the branch
+      directory first).
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALrename">rename</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">rename t new_name</code> changes the name of this branch.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALrename">rename</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">rename t path new_name</code> changes the basename of <code class="code">path</code> to
+        <code class="code">new_name</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Dir.html#VALrename">rename</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
 <td><div class="info">
 The <code class="code">rename</code> command.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALreplace_file">replace_file</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">replace_file t ~dir name new_content</code> changes the content of
+        the existing file <code class="code">dir/name</code>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALrepo">repo</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
@@ -356,6 +673,24 @@ The <code class="code">rename</code> command.
 <code class="code">set_basename t name</code> changes <code class="code">t</code>'s basename to <code class="code">name</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_descr">set_descr</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALset_executable">set_executable</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">set_executable t path flag</code> marks the file at <code class="code">path</code> as
+        executable or not.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALset_parents">set_parents</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">set_parents t new_parents</code> replaces the current list of
+        parents.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_state">set_state</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_url">set_url</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td></td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALsize">size</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
 <td></td></tr>
 <tr><td><a href="Vfs.File.html#VALsize">size</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
@@ -369,6 +704,11 @@ Convert a branch, which may update while we read it, to a fixed directory
       by reading its current root.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#VALstat">stat</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td><div class="info">
+<code class="code">stat t path</code> is the metadata of the object at <code class="code">path</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALstat">stat</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">stat t</code> is <code class="code">t</code>'s metadata.
@@ -379,12 +719,52 @@ Convert a branch, which may update while we read it, to a fixed directory
 <code class="code">stat_of ~read</code> makes a <code class="code">stat</code> function from <code class="code">read</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALstate">state</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.PR.html#VALstatus">status</a> [<a href="Datakit_S.CLIENT.GitHub.PR.html">Datakit_S.CLIENT.GitHub.PR</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.File.html#VALstatus">status</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">status f</code> is the file containing the result of <code class="code">f</code>.
 </div>
 </td></tr>
 <tr><td align="left"><br>T</td></tr>
+<tr><td><a href="Datakit_path.html#VALto_hum">to_hum</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+Convert to a string, in the same format as <code class="code">pp</code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALto_ro_cstruct">to_ro_cstruct</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">to_ro_cstruct t</code> is a read-only Cstruct with the same data as <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALto_string">to_string</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">to_string t</code> is a string containing the same data as <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALtree">tree</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">tree t</code> is the content of the commit.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#VALtree">tree</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+<code class="code">tree t id</code> is the tree with ID <code class="code">id</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALtruncate">truncate</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">truncate t path length</code> sets the length of the file at <code class="code">path</code>
+        to <code class="code">length</code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALtruncate">truncate</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">truncate t l</code> is a blob of length <code class="code">l</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALtruncate">truncate</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">truncate t len</code> sets the length of <code class="code">t</code> to <code class="code">len</code>.
@@ -395,15 +775,46 @@ Convert a branch, which may update while we read it, to a fixed directory
 Check the type of a path.
 </div>
 </td></tr>
+<tr><td align="left"><br>U</td></tr>
+<tr><td><a href="Datakit_path.html#VALunwrap">unwrap</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+Cast to a list of strings
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALurl">url</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td></td></tr>
 <tr><td align="left"><br>W</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwait_for_head">wait_for_head</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">wait_for_head t fn</code> calls <code class="code">fn commit</code> on the current
+        commit.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwait_for_path">wait_for_path</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">wait_for_path</code> is similar to <code class="code">wait_for_head</code>, but waits for a
+        particular sub-tree to change.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALwith_child">with_child</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 <code class="code">with_child dir name child</code> is a copy of <code class="code">dir</code> except that <code class="code">name</code> links to <code class="code">child</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwith_transaction">with_transaction</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">with_transaction t fn</code> is the result of applying <code class="code">fn</code> to a
+        new transaction on branch <code class="code">t</code>.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALwithout_child">without_child</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 <code class="code">without_child dir name</code> is a copy of <code class="code">dir</code> except that it has no child called <code class="code">name</code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALwrite">write</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">write t ~offset data</code> is the blob <code class="code">t</code> overwritten with <code class="code">data</code> at <code class="code">offset</code>.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALwrite">write</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>

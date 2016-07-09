@@ -14,7 +14,11 @@
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Vfs.Error</title>
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Vfs.Error</title>
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="Vfs.html" title="Vfs">Up</a>
@@ -144,4 +148,14 @@ Infix operators.
 <code class="code"><span class="constructor">Other</span> ~errno descr</code> is <code class="code"><span class="constructor">Error</span> { errno; descr }</code>. <code class="code">errno</code> is 0
       if not set.<br>
 </div>
-</body></html>
+
+<pre><span id="VALnegative_offset"><span class="keyword">val</span> negative_offset</span> : <code class="type">int64 -> ('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
+<code class="code">negative_offset o</code> is an error saying that <code class="code">o</code> is negative.<br>
+</div>
+
+<pre><span id="VALoffset_too_large"><span class="keyword">val</span> offset_too_large</span> : <code class="type">offset:int64 -> int64 -> ('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
+<code class="code">offset_too_large ~offset len</code> is an error saying that <code class="code">offset</code>
+      is beyond the end of the file (<code class="code">len</code>).<br>
+</div>
+
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Vfs.Error.html#TYPEt">t</a> Fmt.t</code></pre></body></html>

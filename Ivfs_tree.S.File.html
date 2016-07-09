@@ -14,7 +14,11 @@
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Ivfs_tree.S.File</title>
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Ivfs_tree.S.File</title>
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="Ivfs_tree.S.html" title="Ivfs_tree.S">Up</a>
@@ -36,7 +40,7 @@ The type for file IDs (hashes).<br>
 </div>
 
 
-<pre><span id="VALof_data"><span class="keyword">val</span> of_data</span> : <code class="type"><a href="Ivfs_tree.S.html#TYPErepo">Ivfs_tree.S.repo</a> -> Cstruct.t -> <a href="Ivfs_tree.S.File.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALof_data"><span class="keyword">val</span> of_data</span> : <code class="type"><a href="Ivfs_tree.S.html#TYPErepo">Ivfs_tree.S.repo</a> -> <a href="Ivfs_blob.html#TYPEt">Ivfs_blob.t</a> -> <a href="Ivfs_tree.S.File.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">of_data repo data</code> is a file containing <code class="code">data</code>, which may later
         be stored in <code class="code">repo</code>.<br>
 </div>
@@ -46,7 +50,7 @@ The type for file IDs (hashes).<br>
         will cause it to be written.<br>
 </div>
 
-<pre><span id="VALcontent"><span class="keyword">val</span> content</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> Cstruct.t Lwt.t</code></pre>
+<pre><span id="VALcontent"><span class="keyword">val</span> content</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> <a href="Ivfs_blob.html#TYPEt">Ivfs_blob.t</a> Lwt.t</code></pre>
 <pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> <a href="Ivfs_tree.S.File.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
 Quick equality check (compares hashes).<br>
 </div>

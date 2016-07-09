@@ -11,7 +11,11 @@
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html"><title>Datakit : Index of types</title>
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Index of types</title>
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
@@ -24,6 +28,8 @@
 The type for generic errors.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#TYPEerror">error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td></td></tr>
 <tr><td align="left"><br>F</td></tr>
 <tr><td><a href="Vfs.File.html#TYPEfd">fd</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
@@ -54,6 +60,12 @@ The type for inode kinds.
 </div>
 </td></tr>
 <tr><td align="left"><br>M</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#TYPEmerge_inputs">merge_inputs</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+When performing a merge, these three directories can be used
+        to calculate the final result.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.html#TYPEmetadata">metadata</a> [<a href="Vfs.html">Vfs</a>]</td>
 <td></td></tr>
 <tr><td align="left"><br>O</td></tr>
@@ -62,6 +74,10 @@ The type for inode kinds.
 The type of errors.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td></td></tr>
 <tr><td align="left"><br>P</td></tr>
 <tr><td><a href="Ivfs_tree.html#TYPEpath">path</a> [<a href="Ivfs_tree.html">Ivfs_tree</a>]</td>
 <td></td></tr>
@@ -86,6 +102,10 @@ The type for repositories.
 The type for stream sessions.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_S.html#TYPEstat">stat</a> [<a href="Datakit_S.html">Datakit_S</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.html#TYPEstatus_state">status_state</a> [<a href="Datakit_S.html">Datakit_S</a>]</td>
+<td></td></tr>
 <tr><td><a href="Ivfs_tree.html#TYPEstep">step</a> [<a href="Ivfs_tree.html">Ivfs_tree</a>]</td>
 <td></td></tr>
 <tr><td><a href="Ivfs_tree.S.html#TYPEstore">store</a> [<a href="Ivfs_tree.S.html">Ivfs_tree.S</a>]</td>
@@ -94,6 +114,45 @@ The type for Irmin stores.
 </div>
 </td></tr>
 <tr><td align="left"><br>T</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.PR.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.GitHub.PR.html">Datakit_S.CLIENT.GitHub.PR</a>]</td>
+<td><div class="info">
+A GitHub Pull Request
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
+<td><div class="info">
+A PR status (e.g.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.GitHub.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+A <code class="code">t</code> is a named pointer to a commit.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+A <code class="code">t</code> is an immutable commit in the database.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
+<td><div class="info">
+A <code class="code">t</code> is a connection to a Datakit server.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_path.html#TYPEt">t</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+A <code class="code">path</code> identifies a file or directory (relative to some other directory).
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#TYPEt">t</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+A <code class="code">t</code> is an immutable sequence of bytes.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 An immutable directory node.

@@ -3,7 +3,7 @@ open Result
 open Astring
 
 module UnixServer = Fs9p.Make(Flow_lwt_unix)
-module HyperVServer = Fs9p.Make(Flow_lwt_hvsock)
+module HyperVServer = Fs9p.Make(Flow_lwt_unix_hvsock)
 
 let src = Logs.Src.create "datakit-conduit" ~doc:"Datakit conduit handling"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -78,7 +78,7 @@ module HyperV = struct
     Log.debug (fun l -> l "New Hyper-V client");
     Lwt.catch
       (fun () ->
-         let flow = Flow_lwt_hvsock.connect fd in
+         let flow = Flow_lwt_unix_hvsock.connect fd in
          (* Re-build the filesystem for each client because command files
             need per-client state. *)
          let root = make_root () in
@@ -94,9 +94,9 @@ module HyperV = struct
         )
 
   let accept_forever url socket callback =
-    Lwt_hvsock.listen socket 5;
+    Flow_lwt_unix_hvsock.Hvsock.listen socket 5;
     let rec aux () =
-      Lwt_hvsock.accept socket >>= fun (client, _addr) ->
+      Flow_lwt_unix_hvsock.Hvsock.accept socket >>= fun (client, _addr) ->
       let _ = (* background thread *)
         (* the callback will close the connection when its done *)
         callback client in
@@ -107,13 +107,13 @@ module HyperV = struct
 
   let connect_forever url sockaddr callback =
     let rec aux () =
-      let socket = Lwt_hvsock.create () in
+      let socket = Flow_lwt_unix_hvsock.Hvsock.create () in
       Lwt.catch
         (fun () ->
-           Lwt_hvsock.connect socket sockaddr >>= fun () ->
+           Flow_lwt_unix_hvsock.Hvsock.connect socket sockaddr >>= fun () ->
            callback socket
         ) (fun _e ->
-            Lwt_hvsock.close socket >>= fun () ->
+            Flow_lwt_unix_hvsock.Hvsock.close socket >>= fun () ->
             Lwt_unix.sleep 1.
           )
       >>= fun () ->
@@ -183,8 +183,8 @@ let accept_forever ~sandbox ~serviceid ~make_root url =
            HyperV.connect_forever uri
              (HyperV.of_uri ~serviceid uri) (HyperV.handle ~make_root)
          | Some "hyperv-accept" ->
-           let socket = Lwt_hvsock.create () in
-           Lwt_hvsock.bind socket (HyperV.of_uri ~serviceid uri);
+           let socket = Flow_lwt_unix_hvsock.Hvsock.create () in
+           Flow_lwt_unix_hvsock.Hvsock.bind socket (HyperV.of_uri ~serviceid uri);
            HyperV.accept_forever uri socket (HyperV.handle ~make_root)
          | _ ->
            Printf.fprintf stderr

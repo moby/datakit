@@ -106,7 +106,7 @@ $ make && make test
 ### Usage
 
 ```shell
-$ datakit -h
+$ datakit --help
 ```
 
 ## Filesystem API

@@ -21,4 +21,4 @@ RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 
 ENTRYPOINT ["/usr/bin/datakit"]
-CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-vv"]
+CMD ["--url=tcp://0.0.0.0:5640", "--git=/data", "-v"]

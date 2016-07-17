@@ -115,8 +115,8 @@ let status_state: Status_state.t Alcotest.testable =
 
 let user = "test"
 let repo = "test"
-let branch = "test"
-let writes = "test-writes"
+let pub = "test-pub"
+let priv = "test-priv"
 
 let init events =
   { API.user; repo; status = []; prs = []; events; count_events = 0 }
@@ -124,7 +124,7 @@ let init events =
 let run f () =
   Test_utils.run (fun _repo conn ->
       let dk = DK.connect conn in
-      DK.branch dk branch >>*= fun branch ->
+      DK.branch dk pub >>*= fun branch ->
       DK.Branch.with_transaction branch (fun tr ->
           let dir = Datakit_path.(empty / user / repo) in
           DK.Transaction.make_dirs tr dir >>*= fun () ->
@@ -190,14 +190,16 @@ let test_events dk =
   quiet_irmin ();
   let t = init events0 in
   let s = VG.empty in
-  DK.branch dk branch >>*= fun branch ->
-  DK.branch dk writes >>*= fun writes ->
+  DK.branch dk priv >>*= fun priv ->
+  DK.branch dk pub  >>*= fun pub  ->
   Alcotest.(check int) "API.event: 0" 0 t.API.count_events;
-  VG.sync ~policy:`Once s branch ~writes t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check int) "API.event: 1" 1 t.API.count_events;
-  VG.sync ~policy:`Once s branch ~writes t >>= fun _s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
   Alcotest.(check int) "API.event: 2" 1 t.API.count_events;
-  expect_head branch >>*= fun head ->
+  expect_head priv >>*= fun head ->
+  check (DK.Commit.tree head) >>= fun () ->
+  expect_head pub >>*= fun head ->
   check (DK.Commit.tree head)
 
 let test_updates dk =
@@ -206,24 +208,24 @@ let test_updates dk =
   quiet_irmin ();
   let t = init events1 in
   let s = VG.empty in
-  DK.branch dk branch >>*= fun branch ->
-  DK.branch dk writes >>*= fun writes ->
+  DK.branch dk priv >>*= fun priv ->
+  DK.branch dk pub  >>*= fun pub ->
   Alcotest.(check int) "API.event: 0" t.API.count_events 0;
-  VG.sync ~policy:`Once s branch ~writes t >>= fun s ->
-  VG.sync ~policy:`Once s branch ~writes t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check int) "API.event: 1" t.API.count_events 1;
-  expect_head branch >>*= fun head ->
+  expect_head priv >>*= fun head ->
   let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
   DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
   Alcotest.(check bool) "exist commit/foo" true exists;
-  DK.Branch.with_transaction writes (fun tr ->
+  DK.Branch.with_transaction pub (fun tr ->
       DK.Transaction.create_or_replace_file tr
         ~dir:(dir / "status" / "foo" / "bar" / "baz") "state"
         (Cstruct.of_string "pending\n")
       >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     ) >>*= fun () ->
-  VG.sync ~policy:`Once s branch ~writes t >>= fun _s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check int) "API.event: 2" t.API.count_events 1;
   let s =
     try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd

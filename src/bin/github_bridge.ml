@@ -19,14 +19,18 @@ let serviceid = "C378280D-DA14-42C8-A24E-0DE92A1028E3"
 let token () =
   let cookie = "datakit" in
   Lwt_main.run (
-    let open Lwt.Infix in
-    Github_cookie_jar.init () >>= fun jar ->
-    Github_cookie_jar.get jar ~name:cookie >|= function
-    | Some t -> Github.Token.of_string t.Github_t.auth_token
-    | None   ->
-      Printf.eprintf "Missing cookie: use git-jar to create cookie `%s`.\n%!"
-        cookie;
-      exit 1
+    Lwt.catch (fun () ->
+        let open Lwt.Infix in
+        Github_cookie_jar.init () >>= fun jar ->
+        Github_cookie_jar.get jar ~name:cookie >|= function
+        | Some t -> Some (Github.Token.of_string t.Github_t.auth_token)
+        | None   -> None
+      ) (fun e ->
+        Log.err (fun l ->
+            l "Missing cookie: use git-jar to create cookie `%s`.\n%s%!"
+              cookie (Printexc.to_string e)
+          );
+        Lwt.return_none)
   )
 
 let parse_address address =
@@ -52,7 +56,7 @@ let exec ~name cmd =
 
 let start () sandbox listen_urls
     datakit private_branch public_branch
-    gh_hooks webhook_secret webhook_port =
+    no_webhook gh_hooks webhook_secret webhook_port =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V
@@ -65,42 +69,57 @@ let start () sandbox listen_urls
       Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));
-  Log.app (fun l -> l "Starting datakit-github-bridge");
-  let token = token () in
-  let root = VG.create token in
-  let make_root () = Vfs.Dir.of_list (fun () -> [root]) in
+  Log.app (fun l ->
+      l "Starting %s %%VERSION%% ...\npublic-branch: %s\nprivate-branch: %s"
+        (Filename.basename Sys.argv.(0)) public_branch private_branch
+    );
+  let token = match token () with
+    | None   -> failwith "Missing datakit GitHub token"
+    | Some t -> t
+  in
   let connect_to_datakit () =
-    Log.info (fun l -> l "Connecting to %s" datakit);
     let proto, address = parse_address datakit in
-    Client9p.connect proto address () >>= function
+    Log.info (fun l -> l "Connecting to %s (%s, %s)" datakit proto address);
+    (Lwt.catch
+       (fun () -> Client9p.connect proto address ())
+       (fun _ -> Lwt.fail_with
+           "%s is not a valid connect adress. Use 'tcp:hostname:port' or \
+            'unix:path'."))
+    >>= function
     | Error (`Msg e) ->
       Log.err (fun l -> l "cannot connect: %s" e);
       Lwt.fail_with "connecting to datakit"
     | Ok conn        ->
+      Log.info (fun l -> l "Connected to %s" datakit);
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
       DK.branch dk private_branch >>= function
-      | Error e           -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-      | Ok private_branch ->
+      | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+      | Ok priv ->
         DK.branch dk public_branch >>= function
-        | Error e          -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-        | Ok public_branch ->
-          VG.Sync.sync t private_branch ~writes:public_branch token >|= ignore
+        | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+        | Ok pub  -> VG.Sync.sync t ~priv ~pub ~token >|= ignore
   in
   let accept_connections () =
-    Lwt_list.iter_p
-      (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
-      listen_urls
+    if listen_urls = [] then Lwt.return_unit
+    else
+      let root = VG.create token in
+      let make_root () = Vfs.Dir.of_list (fun () -> [root]) in
+      Lwt_list.iter_p
+        (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
+        listen_urls
   in
   let start_datakit_gh_hooks () =
-    let secret = match webhook_secret with
-      | None   -> ""
-      | Some s -> Fmt.strf " -s %s" s
-    in
-    exec ~name:"datakit-gh-hooks"
-      (Lwt_process.shell @@
-       Fmt.strf "%s%s -v -l :%d -b %s -a %s"
-         gh_hooks secret webhook_port private_branch datakit)
+    if no_webhook then Lwt.return_unit
+    else
+      let secret = match webhook_secret with
+        | None   -> ""
+        | Some s -> Fmt.strf " -s %s" s
+      in
+      exec ~name:"datakit-gh-hooks"
+        (Lwt_process.shell @@
+         Fmt.strf "%s%s -v -l :%d -b %s -a %s"
+           gh_hooks secret webhook_port private_branch datakit)
   in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();
@@ -143,7 +162,7 @@ let sandbox =
 
 let datakit =
   let doc = Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"] in
-  Arg.(value & opt string "tcp://127.0.0.1:5640" doc)
+  Arg.(value & opt string "tcp:127.0.0.1:5640" doc)
 
 let private_branch =
   let doc =
@@ -161,6 +180,10 @@ let public_branch =
       ["b"; "branch"]
   in
   Arg.(value & opt string "github-metadata" doc)
+
+let no_webhook =
+  let doc = Arg.info ~doc:"Disable webhook handling" ["disable-webhooks"] in
+  Arg.(value & flag doc)
 
 let gh_hooks =
   let doc =
@@ -187,7 +210,7 @@ let term =
   ] in
   Term.(pure start $ setup_log $ sandbox $ listen_urls $
         datakit $ private_branch $ public_branch $
-        gh_hooks $ webhook_secret $ webhook_port),
+        no_webhook $ gh_hooks $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 
 let () = match Term.eval term with

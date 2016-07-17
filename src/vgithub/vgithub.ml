@@ -473,6 +473,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         ok { Status.state; commit; context; description; url; }
 
     let read_statuses ~root t =
+      Log.debug (fun l -> l "read_statuses");
       let dir = root / "commit" in
       Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
       DK.Tree.exists_dir t dir >>*= fun exists ->
@@ -559,25 +560,30 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   (* compute all the active hooks for a given DataKit commit *)
   let of_commit c =
+    Log.debug (fun l -> l "of_commit %s" @@ DK.Commit.id c);
     let tree = DK.Commit.tree c in
     let root = Datakit_path.empty in
     DK.Tree.read_dir tree root >>*= fun users ->
     List.fold_left (fun acc user ->
-        DK.Tree.read_dir tree (root / user) >>*= fun repos ->
-        List.fold_left (fun acc repo ->
-            acc >>*= fun acc ->
-            read_files tree (root / user / repo) >>*= fun files ->
-            let hooks = HookSet.add { user; repo; files } acc.hooks in
-            let user_repos =
-              UserRepoSet.add { user; repo; files } acc.user_repos
-            in
-            ok { tree = Some tree; hooks; user_repos }
-          ) acc repos
+        DK.Tree.exists_dir tree (root / user) >>*= fun is_dir ->
+        if not is_dir then acc
+        else
+          DK.Tree.read_dir tree (root / user) >>*= fun repos ->
+          List.fold_left (fun acc repo ->
+              acc >>*= fun acc ->
+              read_files tree (root / user / repo) >>*= fun files ->
+              let hooks = HookSet.add { user; repo; files } acc.hooks in
+              let user_repos =
+                UserRepoSet.add { user; repo; files } acc.user_repos
+              in
+              ok { tree = Some tree; hooks; user_repos }
+            ) acc repos
       ) (ok @@ empty) users
 
   (* Read events from the GitHub API and overwrite DataKit state with
      them, in chronological order. *)
   let sync_datakit token ~user ~repo tr =
+    Log.debug (fun l -> l "sycn_datakit %s/%s" user repo);
     let root = Datakit_path.empty / user / repo in
     API.events token ~user ~repo >>= fun events ->
     list_iter (function
@@ -690,14 +696,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | None   -> error "empty branch!"
     | Some c -> fn c
 
-  let sync ?switch ?(policy=`Repeat) t branch ~writes token =
-    Log.debug (fun l -> l "sync %s" @@ DK.Branch.name branch);
-    let import_events last_t current =
+  let sync ?switch ?(policy=`Repeat) ~pub ~priv ~token t =
+    Log.debug (fun l ->
+        l "sync pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)
+      );
+    let event_diff last_t current =
       of_commit current >>*= fun current_t ->
       let diff = UserRepoSet.sdiff last_t.user_repos current_t.user_repos in
       Log.debug (fun l -> l "user-repo-diff: %a" UserRepoSet.pp diff);
-      import_github_events ~token branch diff >>*= fun () ->
-      ok ()
+      ok diff
     in
     let github_calls last_t current =
       of_commit current >>*= fun current_t ->
@@ -706,46 +713,70 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     let prune current =
       of_commit current >>*= fun last_t ->
-      prune last_t branch >>*= fun () ->
+      prune last_t priv >>*= fun () ->
       ok ()
     in
-    let merge_writes c =
-      DK.Branch.with_transaction writes (fun tr ->
+    let merge c =
+      DK.Branch.with_transaction pub (fun tr ->
           DK.Transaction.merge tr c >>*= fun (_, conflicts) ->
           if conflicts <> [] then failwith "TODO";
-          let msg = Fmt.strf "Merging with %s" @@ DK.Branch.name branch in
+          let msg = Fmt.strf "Merging with %s" @@ DK.Branch.name priv in
           DK.Transaction.commit tr ~message:msg
         ) >>*= fun _ ->
       ok ()
     in
+    let init () =
+      Log.debug (fun l -> l "init");
+      (DK.Branch.head pub >>*= function
+        | Some _ -> ok ()
+        | None   ->
+          DK.Branch.with_transaction pub (fun tr ->
+              let dir  = Datakit_path.empty in
+              let data = Cstruct.of_string "### DataKit -- GitHub bridge" in
+              DK.Transaction.create_or_replace_file tr ~dir "README.md" data
+              >>*= fun () ->
+              DK.Transaction.commit tr ~message:"Initial commit"
+            ))
+      >>*= fun _ ->
+      (DK.Branch.head priv >>*= function
+        | Some _ -> ok ()
+        | None   -> with_head pub (DK.Branch.fast_forward priv))
+    in
+    let once t =
+      Log.debug (fun l -> l "once");
+      with_head priv (fun priv_c ->
+          with_head pub (fun pub_c ->
+              event_diff t pub_c  >>*= fun pub_diff ->
+              event_diff t priv_c >>*= fun priv_diff ->
+              import_github_events
+                ~token priv (UserRepoSet.union pub_diff priv_diff)
+              >>*= fun () ->
+              github_calls t pub_c))
+      >>*= fun () ->
+      with_head priv prune >>*= fun () ->
+      with_head priv (fun priv_c ->
+          merge priv_c >>*= fun () ->
+          of_commit priv_c
+        )
+    in
     let run () =
-      with_head branch merge_writes >>*= fun () ->
-      (* 1. handle user requests since last iteration. *)
-      with_head writes (github_calls t) >>*= fun () ->
-      (* 2. import GitHub events for new repositories. *)
-      with_head branch (import_events t) >>*= fun () ->
-      (* 3. prune *)
-      with_head branch prune >>*= fun () ->
-
+      once t >>*= fun t ->
       match policy with
-      | `Once   -> ok (`Finish ())
+      | `Once   -> ok (`Finish t)
       | `Repeat ->
         let last = ref t in
-        DK.Branch.wait_for_head ?switch branch (function
+        DK.Branch.wait_for_head ?switch priv (function
             | None   -> ok `Again
             | Some c ->
-              (* Note: we use the same commit [c] for import and
-                 prune, so might need multiple calls to stabilise. *)
-              merge_writes c >>*= fun () ->
-              github_calls !last c >>*= fun () ->
-              import_events !last c >>*= fun () ->
-              prune c >>*= fun () ->
-              of_commit c >>*= fun l ->
+              once !last >>*= fun l ->
               last := l;
               ok `Again
           )
     in
-    (run () >>*= fun _ -> (* FIXME: racy *) with_head branch of_commit)
+    (init () >>*= fun () ->
+     run  () >>*= function
+     | `Finish l -> ok l
+     | _ -> failwith "TODO")
     >>= function
     | Ok t    -> Lwt.return t
     | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e

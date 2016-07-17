@@ -76,7 +76,9 @@ let start urls sandbox git =
       Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));
-  Log.app (fun l -> l "Starting %s..." @@ Filename.basename Sys.argv.(0));
+  Log.app (fun l ->
+      l "Starting %s %%VERSION%% ..." @@ Filename.basename Sys.argv.(0)
+    );
   begin match git with
     | None      -> In_memory_store.connect ()
     | Some path ->

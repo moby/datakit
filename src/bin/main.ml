@@ -28,14 +28,14 @@ module Git_fs_store = struct
   module Filesystem = Ivfs.Make(Store)
   let listener = lazy (Ir_io.Poll.install_dir_polling_listener 1.0)
 
-  let repo ~bare path =
-    let config = Irmin_git.config ~root:path ~bare () in
+  let repo path =
+    let config = Irmin_git.config ~root:path ~bare:true () in
     Store.Repo.create config
 
-  let connect ~bare path =
+  let connect path =
     Lazy.force listener;
     Log.debug (fun l -> l "Using Git-format store %S" path);
-    repo ~bare path >|= fun repo ->
+    repo path >|= fun repo ->
     fun () -> Filesystem.create make_task repo
 end
 
@@ -63,7 +63,7 @@ let set_signal_if_supported signal handler =
   with Invalid_argument _ ->
     ()
 
-let start urls sandbox git ~bare =
+let start urls sandbox git =
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V
@@ -81,14 +81,14 @@ let start urls sandbox git ~bare =
     | None      -> In_memory_store.connect ()
     | Some path ->
       let prefix = if sandbox then "." else "" in
-      Git_fs_store.connect ~bare (prefix ^ path)
+      Git_fs_store.connect (prefix ^ path)
   end >>= fun make_root ->
   Lwt_list.iter_p
     (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
     urls
 
-let start () url sandbox git bare auto_push =
-  let start () = start url sandbox git ~bare in
+let start () url sandbox git auto_push =
+  let start () = start url sandbox git in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()
@@ -141,7 +141,7 @@ let start () url sandbox git bare auto_push =
           in
           pull () >>= fun () ->
           push () >>= fun () ->
-          Git_fs_store.repo ~bare path >>= fun repo ->
+          Git_fs_store.repo path >>= fun repo ->
           Git_fs_store.Store.Repo.watch_branches repo (fun _ _ -> push ())
       in
       watch () >>= fun unwatch ->
@@ -187,12 +187,6 @@ let sandbox =
   in
   Arg.(value & flag & doc)
 
-let bare =
-  let doc =
-    Arg.info ~doc:"Use a bare Git repository (no working directory)" ["bare"]
-  in
-  Arg.(value & flag & doc)
-
 let auto_push =
   let doc =
     Arg.info ~doc:"Auto-push the local repository to a remote source."
@@ -206,7 +200,7 @@ let term =
     `S "DESCRIPTION";
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ setup_log $ url $ sandbox $ git $ bare $ auto_push),
+  Term.(pure start $ setup_log $ url $ sandbox $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 
 let () = match Term.eval term with

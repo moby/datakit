@@ -1,0 +1,29 @@
+machine:
+  xcode:
+    version: "7.3"
+  environment:
+    OPAMYES: "1"
+    OPAMJOBS: "2"
+    MACOSX_DEPLOYMENT_TARGET: "10.10"
+general:
+  artifacts:
+  - com.docker.db
+  - COMMIT
+dependencies:
+  cache_directories:
+  - ~/.opam
+  override:
+  - brew install wget opam dylibbundler
+  - opam init --comp 4.02.3 -n https://github.com/ocaml/opam-repository
+  - opam switch 4.02.3
+  - opam update -u
+  - opam pin add datakit . -n
+  - opam install depext && opam depext datakit
+  - opam install datakit
+  - opam config exec -- make COMMIT
+  - mkdir -p _build/src/bin
+  - opam config exec -- cp /Users/distiller/.opam/4.02.3/bin/datakit _build/src/bin/main.native
+  - opam config exec -- make bundle
+test:
+  override:
+  - echo Dummy test

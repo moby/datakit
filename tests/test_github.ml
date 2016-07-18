@@ -1,5 +1,22 @@
 open Lwt.Infix
 
+module Counter = struct
+  type t = {
+    mutable events    : int;
+    mutable status    : int;
+    mutable set_status: int;
+    mutable set_pr    : int;
+  }
+
+  let zero () = { events = 0; status = 0; set_status = 0; set_pr = 0 }
+
+  let pp ppf t =
+    Fmt.pf ppf "events:%d status:%d set-status:%d set-pr:%d"
+      t.events t.status t.set_status t.set_pr
+
+  let equal x y = Pervasives.compare x y = 0
+end
+
 module API = struct
 
   open Vgithub
@@ -10,9 +27,7 @@ module API = struct
     mutable status: (string * Status.t list) list;
     mutable prs   : PR.t list;
     mutable events: Event.t list;
-    mutable count_events: int;
-    mutable count_status: int;
-    mutable count_prs   : int;
+    ctx: Counter.t;
   }
 
   type token = state
@@ -23,13 +38,15 @@ module API = struct
     if not (t.user = user) then Lwt.return_nil else Lwt.return [t.repo]
 
   let status t ~user ~repo ~commit =
-    t.count_status <- t.count_status + 1;
+    t.ctx.Counter.status <- t.ctx.Counter.status + 1;
     if not (t.user = user && t.repo = repo) then Lwt.return_nil
     else
       try Lwt.return (List.assoc commit t.status)
       with Not_found -> Lwt.return_nil
 
   let set_status t ~user ~repo s =
+    Printf.eprintf "XXX\n%!";
+    t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
     if not (t.user = user && t.repo = repo) then Lwt.return_unit
     else
       let commit = s.Status.commit in
@@ -47,13 +64,21 @@ module API = struct
       t.status <- status;
       Lwt.return_unit
 
+  let set_pr t ~user ~repo pr =
+    t.ctx.Counter.set_pr <- t.ctx.Counter.set_pr + 1;
+    if not (t.user = user && t.repo = repo) then Lwt.return_unit
+    else
+      let num = pr.PR.number in
+      let prs = List.filter (fun pr -> pr.PR.number <> num) t.prs in
+      t.prs <- pr :: prs;
+      Lwt.return_unit
+
   let prs t ~user ~repo =
-    t.count_prs <- t.count_prs + 1;
     if not (t.user = user && t.repo = repo) then Lwt.return_nil
     else Lwt.return t.prs
 
   let events t ~user ~repo =
-    t.count_events <- t.count_events + 1;
+    t.ctx.Counter.events <- t.ctx.Counter.events + 1;
     if not (t.user = user && t.repo = repo) then Lwt.return_nil
     else Lwt.return t.events
 
@@ -121,6 +146,8 @@ let status0 = [s1; s2; s3; s4]
 let status_state: Status_state.t Alcotest.testable =
   (module struct include Status_state let equal = (=) end)
 
+let counter: Counter.t Alcotest.testable = (module Counter)
+
 let user = "test"
 let repo = "test"
 let pub = "test-pub"
@@ -136,8 +163,8 @@ let init status events =
       Hashtbl.replace tbl s.Status.commit (s :: v)
     ) status;
   let status = Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl [] in
-  { API.user; repo; status; prs = []; events;
-    count_events = 0; count_prs = 0; count_status = 0 }
+  let ctx = Counter.zero () in
+  { API.user; repo; status; prs = []; events; ctx }
 
 let run f () =
   Test_utils.run (fun _repo conn ->
@@ -210,21 +237,27 @@ let test_events dk =
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub  ->
-  Alcotest.(check int) "API.event: 0" 0 t.API.count_events;
-  Alcotest.(check int) "API.status: 0" 0 t.API.count_status;
-  Alcotest.(check int) "API.prs: 0" 0 t.API.count_prs;
+  Alcotest.(check counter) "counter: 0"
+    { Counter.events = 0; status = 0; set_pr = 0; set_status = 0 } t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  Alcotest.(check int) "API.event: 1" 1 t.API.count_events;
-  Alcotest.(check int) "API.status: 1" 1 t.API.count_status;
-  Alcotest.(check int) "API.prs: 1" 0 t.API.count_prs;
+  Alcotest.(check counter) "counter: 1"
+    { Counter.events = 1; status = 1; set_pr = 0; set_status = 0 } t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
-  Alcotest.(check int) "API.event: 2" 1 t.API.count_events;
-  Alcotest.(check int) "API.status: 2" 1 t.API.count_status;
-  Alcotest.(check int) "API.prs: 2" 0 t.API.count_prs;
+  Alcotest.(check counter) "counter: 2"
+    { Counter.events = 1; status = 1; set_pr = 0; set_status = 0 }  t.API.ctx;
   expect_head priv >>*= fun head ->
   check (DK.Commit.tree head) >>= fun () ->
   expect_head pub >>*= fun head ->
   check (DK.Commit.tree head)
+
+let update_status br dir =
+  DK.Branch.with_transaction br (fun tr ->
+      DK.Transaction.create_or_replace_file tr
+        ~dir:(dir / "status" / "foo" / "bar" / "baz") "state"
+        (Cstruct.of_string "pending\n")
+      >>*= fun () ->
+      DK.Transaction.commit tr ~message:"Test"
+    )
 
 let test_updates dk =
   quiet_9p ();
@@ -234,34 +267,51 @@ let test_updates dk =
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
-  Alcotest.(check int) "API.event: 0" 0 t.API.count_events;
-  Alcotest.(check int) "API.status: 0" 0 t.API.count_status;
-  Alcotest.(check int) "API.prs: 0" 0 t.API.count_prs;
+  Alcotest.(check counter) "counter: 0"
+    { Counter.events = 0; status = 0; set_pr = 0; set_status = 0 } t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  Alcotest.(check int) "API.event: 1" 1 t.API.count_events;
-  Alcotest.(check int) "API.status: 1" 2 t.API.count_status;
-  Alcotest.(check int) "API.prs: 1" 0 t.API.count_prs;
+  Alcotest.(check counter) "counter: 1"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 0 } t.API.ctx;
   expect_head priv >>*= fun head ->
+
+  (* test status update *)
   let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
   DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
   Alcotest.(check bool) "exist commit/foo" true exists;
+  update_status pub dir >>*= fun () -> (* API request in the public branch *)
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  Alcotest.(check counter) "counter: 2"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
+  update_status priv dir >>*= fun () -> (* simulated webhook event *)
+  (* FIXME: this should not trigger an API.set_status call *)
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  Alcotest.(check counter) "counter: 3"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 2 } t.API.ctx;
+  let status =
+    try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
+    with Not_found -> Alcotest.fail "foo not found"
+  in
+  Alcotest.(check status_state) "update status" `Pending status.Status.state;
+
+  (* test PR update *)
+  let dir = Datakit_path.empty / user / repo / "pr" / "2" in
+  DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
+  Alcotest.(check bool) "exist commit/foo" true exists;
   DK.Branch.with_transaction pub (fun tr ->
-      DK.Transaction.create_or_replace_file tr
-        ~dir:(dir / "status" / "foo" / "bar" / "baz") "state"
-        (Cstruct.of_string "pending\n")
+      DK.Transaction.create_or_replace_file tr ~dir
+        "title" (Cstruct.of_string "hahaha\n")
       >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     ) >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
-  Alcotest.(check int) "API.event: 2" 1 t.API.count_events;
-  Alcotest.(check int) "API.status: 2" 2 t.API.count_status;
-  Alcotest.(check int) "API.prs: 2" 0 t.API.count_prs;
-  let s =
-    try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
+  Alcotest.(check counter) "counter: 4"
+    { Counter.events = 1; status = 2; set_pr = 1; set_status = 2 } t.API.ctx;
+  let pr =
+    try List.find (fun pr -> pr.PR.number = 2) t.API.prs
     with Not_found -> Alcotest.fail "foo not found"
   in
-  Alcotest.(check status_state) "update status" s.Status.state `Pending;
+  Alcotest.(check string) "update pr's title" "hahaha" pr.PR.title;
   Lwt.return_unit
 
 let test_set = [

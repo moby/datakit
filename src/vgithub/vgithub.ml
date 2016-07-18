@@ -53,8 +53,10 @@ module PR = struct
     Fmt.pf ppf "[number: %d, state: %a, head: %s]"
       t.number pp_state t.state t.head
 
-  module Set = Set.Make(struct type r = t type t = r let compare = compare end)
-
+  module Set = struct
+    include Set.Make(struct type r = t type t = r let compare = compare end)
+    let pp ppf l = Fmt.(Dump.list pp) ppf @@ elements l
+  end
 end
 
 module Status = struct
@@ -113,6 +115,7 @@ module type API = sig
   val status: token -> user:string -> repo:string -> commit:string ->
     Status.t list Lwt.t
   val set_status: token -> user:string -> repo:string -> Status.t -> unit Lwt.t
+  val set_pr: token -> user:string -> repo:string -> PR.t -> unit Lwt.t
   val prs: token -> user:string -> repo:string -> PR.t list Lwt.t
   val events: token -> user:string -> repo:string -> Event.t list Lwt.t
 end
@@ -689,13 +692,30 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       let root = Datakit_path.empty / user / repo in
       conv_read_statuses_opt ~root old.tree >>*= fun old_status ->
       conv_read_statuses_opt ~root t.tree   >>*= fun new_status ->
+      let old_status = Status.Set.of_list old_status in
+      let new_status = Status.Set.of_list new_status in
       (* status cannot be removed, so simply monitor updates in [new_status]. *)
-      let diff = Status.Set.(diff (of_list new_status) (of_list old_status)) in
-      Log.debug
-        (fun l -> l "call_github_api %s/%s: %a" user repo Status.Set.pp diff);
+      let diff = Status.Set.diff new_status old_status in
+      Log.debug (fun l ->
+          l "call_github_api %s/%s: @[old-status:%a@] @[new-status:%a@] @[status:%a@]" user repo
+            Status.Set.pp old_status
+            Status.Set.pp new_status
+            Status.Set.pp diff
+        );
       Lwt_list.iter_p
         (API.set_status token ~user ~repo)
         (Status.Set.elements diff)
+      >>= fun () ->
+      conv_read_prs_opt ~root old.tree >>*= fun old_prs ->
+      conv_read_prs_opt ~root t.tree   >>*= fun new_prs ->
+      let old_prs = PR.Set.of_list old_prs in
+      let new_prs = PR.Set.of_list new_prs in
+      (* only the PR titles can be changed at the moment *)
+      let diff = PR.Set.diff new_prs old_prs in
+      Log.debug (fun l ->
+          l "call_github_api %s/%s pr:%a" user repo PR.Set.pp diff
+        );
+      Lwt_list.iter_p (API.set_pr token ~user ~repo) (PR.Set.elements diff)
       >>= ok
     in
     let hooks = (* search for changes in subtrees. *)

@@ -18,6 +18,12 @@ module PR = struct
     title  = pr.pull_title;
   }
 
+  let to_gh pr = {
+    update_pull_title = Some pr.title;
+    update_pull_body  = None;
+    update_pull_state = Some pr.state;
+  }
+
   let of_event pr = {
     number = pr.pull_request_event_number;
     state  = pr.pull_request_event_pull_request.pull_state;
@@ -127,6 +133,12 @@ let set_status token ~user ~repo status =
   let new_status = Status.to_gh status in
   Github.Status.create ~token ~user ~repo ~sha:status.Status.commit
     ~status:new_status ()
+  |> run
+  >|= ignore
+
+let set_pr token ~user ~repo pr =
+  let new_pr = PR.to_gh pr in
+  Github.Pull.update ~token ~user ~repo ~num:pr.PR.number ~update_pull:new_pr ()
   |> run
   >|= ignore
 

@@ -83,8 +83,12 @@ module type API = sig
       attached to [commit]. *)
 
   val set_status: token -> user:string -> repo:string ->  Status.t -> unit Lwt.t
-  (** [status t ~user ~repo s] updates [Status.commit s]'s status with
+  (** [set_status t ~user ~repo s] updates [Status.commit s]'s status with
       [s]. *)
+
+  val set_pr: token -> user:string -> repo:string -> PR.t -> unit Lwt.t
+  (** [set_pr t ~user ~repo pr] updates the PR number [PR.number pr]
+      with [pr]. *)
 
   val prs: token -> user:string -> repo:string -> PR.t list Lwt.t
   (** [pr t ~user ~repo] is the list of open pull-requests for the

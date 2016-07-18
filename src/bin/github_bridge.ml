@@ -104,7 +104,7 @@ let start () sandbox listen_urls
     if listen_urls = [] then Lwt.return_unit
     else
       let root = VG.create token in
-      let make_root () = Vfs.Dir.of_list (fun () -> [root]) in
+      let make_root () = Vfs.Dir.of_list (fun () -> Vfs.ok [root]) in
       Lwt_list.iter_p
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls

@@ -66,26 +66,26 @@ module type API = sig
   type token
   (** The type for API tokens. *)
 
-  val user_exists: token -> user:string -> bool
+  val user_exists: token -> user:string -> bool Lwt.t
   (** [exist_user t ~user] is true iff [user] exists. *)
 
-  val repo_exists: token -> user:string -> repo:string -> bool
+  val repo_exists: token -> user:string -> repo:string -> bool Lwt.t
   (** [exists_repo t ~user ~repo] is true iff [user/repo] exists. *)
 
-  val repos: token -> user:string -> string list
+  val repos: token -> user:string -> string list Lwt.t
   (** [repos t ~user] is the list of repositories owned by user
       [user]. *)
 
   val status: token -> user:string -> repo:string -> commit:string ->
-    Status.t list
+    Status.t list Lwt.t
   (** [status t ~user ~repo ~commit] returns the list of status
       attached to [commit]. *)
 
-  val set_status: token -> user:string -> repo:string ->  Status.t -> unit
+  val set_status: token -> user:string -> repo:string ->  Status.t -> unit Lwt.t
   (** [status t ~user ~repo s] updates [Status.commit s]'s status with
       [s]. *)
 
-  val prs: token -> user:string -> repo:string -> PR.t list
+  val prs: token -> user:string -> repo:string -> PR.t list Lwt.t
   (** [pr t ~user ~repo] is the list of open pull-requests for the
       repo [user/repo]. *)
 

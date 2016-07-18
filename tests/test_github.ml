@@ -11,22 +11,26 @@ module API = struct
     mutable prs   : PR.t list;
     mutable events: Event.t list;
     mutable count_events: int;
+    mutable count_status: int;
+    mutable count_prs   : int;
   }
 
   type token = state
 
-  let user_exists t ~user = user = t.user
-  let repo_exists t ~user ~repo = user = t.user && repo = t.repo
-  let repos t ~user = if not (t.user = user) then [] else [t.repo]
+  let user_exists t ~user = user = t.user |> Lwt.return
+  let repo_exists t ~user ~repo = (user = t.user && repo = t.repo) |> Lwt.return
+  let repos t ~user =
+    if not (t.user = user) then Lwt.return_nil else Lwt.return [t.repo]
 
   let status t ~user ~repo ~commit =
-    if not (t.user = user && t.repo = repo) then []
+    t.count_status <- t.count_status + 1;
+    if not (t.user = user && t.repo = repo) then Lwt.return_nil
     else
-      try List.assoc commit t.status
-      with Not_found -> []
+      try Lwt.return (List.assoc commit t.status)
+      with Not_found -> Lwt.return_nil
 
   let set_status t ~user ~repo s =
-    if not (t.user = user && t.repo = repo) then ()
+    if not (t.user = user && t.repo = repo) then Lwt.return_unit
     else
       let commit = s.Status.commit in
       let keep (c, _) = c <> commit in
@@ -40,11 +44,13 @@ module API = struct
           []
       in
       let status = (commit, s :: rest) :: status in
-      t.status <- status
+      t.status <- status;
+      Lwt.return_unit
 
   let prs t ~user ~repo =
-    if not (t.user = user && t.repo = repo) then []
-    else t.prs
+    t.count_prs <- t.count_prs + 1;
+    if not (t.user = user && t.repo = repo) then Lwt.return_nil
+    else Lwt.return t.prs
 
   let events t ~user ~repo =
     t.count_events <- t.count_events + 1;
@@ -110,6 +116,8 @@ let events1 = [
   Event.Status s4;
 ]
 
+let status0 = [s1; s2; s3; s4]
+
 let status_state: Status_state.t Alcotest.testable =
   (module struct include Status_state let equal = (=) end)
 
@@ -118,8 +126,18 @@ let repo = "test"
 let pub = "test-pub"
 let priv = "test-priv"
 
-let init events =
-  { API.user; repo; status = []; prs = []; events; count_events = 0 }
+let init status events =
+  let tbl = Hashtbl.create (List.length status) in
+  List.iter (fun s ->
+      let v =
+        try Hashtbl.find tbl s.Status.commit
+        with Not_found -> []
+      in
+      Hashtbl.replace tbl s.Status.commit (s :: v)
+    ) status;
+  let status = Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl [] in
+  { API.user; repo; status; prs = []; events;
+    count_events = 0; count_prs = 0; count_status = 0 }
 
 let run f () =
   Test_utils.run (fun _repo conn ->
@@ -188,15 +206,21 @@ let test_events dk =
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
-  let t = init events0 in
+  let t = init status0 events0 in
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub  ->
   Alcotest.(check int) "API.event: 0" 0 t.API.count_events;
+  Alcotest.(check int) "API.status: 0" 0 t.API.count_status;
+  Alcotest.(check int) "API.prs: 0" 0 t.API.count_prs;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check int) "API.event: 1" 1 t.API.count_events;
+  Alcotest.(check int) "API.status: 1" 1 t.API.count_status;
+  Alcotest.(check int) "API.prs: 1" 0 t.API.count_prs;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
   Alcotest.(check int) "API.event: 2" 1 t.API.count_events;
+  Alcotest.(check int) "API.status: 2" 1 t.API.count_status;
+  Alcotest.(check int) "API.prs: 2" 0 t.API.count_prs;
   expect_head priv >>*= fun head ->
   check (DK.Commit.tree head) >>= fun () ->
   expect_head pub >>*= fun head ->
@@ -206,14 +230,18 @@ let test_updates dk =
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
-  let t = init events1 in
+  let t = init status0 events1 in
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
-  Alcotest.(check int) "API.event: 0" t.API.count_events 0;
+  Alcotest.(check int) "API.event: 0" 0 t.API.count_events;
+  Alcotest.(check int) "API.status: 0" 0 t.API.count_status;
+  Alcotest.(check int) "API.prs: 0" 0 t.API.count_prs;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  Alcotest.(check int) "API.event: 1" t.API.count_events 1;
+  Alcotest.(check int) "API.event: 1" 1 t.API.count_events;
+  Alcotest.(check int) "API.status: 1" 2 t.API.count_status;
+  Alcotest.(check int) "API.prs: 1" 0 t.API.count_prs;
   expect_head priv >>*= fun head ->
   let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
   DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
@@ -226,7 +254,9 @@ let test_updates dk =
       DK.Transaction.commit tr ~message:"Test"
     ) >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
-  Alcotest.(check int) "API.event: 2" t.API.count_events 1;
+  Alcotest.(check int) "API.event: 2" 1 t.API.count_events;
+  Alcotest.(check int) "API.status: 2" 2 t.API.count_status;
+  Alcotest.(check int) "API.prs: 2" 0 t.API.count_prs;
   let s =
     try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
     with Not_found -> Alcotest.fail "foo not found"

@@ -170,7 +170,7 @@ let private_branch =
                    and webhook) is be mirrored."
       ["x"; "branch-x"]
   in
-  Arg.(value & opt string "github-metadata-events" doc)
+  Arg.(value & opt string "github-metadata-x" doc)
 
 let public_branch =
   let doc =

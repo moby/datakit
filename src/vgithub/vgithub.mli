@@ -24,6 +24,7 @@ module PR: sig
     number: int;
     state: [`Open | `Closed];
     head: string; (* SHA1 *)
+    title: string;
   }
 
   val pp: t Fmt.t

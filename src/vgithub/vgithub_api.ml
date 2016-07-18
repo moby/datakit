@@ -15,12 +15,14 @@ module PR = struct
     number = pr.pull_number;
     state  = pr.pull_state;
     head   = pr.pull_head.branch_sha;
+    title  = pr.pull_title;
   }
 
   let of_event pr = {
     number = pr.pull_request_event_number;
     state  = pr.pull_request_event_pull_request.pull_state;
     head   = pr.pull_request_event_pull_request.pull_head.branch_sha;
+    title  = pr.pull_request_event_pull_request.pull_title;
   }
 
 end

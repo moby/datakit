@@ -98,9 +98,9 @@ let s4 = {
 }
 
 let events0 = [
-  Event.PR { PR.number = 1; state = `Open  ; head = "foo" };
-  Event.PR { PR.number = 1; state = `Closed; head = "foo" };
-  Event.PR { PR.number = 2; state = `Open  ; head = "bar" };
+  Event.PR { PR.number = 1; state = `Open  ; head = "foo"; title = "";  };
+  Event.PR { PR.number = 1; state = `Closed; head = "foo"; title = "foo"; };
+  Event.PR { PR.number = 2; state = `Open  ; head = "bar"; title = "bar"; };
   Event.Status s1;
   Event.Status s2;
   Event.Status s3;
@@ -108,8 +108,8 @@ let events0 = [
 ]
 
 let events1 = [
-  Event.PR { PR.number = 1; state = `Open  ; head = "foo" };
-  Event.PR { PR.number = 2; state = `Open  ; head = "bar" };
+  Event.PR { PR.number = 1; state = `Open  ; head = "foo"; title = "" };
+  Event.PR { PR.number = 2; state = `Open  ; head = "bar"; title = "toto" };
   Event.Status s1;
   Event.Status s2;
   Event.Status s3;
@@ -194,7 +194,7 @@ let check tree =
   DK.Tree.read_dir tree pr >>*= fun dirs ->
   check_dirs "pr 1" ["2"] dirs ;
   DK.Tree.read_dir tree (pr / "2") >>*= fun dirs ->
-  check_dirs "pr 2" dirs ["state"; "head"];
+  check_dirs "pr 2" dirs ["state"; "head"; "title"];
   DK.Tree.read_file tree (pr / "2" / "state") >>*= fun data ->
   check_data "state" "open\n" data;
   DK.Tree.read_file tree (pr / "2" / "head") >>*= fun data ->

@@ -33,6 +33,7 @@ module PR = struct
     number: int;
     state: [`Open | `Closed];
     head: string; (* SHA1 *)
+    title: string;
   }
 
   let string_of_state = function
@@ -420,8 +421,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         DK.Transaction.make_dirs t dir >>*= fun () ->
         let head = Cstruct.of_string (pr.PR.head ^ "\n")in
         let state = Cstruct.of_string (PR.string_of_state pr.PR.state ^ "\n") in
+        let title = Cstruct.of_string (pr.PR.title ^ "\n") in
         DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
-        DK.Transaction.create_or_replace_file t ~dir "state" state
+        DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
+        DK.Transaction.create_or_replace_file t ~dir "title" title
 
     module type TREE = Datakit_S.READABLE_TREE with
       type 'a or_error := 'a DK.or_error
@@ -431,6 +434,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
       Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
       Tree.exists_file t (dir / "state") >>*= fun exists_state ->
+      Tree.exists_file t (dir / "title") >>*= fun exists_title ->
       if not exists_head then
         Log.err (fun l -> l "pr/%d/head does not exist" number);
       if not exists_state then
@@ -439,12 +443,16 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       else (
         Tree.read_file t (dir / "head") >>*= fun head ->
         Tree.read_file t (dir / "state") >>*= fun state ->
+        (if not exists_title then ok (Cstruct.of_string "")
+         else Tree.read_file t (dir / "title"))
+        >>*= fun title ->
         let parse s = String.trim (Cstruct.to_string s) in
         let state = parse state in
         let head = parse head in
+        let title = parse title in
         match PR.state_of_string state with
         | None       -> error "%s is not a valid PR state" state
-        | Some state -> ok (Some { PR.number; state; head })
+        | Some state -> ok (Some { PR.number; state; head; title })
       )
 
     let read_prs (type t) (module Tree: TREE with type t = t) ~root t =

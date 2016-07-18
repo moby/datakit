@@ -381,18 +381,27 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let ok x = Lwt.return (Ok x)
   let error fmt = Fmt.kstrf (fun str -> DK.error "%s" str) fmt
 
-  let list_iter f l =
-    List.fold_left (fun acc x ->
-        acc >>*= fun () ->
-        f x
-      ) (ok ()) l
+  let list_iter_p f l =
+    Lwt_list.map_p f l >|= fun l ->
+    List.fold_left (fun acc x -> match acc, x with
+        | Ok (), Ok ()            -> Ok ()
+        | Error e, _ | _, Error e -> Error e
+      ) (Ok ()) (List.rev l)
 
-  let list_map f l =
-    List.fold_left (fun acc x ->
-        acc >>*= fun acc ->
-        f x >>*= fun y   ->
-        ok (y :: acc)
-      ) (ok []) (List.rev l)
+  let list_iter_s f l =
+    Lwt_list.map_s f l >|= fun l ->
+    List.fold_left (fun acc x -> match acc, x with
+        | Ok (), Ok ()            -> Ok ()
+        | Error e, _ | _, Error e -> Error e
+      ) (Ok ()) (List.rev l)
+
+  let list_map_p f l =
+    Lwt_list.map_p f l >|= fun l ->
+    List.fold_left (fun acc x -> match acc, x with
+        | Ok acc, Ok x            -> Ok (x :: acc)
+        | Error e, _ | _, Error e -> Error e
+      ) (Ok []) (List.rev l)
+
 
   module Conv = struct
 
@@ -445,7 +454,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       if not exists then ok []
       else
         Tree.read_dir t dir >>*=
-        list_map (fun num -> read_pr (module Tree) ~root t (int_of_string num))
+        list_map_p (fun num -> read_pr (module Tree) ~root t (int_of_string num))
         >>*= fun l ->
         List.fold_left
           (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
@@ -466,7 +475,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         "state"      , Some (Status_state.to_string s.Status.state);
         "target_url" , s.Status.url;
       ] in
-      list_iter (fun (k, v) -> match v with
+      list_iter_p (fun (k, v) -> match v with
           | None   ->
             DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
             if not exists then ok () else DK.Transaction.remove t (dir / k)
@@ -504,7 +513,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       if not exists then ok []
       else
         DK.Tree.read_dir t dir >>*=
-        list_map (fun commit ->
+        list_map_p (fun commit ->
             let dir = dir / commit / "status" in
             let rec aux context =
               Log.debug
@@ -514,7 +523,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
               if not exists then ok []
               else
                 DK.Tree.read_dir t dir >>*= fun child ->
-                list_map (fun c -> aux (context @ [c])) child >>*= fun child ->
+                list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
                 let child = List.flatten child in
                 DK.Tree.exists_file t (dir / "state") >>*= fun exists ->
                 if exists then read_status ~root t ~commit ~context >>*= fun s ->
@@ -612,20 +621,22 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "sync_datakit %s/%s" user repo);
     let root = Datakit_path.empty / user / repo in
     API.events token ~user ~repo >>= fun events ->
-    list_iter (function
+    list_iter_s (function
         | Event.PR pr    -> Conv.update_pr ~root tr pr
         | Event.Status s -> Conv.update_status ~root tr s
         | _               -> ok ()
       ) events >>*= fun () ->
     (* NOTE: it seems that GitHub doesn't store status events so we
        need to do load them ourself ... *)
-    DK.Transaction.remove tr (root / "commit")     >>*= fun () ->
+    DK.Transaction.exists_dir tr (root / "commit") >>*= fun exists_c ->
+    (if not exists_c then ok () else DK.Transaction.remove tr (root / "commit"))
+    >>*= fun () ->
     Conv.read_prs (module DK.Transaction) ~root tr >>*= fun prs ->
-    list_iter (fun pr ->
+    list_iter_p (fun pr ->
         if pr.PR.state = `Closed then ok ()
         else (
           API.status token ~user ~repo ~commit:pr.PR.head >>= fun s ->
-          list_iter (Conv.update_status ~root tr) s
+          list_iter_p (Conv.update_status ~root tr) s
         )
       ) prs
 
@@ -638,16 +649,19 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "import_github_events %a" UserRepoSet.pp diff);
     if UserRepoSet.is_empty diff then ok ()
     else DK.Branch.with_transaction branch (fun tr ->
-        Lwt_list.iter_p (fun { user; repo; _ } ->
+        list_iter_p (fun { user; repo; _ } ->
             sync_datakit token ~user ~repo tr >>= function
-            | Ok ()   -> Lwt.return_unit
+            | Ok ()   -> ok ()
             | Error e ->
-              Fmt.strf "Error while syncing %s/%s: %a" user repo DK.pp_error e
-              |> Lwt.fail_with
+              error "Error while syncing %s/%s: %a" user repo DK.pp_error e
           ) (UserRepoSet.elements diff)
-        >>= fun () ->
-        let message = Fmt.strf "Syncing with events %a" UserRepoSet.pp diff in
-        DK.Transaction.commit tr ~message
+        >>= function
+        | Ok () ->
+          let message = Fmt.strf "Syncing with events %a" UserRepoSet.pp diff in
+          DK.Transaction.commit tr ~message
+        | Error e ->
+          DK.Transaction.abort tr >>= fun () ->
+          error "%a" DK.pp_error e
       )
 
   let conv_read_statuses_opt ~root = function
@@ -681,7 +695,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       |> UserRepoSet.of_list
       |> UserRepoSet.elements
     in
-    list_iter aux hooks
+    list_iter_p aux hooks
 
   let prune t branch =
     let aux { user; repo; _ } =
@@ -713,11 +727,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Log.debug (fun l -> l "closed_commits:%a" String.Set.dump closed_commits);
       if String.Set.is_empty closed_commits && closed_prs = [] then ok ()
       else DK.Branch.with_transaction branch (fun tr ->
-          list_iter (fun pr ->
+          list_iter_p (fun pr ->
               DK.Transaction.remove tr (root / "pr" / string_of_int pr.PR.number)
             ) closed_prs
           >>*= fun () ->
-          list_iter (fun commit ->
+          list_iter_p (fun commit ->
               DK.Transaction.remove tr (root / "commit" / commit)
             ) (String.Set.elements closed_commits)
           >>= function
@@ -728,7 +742,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
-    list_iter aux (UserRepoSet.elements t.user_repos)
+    list_iter_p aux (UserRepoSet.elements t.user_repos)
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function

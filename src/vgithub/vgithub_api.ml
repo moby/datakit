@@ -5,7 +5,7 @@ open Github_t
 
 type token = Github.Token.t
 
-let run x = Lwt_main.run (Github.Monad.run x)
+let run x = Github.Monad.run x
 
 module PR = struct
 
@@ -15,12 +15,20 @@ module PR = struct
     number = pr.pull_number;
     state  = pr.pull_state;
     head   = pr.pull_head.branch_sha;
+    title  = pr.pull_title;
+  }
+
+  let to_gh pr = {
+    update_pull_title = Some pr.title;
+    update_pull_body  = None;
+    update_pull_state = Some pr.state;
   }
 
   let of_event pr = {
     number = pr.pull_request_event_number;
     state  = pr.pull_request_event_pull_request.pull_state;
     head   = pr.pull_request_event_pull_request.pull_head.branch_sha;
+    title  = pr.pull_request_event_pull_request.pull_title;
   }
 
 end
@@ -81,27 +89,29 @@ module Event = struct
 
 end
 
+open Lwt.Infix
+
 let user_exists token ~user =
   try
     Github.User.info ~token ~user ()
     |> run
-    |> fun _ -> true
+    >|= fun _ -> true
   with Github.Message _ ->
-    false
+    Lwt.return_false
 
 let repo_exists token ~user ~repo =
   try
     Github.Repo.info ~token ~user ~repo ()
     |> run
-    |> fun _ -> true
+    >|= fun _ -> true
   with Github.Message _ ->
-    false
+    Lwt.return_false
 
 let repos token ~user =
   Github.User.repositories ~token ~user ()
   |> Github.Stream.to_list
   |> run
-  |> List.map (fun r -> r.repository_name)
+  >|= List.map (fun r -> r.repository_name)
 
 let list_dedup f l =
   let tbl = Hashtbl.create (List.length l) in
@@ -116,7 +126,7 @@ let status token ~user ~repo ~commit =
   Github.Status.for_ref ~token ~user ~repo ~git_ref:commit ()
   |> Github.Stream.to_list
   |> run
-  |> list_dedup (fun s -> s.status_context)
+  >|= fun l -> list_dedup (fun s -> s.status_context) l
   |> List.map (Status.of_gh commit)
 
 let set_status token ~user ~repo status =
@@ -124,16 +134,22 @@ let set_status token ~user ~repo status =
   Github.Status.create ~token ~user ~repo ~sha:status.Status.commit
     ~status:new_status ()
   |> run
-  |> ignore
+  >|= ignore
+
+let set_pr token ~user ~repo pr =
+  let new_pr = PR.to_gh pr in
+  Github.Pull.update ~token ~user ~repo ~num:pr.PR.number ~update_pull:new_pr ()
+  |> run
+  >|= ignore
 
 let prs token ~user ~repo =
   Github.Pull.for_repo ~token ~state:`Open ~user ~repo ()
   |> Github.Stream.to_list
   |> run
-  |> List.map PR.of_gh
+  >|= List.map PR.of_gh
 
 let events token ~user ~repo =
   let open Lwt.Infix in
   let events = Github.Event.for_repo ~token ~user ~repo () in
   Github.Monad.run @@ Github.Stream.to_list events >>= fun events ->
-  Lwt_list.map_p (fun e -> Lwt.return (Event.of_gh e)) events
+  Lwt_list.rev_map_p (fun e -> Lwt.return (Event.of_gh e)) events

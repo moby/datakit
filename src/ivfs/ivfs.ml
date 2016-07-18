@@ -790,7 +790,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   let snapshot_dir store name =
     let store = store "ro" in
-    let dirs = [
+    let dirs = Vfs.ok [
       read_only ~name:"ro"     store;
       Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
       Vfs.Inode.file "msg"     (msg_file store name);
@@ -821,7 +821,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     Vfs.Dir.read_only ~ls ~lookup ~remove
 
   let create make_task repo =
-    let dirs = [
+    let dirs = Vfs.ok [
       Vfs.Inode.dir "branch"     (branch_dir make_task repo);
       Vfs.Inode.dir "trees"      (trees_dir make_task repo);
       Vfs.Inode.dir "snapshots"  (snapshots_dir make_task repo);

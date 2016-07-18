@@ -55,7 +55,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let head_file, update_head = mk_head session in
     let t = { remote_url; update_head } in
     let fetch_file = mk_fetch t make_task repo in
-    let files = [
+    let files = Vfs.ok [
       Vfs.Inode.file "url" url_file;
       Vfs.Inode.file "head" head_file;
       Vfs.Inode.file "fetch" fetch_file;

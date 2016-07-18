@@ -237,7 +237,7 @@ module rec Dir: sig
   val empty: t
   (** [empty] is the empty directory. *)
 
-  val of_list: (unit -> Inode.t list) -> t
+  val of_list: (unit -> Inode.t list or_err) -> t
   (** [of_list l] is a read-only, static directory containing only the
       inodes [l]. The sub-directories are re-evaluated on every [ls]
       and [read]. *)

@@ -24,6 +24,7 @@ module PR: sig
     number: int;
     state: [`Open | `Closed];
     head: string; (* SHA1 *)
+    title: string;
   }
 
   val pp: t Fmt.t
@@ -66,26 +67,30 @@ module type API = sig
   type token
   (** The type for API tokens. *)
 
-  val user_exists: token -> user:string -> bool
+  val user_exists: token -> user:string -> bool Lwt.t
   (** [exist_user t ~user] is true iff [user] exists. *)
 
-  val repo_exists: token -> user:string -> repo:string -> bool
+  val repo_exists: token -> user:string -> repo:string -> bool Lwt.t
   (** [exists_repo t ~user ~repo] is true iff [user/repo] exists. *)
 
-  val repos: token -> user:string -> string list
+  val repos: token -> user:string -> string list Lwt.t
   (** [repos t ~user] is the list of repositories owned by user
       [user]. *)
 
   val status: token -> user:string -> repo:string -> commit:string ->
-    Status.t list
+    Status.t list Lwt.t
   (** [status t ~user ~repo ~commit] returns the list of status
       attached to [commit]. *)
 
-  val set_status: token -> user:string -> repo:string ->  Status.t -> unit
-  (** [status t ~user ~repo s] updates [Status.commit s]'s status with
+  val set_status: token -> user:string -> repo:string ->  Status.t -> unit Lwt.t
+  (** [set_status t ~user ~repo s] updates [Status.commit s]'s status with
       [s]. *)
 
-  val prs: token -> user:string -> repo:string -> PR.t list
+  val set_pr: token -> user:string -> repo:string -> PR.t -> unit Lwt.t
+  (** [set_pr t ~user ~repo pr] updates the PR number [PR.number pr]
+      with [pr]. *)
+
+  val prs: token -> user:string -> repo:string -> PR.t list Lwt.t
   (** [pr t ~user ~repo] is the list of open pull-requests for the
       repo [user/repo]. *)
 
@@ -112,11 +117,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   val empty: t
   (** Create an empty sync state. *)
 
-  val sync: ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] ->
-    t -> DK.Branch.t -> writes:DK.Branch.t -> API.token -> t Lwt.t
-  (** [sync t b ~writes tok] mirror GitHub changes in the DataKit
-      branch [b] and translate change requests from the branch
-      [writes] into GitHub API calls. It connects to the GitHub API
-      using the token [tok]. The default [policy] is [`Repeat]. *)
+  val sync:
+    ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] ->
+    pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
+    t -> t Lwt.t
+(** [sync t ~pub ~priv ~token] mirror GitHub changes in the DataKit
+    public branch [pub]. It uses the private branch [priv] to store
+    the received wehook event states. It connects to the GitHub API
+    using the token [tok]. The default [policy] is [`Repeat]. *)
 
 end

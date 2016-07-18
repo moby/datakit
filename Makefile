@@ -21,7 +21,7 @@ test:
 bundle:
 	opam remove tls ssl -y
 	$(MAKE) clean
-	ocaml pkg/pkg.ml build --tests false --with-github false
+	ocaml pkg/pkg.ml build --tests false --with-github false --pinned true
 	mkdir -p $(APP)/Contents/MacOS/
 	mkdir -p $(APP)/Contents/Resources/lib/
 	cp _build/src/bin/main.native $(APP)/Contents/MacOS/com.docker.db
@@ -39,7 +39,7 @@ COMMIT:
 exe:
 	opam remove tls ssl -y
 	$(MAKE) clean
-	ocaml pkg/pkg.ml build --tests false --with-github false
+	ocaml pkg/pkg.ml build --tests false --with-github false --pinned true
 	mkdir -p $(EXE)
 	cp _build/src/bin/main.native $(EXE)/datakit.exe
 	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)

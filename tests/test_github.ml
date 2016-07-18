@@ -283,11 +283,9 @@ let test_updates dk =
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 2"
     { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
-  update_status priv dir >>*= fun () -> (* simulated webhook event *)
-  (* FIXME: this should not trigger an API.set_status call *)
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 3"
-    { Counter.events = 1; status = 2; set_pr = 0; set_status = 2 } t.API.ctx;
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
   let status =
     try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
     with Not_found -> Alcotest.fail "foo not found"
@@ -306,7 +304,7 @@ let test_updates dk =
     ) >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 4"
-    { Counter.events = 1; status = 2; set_pr = 1; set_status = 2 } t.API.ctx;
+    { Counter.events = 1; status = 2; set_pr = 1; set_status = 1 } t.API.ctx;
   let pr =
     try List.find (fun pr -> pr.PR.number = 2) t.API.prs
     with Not_found -> Alcotest.fail "foo not found"

@@ -838,10 +838,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
               github_calls t pub_c))
       >>*= fun () ->
       with_head priv prune >>*= fun () ->
-      with_head priv (fun priv_c ->
-          merge priv_c >>*= fun () ->
-          of_commit priv_c
-        )
+      with_head priv merge >>*= fun () ->
+      with_head pub of_commit
     in
     let run () =
       once t >>*= fun t ->

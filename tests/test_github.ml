@@ -45,7 +45,6 @@ module API = struct
       with Not_found -> Lwt.return_nil
 
   let set_status t ~user ~repo s =
-    Printf.eprintf "XXX\n%!";
     t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
     if not (t.user = user && t.repo = repo) then Lwt.return_unit
     else
@@ -239,6 +238,11 @@ let test_events dk =
   DK.branch dk pub  >>*= fun pub  ->
   Alcotest.(check counter) "counter: 0"
     { Counter.events = 0; status = 0; set_pr = 0; set_status = 0 } t.API.ctx;
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 1"
     { Counter.events = 1; status = 1; set_pr = 0; set_status = 0 } t.API.ctx;

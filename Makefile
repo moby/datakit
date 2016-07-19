@@ -2,7 +2,6 @@ GITHUB=$(shell opam config var github:installed)
 APP=Datakit.app
 EXE=Datakit
 
-COMMIT_ID=$(shell git rev-parse HEAD)
 TESTS = true
 
 .PHONY: all clean test bundle COMMIT exe
@@ -32,9 +31,8 @@ bundle:
 	 -p @executable_path/../Resources/lib
 	cp $(APP)/Contents/MacOS/com.docker.db .
 
-
 COMMIT:
-	@echo $(COMMIT_ID) > COMMIT
+	@git rev-parse HEAD > COMMIT
 
 exe:
 	opam remove tls ssl -y

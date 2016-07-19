@@ -34,7 +34,7 @@ func (h *Server) PRDir(e github.PullRequestEvent) ([]string, error) {
 	repo := *e.Repo.Name
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	prDir := []string{user, repo, "prs", strconv.Itoa(*n)}
+	prDir := []string{user, repo, "pr", strconv.Itoa(*n)}
 	return prDir, nil
 }
 
@@ -82,6 +82,11 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 			return fmt.Errorf("PR %d has an invalid head", *e.Number)
 		}
 		tr.Write(ctx, append(dir, "head"), *head)
+		tr.Write(ctx, append(dir, "state"), "open")
+		title := e.PullRequest.Title
+		if title != nil {
+			tr.Write(ctx, append(dir, "title"), *title)
+		}
 	}
 
 	// commit the changes to the hook's branch
@@ -112,7 +117,7 @@ func (h *Server) CommitDir(e github.StatusEvent) ([]string, error) {
 	sha := *e.SHA
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	commitDir := []string{user, repo, "commits", sha}
+	commitDir := []string{user, repo, "commit", "status", sha}
 	return commitDir, nil
 }
 

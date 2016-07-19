@@ -34,7 +34,7 @@ depends: [
   "conduit" "mirage-flow"
   "named-pipe"
   "hvsock"      {=  "0.7"}
-  "protocol-9p" {>= "0.5.0"}
+  "protocol-9p" {>= "0.7.0"}
   "logs"        {>= "0.5.0"}
   "win-eventlog"
   "asl"         {>= "0.10"}

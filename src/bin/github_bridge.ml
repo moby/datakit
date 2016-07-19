@@ -42,7 +42,12 @@ let token () =
 let parse_address address =
   match String.cut ~sep:":" address with
   | Some (proto, address) -> proto, address
-  | _ -> address, "5640"
+  | _                     -> failwith "Wrong address, use proto:address"
+
+let parse_host host =
+  match String.cut ~rev:true ~sep:":" host with
+  | Some (host, port) -> host, port
+  | _                 -> host, "5640"
 
 let set_signal_if_supported signal handler =
   try
@@ -86,7 +91,7 @@ let start () sandbox listen_urls
   in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
-    Log.info (fun l -> l "Connecting to %s (%s, %s)" datakit proto address);
+    Log.info (fun l -> l "Connecting to %s." datakit);
     (Lwt.catch
        (fun () -> Client9p.connect proto address ())
        (fun _ -> Lwt.fail_with
@@ -123,10 +128,12 @@ let start () sandbox listen_urls
         | None   -> ""
         | Some s -> Fmt.strf " -s %s" s
       in
+      let _, address = parse_address datakit in
+      let host, port = parse_host address in
       exec ~name:"datakit-gh-hooks"
         (Lwt_process.shell @@
-         Fmt.strf "%s%s -v -l :%d -b %s -a %s"
-           gh_hooks secret webhook_port private_branch datakit)
+         Fmt.strf "%s%s -v -l :%d -b %s -a [%s]:%s"
+           gh_hooks secret webhook_port private_branch host port)
   in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();

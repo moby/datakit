@@ -69,8 +69,8 @@ true: \
 ### because of src/log
 
 <src/bin/{main,github_bridge}.*>: \
-  package(asl), package(win-eventlog), package(mtime.os), package(logs.cli)
-
+  package(asl), package(win-eventlog), package(mtime.os), package(logs.cli), \
+  package(lwt.unix)
 
 ### Tests
 

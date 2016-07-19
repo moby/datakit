@@ -36,6 +36,8 @@ module PR = struct
     title: string;
   }
 
+  let compare = Pervasives.compare
+
   let string_of_state = function
     | `Open   -> "open"
     | `Closed -> "closed"
@@ -53,10 +55,6 @@ module PR = struct
     Fmt.pf ppf "[number: %d, state: %a, head: %s]"
       t.number pp_state t.state t.head
 
-  module Set = struct
-    include Set.Make(struct type r = t type t = r let compare = compare end)
-    let pp ppf l = Fmt.(Dump.list pp) ppf @@ elements l
-  end
 end
 
 module Status = struct
@@ -69,6 +67,8 @@ module Status = struct
     commit: string;
   }
 
+  let compare = Pervasives.compare
+
   let pp ppf t =
     let pp_opt k ppf v = match v with
       | None   -> ()
@@ -80,12 +80,6 @@ module Status = struct
       (pp_opt "url") t.url
       (pp_opt "description") t.description
       Status_state.pp t.state
-
-  module Set = struct
-    include Set.Make(struct type r = t type t = r let compare = compare end)
-    let of_list = List.fold_left (fun s e -> add e s) empty
-    let pp ppf s = Fmt.(Dump.list pp) ppf (elements s)
-  end
 
   let path t = match t.context with
     | None   -> ["default"]
@@ -406,6 +400,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         | Error e, _ | _, Error e -> Error e
       ) (Ok []) (List.rev l)
 
+  module type TREE = Datakit_S.READABLE_TREE with
+    type 'a or_error := 'a DK.or_error
+
+  type tree = E: (module TREE with type t = 'a) * 'a -> tree
 
   module Conv = struct
 
@@ -429,10 +427,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
         DK.Transaction.create_or_replace_file t ~dir "title" title
 
-    module type TREE = Datakit_S.READABLE_TREE with
-      type 'a or_error := 'a DK.or_error
-
-    let read_pr (type t) (module Tree: TREE with type t = t) ~root t number =
+    let read_pr ~root (E ((module Tree), t)) number =
       let dir = root / "pr" / string_of_int number in
       Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
       Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
@@ -458,14 +453,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         | Some state -> ok (Some { PR.number; state; head; title })
       )
 
-    let read_prs (type t) (module Tree: TREE with type t = t) ~root t =
+    let read_prs ~root tree =
+      let E ((module Tree), t) = tree in
       let dir = root / "pr"  in
       Log.debug (fun l -> l "read_prs %s" @@ Datakit_path.to_hum dir);
       Tree.exists_dir t dir >>*= fun exists ->
       if not exists then ok []
       else
         Tree.read_dir t dir >>*=
-        list_map_p (fun num -> read_pr (module Tree) ~root t (int_of_string num))
+        list_map_p (fun num -> read_pr ~root tree (int_of_string num))
         >>*= fun l ->
         List.fold_left
           (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
@@ -495,20 +491,20 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             DK.Transaction.create_or_replace_file t ~dir k v
         ) kvs
 
-    let read_status ~root t ~commit ~context =
+    let read_status ~root (E ((module Tree), t)) ~commit ~context =
       let context_path = Datakit_path.of_steps_exn context in
       let dir = root / "commit" / commit / "status" /@ context_path in
       Log.debug (fun l -> l "read_status %a" Datakit_path.pp dir);
-      DK.Tree.read_file t (dir / "state") >>*= fun state ->
+      Tree.read_file t (dir / "state") >>*= fun state ->
       match Status_state.of_string (String.trim (Cstruct.to_string state)) with
       | None       -> error "%s: invalid state" @@ Cstruct.to_string state
       | Some state ->
         let read file =
           let some s = match String.trim s with "" -> None | s -> Some s in
-          DK.Tree.exists_file t file >>*= function
+          Tree.exists_file t file >>*= function
           | false -> ok None
           | true  ->
-            DK.Tree.read_file t file >>*= fun d ->
+            Tree.read_file t file >>*= fun d ->
             ok (some @@ Cstruct.to_string d)
         in
         read (dir / "description") >>*= fun description ->
@@ -516,28 +512,30 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         let context = Some (Datakit_path.to_hum context_path) in
         ok { Status.state; commit; context; description; url; }
 
-    let read_statuses ~root t =
+    let read_statuses ~root tree =
+      let E ((module Tree), t) = tree in
       Log.debug (fun l -> l "read_statuses");
       let dir = root / "commit" in
       Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
-      DK.Tree.exists_dir t dir >>*= fun exists ->
+      Tree.exists_dir t dir >>*= fun exists ->
       if not exists then ok []
       else
-        DK.Tree.read_dir t dir >>*=
+        Tree.read_dir t dir >>*=
         list_map_p (fun commit ->
             let dir = dir / commit / "status" in
             let rec aux context =
               Log.debug
                 (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
               let dir = dir /@ Datakit_path.of_steps_exn context in
-              DK.Tree.exists_dir t dir >>*= fun exists ->
+              Tree.exists_dir t dir >>*= fun exists ->
               if not exists then ok []
               else
-                DK.Tree.read_dir t dir >>*= fun child ->
+                Tree.read_dir t dir >>*= fun child ->
                 list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
                 let child = List.flatten child in
-                DK.Tree.exists_file t (dir / "state") >>*= fun exists ->
-                if exists then read_status ~root t ~commit ~context >>*= fun s ->
+                Tree.exists_file t (dir / "state") >>*= fun exists ->
+                if exists then
+                  read_status ~root tree ~commit ~context >>*= fun s ->
                   ok (s :: child)
                 else
                   ok child
@@ -549,82 +547,120 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   end
 
-  (* FIXME: should be simply DK.Tree.t and/or a Tree ID so that it
-     should be much more efficient to compare. *)
-  type files = Cstruct.t Datakit_path.Map.t
-
-  let compare_files = Datakit_path.Map.compare Cstruct.compare
-
-  let read_files tree root =
-    let rec aux acc path =
-      DK.Tree.read_dir tree path >>*= fun dirs ->
-      List.fold_left (fun acc dir ->
-          acc >>*= fun acc ->
-          let k = path / dir in
-          DK.Tree.exists_dir tree k >>*= fun is_dir ->
-          if is_dir then aux acc k >>*= ok
-          else
-            DK.Tree.read_file tree k >>*= fun v ->
-            ok (Datakit_path.Map.add k v acc)
-        ) (ok acc) dirs
-    in
-    aux Datakit_path.Map.empty root
-
-  type hook = {
+  type 'a user_repo = {
     user: string;
     repo: string;
-    files: files;                              (* the files under /user/repo/ *)
+    data: 'a;
   }
 
-  let pp_hook ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
+  let pp_user_repo pp_a ppf t =
+    Fmt.pf ppf "@[%s/%s: %a@]" t.user t.repo pp_a t.data
 
-  let compare_user_repo x y = compare (x.user, x.repo) (y.user, y.repo)
-
-  module UserRepoSet = struct (* discard tree *)
-    include Set.Make(struct type t = hook let compare = compare_user_repo end)
-    let sdiff x y = union (diff x y) (diff y x)
-    let pp ppf t = Fmt.(list pp_hook) ppf (elements t)
-  end
-
-  let compare_hook x y =
-    match compare_user_repo x y with
-    | 0 -> compare_files x.files y.files
+  let compare_user_repo cmp x y =
+    match compare (x.user, x.repo) (y.user, y.repo) with
+    | 0 -> cmp x.data y.data
     | i -> i
 
-  module HookSet = Set.Make(struct type t = hook let compare = compare_hook end)
+  module type ELT = sig
+    include Set.OrderedType
+    val pp: t Fmt.t
+  end
 
-  type t = {
-    commit    : DK.Commit.t option;
-    tree      : DK.Tree.t option;
-    user_repos: UserRepoSet.t;            (* active hooks, computed from tree *)
-    hooks     : HookSet.t;         (* user_repo + FS tree, computed from tree *)
+  module UserRepoSet (E: ELT) = struct
+    include Set.Make(struct
+        type t = E.t user_repo
+        let compare = compare_user_repo E.compare
+      end)
+    let sdiff x y = union (diff x y) (diff y x)
+    let pp ppf t = Fmt.(Dump.list @@ pp_user_repo E.pp) ppf (elements t)
+
+    let bindings t =
+      let tbl = Hashtbl.create (cardinal t) in
+      iter (fun { user; repo; data } ->
+          let v =
+            try Hashtbl.find tbl (user, repo)
+            with Not_found -> []
+          in
+          Hashtbl.replace tbl (user, repo) (data :: v)
+        ) t;
+      tbl
+
+  end
+
+  module XStatusSet = UserRepoSet(Status)
+  module XPRSet = UserRepoSet(PR)
+  module XRepoSet = UserRepoSet(struct
+      type t = unit
+      let compare = compare
+      let pp ppf () = Fmt.string ppf ""
+    end)
+
+  type snapshot = {
+    repos     : XRepoSet.t;
+    status    : XStatusSet.t;
+    prs       : XPRSet.t;
   }
 
-  let empty =
-    { hooks = HookSet.empty; user_repos = UserRepoSet.empty;
-      tree = None; commit = None }
+  let compare_snapshot x y =
+    match XRepoSet.compare x.repos y.repos with
+    | 0 ->
+      begin match XStatusSet.compare x.status y.status with
+        | 0 -> XPRSet.compare x.prs y.prs
+        | i -> i
+      end
+    | i -> i
+
+  let pp_snapshot ppf t =
+    Fmt.pf ppf "@[status: %a@, prs: %a@]" XStatusSet.pp t.status XPRSet.pp t.prs
+
+  let empty_snapshot =
+    { repos = XRepoSet.empty; status = XStatusSet.empty; prs = XPRSet.empty }
+
+  type t = { pub: snapshot; priv: snapshot }
+
+  let pp ppf t =
+    Fmt.pf ppf "@[pub: %a@, priv: %a@]" pp_snapshot t.pub pp_snapshot t.priv
+
+  let empty = { pub = empty_snapshot; priv = empty_snapshot }
+
+  let of_tree (E ((module Tree), tree)) =
+    Log.debug (fun l -> l "of_tree");
+    let root = Datakit_path.empty in
+    Tree.exists_dir tree root >>*= fun is_dir ->
+    if not is_dir then ok empty_snapshot
+    else
+    Tree.read_dir tree root >>*= fun users ->
+    List.fold_left (fun acc user ->
+        Tree.exists_dir tree (root / user) >>*= fun is_dir ->
+        if not is_dir then acc
+        else
+          Tree.read_dir tree (root / user) >>*= fun repos ->
+          List.fold_left (fun acc repo ->
+              acc >>*= fun acc ->
+              let tree = E ((module Tree), tree) in
+              let root = root / user / repo in
+              Conv.read_statuses ~root tree >>*= fun status ->
+              let status =
+                status
+                |> List.map (fun data -> { user; repo; data })
+                |> XStatusSet.of_list
+                |> XStatusSet.union acc.status
+              in
+              Conv.read_prs ~root tree >>*= fun prs ->
+              let prs =
+                List.map (fun data -> { user; repo; data }) prs
+                |> XPRSet.of_list
+                |> XPRSet.union acc.prs
+              in
+              let repos = XRepoSet.add { user; repo; data = () } acc.repos in
+              ok { repos; status; prs }
+            ) acc repos
+      ) (ok @@ empty_snapshot) users
 
   (* compute all the active hooks for a given DataKit commit *)
   let of_commit c =
     Log.debug (fun l -> l "of_commit %s" @@ DK.Commit.id c);
-    let tree = DK.Commit.tree c in
-    let root = Datakit_path.empty in
-    DK.Tree.read_dir tree root >>*= fun users ->
-    List.fold_left (fun acc user ->
-        DK.Tree.exists_dir tree (root / user) >>*= fun is_dir ->
-        if not is_dir then acc
-        else
-          DK.Tree.read_dir tree (root / user) >>*= fun repos ->
-          List.fold_left (fun acc repo ->
-              acc >>*= fun acc ->
-              read_files tree (root / user / repo) >>*= fun files ->
-              let hooks = HookSet.add { user; repo; files } acc.hooks in
-              let user_repos =
-                UserRepoSet.add { user; repo; files } acc.user_repos
-              in
-              ok { commit = Some c; tree = Some tree; hooks; user_repos }
-            ) acc repos
-      ) (ok @@ empty) users
+    of_tree (E ((module DK.Tree), DK.Commit.tree c))
 
   (* Read events from the GitHub API and overwrite DataKit state with
      them, in chronological order. *)
@@ -642,7 +678,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     DK.Transaction.exists_dir tr (root / "commit") >>*= fun exists_c ->
     (if not exists_c then ok () else DK.Transaction.remove tr (root / "commit"))
     >>*= fun () ->
-    Conv.read_prs (module DK.Transaction) ~root tr >>*= fun prs ->
+    let tree = E ((module DK.Transaction), tr) in
+    Conv.read_prs ~root tree >>*= fun prs ->
     list_iter_p (fun pr ->
         if pr.PR.state = `Closed then ok ()
         else (
@@ -657,83 +694,53 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   (* NOTE: quite slow (because of the call to API.events), so use it
      with care *)
   let import_github_events ~token branch diff =
-    Log.debug (fun l -> l "import_github_events %a" UserRepoSet.pp diff);
-    if UserRepoSet.is_empty diff then ok ()
+    Log.debug (fun l -> l "import_github_events %a" XRepoSet.pp diff);
+    if XRepoSet.is_empty diff then ok ()
     else DK.Branch.with_transaction branch (fun tr ->
         list_iter_p (fun { user; repo; _ } ->
             sync_datakit token ~user ~repo tr >>= function
             | Ok ()   -> ok ()
             | Error e ->
               error "Error while syncing %s/%s: %a" user repo DK.pp_error e
-          ) (UserRepoSet.elements diff)
+          ) (XRepoSet.elements diff)
         >>= function
         | Ok () ->
-          let message = Fmt.strf "Syncing with events %a" UserRepoSet.pp diff in
+          let message = Fmt.strf "Syncing with events %a" XRepoSet.pp diff in
           DK.Transaction.commit tr ~message
         | Error e ->
           DK.Transaction.abort tr >>= fun () ->
           error "%a" DK.pp_error e
       )
 
-  let conv_read_statuses_opt ~root = function
-    | None   -> ok []
-    | Some t -> Conv.read_statuses ~root t
-
-  let conv_read_prs_opt ~root = function
-    | None   -> ok []
-    | Some t -> Conv.read_prs (module DK.Tree) ~root t
-
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be.
      Also clean-up DataKit invariants such as GC-ing commit entries. *)
   (* TODO: handle pr_diffs too *)
   let call_github_api ~token ~old t =
-    let aux { user; repo; _ } =
-      let root = Datakit_path.empty / user / repo in
-      conv_read_statuses_opt ~root old.tree >>*= fun old_status ->
-      conv_read_statuses_opt ~root t.tree   >>*= fun new_status ->
-      let old_status = Status.Set.of_list old_status in
-      let new_status = Status.Set.of_list new_status in
-      (* status cannot be removed, so simply monitor updates in [new_status]. *)
-      let diff = Status.Set.diff new_status old_status in
-      Log.debug (fun l ->
-          l "call_github_api %s/%s: @[old-status:%a@] @[new-status:%a@] @[status:%a@]" user repo
-            Status.Set.pp old_status
-            Status.Set.pp new_status
-            Status.Set.pp diff
-        );
-      Lwt_list.iter_p
-        (API.set_status token ~user ~repo)
-        (Status.Set.elements diff)
-      >>= fun () ->
-      conv_read_prs_opt ~root old.tree >>*= fun old_prs ->
-      conv_read_prs_opt ~root t.tree   >>*= fun new_prs ->
-      let old_prs = PR.Set.of_list old_prs in
-      let new_prs = PR.Set.of_list new_prs in
-      (* only the PR titles can be changed at the moment *)
-      let diff = PR.Set.diff new_prs old_prs in
-      Log.debug (fun l ->
-          l "call_github_api %s/%s pr:%a" user repo PR.Set.pp diff
-        );
-      Lwt_list.iter_p (API.set_pr token ~user ~repo) (PR.Set.elements diff)
-      >>= ok
-    in
-    let hooks = (* search for changes in subtrees. *)
-      HookSet.elements t.hooks
-      |> UserRepoSet.of_list
-      |> UserRepoSet.elements
-    in
-    list_iter_p aux hooks
+    let status = XStatusSet.diff t.status old.status |> XStatusSet.elements in
+    let prs = XPRSet.diff t.prs old.prs |> XPRSet.elements in
+    Lwt_list.iter_p (fun { user; repo; data } ->
+        Log.debug (fun l -> l "call-github-api: status %s/%s" user repo);
+        API.set_status token ~user ~repo data
+      ) status
+    >>= fun () ->
+    Lwt_list.iter_p (fun { user; repo; data } ->
+        Log.debug (fun l -> l "call-github-api: pr %s/%s" user repo);
+        API.set_pr token ~user ~repo data
+      ) prs
+    >>= ok
 
   let prune t branch =
+    let status = XStatusSet.bindings t.status in
+    let prs = XPRSet.bindings t.prs in
     let aux { user; repo; _ } =
+      let status = try Hashtbl.find status (user, repo) with Not_found -> [] in
+      let prs = try Hashtbl.find prs (user, repo) with Not_found -> [] in
       Log.debug (fun l -> l "prune user=%s repo=%s" user repo);
       let root = Datakit_path.empty / user / repo in
-      conv_read_statuses_opt ~root t.tree >>*= fun status ->
-      conv_read_prs_opt ~root t.tree      >>*= fun prs ->
       Log.debug (fun l ->
           l "status:@ %a@ prs:@ %a"
-            Fmt.(list Status.pp) status Fmt.(list PR.pp) prs
+            Fmt.(Dump.list Status.pp) status Fmt.(Dump.list PR.pp) prs
         );
       (* 1. Prune closed PRs. *)
       let open_prs =
@@ -744,7 +751,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Log.debug (fun l -> l "open_prs:%a" String.Set.dump open_prs);
       let is_open commit = String.Set.mem commit open_prs in
       let closed_prs = List.filter (fun pr -> pr.PR.state = `Closed) prs in
-      Log.debug (fun l -> l "closed_prs:%a" Fmt.(list PR.pp) closed_prs);
+      Log.debug (fun l -> l "closed_prs:%a" Fmt.(Dump.list PR.pp) closed_prs);
       (* 2. Prune commits which doesn't belong to an open PR. *)
       let closed_commits =
         List.fold_left (fun acc s ->
@@ -770,7 +777,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
-    list_iter_p aux (UserRepoSet.elements t.user_repos)
+    list_iter_p aux (XRepoSet.elements t.repos)
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function
@@ -781,15 +788,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l ->
         l "sync pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)
       );
-    let event_diff last_t current =
-      of_commit current >>*= fun current_t ->
-      let diff = UserRepoSet.sdiff last_t.user_repos current_t.user_repos in
-      Log.debug (fun l -> l "user-repo-diff: %a" UserRepoSet.pp diff);
+    let user_repo_diff old_t c =
+      of_commit c >>*= fun current_t ->
+      let diff = XRepoSet.sdiff old_t.repos current_t.repos in
+      Log.debug (fun l -> l "user-repo-diff: %a" XRepoSet.pp diff);
       ok diff
     in
-    let github_calls last_t current =
+    let call_github_api old_t current =
       of_commit current >>*= fun current_t ->
-      call_github_api ~token ~old:last_t current_t >>*= fun () ->
+      call_github_api ~token ~old:old_t current_t >>*= fun () ->
       ok ()
     in
     let prune current =
@@ -797,14 +804,20 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       prune last_t priv >>*= fun () ->
       ok ()
     in
-    let merge c =
+    let merge old_t c =
       DK.Branch.with_transaction pub (fun tr ->
           DK.Transaction.merge tr c >>*= fun (_, conflicts) ->
           if conflicts <> [] then failwith "TODO";
           let msg = Fmt.strf "Merging with %s" @@ DK.Branch.name priv in
-          DK.Transaction.commit tr ~message:msg
-        ) >>*= fun _ ->
-      ok ()
+          of_commit c >>*= fun priv ->
+          of_tree (E ((module DK.Transaction), tr)) >>*= fun pub ->
+          (if compare_snapshot old_t.priv priv = 0 then
+             DK.Transaction.abort tr >>= ok
+           else
+             DK.Transaction.commit tr ~message:msg)
+          >>*= fun () ->
+          ok { pub; priv }
+        )
     in
     let init () =
       Log.debug (fun l -> l "init");
@@ -827,19 +840,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         | None   -> with_head pub (DK.Branch.fast_forward priv))
     in
     let once t =
-      Log.debug (fun l -> l "once");
+      Log.debug (fun l -> l "once %a" pp t);
       with_head priv (fun priv_c ->
           with_head pub (fun pub_c ->
-              event_diff t pub_c  >>*= fun pub_diff ->
-              event_diff t priv_c >>*= fun priv_diff ->
-              import_github_events
-                ~token priv (UserRepoSet.union pub_diff priv_diff)
-              >>*= fun () ->
-              github_calls t pub_c))
+              call_github_api t.pub pub_c  >>*= fun () ->
+              user_repo_diff t.pub pub_c   >>*= fun pub_d ->
+              user_repo_diff t.priv priv_c >>*= fun priv_d ->
+              import_github_events ~token priv (XRepoSet.union pub_d priv_d)
+            ))
       >>*= fun () ->
       with_head priv prune >>*= fun () ->
-      with_head priv merge >>*= fun () ->
-      with_head pub of_commit
+      with_head priv (merge t)
     in
     let run () =
       once t >>*= fun t ->
@@ -849,8 +860,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         let last = ref t in
         let cond = Lwt_condition.create () in
         let signal = function
-              | None    -> ok `Again
-              | Some _ -> Lwt_condition.signal cond (); ok `Again
+          | None    -> ok `Again
+          | Some _ -> Lwt_condition.signal cond (); ok `Again
         in
         let rec react () =
           Lwt_condition.wait cond >>= fun () ->

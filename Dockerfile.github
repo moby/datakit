@@ -13,14 +13,17 @@ RUN go build
 
 RUN opam update
 RUN sudo apk add ncurses-dev libev-dev
-RUN opam depext lwt ssl &&  opam install lwt alcotest conf-libev
+RUN opam depext lwt ssl github && \
+    opam install lwt base-unix base-threads conf-libev camlp4 ppx_tools \
+         alcotest irmin git conduit
 
 RUN opam pin add github --dev -n
 
 # cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext github ssl datakit && opam install github ssl && opam install datakit --deps
+RUN opam depext datakit && \
+    opam install github ssl && opam install datakit --deps
 
 COPY . /home/opam/src/datakit/
 

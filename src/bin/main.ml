@@ -115,36 +115,16 @@ let start () url sandbox git auto_push =
             | Unix.WSTOPPED i  ->
               Logs.err (fun l -> l "%s to %s stopped by signal %d" name remote i)
           in
-          let pull () =
-            Logs.debug (fun l -> l "Pulling %s to %s" remote path);
+          let push br =
+            Logs.debug (fun l -> l "Pushing %s to %s:%s" path remote br);
             let cmd =
               Lwt_process.shell @@
-              Printf.sprintf
-                "mkdir -p %S && cd %S && git init && \
-                 (git remote add origin %S || echo origin is already set) && \
-                 git fetch origin && \
-                 for remote in `git branch -r`; do \
-                \  echo tracking $remote && \
-                \  (git branch --track \"${remote#origin/}\" \"$remote\" \
-                \    || echo $remote is already tracked) && \
-                \  git pull origin \"${remote#origin/}\" --no-edit; \
-                 done"
-                path path remote
-            in
-            exec ~name:"initial pull" cmd
-          in
-          let push () =
-            Logs.debug (fun l -> l "Pushing %s to %s" path remote);
-            let cmd =
-              Lwt_process.shell @@
-              Printf.sprintf "cd %S && git push %S --all" path remote
+              Printf.sprintf "cd %S && git push %S %S --force" path remote br
             in
             exec ~name:"auto-push" cmd
           in
-          pull () >>= fun () ->
-          push () >>= fun () ->
           Git_fs_store.repo path >>= fun repo ->
-          Git_fs_store.Store.Repo.watch_branches repo (fun _ _ -> push ())
+          Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)
       in
       watch () >>= fun unwatch ->
       start () >>= fun () ->

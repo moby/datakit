@@ -118,12 +118,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   (** Create an empty sync state. *)
 
   val sync:
-    ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] ->
+    ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?dry_updates:bool ->
     pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
     t -> t Lwt.t
 (** [sync t ~pub ~priv ~token] mirror GitHub changes in the DataKit
     public branch [pub]. It uses the private branch [priv] to store
-    the received wehook event states. It connects to the GitHub API
-    using the token [tok]. The default [policy] is [`Repeat]. *)
+    the received webhook event states. It connects to the GitHub API
+    using the token [tok]. The default [policy] is [`Repeat]. If
+    [dry_updates] is set (by default it is not), do not do the update
+    API calls but print in the logs (with an [Logs.App] level) them
+    instead. *)
 
 end

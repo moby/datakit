@@ -720,17 +720,24 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
      what DataKit think it should be.
      Also clean-up DataKit invariants such as GC-ing commit entries. *)
   (* TODO: handle pr_diffs too *)
-  let call_github_api ~token ~old t =
+  let call_github_api ~dry_updates ~token ~old t =
     let status = XStatusSet.diff t.status old.status |> XStatusSet.elements in
     let prs = XPRSet.diff t.prs old.prs |> XPRSet.elements in
     Lwt_list.iter_p (fun { user; repo; data } ->
         Log.debug (fun l -> l "call-github-api: status %s/%s" user repo);
-        API.set_status token ~user ~repo data
+        if not dry_updates then API.set_status token ~user ~repo data
+        else (
+          Log.app
+            (fun l -> l "API.set-status %s/%s %a" user repo Status.pp data);
+          Lwt.return_unit)
       ) status
     >>= fun () ->
     Lwt_list.iter_p (fun { user; repo; data } ->
         Log.debug (fun l -> l "call-github-api: pr %s/%s" user repo);
-        API.set_pr token ~user ~repo data
+        if not dry_updates then API.set_pr token ~user ~repo data
+        else (
+          Log.app (fun l -> l "API.set-pr %s/%s %a" user repo PR.pp data);
+          Lwt.return_unit)
       ) prs
     >>= ok
 
@@ -788,7 +795,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | None   -> error "empty branch!"
     | Some c -> fn c
 
-  let sync ?switch ?(policy=`Repeat) ~pub ~priv ~token t =
+  let sync ?switch ?(policy=`Repeat) ?(dry_updates=false) ~pub ~priv ~token t =
     Log.debug (fun l ->
         l "sync pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)
       );
@@ -807,7 +814,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         ok ()
       else (
         of_commit current >>*= fun current_t ->
-        call_github_api ~token ~old:old_t current_t >>*= fun () ->
+        call_github_api ~dry_updates ~token ~old:old_t current_t >>*= fun () ->
         ok ()
       ) in
     let prune current =
@@ -860,7 +867,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
               import_github_events ~token priv (XRepoSet.union pub_d priv_d)
             ))
       >>*= fun () ->
-      with_head priv prune >>*= fun () ->
+      with_head priv prune     >>*= fun () ->
       with_head priv (merge t)
     in
     let run () =

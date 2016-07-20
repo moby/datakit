@@ -502,8 +502,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let read t path = FS.read_node t.fs (t.path / "rw" /@ path)
     let stat t path = FS.stat t.fs (t.path / "rw" /@ path)
     let exists t path = FS.exists t.fs (t.path / "rw" /@ path)
-    let exists_file t path = FS.exists t.fs (t.path / "rw" /@ path)
-    let exists_dir t path = FS.exists t.fs (t.path / "rw" /@ path)
+    let exists_file t path = FS.exists_file t.fs (t.path / "rw" /@ path)
+    let exists_dir t path = FS.exists_dir t.fs (t.path / "rw" /@ path)
 
     let create_or_replace_file t ~dir =
       FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)

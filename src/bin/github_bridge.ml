@@ -66,7 +66,7 @@ let exec ~name cmd =
     Logs.err (fun l -> l "%s stopped by signal %d" name i)
 
 let start () sandbox listen_urls
-    datakit private_branch public_branch
+    datakit private_branch public_branch dry_updates
     no_webhook gh_hooks webhook_secret webhook_port =
   quiet9p ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
@@ -91,7 +91,7 @@ let start () sandbox listen_urls
   in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
-    Log.info (fun l -> l "Connecting to %s." datakit);
+    Log.app (fun l -> l "Connecting to %s." datakit);
     (Lwt.catch
        (fun () -> Client9p.connect proto address ())
        (fun _ -> Lwt.fail_with
@@ -110,7 +110,7 @@ let start () sandbox listen_urls
       | Ok priv ->
         DK.branch dk public_branch >>= function
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-        | Ok pub  -> VG.Sync.sync t ~priv ~pub ~token >|= ignore
+        | Ok pub  -> VG.Sync.sync t ~dry_updates ~priv ~pub ~token >|= ignore
   in
   let accept_connections () =
     if listen_urls = [] then Lwt.return_unit
@@ -214,6 +214,13 @@ let webhook_port =
   let doc = Arg.info ~doc:"Webhook port" ["p";"port"] in
   Arg.(value & opt int 80 doc)
 
+let dry_updates =
+  let doc =
+    Arg.info ~doc:"Dry API updates: do not call the GitHub API, \
+                   print a line in the logs instead." ["d"; "dry-udpates"]
+  in
+  Arg.(value & flag doc)
+
 let term =
   let doc = "Bridge between GiHub API and Datakit." in
   let man = [
@@ -223,7 +230,7 @@ let term =
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ sandbox $ listen_urls $
-        datakit $ private_branch $ public_branch $
+        datakit $ private_branch $ public_branch $ dry_updates $
         no_webhook $ gh_hooks $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
 

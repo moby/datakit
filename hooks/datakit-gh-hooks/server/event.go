@@ -112,7 +112,7 @@ func (h *Server) CommitDir(e github.StatusEvent) ([]string, error) {
 	sha := *e.SHA
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	commitDir := []string{user, repo, "commits", sha}
+	commitDir := []string{user, repo, "commit", sha}
 	return commitDir, nil
 }
 
@@ -143,6 +143,7 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 	if context == nil {
 		return fmt.Errorf("Status without a valid context")
 	}
+	dir = append(dir, "status")
 	dir = append(dir, strings.Split(*context, "/")...)
 
 	if e.Description != nil {

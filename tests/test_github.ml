@@ -254,12 +254,12 @@ let test_events dk =
   expect_head pub >>*= fun head ->
   check (DK.Commit.tree head)
 
-let update_status br dir =
+let update_status br dir state =
   DK.Branch.with_transaction br (fun tr ->
-      DK.Transaction.create_or_replace_file tr
-        ~dir:(dir / "status" / "foo" / "bar" / "baz") "state"
-        (Cstruct.of_string "pending\n")
-      >>*= fun () ->
+      let dir = dir / "status" / "foo" / "bar" / "baz" in
+      DK.Transaction.make_dirs tr dir >>*= fun () ->
+      let state = Cstruct.of_string  (Status_state.to_string state ^ "\n") in
+      DK.Transaction.create_or_replace_file tr ~dir "state" state >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     )
 
@@ -283,7 +283,7 @@ let test_updates dk =
   let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
   DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
   Alcotest.(check bool) "exist commit/foo" true exists;
-  update_status pub dir >>*= fun () -> (* API request in the public branch *)
+  update_status pub dir `Pending >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 2"
     { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
@@ -316,7 +316,50 @@ let test_updates dk =
   Alcotest.(check string) "update pr's title" "hahaha" pr.PR.title;
   Lwt.return_unit
 
+let test_startup dk =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ();
+  let t = init status0 events1 in
+  let s = VG.empty in
+  DK.branch dk priv >>*= fun priv ->
+  DK.branch dk pub  >>*= fun pub ->
+  let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
+
+  (* start from scratch *)
+  update_status pub dir `Pending >>*= fun () ->
+  Alcotest.(check counter) "counter: 1"
+    { Counter.events = 0; status = 0; set_pr = 0; set_status = 0 } t.API.ctx;
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  Alcotest.(check counter) "counter: 2"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 3"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
+
+  (* restart *)
+  let s = VG.empty in
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 4"
+    { Counter.events = 2; status = 4; set_pr = 0; set_status = 1 } t.API.ctx;
+
+  (* restart with dirty public branch *)
+  let s = VG.empty in
+  update_status pub dir `Failure >>*= fun () ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 5"
+    { Counter.events = 3; status = 6; set_pr = 0; set_status = 2 } t.API.ctx;
+
+  Lwt.return_unit
+
 let test_set = [
   "events" , `Quick, run test_events;
   "updates", `Quick, run test_updates;
+  "startup", `Quick, run test_startup;
 ]

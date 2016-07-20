@@ -616,12 +616,16 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let empty_snapshot =
     { repos = XRepoSet.empty; status = XStatusSet.empty; prs = XPRSet.empty }
 
-  type t = { pub: snapshot; priv: snapshot }
+  type t = {
+    pub: snapshot; priv: snapshot;
+    merged: bool;     (* becomes true after the first merge of priv into pub. *)
+  }
 
   let pp ppf t =
-    Fmt.pf ppf "@[pub: %a@, priv: %a@]" pp_snapshot t.pub pp_snapshot t.priv
+    Fmt.pf ppf "@[pub: %a@, priv: %a@, merged: %b]"
+      pp_snapshot t.pub pp_snapshot t.priv t.merged
 
-  let empty = { pub = empty_snapshot; priv = empty_snapshot }
+  let empty = { pub = empty_snapshot; priv = empty_snapshot; merged = false }
 
   let of_tree (E ((module Tree), tree)) =
     Log.debug (fun l -> l "of_tree");
@@ -795,10 +799,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       ok diff
     in
     let call_github_api old_t current =
-      of_commit current >>*= fun current_t ->
-      call_github_api ~token ~old:old_t current_t >>*= fun () ->
-      ok ()
-    in
+      if not t.merged then
+        (* if [t.priv] is not yet merged into [t.pub], this means that
+           [t.pub] might contain some outdated information. In that
+           case, skip the user updates as it is unsafe to call GitHub
+           API calls.  *)
+        ok ()
+      else (
+        of_commit current >>*= fun current_t ->
+        call_github_api ~token ~old:old_t current_t >>*= fun () ->
+        ok ()
+      ) in
     let prune current =
       of_commit current >>*= fun last_t ->
       prune last_t priv >>*= fun () ->
@@ -816,7 +827,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
            else
              DK.Transaction.commit tr ~message:msg)
           >>*= fun () ->
-          ok { pub; priv }
+          ok { pub; priv; merged = true }
         )
     in
     let init () =

@@ -434,9 +434,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Tree.exists_file t (dir / "state") >>*= fun exists_state ->
       Tree.exists_file t (dir / "title") >>*= fun exists_title ->
       if not exists_head then
-        Log.err (fun l -> l "pr/%d/head does not exist" number);
+        Log.debug (fun l -> l "error: pr/%d/head does not exist" number);
       if not exists_state then
-        Log.err (fun l -> l "pr/%d/state does not exist" number);
+        Log.debug (fun l -> l "error: pr/%d/state does not exist" number);
       if not exists_head || not exists_state then ok None
       else (
         Tree.read_file t (dir / "head") >>*= fun head ->

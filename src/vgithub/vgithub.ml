@@ -52,8 +52,8 @@ module PR = struct
     | `Closed -> Fmt.string ppf "closed"
 
   let pp ppf t =
-    Fmt.pf ppf "[number: %d, state: %a, head: %s]"
-      t.number pp_state t.state t.head
+    Fmt.pf ppf "[number: %d, state: %a, head: %s, title: %s]"
+      t.number pp_state t.state t.head t.title
 
 end
 
@@ -611,7 +611,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | i -> i
 
   let pp_snapshot ppf t =
-    Fmt.pf ppf "@[status: %a@, prs: %a@]" XStatusSet.pp t.status XPRSet.pp t.prs
+    Fmt.pf ppf "@[repos: %a@, status: %a@, prs: %a@]"
+      XRepoSet.pp t.repos XStatusSet.pp t.status XPRSet.pp t.prs
 
   let empty_snapshot =
     { repos = XRepoSet.empty; status = XStatusSet.empty; prs = XPRSet.empty }

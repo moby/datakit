@@ -99,7 +99,7 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 	return nil
 }
 
-func (h *Server) CommitDir(e github.StatusEvent) ([]string, error) {
+func (h *Server) StatusDir(e github.StatusEvent) ([]string, error) {
 
 	if e.Repo.Owner.Login == nil {
 		return nil, fmt.Errorf("Empty user")
@@ -117,8 +117,8 @@ func (h *Server) CommitDir(e github.StatusEvent) ([]string, error) {
 	sha := *e.SHA
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	commitDir := []string{user, repo, "commit", "status", sha}
-	return commitDir, nil
+	statusDir := []string{user, repo, "commit", "status", sha}
+	return statusDir, nil
 }
 
 func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error {
@@ -138,7 +138,7 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 	}
 
 	// project the event in the the filesystem
-	dir, err := h.CommitDir(e)
+	dir, err := h.StatusDir(e)
 	if err != nil {
 		return err
 	}

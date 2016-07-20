@@ -596,9 +596,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     end)
 
   type snapshot = {
-    repos     : XRepoSet.t;
-    status    : XStatusSet.t;
-    prs       : XPRSet.t;
+    repos : XRepoSet.t;
+    status: XStatusSet.t;
+    prs   : XPRSet.t;
   }
 
   let compare_snapshot x y =

@@ -91,7 +91,7 @@ let start () sandbox listen_urls
   in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
-    Log.info (fun l -> l "Connecting to %s." datakit);
+    Log.app (fun l -> l "Connecting to %s." datakit);
     (Lwt.catch
        (fun () -> Client9p.connect proto address ())
        (fun _ -> Lwt.fail_with

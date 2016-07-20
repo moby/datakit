@@ -128,8 +128,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       P9p.mkdir t.conn dir leaf rwxr_xr_x
 
     let write_to_fid t fid ~offset data =
-      (* TODO: see https://github.com/mirage/ocaml-9p/pull/80 *)
-      let maximum_payload = 8192 in
+      let maximum_payload = Int32.to_int (min 0x100000l (P9p.LowLevel.maximum_write_payload t.conn)) in
       let rec loop ~offset remaining =
         let len = Cstruct.len remaining in
         if len = 0 then ok ()

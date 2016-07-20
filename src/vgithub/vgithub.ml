@@ -806,18 +806,18 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Log.debug (fun l -> l "user-repo-diff: %a" XRepoSet.pp diff);
       ok diff
     in
-    let call_github_api old_t current =
+    let call_github_api old_t ~priv_c ~pub_c =
+      of_commit pub_c >>*= fun pub_t ->
       if not t.merged then
         (* if [t.priv] is not yet merged into [t.pub], this means that
            [t.pub] might contain some outdated information. In that
            case, skip the user updates as it is unsafe to call GitHub
            API calls.  *)
-        ok ()
-      else (
-        of_commit current >>*= fun current_t ->
-        call_github_api ~dry_updates ~token ~old:old_t current_t >>*= fun () ->
-        ok ()
-      ) in
+        of_commit priv_c >>*= fun priv_t ->
+        call_github_api ~dry_updates ~token ~old:priv_t pub_t
+      else
+        call_github_api ~dry_updates ~token ~old:old_t.pub pub_t
+    in
     let prune current =
       of_commit current >>*= fun last_t ->
       prune last_t priv >>*= fun () ->
@@ -840,10 +840,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     let init () =
       Log.debug (fun l -> l "init");
-      (DK.Branch.head pub >>*= function
+      (DK.Branch.head priv >>*= function
         | Some _ -> ok ()
         | None   ->
-          DK.Branch.with_transaction pub (fun tr ->
+          DK.Branch.with_transaction priv (fun tr ->
               let dir  = Datakit_path.empty in
               let data = Cstruct.of_string "### DataKit -- GitHub bridge" in
               DK.Transaction.create_or_replace_file tr ~dir "README.md" data
@@ -854,17 +854,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
                 Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
             ))
       >>*= fun () ->
-      (DK.Branch.head priv >>*= function
-        | Some _ -> ok ()
-        | None   -> with_head pub (DK.Branch.fast_forward priv))
+      DK.Branch.head pub >>*= function
+      | Some _ -> ok ()
+      | None   -> with_head priv (DK.Branch.fast_forward pub)
     in
     let once t =
       Log.debug (fun l -> l "once %a" pp t);
       with_head priv (fun priv_c ->
           with_head pub (fun pub_c ->
-              call_github_api t.pub pub_c  >>*= fun () ->
-              user_repo_diff t.pub pub_c   >>*= fun pub_d ->
-              user_repo_diff t.priv priv_c >>*= fun priv_d ->
+              call_github_api t ~priv_c ~pub_c >>*= fun () ->
+              user_repo_diff t.pub pub_c       >>*= fun pub_d ->
+              user_repo_diff t.priv priv_c     >>*= fun priv_d ->
               import_github_events ~token priv (XRepoSet.union pub_d priv_d)
             ))
       >>*= fun () ->

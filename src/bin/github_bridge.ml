@@ -217,7 +217,7 @@ let webhook_port =
 let dry_updates =
   let doc =
     Arg.info ~doc:"Dry API updates: do not call the GitHub API, \
-                   print a line in the logs instead." ["d"; "dry-udpates"]
+                   print a line in the logs instead." ["d"; "dry-updates"]
   in
   Arg.(value & flag doc)
 

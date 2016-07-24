@@ -5,7 +5,7 @@ RUN opam depext lwt && opam install lwt alcotest conf-libev
 
 # cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
-RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam pin add datakit.dev -k git /home/opam/src/datakit#HEAD -n
 RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit

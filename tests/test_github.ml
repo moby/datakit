@@ -1,4 +1,9 @@
+open Test_utils
 open Lwt.Infix
+open Vgithub
+open Datakit_path.Infix
+
+module Conv = Conv(DK)
 
 module Counter = struct
   type t = {
@@ -19,8 +24,6 @@ end
 
 module API = struct
 
-  open Vgithub
-
   type state = {
     user  : string;
     repo  : string;
@@ -28,7 +31,17 @@ module API = struct
     mutable prs   : PR.t list;
     mutable events: Event.t list;
     ctx: Counter.t;
+    mutable webhooks: (DK.Branch.t -> (unit, DK.error) Result.result Lwt.t) list;
   }
+
+  let apply_webhooks t priv =
+    let rec aux = function
+      | []   -> ok ()
+      | h::t -> h priv >>*= fun () -> aux t
+    in
+    aux t.webhooks >>*= fun () ->
+    t.webhooks <- [];
+    ok ()
 
   type token = state
 
@@ -61,6 +74,14 @@ module API = struct
       in
       let status = (commit, s :: rest) :: status in
       t.status <- status;
+      let w br =
+        let root = Datakit_path.(empty / user / repo) in
+        DK.Branch.with_transaction br (fun tr ->
+            Conv.update_status tr ~root s >>*= fun () ->
+            DK.Transaction.commit tr ~message:"webhook"
+          )
+      in
+      t.webhooks <- w :: t.webhooks;
       Lwt.return_unit
 
   let set_pr t ~user ~repo pr =
@@ -82,10 +103,6 @@ module API = struct
     else Lwt.return t.events
 
 end
-
-open Test_utils
-open Vgithub
-open Datakit_path.Infix
 
 module VG = Sync(API)(DK)
 
@@ -163,17 +180,21 @@ let init status events =
     ) status;
   let status = Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl [] in
   let ctx = Counter.zero () in
-  { API.user; repo; status; prs = []; events; ctx }
+  { API.user; repo; status; prs = []; events; ctx; webhooks = [] }
 
 let run f () =
   Test_utils.run (fun _repo conn ->
       let dk = DK.connect conn in
-      DK.branch dk pub >>*= fun branch ->
-      DK.Branch.with_transaction branch (fun tr ->
+      DK.branch dk pub  >>*= fun pub ->
+      DK.branch dk priv >>*= fun priv ->
+      let t = init [] [] in
+      let s = VG.empty in
+      VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
+      DK.Branch.with_transaction pub (fun tr ->
           let dir = Datakit_path.(empty / user / repo) in
           DK.Transaction.make_dirs tr dir >>*= fun () ->
           DK.Transaction.create_or_replace_file tr ~dir
-            "README" (Cstruct.of_string "")
+            "README" (Cstruct.of_string "trigger an import of test/test\n")
           >>*= fun () ->
           DK.Transaction.commit tr ~message:"init"
         )
@@ -184,11 +205,11 @@ let run f () =
 let check_dirs = Alcotest.(check (slist string String.compare))
 let check_data msg x y = Alcotest.(check string) msg x (Cstruct.to_string y)
 
-let check tree =
+let check name tree =
   (* check test/test/commit *)
   let commit = Datakit_path.empty / user / repo / "commit" in
   DK.Tree.exists_dir tree commit >>*= fun exists ->
-  Alcotest.(check bool) "commit dir exists" exists true;
+  Alcotest.(check bool) (name ^ " commit dir exists")  exists true;
   DK.Tree.read_dir tree commit >>*= fun dirs ->
   check_dirs "commits" ["bar"] dirs;
   DK.Tree.read_dir tree (commit / "bar"/ "status" ) >>*= fun dirs ->
@@ -250,9 +271,9 @@ let test_events dk =
   Alcotest.(check counter) "counter: 2"
     { Counter.events = 1; status = 1; set_pr = 0; set_status = 0 }  t.API.ctx;
   expect_head priv >>*= fun head ->
-  check (DK.Commit.tree head) >>= fun () ->
+  check "priv" (DK.Commit.tree head) >>= fun () ->
   expect_head pub >>*= fun head ->
-  check (DK.Commit.tree head)
+  check "pub" (DK.Commit.tree head)
 
 let update_status br dir state =
   DK.Branch.with_transaction br (fun tr ->
@@ -262,6 +283,10 @@ let update_status br dir state =
       DK.Transaction.create_or_replace_file tr ~dir "state" state >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     )
+
+let find_status t =
+  try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
+  with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
   quiet_9p ();
@@ -274,15 +299,20 @@ let test_updates dk =
   Alcotest.(check counter) "counter: 0"
     { Counter.events = 0; status = 0; set_pr = 0; set_status = 0 } t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 1"
     { Counter.events = 1; status = 2; set_pr = 0; set_status = 0 } t.API.ctx;
-  expect_head priv >>*= fun head ->
+  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  Alcotest.(check counter) "counter: 1'"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 0 } t.API.ctx;
 
   (* test status update *)
   let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
-  DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
-  Alcotest.(check bool) "exist commit/foo" true exists;
+  expect_head priv >>*= fun h ->
+  DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
+  Alcotest.(check bool) "exist private commit/foo" true exists;
+  expect_head priv >>*= fun h ->
+  DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
+  Alcotest.(check bool) "exist private commit/foo" true exists;
   update_status pub dir `Pending >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 2"
@@ -290,15 +320,16 @@ let test_updates dk =
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 3"
     { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
-  let status =
-    try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
-    with Not_found -> Alcotest.fail "foo not found"
-  in
+  let status = find_status t in
   Alcotest.(check status_state) "update status" `Pending status.Status.state;
 
   (* test PR update *)
   let dir = Datakit_path.empty / user / repo / "pr" / "2" in
-  DK.Tree.exists_dir (DK.Commit.tree head) dir >>*= fun exists ->
+  expect_head priv >>*= fun h ->
+  DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
+  Alcotest.(check bool) "exist private commit/foo" true exists;
+  expect_head priv >>*= fun h ->
+  DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist commit/foo" true exists;
   DK.Branch.with_transaction pub (fun tr ->
       DK.Transaction.create_or_replace_file tr ~dir
@@ -327,24 +358,32 @@ let test_startup dk =
   let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
 
   (* start from scratch *)
-  update_status pub dir `Pending >>*= fun () ->
   Alcotest.(check counter) "counter: 1"
     { Counter.events = 0; status = 0; set_pr = 0; set_status = 0 } t.API.ctx;
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 2"
-    { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 0 } t.API.ctx;
+  update_status pub dir `Pending >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 3"
     { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
 
-  (* restart *)
-  let s = VG.empty in
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 3'"
+    { Counter.events = 1; status = 2; set_pr = 0; set_status = 1 } t.API.ctx;
+
+  (* stop the app, apply the webhooks and restart *)
+  let s = VG.empty in
+  API.apply_webhooks t priv >>*= fun () ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 4"
+    { Counter.events = 2; status = 4; set_pr = 0; set_status = 1 } t.API.ctx;
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 4'"
     { Counter.events = 2; status = 4; set_pr = 0; set_status = 1 } t.API.ctx;
 
   (* restart with dirty public branch *)
@@ -352,9 +391,27 @@ let test_startup dk =
   update_status pub dir `Failure >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 5"
     { Counter.events = 3; status = 6; set_pr = 0; set_status = 2 } t.API.ctx;
+  let status = find_status t in
+  Alcotest.(check status_state) "update status" `Failure status.Status.state;
+
+  (* receive new webhooks *)
+  t.API.webhooks <- [fun br -> update_status br dir `Success];
+  API.apply_webhooks t priv >>*= fun () ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 6"
+    { Counter.events = 3; status = 6; set_pr = 0; set_status = 2 } t.API.ctx;
+  let status_dir = dir / "status" / "foo" / "bar" / "baz" in
+  expect_head pub >>*= fun h ->
+  let tree = DK.Commit.tree h in
+  DK.Tree.exists_dir tree status_dir >>*= fun dir_exists ->
+  Alcotest.(check bool) "dir exists" true dir_exists;
+  DK.Tree.exists_file tree (status_dir / "state") >>*= fun file_exists ->
+  Alcotest.(check bool) "file exists" true file_exists;
+  DK.Tree.read_file tree (status_dir / "state") >>*= fun buf ->
+  Alcotest.(check string) "webhook update" "success\n" (Cstruct.to_string buf);
 
   Lwt.return_unit
 

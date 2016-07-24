@@ -589,15 +589,24 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         ) t;
       tbl
 
+    exception Found of elt
+
+    let findf f t =
+      try iter (fun e -> if f e then raise (Found e)) t; None
+      with Found e -> Some e
   end
 
   module XStatusSet = UserRepoSet(Status)
   module XPRSet = UserRepoSet(PR)
-  module XRepoSet = UserRepoSet(struct
-      type t = unit
-      let compare = compare
-      let pp ppf () = Fmt.string ppf ""
-    end)
+  module XRepoSet = struct
+    include UserRepoSet(struct
+        type t = unit
+        let compare = compare
+        let pp ppf () = Fmt.string ppf ""
+      end)
+    let pp_elt ppf { user; repo; _ } = Fmt.pf ppf "%s/%s" user repo
+    let pp ppf t = Fmt.(Dump.list pp_elt) ppf (elements t)
+  end
 
   type snapshot = {
     repos : XRepoSet.t;
@@ -615,7 +624,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | i -> i
 
   let pp_snapshot ppf t =
-    Fmt.pf ppf "@[repos: %a@, status: %a@, prs: %a@]"
+    Fmt.pf ppf "@[[repos: %a@, status: %a@, prs: %a]@]"
       XRepoSet.pp t.repos XStatusSet.pp t.status XPRSet.pp t.prs
 
   let empty_snapshot =
@@ -623,14 +632,14 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   type t = {
     pub: snapshot; priv: snapshot;
-    merged: bool;     (* becomes true after the first merge of priv into pub. *)
+    starting: bool;                     (* becomes true after the first sync. *)
   }
 
   let pp ppf t =
-    Fmt.pf ppf "@[pub: %a@, priv: %a@, merged: %b]"
-      pp_snapshot t.pub pp_snapshot t.priv t.merged
+    Fmt.pf ppf "@[[pub: %a@, priv: %a@, starting: %b]@]"
+      pp_snapshot t.pub pp_snapshot t.priv t.starting
 
-  let empty = { pub = empty_snapshot; priv = empty_snapshot; merged = false }
+  let empty = { pub = empty_snapshot; priv = empty_snapshot; starting = true }
 
   let of_tree (E ((module Tree), tree)) =
     Log.debug (fun l -> l "of_tree");
@@ -697,66 +706,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         )
       ) prs
 
-  (* Read the GitHub events for the repositories appearing in [diff]
-     and populate [branch] with the result of applying all of the into
-     the state. *)
-  (* NOTE: quite slow (because of the call to API.events), so use it
-     with care *)
-  let import_github_events ~token priv diff =
-    Log.debug (fun l -> l "import_github_events %a" XRepoSet.pp diff);
-    if XRepoSet.is_empty diff then ok ()
-    else DK.Branch.with_transaction priv (fun tr ->
-        Lwt.catch (fun () ->
-            list_iter_p (fun { user; repo; _ } ->
-                sync_datakit token ~user ~repo tr >>= function
-                | Ok ()   -> ok ()
-                | Error e ->
-                  error "Error while syncing %s/%s: %a" user repo DK.pp_error e
-              ) (XRepoSet.elements diff)
-          ) (fun e -> error "%s" @@ Printexc.to_string e)
-        >>= function
-        | Ok () ->
-          let message = Fmt.strf "Syncing with events %a" XRepoSet.pp diff in
-          DK.Transaction.commit tr ~message
-        | Error e ->
-          DK.Transaction.abort tr >>= fun () ->
-          error "%a" DK.pp_error e
-      )
-
-  (* Read DataKit data and call the GitHub API to sync the world with
-     what DataKit think it should be.
-     Also clean-up DataKit invariants such as GC-ing commit entries. *)
-  (* TODO: handle pr_diffs too *)
-  let call_github_api ~dry_updates ~token ~old ~priv ~pub =
-    let aux old t =
-      let status = XStatusSet.diff t.status old.status |> XStatusSet.elements in
-      let prs = XPRSet.diff t.prs old.prs |> XPRSet.elements in
-      Lwt_list.iter_p (fun { user; repo; data } ->
-          Log.info
-            (fun l -> l "API.set-status %s/%s %a" user repo Status.pp data);
-          if not dry_updates then API.set_status token ~user ~repo data
-          else  Lwt.return_unit
-        ) status
-      >>= fun () ->
-      Lwt_list.iter_p (fun { user; repo; data } ->
-          Log.info (fun l -> l "API.set-pr %s/%s %a" user repo PR.pp data);
-          if not dry_updates then API.set_pr token ~user ~repo data
-          else Lwt.return_unit
-        ) prs
-      >>= ok
-    in
-    of_commit pub >>*= fun pub ->
-    if not old.merged then (
-      (* if [t.priv] is not yet merged into [t.pub], this means that
-         [t.pub] might contain some outdated information. In that
-         case, skip the user updates as it is unsafe to call GitHub
-         API calls.  *)
-      of_commit priv >>*= fun priv ->
-      aux priv pub
-    ) else
-      aux old.pub pub
-
-  let prune t branch =
+  let prune t tr =
+    Log.debug (fun l -> l "prune");
     let status = XStatusSet.bindings t.status in
     let prs = XPRSet.bindings t.prs in
     let aux { user; repo; _ } =
@@ -787,97 +738,217 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       in
       Log.debug (fun l -> l "closed_commits:%a" String.Set.dump closed_commits);
       if String.Set.is_empty closed_commits && closed_prs = [] then ok ()
-      else DK.Branch.with_transaction branch (fun tr ->
-          Lwt.catch (fun () ->
-              list_iter_p (fun pr ->
-                  DK.Transaction.remove tr
-                    (root / "pr" / string_of_int pr.PR.number)
-                ) closed_prs
-              >>*= fun () ->
-              list_iter_p (fun commit ->
-                  DK.Transaction.remove tr (root / "commit" / commit)
-                ) (String.Set.elements closed_commits)
-            ) (fun e -> error "%s" @@ Printexc.to_string e)
-          >>= function
-          | Ok ()   -> DK.Transaction.commit tr
-                         ~message:"Pruning closed PRs and their commits."
-          | Error e -> DK.Transaction.abort tr >|= fun () -> Error e
-        )
+      else (
+        list_iter_p (fun pr ->
+            DK.Transaction.remove tr
+              (root / "pr" / string_of_int pr.PR.number)
+          ) closed_prs
+        >>*= fun () ->
+        list_iter_p (fun commit ->
+            DK.Transaction.remove tr (root / "commit" / commit)
+          ) (String.Set.elements closed_commits)
+      )
     in
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
     list_iter_p aux (XRepoSet.elements t.repos)
+
+  type input = {
+    c: DK.Commit.t;
+    s: snapshot;
+    b: DK.Branch.t;
+  }
+
+  (* Read the GitHub events for the repositories appearing in [diff]
+     and populate [branch] with the result of applying all of the into
+     the state. *)
+  (* NOTE: quite slow (because of the call to API.events), so use it
+     with care *)
+  let import_github_events ~token priv diff =
+    Log.debug (fun l -> l "import_github_events %a" XRepoSet.pp diff);
+    if XRepoSet.is_empty diff then ok ()
+    else DK.Branch.with_transaction priv.b (fun tr ->
+        Lwt.catch (fun () ->
+            list_iter_p (fun { user; repo; _ } ->
+                sync_datakit token ~user ~repo tr >>= function
+                | Ok ()   -> ok ()
+                | Error e ->
+                  error "Error while syncing %s/%s: %a" user repo DK.pp_error e
+              ) (XRepoSet.elements diff)
+          ) (fun e -> error "%s" @@ Printexc.to_string e)
+        >>= function
+        | Ok () ->
+          of_tree (E ((module DK.Transaction), tr)) >>*= fun t ->
+          if compare_snapshot priv.s t = 0 then (DK.Transaction.abort tr >>= ok)
+          else
+            prune t tr >>*= fun () ->
+            let message = Fmt.strf "Importing events from %a" XRepoSet.pp diff in
+            DK.Transaction.commit tr ~message
+        | Error e ->
+          DK.Transaction.abort tr >>= fun () ->
+          error "%a" DK.pp_error e
+      )
+
+  (* Read DataKit data and call the GitHub API to sync the world with
+     what DataKit think it should be. *)
+  let call_github_api ~dry_updates ~token ~old t =
+    Log.debug (fun l -> l "call_github_api");
+    let status = XStatusSet.diff t.status old.status |> XStatusSet.elements in
+    let prs = XPRSet.diff t.prs old.prs |> XPRSet.elements in
+    Lwt_list.iter_p (fun { user; repo; data } ->
+        let old =
+          let same_context s =
+            s.data.Status.context = data.Status.context
+            && s.data.Status.commit = data.Status.commit
+          in
+          XStatusSet.findf same_context old.status |> function
+          | None   -> None
+          | Some s -> Some s.data
+        in
+        Log.info
+          (fun l -> l "API.set-status %s/%s %a (was %a)"
+              user repo Status.pp data Fmt.(option Status.pp) old);
+        if not dry_updates then API.set_status token ~user ~repo data
+        else  Lwt.return_unit
+      ) status
+    >>= fun () ->
+    Lwt_list.iter_p (fun { user; repo; data } ->
+        Log.info (fun l -> l "API.set-pr %s/%s %a" user repo PR.pp data);
+        if not dry_updates then API.set_pr token ~user ~repo data
+        else Lwt.return_unit
+      ) prs
+    >>= ok
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function
     | None   -> error "empty branch!"
     | Some c -> fn c
 
-  let user_repo_diff ~old c =
-    of_commit c >>*= fun current_t ->
-    let diff = XRepoSet.sdiff old.repos current_t.repos in
-    Log.debug (fun l -> l "user-repo-diff: %a" XRepoSet.pp diff);
-    ok diff
-
-  let prune ~priv c =
-    of_commit c >>*= fun t ->
-    prune t priv >>*= fun () ->
-    ok ()
-
-  let merge ~old ~pub ~priv c =
-    DK.Branch.with_transaction pub (fun tr ->
-        DK.Transaction.merge tr c >>*= fun (_, conflicts) ->
-        if conflicts <> [] then failwith "TODO";
-        let msg = Fmt.strf "Merging with %s" @@ DK.Branch.name priv in
-        of_commit c >>*= fun priv ->
-        of_tree (E ((module DK.Transaction), tr)) >>*= fun pub ->
-        (if compare_snapshot old.priv priv = 0 then
-           DK.Transaction.abort tr >>= ok
-         else
-           DK.Transaction.commit tr ~message:msg)
-        >>*= fun () ->
-        ok { pub; priv; merged = true }
-      )
+  let merge ~pub ~priv =
+    Log.debug (fun l -> l "merge pub:%a" pp_snapshot pub.s);
+    if compare_snapshot pub.s priv.s = 0 then
+      ok { pub = pub.s; priv = priv.s; starting = false }
+    else
+      with_head priv.b (fun priv_c ->
+          (* FIXME: ideally we will create a transaction from the commit
+             [pub.c]. *)
+          DK.Branch.with_transaction pub.b (fun tr ->
+              DK.Transaction.merge tr priv_c >>*= fun (m, conflicts) ->
+              (if conflicts = [] then ok ""
+               else (
+                 (* usually that means a conflict between what the user
+                    request and the state of imported events from
+                    GitHub. *)
+                 let { DK.Transaction.ours; theirs; _ } = m in
+                 list_iter_p (fun path ->
+                     let dir, file =
+                       match List.rev @@ Datakit_path.unwrap path with
+                       | [] -> failwith "TODO"
+                       | base :: dir ->
+                         Datakit_path.of_steps_exn (List.rev dir), base
+                     in
+                     DK.Tree.read_file ours path   >>= fun ours   ->
+                     DK.Tree.read_file theirs path >>= fun theirs ->
+                     match ours, theirs with
+                     | Error _ , Error _ -> DK.Transaction.remove tr dir
+                     |    Ok v , Error _
+                     |       _ , Ok v    ->
+                       DK.Transaction.create_or_replace_file tr ~dir file v
+                   ) conflicts
+                 >>*= fun () ->
+                 ok @@ Fmt.strf "\n\nconflicts:@,@[%a@]"
+                   Fmt.(Dump.list Datakit_path.pp) conflicts)
+              ) >>*= fun conflict_msg ->
+              of_tree (E ((module DK.Transaction), tr)) >>*= fun s ->
+              let p =
+                { priv.s with repos = XRepoSet.union s.repos priv.s.repos }
+              in
+              let t = { pub = s; priv = p; starting = false } in
+              if compare_snapshot pub.s s = 0 then (
+                (* No changes, skip the commit.
+                   FIXME: this should be done by Datakit *)
+                Log.debug (fun l -> l "merge abort");
+                DK.Transaction.abort tr >>= fun () ->
+                ok t
+              ) else
+                let msg =
+                  Fmt.strf
+                    "Merging with %s\n\nbefore:@,@[%a@]\n\nafter:@,@[%a@]%s"
+                    (DK.Branch.name priv.b) pp_snapshot pub.s pp_snapshot s
+                    conflict_msg
+                in
+                Log.debug (fun l -> l "merge commit: %s" msg);
+                DK.Transaction.commit tr ~message:msg >>*= fun () ->
+                ok t
+            ))
 
   let init ~priv ~pub =
     Log.debug (fun l -> l "init");
-    (DK.Branch.head priv >>*= function
-      | Some _ -> ok ()
-      | None   ->
+    DK.Branch.head pub  >>*= fun pub_h ->
+    DK.Branch.head priv >>*= fun priv_h ->
+    match pub_h, priv_h with
+    | None, None ->
         DK.Branch.with_transaction priv (fun tr ->
             let dir  = Datakit_path.empty in
-            let data = Cstruct.of_string "### DataKit -- GitHub bridge" in
+            let data = Cstruct.of_string "### DataKit -- GitHub bridge\n" in
             DK.Transaction.create_or_replace_file tr ~dir "README.md" data
             >>= function
             | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
             | Error e ->
               DK.Transaction.abort tr >>= fun () ->
               Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-          ))
-    >>*= fun () ->
-    DK.Branch.head pub >>*= function
-    | Some _ -> ok ()
-    | None   -> with_head priv (DK.Branch.fast_forward pub)
+        ) >>*= fun () ->
+        with_head priv (DK.Branch.fast_forward pub)
+    | Some pub_c, None  -> DK.Branch.fast_forward priv pub_c
+    | None, Some priv_c -> DK.Branch.fast_forward pub priv_c
+    | Some _, Some _    -> ok ()
 
-  let once ~dry_updates ~token ~priv ~pub old =
-    Log.debug (fun l -> l "once %a" pp old);
-    with_head priv (fun priv_c ->
-        with_head pub (fun pub_c ->
-            call_github_api ~dry_updates ~token ~old ~priv:priv_c ~pub:pub_c
-            >>*= fun () ->
-            user_repo_diff ~old:old.pub pub_c  >>*= fun pub_d ->
-            user_repo_diff ~old:old.priv priv_c >>*= fun priv_d ->
-            import_github_events ~token priv (XRepoSet.union pub_d priv_d)
-          ))
-    >>= function
-    | Error e ->
-      (* FIXME: we should probably be retrying a bit less aggressively *)
-      Log.err (fun l -> l "%a" DK.pp_error e);
-      ok old
-    | Ok () ->
-      with_head priv (prune ~priv) >>*= fun () ->
-      with_head priv (merge ~old ~pub ~priv) >>*= fun t ->
-      ok t
+  (* Updates on the public branch trigger:
+     - GH API update calls to apply user change requests
+     - GH API event calls to initialise new repositories in the
+       private branch. *)
+  let once_pub ~dry_updates ~token ~old ~pub ~priv =
+    (if old.starting then (
+        let diff = XRepoSet.union pub.s.repos priv.s.repos in
+        import_github_events ~token priv diff
+      ) else (
+       let diff = XRepoSet.diff pub.s.repos old.pub.repos in
+       import_github_events ~token priv diff)
+    ) >>*= fun () ->
+    (* if [old.starting] is set, [old.priv] is not yet merged into
+       [old.pub], this means that [old.pub] might contain some
+       outdated information. In that case, sync the diff between
+       [priv] and [pub] in case some processes wrote stuff in
+       [t.pub] while we were not listening. *)
+    (if old.starting then with_head priv.b of_commit else ok old.pub)
+    >>*= fun orig ->
+    call_github_api ~dry_updates ~token ~old:orig pub.s
+
+  (* Updates on the private branch trigger:
+     - GH API event calls to initialise new repositories in the
+       private branch.
+     - Merge changes back to the public branch *)
+  let once_priv ~token ~old ~pub ~priv =
+    let diff = XRepoSet.sdiff priv.s.repos old.priv.repos in
+    (if old.starting then ok () else import_github_events ~token priv diff)
+    >>*= fun () -> merge ~priv ~pub
+
+  let input ?commit b =
+    match commit with
+    | None  -> with_head b (fun c -> of_commit c >>*= fun s -> ok { b; c; s })
+    | Some c -> of_commit c >>*= fun s -> ok { b; c; s }
+
+  let once ?pub_c ?priv_c ~dry_updates ~token ~priv ~pub old =
+    input ?commit:priv_c priv >>*= fun priv ->
+    input ?commit:pub_c  pub  >>*= fun pub  ->
+    Log.debug (fun l ->
+        l "once@, @[old: %a@]@, @[pub: %s %a@]@, @[priv: %s %a@]"
+          pp old
+          (DK.Branch.name pub.b)  pp_snapshot pub.s
+          (DK.Branch.name priv.b) pp_snapshot priv.s
+      );
+    once_pub ~dry_updates ~token ~old ~pub ~priv >>*= fun () ->
+    once_priv ~token ~old ~pub ~priv
 
   let run ?switch ~dry_updates ~token ~priv ~pub ~old policy =
     let once = once ~dry_updates ~token ~priv ~pub in
@@ -886,23 +957,27 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | `Repeat ->
       let old = ref old in
       let mutex = Lwt_mutex.create () in
-      let react = function
+      let react ~pub = function
         | None   -> ok `Again
         | Some h ->
           Log.debug (fun l -> l "Got event: %s" @@  DK.Commit.id h);
           Lwt_mutex.with_lock mutex (fun () ->
-              once !old >>= function
+              let pub_c, priv_c = match pub with
+                | true  -> Some h, None
+                | false -> None  , Some h
+              in
+              once ?pub_c ?priv_c !old >>= function
               | Ok t    -> old := t; Lwt.return_unit
               | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
             ) >>= fun () ->
           ok `Again
       in
-      let watch br =
-        DK.Branch.wait_for_head ?switch br react >>= function
+      let watch ~pub br =
+        DK.Branch.wait_for_head ?switch br (react ~pub) >>= function
         | Ok _    -> Lwt.return_unit
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
       in
-      Lwt.join [ watch priv; watch pub ] >>= fun () ->
+      Lwt.join [ watch ~pub:false priv; watch ~pub:true pub ] >>= fun () ->
       ok (`Finish !old)
 
   let sync ?switch ?(policy=`Repeat) ?(dry_updates=false) ~pub ~priv ~token t =

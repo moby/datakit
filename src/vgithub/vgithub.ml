@@ -366,186 +366,190 @@ module Make (API: API) = struct
 
 end
 
-module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
+open Lwt.Infix
+open Datakit_path.Infix
 
-  open Lwt.Infix
-  open Datakit_path.Infix
+let ( >>*= ) x f =
+  x >>= function
+  | Ok x -> f x
+  | Error _ as e -> Lwt.return e
 
-  let ( >>*= ) x f =
-    x >>= function
-    | Ok x -> f x
-    | Error _ as e -> Lwt.return e
+let ok x = Lwt.return (Ok x)
 
-  let ok x = Lwt.return (Ok x)
-  let error fmt = Fmt.kstrf (fun str -> DK.error "%s" str) fmt
+let list_iter_p f l =
+  Lwt_list.map_p f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok (), Ok ()            -> Ok ()
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok ()) (List.rev l)
 
-  let list_iter_p f l =
-    Lwt_list.map_p f l >|= fun l ->
-    List.fold_left (fun acc x -> match acc, x with
-        | Ok (), Ok ()            -> Ok ()
-        | Error e, _ | _, Error e -> Error e
-      ) (Ok ()) (List.rev l)
+let list_iter_s f l =
+  Lwt_list.map_s f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok (), Ok ()            -> Ok ()
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok ()) (List.rev l)
 
-  let list_iter_s f l =
-    Lwt_list.map_s f l >|= fun l ->
-    List.fold_left (fun acc x -> match acc, x with
-        | Ok (), Ok ()            -> Ok ()
-        | Error e, _ | _, Error e -> Error e
-      ) (Ok ()) (List.rev l)
+let list_map_p f l =
+  Lwt_list.map_p f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok acc, Ok x            -> Ok (x :: acc)
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok []) (List.rev l)
 
-  let list_map_p f l =
-    Lwt_list.map_p f l >|= fun l ->
-    List.fold_left (fun acc x -> match acc, x with
-        | Ok acc, Ok x            -> Ok (x :: acc)
-        | Error e, _ | _, Error e -> Error e
-      ) (Ok []) (List.rev l)
+module Conv (DK: Datakit_S.CLIENT) = struct
+
+  (* conversion between GitHub and DataKit states. *)
 
   module type TREE = Datakit_S.READABLE_TREE with
     type 'a or_error := 'a DK.or_error
 
   type tree = E: (module TREE with type t = 'a) * 'a -> tree
 
-  module Conv = struct
+  let error fmt = Fmt.kstrf (fun str -> DK.error "%s" str) fmt
 
-    (* conversion between GitHub and DataKit states. *)
+  (* PRs *)
 
-    (* PRs *)
-
-    let update_pr ~root t pr =
-      let dir = root / "pr" / string_of_int pr.PR.number in
-      Log.debug (fun l -> l "update_pr %s" @@ Datakit_path.to_hum dir);
-      match pr.PR.state with
-      | `Closed ->
-        DK.Transaction.exists t dir >>*= fun exists ->
-        if exists then DK.Transaction.remove t dir else ok ()
-      | `Open   ->
-        DK.Transaction.make_dirs t dir >>*= fun () ->
-        let head = Cstruct.of_string (pr.PR.head ^ "\n")in
-        let state = Cstruct.of_string (PR.string_of_state pr.PR.state ^ "\n") in
-        let title = Cstruct.of_string (pr.PR.title ^ "\n") in
-        DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
-        DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
-        DK.Transaction.create_or_replace_file t ~dir "title" title
-
-    let read_pr ~root (E ((module Tree), t)) number =
-      let dir = root / "pr" / string_of_int number in
-      Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
-      Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
-      Tree.exists_file t (dir / "state") >>*= fun exists_state ->
-      Tree.exists_file t (dir / "title") >>*= fun exists_title ->
-      if not exists_head then
-        Log.debug (fun l -> l "error: pr/%d/head does not exist" number);
-      if not exists_state then
-        Log.debug (fun l -> l "error: pr/%d/state does not exist" number);
-      if not exists_head || not exists_state then ok None
-      else (
-        Tree.read_file t (dir / "head") >>*= fun head ->
-        Tree.read_file t (dir / "state") >>*= fun state ->
-        (if not exists_title then ok (Cstruct.of_string "")
-         else Tree.read_file t (dir / "title"))
-        >>*= fun title ->
-        let parse s = String.trim (Cstruct.to_string s) in
-        let state = parse state in
-        let head = parse head in
-        let title = parse title in
-        match PR.state_of_string state with
-        | None       -> error "%s is not a valid PR state" state
-        | Some state -> ok (Some { PR.number; state; head; title })
-      )
-
-    let read_prs ~root tree =
-      let E ((module Tree), t) = tree in
-      let dir = root / "pr"  in
-      Log.debug (fun l -> l "read_prs %s" @@ Datakit_path.to_hum dir);
-      Tree.exists_dir t dir >>*= fun exists ->
-      if not exists then ok []
-      else
-        Tree.read_dir t dir >>*=
-        list_map_p (fun num -> read_pr ~root tree (int_of_string num))
-        >>*= fun l ->
-        List.fold_left
-          (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
-          [] (List.rev l)
-        |> ok
-
-    (* Status *)
-
-    let update_status ~root t s =
-      let dir =
-        root / "commit" / s.Status.commit / "status" /@
-        Datakit_path.of_steps_exn (Status.path s)
-      in
-      Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
+  let update_pr ~root t pr =
+    let dir = root / "pr" / string_of_int pr.PR.number in
+    Log.debug (fun l -> l "update_pr %s" @@ Datakit_path.to_hum dir);
+    match pr.PR.state with
+    | `Closed ->
+      DK.Transaction.exists t dir >>*= fun exists ->
+      if exists then DK.Transaction.remove t dir else ok ()
+    | `Open   ->
       DK.Transaction.make_dirs t dir >>*= fun () ->
-      let kvs = [
-        "description", s.Status.description;
-        "state"      , Some (Status_state.to_string s.Status.state);
-        "target_url" , s.Status.url;
-      ] in
-      list_iter_p (fun (k, v) -> match v with
-          | None   ->
-            DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
-            if not exists then ok () else DK.Transaction.remove t (dir / k)
-          | Some v ->
-            let v = Cstruct.of_string (v ^ "\n") in
-            DK.Transaction.create_or_replace_file t ~dir k v
-        ) kvs
+      let head = Cstruct.of_string (pr.PR.head ^ "\n")in
+      let state = Cstruct.of_string (PR.string_of_state pr.PR.state ^ "\n") in
+      let title = Cstruct.of_string (pr.PR.title ^ "\n") in
+      DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
+      DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
+      DK.Transaction.create_or_replace_file t ~dir "title" title
 
-    let read_status ~root (E ((module Tree), t)) ~commit ~context =
-      let context_path = Datakit_path.of_steps_exn context in
-      let dir = root / "commit" / commit / "status" /@ context_path in
-      Log.debug (fun l -> l "read_status %a" Datakit_path.pp dir);
+  let read_pr ~root (E ((module Tree), t)) number =
+    let dir = root / "pr" / string_of_int number in
+    Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
+    Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
+    Tree.exists_file t (dir / "state") >>*= fun exists_state ->
+    Tree.exists_file t (dir / "title") >>*= fun exists_title ->
+    if not exists_head then
+      Log.debug (fun l -> l "error: pr/%d/head does not exist" number);
+    if not exists_state then
+      Log.debug (fun l -> l "error: pr/%d/state does not exist" number);
+    if not exists_head || not exists_state then ok None
+    else (
+      Tree.read_file t (dir / "head") >>*= fun head ->
       Tree.read_file t (dir / "state") >>*= fun state ->
-      match Status_state.of_string (String.trim (Cstruct.to_string state)) with
-      | None       -> error "%s: invalid state" @@ Cstruct.to_string state
-      | Some state ->
-        let read file =
-          let some s = match String.trim s with "" -> None | s -> Some s in
-          Tree.exists_file t file >>*= function
-          | false -> ok None
-          | true  ->
-            Tree.read_file t file >>*= fun d ->
-            ok (some @@ Cstruct.to_string d)
-        in
-        read (dir / "description") >>*= fun description ->
-        read (dir / "target_url")  >>*= fun url ->
-        let context = Some (Datakit_path.to_hum context_path) in
-        ok { Status.state; commit; context; description; url; }
+      (if not exists_title then ok (Cstruct.of_string "")
+       else Tree.read_file t (dir / "title"))
+      >>*= fun title ->
+      let parse s = String.trim (Cstruct.to_string s) in
+      let state = parse state in
+      let head = parse head in
+      let title = parse title in
+      match PR.state_of_string state with
+      | None       -> error "%s is not a valid PR state" state
+      | Some state -> ok (Some { PR.number; state; head; title })
+    )
 
-    let read_statuses ~root tree =
-      let E ((module Tree), t) = tree in
-      Log.debug (fun l -> l "read_statuses");
-      let dir = root / "commit" in
-      Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
-      Tree.exists_dir t dir >>*= fun exists ->
-      if not exists then ok []
-      else
-        Tree.read_dir t dir >>*=
-        list_map_p (fun commit ->
-            let dir = dir / commit / "status" in
-            let rec aux context =
-              Log.debug
-                (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
-              let dir = dir /@ Datakit_path.of_steps_exn context in
-              Tree.exists_dir t dir >>*= fun exists ->
-              if not exists then ok []
+  let read_prs ~root tree =
+    let E ((module Tree), t) = tree in
+    let dir = root / "pr"  in
+    Log.debug (fun l -> l "read_prs %s" @@ Datakit_path.to_hum dir);
+    Tree.exists_dir t dir >>*= fun exists ->
+    if not exists then ok []
+    else
+      Tree.read_dir t dir >>*=
+      list_map_p (fun num -> read_pr ~root tree (int_of_string num))
+      >>*= fun l ->
+      List.fold_left
+        (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
+        [] (List.rev l)
+      |> ok
+
+  (* Status *)
+
+  let update_status ~root t s =
+    let dir =
+      root / "commit" / s.Status.commit / "status" /@
+      Datakit_path.of_steps_exn (Status.path s)
+    in
+    Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
+    DK.Transaction.make_dirs t dir >>*= fun () ->
+    let kvs = [
+      "description", s.Status.description;
+      "state"      , Some (Status_state.to_string s.Status.state);
+      "target_url" , s.Status.url;
+    ] in
+    list_iter_p (fun (k, v) -> match v with
+        | None   ->
+          DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
+          if not exists then ok () else DK.Transaction.remove t (dir / k)
+        | Some v ->
+          let v = Cstruct.of_string (v ^ "\n") in
+          DK.Transaction.create_or_replace_file t ~dir k v
+      ) kvs
+
+  let read_status ~root (E ((module Tree), t)) ~commit ~context =
+    let context_path = Datakit_path.of_steps_exn context in
+    let dir = root / "commit" / commit / "status" /@ context_path in
+    Log.debug (fun l -> l "read_status %a" Datakit_path.pp dir);
+    Tree.read_file t (dir / "state") >>*= fun state ->
+    match Status_state.of_string (String.trim (Cstruct.to_string state)) with
+    | None       -> error "%s: invalid state" @@ Cstruct.to_string state
+    | Some state ->
+      let read file =
+        let some s = match String.trim s with "" -> None | s -> Some s in
+        Tree.exists_file t file >>*= function
+        | false -> ok None
+        | true  ->
+          Tree.read_file t file >>*= fun d ->
+          ok (some @@ Cstruct.to_string d)
+      in
+      read (dir / "description") >>*= fun description ->
+      read (dir / "target_url")  >>*= fun url ->
+      let context = Some (Datakit_path.to_hum context_path) in
+      ok { Status.state; commit; context; description; url; }
+
+  let read_statuses ~root tree =
+    let E ((module Tree), t) = tree in
+    Log.debug (fun l -> l "read_statuses");
+    let dir = root / "commit" in
+    Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
+    Tree.exists_dir t dir >>*= fun exists ->
+    if not exists then ok []
+    else
+      Tree.read_dir t dir >>*=
+      list_map_p (fun commit ->
+          let dir = dir / commit / "status" in
+          let rec aux context =
+            Log.debug
+              (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
+            let dir = dir /@ Datakit_path.of_steps_exn context in
+            Tree.exists_dir t dir >>*= fun exists ->
+            if not exists then ok []
+            else
+              Tree.read_dir t dir >>*= fun child ->
+              list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
+              let child = List.flatten child in
+              Tree.exists_file t (dir / "state") >>*= fun exists ->
+              if exists then
+                read_status ~root tree ~commit ~context >>*= fun s ->
+                ok (s :: child)
               else
-                Tree.read_dir t dir >>*= fun child ->
-                list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
-                let child = List.flatten child in
-                Tree.exists_file t (dir / "state") >>*= fun exists ->
-                if exists then
-                  read_status ~root tree ~commit ~context >>*= fun s ->
-                  ok (s :: child)
-                else
-                  ok child
-            in
-            aux []
-          )
-        >>*= fun status ->
-        ok (List.flatten status)
+                ok child
+          in
+          aux []
+        )
+      >>*= fun status ->
+      ok (List.flatten status)
 
-  end
+end
+
+module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
+
+  module Conv = Conv(DK)
+  open Conv
 
   type 'a user_repo = {
     user: string;

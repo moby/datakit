@@ -686,9 +686,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "sync_datakit %s/%s" user repo);
     let root = Datakit_path.empty / user / repo in
     API.events token ~user ~repo >>= fun events ->
+    let status = ref XStatusSet.empty in
+    let prs = ref XPRSet.empty in
     list_iter_s (function
-        | Event.PR pr    -> Conv.update_pr ~root tr pr
-        | Event.Status s -> Conv.update_status ~root tr s
+        | Event.PR pr    ->
+          prs := XPRSet.add { user; repo; data = pr } !prs;
+          Conv.update_pr ~root tr pr
+        | Event.Status s ->
+          status := XStatusSet.add { user; repo; data = s } !status;
+          Conv.update_status ~root tr s
         | _               -> ok ()
       ) events >>*= fun () ->
     (* NOTE: it seems that GitHub doesn't store status events so we
@@ -697,14 +703,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     (if not exists_c then ok () else DK.Transaction.remove tr (root / "commit"))
     >>*= fun () ->
     let tree = E ((module DK.Transaction), tr) in
-    Conv.read_prs ~root tree >>*= fun prs ->
+    Conv.read_prs ~root tree >>*=
     list_iter_p (fun pr ->
         if pr.PR.state = `Closed then ok ()
         else (
+          prs := XPRSet.add { user; repo; data = pr } !prs;
           API.status token ~user ~repo ~commit:pr.PR.head >>= fun s ->
           list_iter_p (Conv.update_status ~root tr) s
         )
-      ) prs
+      )
+    >>*= fun () ->
+    ok (!status, !prs)
 
   let prune t tr =
     Log.debug (fun l -> l "prune");
@@ -720,38 +729,59 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             Fmt.(Dump.list Status.pp) status Fmt.(Dump.list PR.pp) prs
         );
       (* 1. Prune closed PRs. *)
-      let open_prs =
-        List.fold_left (fun acc pr ->
-            if pr.PR.state = `Open then String.Set.add pr.PR.head acc else acc
-          ) String.Set.empty prs
+      let open_prs, closed_prs =
+        List.fold_left (fun (open_prs, closed_prs) pr ->
+            match pr.PR.state with
+            | `Open   -> XPRSet.add {user; repo; data = pr} open_prs, closed_prs
+            | `Closed -> open_prs, XPRSet.add {user; repo; data = pr} closed_prs
+          ) (XPRSet.empty, XPRSet.empty) prs
       in
-      Log.debug (fun l -> l "open_prs:%a" String.Set.dump open_prs);
-      let is_open commit = String.Set.mem commit open_prs in
-      let closed_prs = List.filter (fun pr -> pr.PR.state = `Closed) prs in
-      Log.debug (fun l -> l "closed_prs:%a" Fmt.(Dump.list PR.pp) closed_prs);
+      let is_open s =
+        XPRSet.exists (fun pr ->
+            pr.data.PR.head = s.Status.commit && pr.data.PR.state = `Open
+          ) open_prs
+      in
+      Log.debug (fun l -> l "open_prs:%a" XPRSet.pp open_prs);
+      Log.debug (fun l -> l "closed_prs:%a" XPRSet.pp closed_prs);
       (* 2. Prune commits which doesn't belong to an open PR. *)
-      let closed_commits =
-        List.fold_left (fun acc s ->
-            if is_open s.Status.commit then acc
-            else String.Set.add s.Status.commit acc
-          ) String.Set.empty status
+      let open_status, closed_status =
+        List.fold_left (fun (open_status, closed_status) s ->
+            match is_open s with
+            | false ->
+              open_status, XStatusSet.add {user; repo; data = s} closed_status
+            | true  ->
+              XStatusSet.add {user; repo; data = s} open_status, closed_status
+          ) (XStatusSet.empty, XStatusSet.empty) status
       in
-      Log.debug (fun l -> l "closed_commits:%a" String.Set.dump closed_commits);
-      if String.Set.is_empty closed_commits && closed_prs = [] then ok ()
+      Log.debug (fun l -> l "open_status:%a" XStatusSet.pp open_status);
+      Log.debug (fun l -> l "closed_status:%a" XStatusSet.pp closed_status);
+      if XStatusSet.is_empty closed_status && XPRSet.is_empty closed_prs
+      then ok (open_status, open_prs)
       else (
         list_iter_p (fun pr ->
             DK.Transaction.remove tr
-              (root / "pr" / string_of_int pr.PR.number)
-          ) closed_prs
+              (root / "pr" / string_of_int pr.data.PR.number)
+          ) (XPRSet.elements closed_prs)
         >>*= fun () ->
-        list_iter_p (fun commit ->
-            DK.Transaction.remove tr (root / "commit" / commit)
-          ) (String.Set.elements closed_commits)
+        list_iter_p (fun s ->
+            DK.Transaction.remove tr (root / "commit" / s.data.Status.commit)
+          ) (XStatusSet.elements closed_status)
+        >>*= fun () ->
+        ok (open_status, open_prs)
       )
     in
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
-    list_iter_p aux (XRepoSet.elements t.repos)
+    let status = ref XStatusSet.empty in
+    let prs = ref XPRSet.empty in
+    list_iter_p (fun r ->
+        aux r >>*= fun (s, p) ->
+        status := XStatusSet.union s !status;
+        prs := XPRSet.union p !prs;
+        ok ()
+      ) (XRepoSet.elements t.repos)
+    >>*= fun () ->
+    ok { repos = t.repos; status = !status; prs = !prs }
 
   type input = {
     c: DK.Commit.t;
@@ -766,35 +796,41 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
      with care *)
   let import_github_events ~token priv diff =
     Log.debug (fun l -> l "import_github_events %a" XRepoSet.pp diff);
-    if XRepoSet.is_empty diff then ok ()
+    if XRepoSet.is_empty diff then ok priv.s
     else DK.Branch.with_transaction priv.b (fun tr ->
-        Lwt.catch (fun () ->
-            list_iter_p (fun { user; repo; _ } ->
-                sync_datakit token ~user ~repo tr >>= function
-                | Ok ()   -> ok ()
-                | Error e ->
-                  error "Error while syncing %s/%s: %a" user repo DK.pp_error e
-              ) (XRepoSet.elements diff)
-          ) (fun e -> error "%s" @@ Printexc.to_string e)
-        >>= function
-        | Ok () ->
-          of_tree (E ((module DK.Transaction), tr)) >>*= fun t ->
-          if compare_snapshot priv.s t = 0 then (DK.Transaction.abort tr >>= ok)
-          else
-            prune t tr >>*= fun () ->
-            let message = Fmt.strf "Importing events from %a" XRepoSet.pp diff in
-            DK.Transaction.commit tr ~message
-        | Error e ->
+        list_iter_p (fun { user; repo; _ } ->
+            Lwt.catch
+              (fun () -> sync_datakit token ~user ~repo tr)
+              (fun e  -> error "%s" (Printexc.to_string e))
+            >>= function
+            | Ok  _   -> ok ()
+            | Error e ->
+              let d =
+                Fmt.strf "Error while syncing %s/%s\n\n%a"
+                  user repo DK.pp_error e
+                |> fun s -> Cstruct.of_string s
+              in
+              let dir = Datakit_path.empty / user / repo in
+              DK.Transaction.create_or_replace_file tr ~dir "ERRORS" d
+          ) (XRepoSet.elements diff)
+        >>*= fun () ->
+        of_tree (E ((module DK.Transaction), tr)) >>*= fun t ->
+        if compare_snapshot priv.s t = 0 then (
           DK.Transaction.abort tr >>= fun () ->
-          error "%a" DK.pp_error e
+          ok t
+        ) else
+          prune t tr >>*= fun r ->
+          let message = Fmt.strf "Importing events from %a" XRepoSet.pp diff in
+          DK.Transaction.commit tr ~message >>*= fun () ->
+          ok r
       )
 
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be. *)
   let call_github_api ~dry_updates ~token ~old t =
     Log.debug (fun l -> l "call_github_api");
-    let status = XStatusSet.diff t.status old.status |> XStatusSet.elements in
-    let prs = XPRSet.diff t.prs old.prs |> XPRSet.elements in
+    let status = XStatusSet.diff t.status old.status in
+    let prs = XPRSet.diff t.prs old.prs in
     Lwt_list.iter_p (fun { user; repo; data } ->
         let old =
           let same_context s =
@@ -810,14 +846,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
               user repo Status.pp data Fmt.(option Status.pp) old);
         if not dry_updates then API.set_status token ~user ~repo data
         else  Lwt.return_unit
-      ) status
+      ) (XStatusSet.elements status)
     >>= fun () ->
     Lwt_list.iter_p (fun { user; repo; data } ->
         Log.info (fun l -> l "API.set-pr %s/%s %a" user repo PR.pp data);
         if not dry_updates then API.set_pr token ~user ~repo data
         else Lwt.return_unit
-      ) prs
-    >>= ok
+      ) (XPRSet.elements prs)
+    >>= fun () ->
+    ok { repos = t.repos; status; prs }
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function
@@ -829,6 +866,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     if compare_snapshot pub.s priv.s = 0 then
       ok { pub = pub.s; priv = priv.s; starting = false }
     else
+      (* FIXME: ideally we can just look at [priv.s], no need to do a
+         racy with_head, heare *)
       with_head priv.b (fun priv_c ->
           (* FIXME: ideally we will create a transaction from the commit
              [pub.c]. *)
@@ -914,7 +953,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       ) else (
        let diff = XRepoSet.diff pub.s.repos old.pub.repos in
        import_github_events ~token priv diff)
-    ) >>*= fun () ->
+    ) >>*= fun _ ->
     (* if [old.starting] is set, [old.priv] is not yet merged into
        [old.pub], this means that [old.pub] might contain some
        outdated information. In that case, sync the diff between
@@ -930,8 +969,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
      - Merge changes back to the public branch *)
   let once_priv ~token ~old ~pub ~priv =
     let diff = XRepoSet.sdiff priv.s.repos old.priv.repos in
-    (if old.starting then ok () else import_github_events ~token priv diff)
-    >>*= fun () -> merge ~priv ~pub
+    (if old.starting then ok priv.s else import_github_events ~token priv diff)
+    >>*= fun s -> merge ~priv:{ priv with s } ~pub
 
   let input ?commit b =
     match commit with
@@ -947,7 +986,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           (DK.Branch.name pub.b)  pp_snapshot pub.s
           (DK.Branch.name priv.b) pp_snapshot priv.s
       );
-    once_pub ~dry_updates ~token ~old ~pub ~priv >>*= fun () ->
+    once_pub ~dry_updates ~token ~old ~pub ~priv >>*= fun _ ->
     once_priv ~token ~old ~pub ~priv
 
   let run ?switch ~dry_updates ~token ~priv ~pub ~old policy =

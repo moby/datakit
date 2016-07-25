@@ -109,6 +109,17 @@ module Make (API: API): sig
 
 end
 
+
+(** Conversion between GitHub and DataKit states. *)
+module Conv (DK: Datakit_S.CLIENT): sig
+
+  (** [update_status t s] applies the status [s] to the filesystem
+      [t]. *)
+  val update_status: root:Datakit_path.t ->
+    DK.Transaction.t -> Status.t -> (unit, DK.error) Result.result Lwt.t
+
+end
+
 module Sync (API: API) (DK: Datakit_S.CLIENT): sig
 
   type t

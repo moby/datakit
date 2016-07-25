@@ -366,186 +366,190 @@ module Make (API: API) = struct
 
 end
 
-module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
+open Lwt.Infix
+open Datakit_path.Infix
 
-  open Lwt.Infix
-  open Datakit_path.Infix
+let ( >>*= ) x f =
+  x >>= function
+  | Ok x -> f x
+  | Error _ as e -> Lwt.return e
 
-  let ( >>*= ) x f =
-    x >>= function
-    | Ok x -> f x
-    | Error _ as e -> Lwt.return e
+let ok x = Lwt.return (Ok x)
 
-  let ok x = Lwt.return (Ok x)
-  let error fmt = Fmt.kstrf (fun str -> DK.error "%s" str) fmt
+let list_iter_p f l =
+  Lwt_list.map_p f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok (), Ok ()            -> Ok ()
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok ()) (List.rev l)
 
-  let list_iter_p f l =
-    Lwt_list.map_p f l >|= fun l ->
-    List.fold_left (fun acc x -> match acc, x with
-        | Ok (), Ok ()            -> Ok ()
-        | Error e, _ | _, Error e -> Error e
-      ) (Ok ()) (List.rev l)
+let list_iter_s f l =
+  Lwt_list.map_s f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok (), Ok ()            -> Ok ()
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok ()) (List.rev l)
 
-  let list_iter_s f l =
-    Lwt_list.map_s f l >|= fun l ->
-    List.fold_left (fun acc x -> match acc, x with
-        | Ok (), Ok ()            -> Ok ()
-        | Error e, _ | _, Error e -> Error e
-      ) (Ok ()) (List.rev l)
+let list_map_p f l =
+  Lwt_list.map_p f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok acc, Ok x            -> Ok (x :: acc)
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok []) (List.rev l)
 
-  let list_map_p f l =
-    Lwt_list.map_p f l >|= fun l ->
-    List.fold_left (fun acc x -> match acc, x with
-        | Ok acc, Ok x            -> Ok (x :: acc)
-        | Error e, _ | _, Error e -> Error e
-      ) (Ok []) (List.rev l)
+module Conv (DK: Datakit_S.CLIENT) = struct
+
+  (* conversion between GitHub and DataKit states. *)
 
   module type TREE = Datakit_S.READABLE_TREE with
     type 'a or_error := 'a DK.or_error
 
   type tree = E: (module TREE with type t = 'a) * 'a -> tree
 
-  module Conv = struct
+  let error fmt = Fmt.kstrf (fun str -> DK.error "%s" str) fmt
 
-    (* conversion between GitHub and DataKit states. *)
+  (* PRs *)
 
-    (* PRs *)
-
-    let update_pr ~root t pr =
-      let dir = root / "pr" / string_of_int pr.PR.number in
-      Log.debug (fun l -> l "update_pr %s" @@ Datakit_path.to_hum dir);
-      match pr.PR.state with
-      | `Closed ->
-        DK.Transaction.exists t dir >>*= fun exists ->
-        if exists then DK.Transaction.remove t dir else ok ()
-      | `Open   ->
-        DK.Transaction.make_dirs t dir >>*= fun () ->
-        let head = Cstruct.of_string (pr.PR.head ^ "\n")in
-        let state = Cstruct.of_string (PR.string_of_state pr.PR.state ^ "\n") in
-        let title = Cstruct.of_string (pr.PR.title ^ "\n") in
-        DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
-        DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
-        DK.Transaction.create_or_replace_file t ~dir "title" title
-
-    let read_pr ~root (E ((module Tree), t)) number =
-      let dir = root / "pr" / string_of_int number in
-      Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
-      Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
-      Tree.exists_file t (dir / "state") >>*= fun exists_state ->
-      Tree.exists_file t (dir / "title") >>*= fun exists_title ->
-      if not exists_head then
-        Log.debug (fun l -> l "error: pr/%d/head does not exist" number);
-      if not exists_state then
-        Log.debug (fun l -> l "error: pr/%d/state does not exist" number);
-      if not exists_head || not exists_state then ok None
-      else (
-        Tree.read_file t (dir / "head") >>*= fun head ->
-        Tree.read_file t (dir / "state") >>*= fun state ->
-        (if not exists_title then ok (Cstruct.of_string "")
-         else Tree.read_file t (dir / "title"))
-        >>*= fun title ->
-        let parse s = String.trim (Cstruct.to_string s) in
-        let state = parse state in
-        let head = parse head in
-        let title = parse title in
-        match PR.state_of_string state with
-        | None       -> error "%s is not a valid PR state" state
-        | Some state -> ok (Some { PR.number; state; head; title })
-      )
-
-    let read_prs ~root tree =
-      let E ((module Tree), t) = tree in
-      let dir = root / "pr"  in
-      Log.debug (fun l -> l "read_prs %s" @@ Datakit_path.to_hum dir);
-      Tree.exists_dir t dir >>*= fun exists ->
-      if not exists then ok []
-      else
-        Tree.read_dir t dir >>*=
-        list_map_p (fun num -> read_pr ~root tree (int_of_string num))
-        >>*= fun l ->
-        List.fold_left
-          (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
-          [] (List.rev l)
-        |> ok
-
-    (* Status *)
-
-    let update_status ~root t s =
-      let dir =
-        root / "commit" / s.Status.commit / "status" /@
-        Datakit_path.of_steps_exn (Status.path s)
-      in
-      Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
+  let update_pr ~root t pr =
+    let dir = root / "pr" / string_of_int pr.PR.number in
+    Log.debug (fun l -> l "update_pr %s" @@ Datakit_path.to_hum dir);
+    match pr.PR.state with
+    | `Closed ->
+      DK.Transaction.exists t dir >>*= fun exists ->
+      if exists then DK.Transaction.remove t dir else ok ()
+    | `Open   ->
       DK.Transaction.make_dirs t dir >>*= fun () ->
-      let kvs = [
-        "description", s.Status.description;
-        "state"      , Some (Status_state.to_string s.Status.state);
-        "target_url" , s.Status.url;
-      ] in
-      list_iter_p (fun (k, v) -> match v with
-          | None   ->
-            DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
-            if not exists then ok () else DK.Transaction.remove t (dir / k)
-          | Some v ->
-            let v = Cstruct.of_string (v ^ "\n") in
-            DK.Transaction.create_or_replace_file t ~dir k v
-        ) kvs
+      let head = Cstruct.of_string (pr.PR.head ^ "\n")in
+      let state = Cstruct.of_string (PR.string_of_state pr.PR.state ^ "\n") in
+      let title = Cstruct.of_string (pr.PR.title ^ "\n") in
+      DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
+      DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
+      DK.Transaction.create_or_replace_file t ~dir "title" title
 
-    let read_status ~root (E ((module Tree), t)) ~commit ~context =
-      let context_path = Datakit_path.of_steps_exn context in
-      let dir = root / "commit" / commit / "status" /@ context_path in
-      Log.debug (fun l -> l "read_status %a" Datakit_path.pp dir);
+  let read_pr ~root (E ((module Tree), t)) number =
+    let dir = root / "pr" / string_of_int number in
+    Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
+    Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
+    Tree.exists_file t (dir / "state") >>*= fun exists_state ->
+    Tree.exists_file t (dir / "title") >>*= fun exists_title ->
+    if not exists_head then
+      Log.debug (fun l -> l "error: pr/%d/head does not exist" number);
+    if not exists_state then
+      Log.debug (fun l -> l "error: pr/%d/state does not exist" number);
+    if not exists_head || not exists_state then ok None
+    else (
+      Tree.read_file t (dir / "head") >>*= fun head ->
       Tree.read_file t (dir / "state") >>*= fun state ->
-      match Status_state.of_string (String.trim (Cstruct.to_string state)) with
-      | None       -> error "%s: invalid state" @@ Cstruct.to_string state
-      | Some state ->
-        let read file =
-          let some s = match String.trim s with "" -> None | s -> Some s in
-          Tree.exists_file t file >>*= function
-          | false -> ok None
-          | true  ->
-            Tree.read_file t file >>*= fun d ->
-            ok (some @@ Cstruct.to_string d)
-        in
-        read (dir / "description") >>*= fun description ->
-        read (dir / "target_url")  >>*= fun url ->
-        let context = Some (Datakit_path.to_hum context_path) in
-        ok { Status.state; commit; context; description; url; }
+      (if not exists_title then ok (Cstruct.of_string "")
+       else Tree.read_file t (dir / "title"))
+      >>*= fun title ->
+      let parse s = String.trim (Cstruct.to_string s) in
+      let state = parse state in
+      let head = parse head in
+      let title = parse title in
+      match PR.state_of_string state with
+      | None       -> error "%s is not a valid PR state" state
+      | Some state -> ok (Some { PR.number; state; head; title })
+    )
 
-    let read_statuses ~root tree =
-      let E ((module Tree), t) = tree in
-      Log.debug (fun l -> l "read_statuses");
-      let dir = root / "commit" in
-      Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
-      Tree.exists_dir t dir >>*= fun exists ->
-      if not exists then ok []
-      else
-        Tree.read_dir t dir >>*=
-        list_map_p (fun commit ->
-            let dir = dir / commit / "status" in
-            let rec aux context =
-              Log.debug
-                (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
-              let dir = dir /@ Datakit_path.of_steps_exn context in
-              Tree.exists_dir t dir >>*= fun exists ->
-              if not exists then ok []
+  let read_prs ~root tree =
+    let E ((module Tree), t) = tree in
+    let dir = root / "pr"  in
+    Log.debug (fun l -> l "read_prs %s" @@ Datakit_path.to_hum dir);
+    Tree.exists_dir t dir >>*= fun exists ->
+    if not exists then ok []
+    else
+      Tree.read_dir t dir >>*=
+      list_map_p (fun num -> read_pr ~root tree (int_of_string num))
+      >>*= fun l ->
+      List.fold_left
+        (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
+        [] (List.rev l)
+      |> ok
+
+  (* Status *)
+
+  let update_status ~root t s =
+    let dir =
+      root / "commit" / s.Status.commit / "status" /@
+      Datakit_path.of_steps_exn (Status.path s)
+    in
+    Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
+    DK.Transaction.make_dirs t dir >>*= fun () ->
+    let kvs = [
+      "description", s.Status.description;
+      "state"      , Some (Status_state.to_string s.Status.state);
+      "target_url" , s.Status.url;
+    ] in
+    list_iter_p (fun (k, v) -> match v with
+        | None   ->
+          DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
+          if not exists then ok () else DK.Transaction.remove t (dir / k)
+        | Some v ->
+          let v = Cstruct.of_string (v ^ "\n") in
+          DK.Transaction.create_or_replace_file t ~dir k v
+      ) kvs
+
+  let read_status ~root (E ((module Tree), t)) ~commit ~context =
+    let context_path = Datakit_path.of_steps_exn context in
+    let dir = root / "commit" / commit / "status" /@ context_path in
+    Log.debug (fun l -> l "read_status %a" Datakit_path.pp dir);
+    Tree.read_file t (dir / "state") >>*= fun state ->
+    match Status_state.of_string (String.trim (Cstruct.to_string state)) with
+    | None       -> error "%s: invalid state" @@ Cstruct.to_string state
+    | Some state ->
+      let read file =
+        let some s = match String.trim s with "" -> None | s -> Some s in
+        Tree.exists_file t file >>*= function
+        | false -> ok None
+        | true  ->
+          Tree.read_file t file >>*= fun d ->
+          ok (some @@ Cstruct.to_string d)
+      in
+      read (dir / "description") >>*= fun description ->
+      read (dir / "target_url")  >>*= fun url ->
+      let context = Some (Datakit_path.to_hum context_path) in
+      ok { Status.state; commit; context; description; url; }
+
+  let read_statuses ~root tree =
+    let E ((module Tree), t) = tree in
+    Log.debug (fun l -> l "read_statuses");
+    let dir = root / "commit" in
+    Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
+    Tree.exists_dir t dir >>*= fun exists ->
+    if not exists then ok []
+    else
+      Tree.read_dir t dir >>*=
+      list_map_p (fun commit ->
+          let dir = dir / commit / "status" in
+          let rec aux context =
+            Log.debug
+              (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
+            let dir = dir /@ Datakit_path.of_steps_exn context in
+            Tree.exists_dir t dir >>*= fun exists ->
+            if not exists then ok []
+            else
+              Tree.read_dir t dir >>*= fun child ->
+              list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
+              let child = List.flatten child in
+              Tree.exists_file t (dir / "state") >>*= fun exists ->
+              if exists then
+                read_status ~root tree ~commit ~context >>*= fun s ->
+                ok (s :: child)
               else
-                Tree.read_dir t dir >>*= fun child ->
-                list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
-                let child = List.flatten child in
-                Tree.exists_file t (dir / "state") >>*= fun exists ->
-                if exists then
-                  read_status ~root tree ~commit ~context >>*= fun s ->
-                  ok (s :: child)
-                else
-                  ok child
-            in
-            aux []
-          )
-        >>*= fun status ->
-        ok (List.flatten status)
+                ok child
+          in
+          aux []
+        )
+      >>*= fun status ->
+      ok (List.flatten status)
 
-  end
+end
+
+module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
+
+  module Conv = Conv(DK)
+  open Conv
 
   type 'a user_repo = {
     user: string;
@@ -585,15 +589,24 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         ) t;
       tbl
 
+    exception Found of elt
+
+    let findf f t =
+      try iter (fun e -> if f e then raise (Found e)) t; None
+      with Found e -> Some e
   end
 
   module XStatusSet = UserRepoSet(Status)
   module XPRSet = UserRepoSet(PR)
-  module XRepoSet = UserRepoSet(struct
-      type t = unit
-      let compare = compare
-      let pp ppf () = Fmt.string ppf ""
-    end)
+  module XRepoSet = struct
+    include UserRepoSet(struct
+        type t = unit
+        let compare = compare
+        let pp ppf () = Fmt.string ppf ""
+      end)
+    let pp_elt ppf { user; repo; _ } = Fmt.pf ppf "%s/%s" user repo
+    let pp ppf t = Fmt.(Dump.list pp_elt) ppf (elements t)
+  end
 
   type snapshot = {
     repos : XRepoSet.t;
@@ -611,7 +624,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | i -> i
 
   let pp_snapshot ppf t =
-    Fmt.pf ppf "@[repos: %a@, status: %a@, prs: %a@]"
+    Fmt.pf ppf "@[[repos: %a@, status: %a@, prs: %a]@]"
       XRepoSet.pp t.repos XStatusSet.pp t.status XPRSet.pp t.prs
 
   let empty_snapshot =
@@ -619,14 +632,14 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   type t = {
     pub: snapshot; priv: snapshot;
-    merged: bool;     (* becomes true after the first merge of priv into pub. *)
+    starting: bool;                     (* becomes true after the first sync. *)
   }
 
   let pp ppf t =
-    Fmt.pf ppf "@[pub: %a@, priv: %a@, merged: %b]"
-      pp_snapshot t.pub pp_snapshot t.priv t.merged
+    Fmt.pf ppf "@[[pub: %a@, priv: %a@, starting: %b]@]"
+      pp_snapshot t.pub pp_snapshot t.priv t.starting
 
-  let empty = { pub = empty_snapshot; priv = empty_snapshot; merged = false }
+  let empty = { pub = empty_snapshot; priv = empty_snapshot; starting = true }
 
   let of_tree (E ((module Tree), tree)) =
     Log.debug (fun l -> l "of_tree");
@@ -673,9 +686,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "sync_datakit %s/%s" user repo);
     let root = Datakit_path.empty / user / repo in
     API.events token ~user ~repo >>= fun events ->
+    let status = ref XStatusSet.empty in
+    let prs = ref XPRSet.empty in
     list_iter_s (function
-        | Event.PR pr    -> Conv.update_pr ~root tr pr
-        | Event.Status s -> Conv.update_status ~root tr s
+        | Event.PR pr    ->
+          prs := XPRSet.add { user; repo; data = pr } !prs;
+          Conv.update_pr ~root tr pr
+        | Event.Status s ->
+          status := XStatusSet.add { user; repo; data = s } !status;
+          Conv.update_status ~root tr s
         | _               -> ok ()
       ) events >>*= fun () ->
     (* NOTE: it seems that GitHub doesn't store status events so we
@@ -684,75 +703,20 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     (if not exists_c then ok () else DK.Transaction.remove tr (root / "commit"))
     >>*= fun () ->
     let tree = E ((module DK.Transaction), tr) in
-    Conv.read_prs ~root tree >>*= fun prs ->
+    Conv.read_prs ~root tree >>*=
     list_iter_p (fun pr ->
         if pr.PR.state = `Closed then ok ()
         else (
+          prs := XPRSet.add { user; repo; data = pr } !prs;
           API.status token ~user ~repo ~commit:pr.PR.head >>= fun s ->
           list_iter_p (Conv.update_status ~root tr) s
         )
-      ) prs
-
-  (* Read the GitHub events for the repositories appearing in [diff]
-     and populate [branch] with the result of applying all of the into
-     the state. *)
-  (* NOTE: quite slow (because of the call to API.events), so use it
-     with care *)
-  let import_github_events ~token priv diff =
-    Log.debug (fun l -> l "import_github_events %a" XRepoSet.pp diff);
-    if XRepoSet.is_empty diff then ok ()
-    else DK.Branch.with_transaction priv (fun tr ->
-        Lwt.catch (fun () ->
-            list_iter_p (fun { user; repo; _ } ->
-                sync_datakit token ~user ~repo tr >>= function
-                | Ok ()   -> ok ()
-                | Error e ->
-                  error "Error while syncing %s/%s: %a" user repo DK.pp_error e
-              ) (XRepoSet.elements diff)
-          ) (fun e -> error "%s" @@ Printexc.to_string e)
-        >>= function
-        | Ok () ->
-          let message = Fmt.strf "Syncing with events %a" XRepoSet.pp diff in
-          DK.Transaction.commit tr ~message
-        | Error e ->
-          DK.Transaction.abort tr >>= fun () ->
-          error "%a" DK.pp_error e
       )
+    >>*= fun () ->
+    ok (!status, !prs)
 
-  (* Read DataKit data and call the GitHub API to sync the world with
-     what DataKit think it should be.
-     Also clean-up DataKit invariants such as GC-ing commit entries. *)
-  (* TODO: handle pr_diffs too *)
-  let call_github_api ~dry_updates ~token ~old ~priv ~pub =
-    let aux old t =
-      let status = XStatusSet.diff t.status old.status |> XStatusSet.elements in
-      let prs = XPRSet.diff t.prs old.prs |> XPRSet.elements in
-      Lwt_list.iter_p (fun { user; repo; data } ->
-          Log.info
-            (fun l -> l "API.set-status %s/%s %a" user repo Status.pp data);
-          if not dry_updates then API.set_status token ~user ~repo data
-          else  Lwt.return_unit
-        ) status
-      >>= fun () ->
-      Lwt_list.iter_p (fun { user; repo; data } ->
-          Log.info (fun l -> l "API.set-pr %s/%s %a" user repo PR.pp data);
-          if not dry_updates then API.set_pr token ~user ~repo data
-          else Lwt.return_unit
-        ) prs
-      >>= ok
-    in
-    of_commit pub >>*= fun pub ->
-    if not old.merged then (
-      (* if [t.priv] is not yet merged into [t.pub], this means that
-         [t.pub] might contain some outdated information. In that
-         case, skip the user updates as it is unsafe to call GitHub
-         API calls.  *)
-      of_commit priv >>*= fun priv ->
-      aux priv pub
-    ) else
-      aux old.pub pub
-
-  let prune t branch =
+  let prune t tr =
+    Log.debug (fun l -> l "prune");
     let status = XStatusSet.bindings t.status in
     let prs = XPRSet.bindings t.prs in
     let aux { user; repo; _ } =
@@ -765,115 +729,265 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             Fmt.(Dump.list Status.pp) status Fmt.(Dump.list PR.pp) prs
         );
       (* 1. Prune closed PRs. *)
-      let open_prs =
-        List.fold_left (fun acc pr ->
-            if pr.PR.state = `Open then String.Set.add pr.PR.head acc else acc
-          ) String.Set.empty prs
+      let open_prs, closed_prs =
+        List.fold_left (fun (open_prs, closed_prs) pr ->
+            match pr.PR.state with
+            | `Open   -> XPRSet.add {user; repo; data = pr} open_prs, closed_prs
+            | `Closed -> open_prs, XPRSet.add {user; repo; data = pr} closed_prs
+          ) (XPRSet.empty, XPRSet.empty) prs
       in
-      Log.debug (fun l -> l "open_prs:%a" String.Set.dump open_prs);
-      let is_open commit = String.Set.mem commit open_prs in
-      let closed_prs = List.filter (fun pr -> pr.PR.state = `Closed) prs in
-      Log.debug (fun l -> l "closed_prs:%a" Fmt.(Dump.list PR.pp) closed_prs);
+      let is_open s =
+        XPRSet.exists (fun pr ->
+            pr.data.PR.head = s.Status.commit && pr.data.PR.state = `Open
+          ) open_prs
+      in
+      Log.debug (fun l -> l "open_prs:%a" XPRSet.pp open_prs);
+      Log.debug (fun l -> l "closed_prs:%a" XPRSet.pp closed_prs);
       (* 2. Prune commits which doesn't belong to an open PR. *)
-      let closed_commits =
-        List.fold_left (fun acc s ->
-            if is_open s.Status.commit then acc
-            else String.Set.add s.Status.commit acc
-          ) String.Set.empty status
+      let open_status, closed_status =
+        List.fold_left (fun (open_status, closed_status) s ->
+            match is_open s with
+            | false ->
+              open_status, XStatusSet.add {user; repo; data = s} closed_status
+            | true  ->
+              XStatusSet.add {user; repo; data = s} open_status, closed_status
+          ) (XStatusSet.empty, XStatusSet.empty) status
       in
-      Log.debug (fun l -> l "closed_commits:%a" String.Set.dump closed_commits);
-      if String.Set.is_empty closed_commits && closed_prs = [] then ok ()
-      else DK.Branch.with_transaction branch (fun tr ->
-          Lwt.catch (fun () ->
-              list_iter_p (fun pr ->
-                  DK.Transaction.remove tr
-                    (root / "pr" / string_of_int pr.PR.number)
-                ) closed_prs
-              >>*= fun () ->
-              list_iter_p (fun commit ->
-                  DK.Transaction.remove tr (root / "commit" / commit)
-                ) (String.Set.elements closed_commits)
-            ) (fun e -> error "%s" @@ Printexc.to_string e)
-          >>= function
-          | Ok ()   -> DK.Transaction.commit tr
-                         ~message:"Pruning closed PRs and their commits."
-          | Error e -> DK.Transaction.abort tr >|= fun () -> Error e
-        )
+      Log.debug (fun l -> l "open_status:%a" XStatusSet.pp open_status);
+      Log.debug (fun l -> l "closed_status:%a" XStatusSet.pp closed_status);
+      if XStatusSet.is_empty closed_status && XPRSet.is_empty closed_prs
+      then ok (open_status, open_prs)
+      else (
+        list_iter_p (fun pr ->
+            DK.Transaction.remove tr
+              (root / "pr" / string_of_int pr.data.PR.number)
+          ) (XPRSet.elements closed_prs)
+        >>*= fun () ->
+        list_iter_p (fun s ->
+            DK.Transaction.remove tr (root / "commit" / s.data.Status.commit)
+          ) (XStatusSet.elements closed_status)
+        >>*= fun () ->
+        ok (open_status, open_prs)
+      )
     in
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
-    list_iter_p aux (XRepoSet.elements t.repos)
+    let status = ref XStatusSet.empty in
+    let prs = ref XPRSet.empty in
+    list_iter_p (fun r ->
+        aux r >>*= fun (s, p) ->
+        status := XStatusSet.union s !status;
+        prs := XPRSet.union p !prs;
+        ok ()
+      ) (XRepoSet.elements t.repos)
+    >>*= fun () ->
+    ok { repos = t.repos; status = !status; prs = !prs }
+
+  type input = {
+    c: DK.Commit.t;
+    s: snapshot;
+    b: DK.Branch.t;
+  }
+
+  (* Read the GitHub events for the repositories appearing in [diff]
+     and populate [branch] with the result of applying all of the into
+     the state. *)
+  (* NOTE: quite slow (because of the call to API.events), so use it
+     with care *)
+  let import_github_events ~token priv diff =
+    Log.debug (fun l -> l "import_github_events %a" XRepoSet.pp diff);
+    if XRepoSet.is_empty diff then ok priv.s
+    else DK.Branch.with_transaction priv.b (fun tr ->
+        list_iter_p (fun { user; repo; _ } ->
+            Lwt.catch
+              (fun () -> sync_datakit token ~user ~repo tr)
+              (fun e  -> error "%s" (Printexc.to_string e))
+            >>= function
+            | Ok  _   -> ok ()
+            | Error e ->
+              let d =
+                Fmt.strf "Error while syncing %s/%s\n\n%a"
+                  user repo DK.pp_error e
+                |> fun s -> Cstruct.of_string s
+              in
+              let dir = Datakit_path.empty / user / repo in
+              DK.Transaction.create_or_replace_file tr ~dir "ERRORS" d
+          ) (XRepoSet.elements diff)
+        >>*= fun () ->
+        of_tree (E ((module DK.Transaction), tr)) >>*= fun t ->
+        if compare_snapshot priv.s t = 0 then (
+          DK.Transaction.abort tr >>= fun () ->
+          ok t
+        ) else
+          prune t tr >>*= fun r ->
+          let message = Fmt.strf "Importing events from %a" XRepoSet.pp diff in
+          DK.Transaction.commit tr ~message >>*= fun () ->
+          ok r
+      )
+
+  (* Read DataKit data and call the GitHub API to sync the world with
+     what DataKit think it should be. *)
+  let call_github_api ~dry_updates ~token ~old t =
+    Log.debug (fun l -> l "call_github_api");
+    let status = XStatusSet.diff t.status old.status in
+    let prs = XPRSet.diff t.prs old.prs in
+    Lwt_list.iter_p (fun { user; repo; data } ->
+        let old =
+          let same_context s =
+            s.data.Status.context = data.Status.context
+            && s.data.Status.commit = data.Status.commit
+          in
+          XStatusSet.findf same_context old.status |> function
+          | None   -> None
+          | Some s -> Some s.data
+        in
+        Log.info
+          (fun l -> l "API.set-status %s/%s %a (was %a)"
+              user repo Status.pp data Fmt.(option Status.pp) old);
+        if not dry_updates then API.set_status token ~user ~repo data
+        else  Lwt.return_unit
+      ) (XStatusSet.elements status)
+    >>= fun () ->
+    Lwt_list.iter_p (fun { user; repo; data } ->
+        Log.info (fun l -> l "API.set-pr %s/%s %a" user repo PR.pp data);
+        if not dry_updates then API.set_pr token ~user ~repo data
+        else Lwt.return_unit
+      ) (XPRSet.elements prs)
+    >>= fun () ->
+    ok { repos = t.repos; status; prs }
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function
     | None   -> error "empty branch!"
     | Some c -> fn c
 
-  let user_repo_diff ~old c =
-    of_commit c >>*= fun current_t ->
-    let diff = XRepoSet.sdiff old.repos current_t.repos in
-    Log.debug (fun l -> l "user-repo-diff: %a" XRepoSet.pp diff);
-    ok diff
-
-  let prune ~priv c =
-    of_commit c >>*= fun t ->
-    prune t priv >>*= fun () ->
-    ok ()
-
-  let merge ~old ~pub ~priv c =
-    DK.Branch.with_transaction pub (fun tr ->
-        DK.Transaction.merge tr c >>*= fun (_, conflicts) ->
-        if conflicts <> [] then failwith "TODO";
-        let msg = Fmt.strf "Merging with %s" @@ DK.Branch.name priv in
-        of_commit c >>*= fun priv ->
-        of_tree (E ((module DK.Transaction), tr)) >>*= fun pub ->
-        (if compare_snapshot old.priv priv = 0 then
-           DK.Transaction.abort tr >>= ok
-         else
-           DK.Transaction.commit tr ~message:msg)
-        >>*= fun () ->
-        ok { pub; priv; merged = true }
-      )
+  let merge ~pub ~priv =
+    Log.debug (fun l -> l "merge pub:%a" pp_snapshot pub.s);
+    if compare_snapshot pub.s priv.s = 0 then
+      ok { pub = pub.s; priv = priv.s; starting = false }
+    else
+      (* FIXME: ideally we can just look at [priv.s], no need to do a
+         racy with_head, heare *)
+      with_head priv.b (fun priv_c ->
+          (* FIXME: ideally we will create a transaction from the commit
+             [pub.c]. *)
+          DK.Branch.with_transaction pub.b (fun tr ->
+              DK.Transaction.merge tr priv_c >>*= fun (m, conflicts) ->
+              (if conflicts = [] then ok ""
+               else (
+                 (* usually that means a conflict between what the user
+                    request and the state of imported events from
+                    GitHub. *)
+                 let { DK.Transaction.ours; theirs; _ } = m in
+                 list_iter_p (fun path ->
+                     let dir, file =
+                       match List.rev @@ Datakit_path.unwrap path with
+                       | [] -> failwith "TODO"
+                       | base :: dir ->
+                         Datakit_path.of_steps_exn (List.rev dir), base
+                     in
+                     DK.Tree.read_file ours path   >>= fun ours   ->
+                     DK.Tree.read_file theirs path >>= fun theirs ->
+                     match ours, theirs with
+                     | Error _ , Error _ -> DK.Transaction.remove tr dir
+                     |    Ok v , Error _
+                     |       _ , Ok v    ->
+                       DK.Transaction.create_or_replace_file tr ~dir file v
+                   ) conflicts
+                 >>*= fun () ->
+                 ok @@ Fmt.strf "\n\nconflicts:@,@[%a@]"
+                   Fmt.(Dump.list Datakit_path.pp) conflicts)
+              ) >>*= fun conflict_msg ->
+              of_tree (E ((module DK.Transaction), tr)) >>*= fun s ->
+              let p =
+                { priv.s with repos = XRepoSet.union s.repos priv.s.repos }
+              in
+              let t = { pub = s; priv = p; starting = false } in
+              if compare_snapshot pub.s s = 0 then (
+                (* No changes, skip the commit.
+                   FIXME: this should be done by Datakit *)
+                Log.debug (fun l -> l "merge abort");
+                DK.Transaction.abort tr >>= fun () ->
+                ok t
+              ) else
+                let msg =
+                  Fmt.strf
+                    "Merging with %s\n\nbefore:@,@[%a@]\n\nafter:@,@[%a@]%s"
+                    (DK.Branch.name priv.b) pp_snapshot pub.s pp_snapshot s
+                    conflict_msg
+                in
+                Log.debug (fun l -> l "merge commit: %s" msg);
+                DK.Transaction.commit tr ~message:msg >>*= fun () ->
+                ok t
+            ))
 
   let init ~priv ~pub =
     Log.debug (fun l -> l "init");
-    (DK.Branch.head priv >>*= function
-      | Some _ -> ok ()
-      | None   ->
+    DK.Branch.head pub  >>*= fun pub_h ->
+    DK.Branch.head priv >>*= fun priv_h ->
+    match pub_h, priv_h with
+    | None, None ->
         DK.Branch.with_transaction priv (fun tr ->
             let dir  = Datakit_path.empty in
-            let data = Cstruct.of_string "### DataKit -- GitHub bridge" in
+            let data = Cstruct.of_string "### DataKit -- GitHub bridge\n" in
             DK.Transaction.create_or_replace_file tr ~dir "README.md" data
             >>= function
             | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
             | Error e ->
               DK.Transaction.abort tr >>= fun () ->
               Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-          ))
-    >>*= fun () ->
-    DK.Branch.head pub >>*= function
-    | Some _ -> ok ()
-    | None   -> with_head priv (DK.Branch.fast_forward pub)
+        ) >>*= fun () ->
+        with_head priv (DK.Branch.fast_forward pub)
+    | Some pub_c, None  -> DK.Branch.fast_forward priv pub_c
+    | None, Some priv_c -> DK.Branch.fast_forward pub priv_c
+    | Some _, Some _    -> ok ()
 
-  let once ~dry_updates ~token ~priv ~pub old =
-    Log.debug (fun l -> l "once %a" pp old);
-    with_head priv (fun priv_c ->
-        with_head pub (fun pub_c ->
-            call_github_api ~dry_updates ~token ~old ~priv:priv_c ~pub:pub_c
-            >>*= fun () ->
-            user_repo_diff ~old:old.pub pub_c  >>*= fun pub_d ->
-            user_repo_diff ~old:old.priv priv_c >>*= fun priv_d ->
-            import_github_events ~token priv (XRepoSet.union pub_d priv_d)
-          ))
-    >>= function
-    | Error e ->
-      (* FIXME: we should probably be retrying a bit less aggressively *)
-      Log.err (fun l -> l "%a" DK.pp_error e);
-      ok old
-    | Ok () ->
-      with_head priv (prune ~priv) >>*= fun () ->
-      with_head priv (merge ~old ~pub ~priv) >>*= fun t ->
-      ok t
+  (* Updates on the public branch trigger:
+     - GH API update calls to apply user change requests
+     - GH API event calls to initialise new repositories in the
+       private branch. *)
+  let once_pub ~dry_updates ~token ~old ~pub ~priv =
+    (if old.starting then (
+        let diff = XRepoSet.union pub.s.repos priv.s.repos in
+        import_github_events ~token priv diff
+      ) else (
+       let diff = XRepoSet.diff pub.s.repos old.pub.repos in
+       import_github_events ~token priv diff)
+    ) >>*= fun _ ->
+    (* if [old.starting] is set, [old.priv] is not yet merged into
+       [old.pub], this means that [old.pub] might contain some
+       outdated information. In that case, sync the diff between
+       [priv] and [pub] in case some processes wrote stuff in
+       [t.pub] while we were not listening. *)
+    (if old.starting then with_head priv.b of_commit else ok old.pub)
+    >>*= fun orig ->
+    call_github_api ~dry_updates ~token ~old:orig pub.s
+
+  (* Updates on the private branch trigger:
+     - GH API event calls to initialise new repositories in the
+       private branch.
+     - Merge changes back to the public branch *)
+  let once_priv ~token ~old ~pub ~priv =
+    let diff = XRepoSet.sdiff priv.s.repos old.priv.repos in
+    (if old.starting then ok priv.s else import_github_events ~token priv diff)
+    >>*= fun s -> merge ~priv:{ priv with s } ~pub
+
+  let input ?commit b =
+    match commit with
+    | None  -> with_head b (fun c -> of_commit c >>*= fun s -> ok { b; c; s })
+    | Some c -> of_commit c >>*= fun s -> ok { b; c; s }
+
+  let once ?pub_c ?priv_c ~dry_updates ~token ~priv ~pub old =
+    input ?commit:priv_c priv >>*= fun priv ->
+    input ?commit:pub_c  pub  >>*= fun pub  ->
+    Log.debug (fun l ->
+        l "once@, @[old: %a@]@, @[pub: %s %a@]@, @[priv: %s %a@]"
+          pp old
+          (DK.Branch.name pub.b)  pp_snapshot pub.s
+          (DK.Branch.name priv.b) pp_snapshot priv.s
+      );
+    once_pub ~dry_updates ~token ~old ~pub ~priv >>*= fun _ ->
+    once_priv ~token ~old ~pub ~priv
 
   let run ?switch ~dry_updates ~token ~priv ~pub ~old policy =
     let once = once ~dry_updates ~token ~priv ~pub in
@@ -882,23 +996,27 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | `Repeat ->
       let old = ref old in
       let mutex = Lwt_mutex.create () in
-      let react = function
+      let react ~pub = function
         | None   -> ok `Again
         | Some h ->
           Log.debug (fun l -> l "Got event: %s" @@  DK.Commit.id h);
           Lwt_mutex.with_lock mutex (fun () ->
-              once !old >>= function
+              let pub_c, priv_c = match pub with
+                | true  -> Some h, None
+                | false -> None  , Some h
+              in
+              once ?pub_c ?priv_c !old >>= function
               | Ok t    -> old := t; Lwt.return_unit
               | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
             ) >>= fun () ->
           ok `Again
       in
-      let watch br =
-        DK.Branch.wait_for_head ?switch br react >>= function
+      let watch ~pub br =
+        DK.Branch.wait_for_head ?switch br (react ~pub) >>= function
         | Ok _    -> Lwt.return_unit
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
       in
-      Lwt.join [ watch priv; watch pub ] >>= fun () ->
+      Lwt.join [ watch ~pub:false priv; watch ~pub:true pub ] >>= fun () ->
       ok (`Finish !old)
 
   let sync ?switch ?(policy=`Repeat) ?(dry_updates=false) ~pub ~priv ~token t =

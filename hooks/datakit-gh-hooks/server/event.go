@@ -117,7 +117,7 @@ func (h *Server) StatusDir(e github.StatusEvent) ([]string, error) {
 	sha := *e.SHA
 
 	h.logger.Debugf("user=%s, repo=%s", user, repo)
-	statusDir := []string{user, repo, "commit", "status", sha}
+	statusDir := []string{user, repo, "commit", sha, "status"}
 	return statusDir, nil
 }
 

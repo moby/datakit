@@ -21,7 +21,7 @@ RUN opam pin add github --dev -n
 
 # cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
-RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam pin add datakit.dev -k git /home/opam/src/datakit#HEAD -n
 RUN opam depext datakit && \
     opam install github ssl && opam install datakit --deps
 

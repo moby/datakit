@@ -162,9 +162,10 @@ let accept_forever ~sandbox ~serviceid ~make_root url =
          Log.info (fun f -> f "Accepting connections on named pipe %s" url);
          Named_pipe.accept_forever url (Unix.handle ~make_root)
        end else if String.is_prefix ~affix:"fd:" url then begin
-         let i = String.with_range ~first:3 ~len:(String.length url - 3) url in
-         ( try Lwt.return (int_of_string i)
-            with _ -> Lwt.fail (Failure (Printf.sprintf "Failed to parse command-line argument [%s]" url))
+         let i = String.with_range ~first:3 url in
+         ( match String.to_int i with
+           | None -> Lwt.fail (Failure (Printf.sprintf "Failed to parse command-line argument [%s]" url))
+           | Some x -> Lwt.return x
          ) >>= fun x ->
          Unix.of_fd x >>= fun socket ->
          let socket' = Lwt_unix.of_unix_file_descr socket in

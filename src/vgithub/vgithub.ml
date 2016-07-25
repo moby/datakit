@@ -383,13 +383,6 @@ let list_iter_p f l =
       | Error e, _ | _, Error e -> Error e
     ) (Ok ()) (List.rev l)
 
-let list_iter_s f l =
-  Lwt_list.map_s f l >|= fun l ->
-  List.fold_left (fun acc x -> match acc, x with
-      | Ok (), Ok ()            -> Ok ()
-      | Error e, _ | _, Error e -> Error e
-    ) (Ok ()) (List.rev l)
-
 let list_map_p f l =
   Lwt_list.map_p f l >|= fun l ->
   List.fold_left (fun acc x -> match acc, x with
@@ -685,35 +678,24 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let sync_datakit token ~user ~repo tr =
     Log.debug (fun l -> l "sync_datakit %s/%s" user repo);
     let root = Datakit_path.empty / user / repo in
-    API.events token ~user ~repo >>= fun events ->
-    let status = ref XStatusSet.empty in
-    let prs = ref XPRSet.empty in
-    list_iter_s (function
-        | Event.PR pr    ->
-          prs := XPRSet.add { user; repo; data = pr } !prs;
-          Conv.update_pr ~root tr pr
-        | Event.Status s ->
-          status := XStatusSet.add { user; repo; data = s } !status;
-          Conv.update_status ~root tr s
-        | _               -> ok ()
-      ) events >>*= fun () ->
-    (* NOTE: it seems that GitHub doesn't store status events so we
-       need to do load them ourself ... *)
-    DK.Transaction.exists_dir tr (root / "commit") >>*= fun exists_c ->
-    (if not exists_c then ok () else DK.Transaction.remove tr (root / "commit"))
+    DK.Transaction.exists_dir tr root >>*= fun exist_root ->
+    (if not exist_root then ok () else DK.Transaction.remove tr root)
     >>*= fun () ->
-    let tree = E ((module DK.Transaction), tr) in
-    Conv.read_prs ~root tree >>*=
+    API.prs token ~user ~repo >>= fun prs ->
+    let status = ref XStatusSet.empty in
     list_iter_p (fun pr ->
         if pr.PR.state = `Closed then ok ()
         else (
-          prs := XPRSet.add { user; repo; data = pr } !prs;
+          Conv.update_pr tr ~root pr >>*= fun () ->
           API.status token ~user ~repo ~commit:pr.PR.head >>= fun s ->
-          list_iter_p (Conv.update_status ~root tr) s
+          list_iter_p (Conv.update_status ~root tr) s >>*= fun () ->
+          let s = List.map (fun s -> { user; repo; data = s }) s in
+          status := XStatusSet.union (XStatusSet.of_list s) !status;
+          ok ()
         )
-      )
+      ) prs
     >>*= fun () ->
-    ok (!status, !prs)
+    ok (!status, prs)
 
   let prune t tr =
     Log.debug (fun l -> l "prune");

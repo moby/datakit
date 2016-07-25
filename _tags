@@ -22,7 +22,7 @@ true: \
 
 <src/conduit/*>: \
   package(threads), thread, \
-  package(conduit.lwt-unix), package(hvsock.lwt), \
+  package(conduit.lwt-unix), package(hvsock.lwt), package(hvsock.lwt-unix), \
   package(named-pipe.lwt), package(uri), package(mirage-flow), \
   package(protocol-9p.unix)
 
@@ -63,7 +63,7 @@ true: \
 
 <src/bin/{main,github_bridge}.*>: \
   package(threads), thread, \
-  package(conduit.lwt-unix), package(hvsock.lwt), package(named-pipe.lwt), \
+  package(conduit.lwt-unix), package(hvsock.lwt), package(hvsock.lwt-unix), package(named-pipe.lwt), \
   package(uri), package(mirage-flow), package(protocol-9p.unix)
 
 ### because of src/log

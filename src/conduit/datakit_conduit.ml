@@ -14,6 +14,14 @@ end
 
 module Unix = struct
 
+  let of_fd x =
+    (* Ideally we would use something like unix-type-representations for this,
+       but unfortunately that library will refuse to install on Win32. *)
+    let file_descr_of_int (x: int) : Unix.file_descr = Obj.magic x in
+    if Sys.os_type <> "Unix"
+    then Lwt.fail (Failure "Inheriting a listening socket is only supported on Unix")
+    else Lwt.return (file_descr_of_int x)
+
   let of_path path =
     Lwt.catch
       (fun () -> Lwt_unix.unlink path)
@@ -153,6 +161,15 @@ let accept_forever ~sandbox ~serviceid ~make_root url =
        if Astring.String.is_prefix ~affix:"\\\\" url then begin
          Log.info (fun f -> f "Accepting connections on named pipe %s" url);
          Named_pipe.accept_forever url (Unix.handle ~make_root)
+       end else if String.is_prefix ~affix:"fd:" url then begin
+         let i = String.with_range ~first:3 url in
+         ( match String.to_int i with
+           | None -> Lwt.fail (Failure (Printf.sprintf "Failed to parse command-line argument [%s]" url))
+           | Some x -> Lwt.return x
+         ) >>= fun x ->
+         Unix.of_fd x >>= fun socket ->
+         let socket' = Lwt_unix.of_unix_file_descr socket in
+         Unix.accept_forever (Uri.of_string url) socket' (Unix.handle ~make_root)
        end else
          let uri = Uri.of_string url in
          match Uri.scheme uri with

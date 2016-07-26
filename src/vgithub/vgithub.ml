@@ -508,17 +508,21 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     let E ((module Tree), t) = tree in
     Log.debug (fun l -> l "read_statuses");
     let dir = root / "commit" in
-    Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
     Tree.exists_dir t dir >>*= fun exists ->
     if not exists then ok []
     else
       Tree.read_dir t dir >>*=
       list_map_p (fun commit ->
+          Log.debug (fun l ->
+              l "read_statuses %a %s" Datakit_path.pp dir commit);
           let dir = dir / commit / "status" in
           let rec aux context =
-            Log.debug
-              (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
-            let dir = dir /@ Datakit_path.of_steps_exn context in
+            let ctx = match Datakit_path.of_steps context with
+              | Ok x    -> ok x
+              | Error e -> error "%s" e
+            in
+            ctx >>*= fun ctx ->
+            let dir = dir /@ ctx in
             Tree.exists_dir t dir >>*= fun exists ->
             if not exists then ok []
             else

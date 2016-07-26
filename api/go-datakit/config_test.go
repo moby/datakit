@@ -117,7 +117,7 @@ func write(ctx context.Context, client *Client, path []string, value string) err
 	if err != nil {
 		return err
 	}
-	err = t.Commit(ctx)
+	err = t.Commit(ctx, "Write test")
 	if err != nil {
 		return err
 	}

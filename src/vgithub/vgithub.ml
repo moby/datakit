@@ -383,8 +383,8 @@ let list_iter_p f l =
       | Error e, _ | _, Error e -> Error e
     ) (Ok ()) (List.rev l)
 
-let list_map_p f l =
-  Lwt_list.map_p f l >|= fun l ->
+let list_map_s f l =
+  Lwt_list.map_s f l >|= fun l ->
   List.fold_left (fun acc x -> match acc, x with
       | Ok acc, Ok x            -> Ok (x :: acc)
       | Error e, _ | _, Error e -> Error e
@@ -453,7 +453,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     if not exists then ok []
     else
       Tree.read_dir t dir >>*=
-      list_map_p (fun num -> read_pr ~root tree (int_of_string num))
+      list_map_s (fun num -> read_pr ~root tree (int_of_string num))
       >>*= fun l ->
       List.fold_left
         (fun acc pr -> match pr with None -> acc | Some x -> x :: acc)
@@ -508,22 +508,26 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     let E ((module Tree), t) = tree in
     Log.debug (fun l -> l "read_statuses");
     let dir = root / "commit" in
-    Log.debug (fun l -> l "read_statuses %a" Datakit_path.pp dir);
     Tree.exists_dir t dir >>*= fun exists ->
     if not exists then ok []
     else
       Tree.read_dir t dir >>*=
-      list_map_p (fun commit ->
+      list_map_s (fun commit ->
+          Log.debug (fun l ->
+              l "read_statuses %a %s" Datakit_path.pp dir commit);
           let dir = dir / commit / "status" in
           let rec aux context =
-            Log.debug
-              (fun l -> l "read_status context=%a" Fmt.(Dump.list string) context);
-            let dir = dir /@ Datakit_path.of_steps_exn context in
+            let ctx = match Datakit_path.of_steps context with
+              | Ok x    -> ok x
+              | Error e -> error "%s" e
+            in
+            ctx >>*= fun ctx ->
+            let dir = dir /@ ctx in
             Tree.exists_dir t dir >>*= fun exists ->
             if not exists then ok []
             else
               Tree.read_dir t dir >>*= fun child ->
-              list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
+              list_map_s (fun c -> aux (context @ [c])) child >>*= fun child ->
               let child = List.flatten child in
               Tree.exists_file t (dir / "state") >>*= fun exists ->
               if exists then

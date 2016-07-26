@@ -9,9 +9,9 @@ RUN opam pin add datakit.dev /home/opam/src/datakit -n
 RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit
-RUN sudo chown opam.nogroup -R /home/opam/src/datakit && \
-    cd /home/opam/src/datakit && git remote -v && (git fetch --unshallow || echo ok) && \
-    opam pin add datakit.dev -k git /home/opam/src/datakit#HEAD -n -vv
+RUN sudo chown opam.nogroup -R /home/opam/src/datakit
+RUN cd /home/opam/src/datakit && scripts/watermark.sh
+RUN opam pin add datakit.dev -k git /home/opam/src/datakit -n -vv
 
 RUN opam install datakit.dev -vv
 

@@ -9,8 +9,9 @@ RUN opam pin add datakit.dev /home/opam/src/datakit -n
 RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit
-RUN sudo chown -R opam.nogroup /home/opam/src/datakit && \
-    opam pin add datakit.dev -k git /home/opam/src/datakit#HEAD -n
+RUN sudo chown opam.nogroup -R /home/opam/src/datakit && \
+    opam unpin datakit && \
+    opam pin add datakit.dev -k git /home/opam/src/datakit#HEAD -n -vv
 
 RUN opam install datakit.dev -vv
 

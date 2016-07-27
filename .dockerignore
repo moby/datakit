@@ -1,6 +1,5 @@
 *.native
 *.byte
 _build
-scripts
 setup.data
 setup.log

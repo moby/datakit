@@ -70,6 +70,7 @@ let start urls sandbox git =
          socket connection *)
       if Sys.os_type <> "Win32" then begin
         Log.debug (fun l -> l "Caught SIGTERM, will exit");
+        exit 1
       end
     ));
   set_signal_if_supported Sys.sigint (Sys.Signal_handle (fun _ ->

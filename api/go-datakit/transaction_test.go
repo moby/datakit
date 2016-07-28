@@ -24,7 +24,7 @@ func TestTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Transaction.Write failed: %v", err)
 	}
-	err = trans.Commit(ctx)
+	err = trans.Commit(ctx, "Test transaction")
 	if err != nil {
 		t.Fatalf("Transaction.Commit failed: %v", err)
 	}

@@ -15,8 +15,12 @@ type watch struct {
 	offset int64 // current offset within head.live file
 }
 
+type Watch struct {
+	watch
+}
+
 // NewWatch starts watching a path within a branch
-func NewWatch(ctx context.Context, client *Client, fromBranch string, path []string) (*watch, error) {
+func NewWatch(ctx context.Context, client *Client, fromBranch string, path []string) (*Watch, error) {
 	// SHA=$(cat branch/<fromBranch>/watch/<path.node>/tree.live)
 	p := []string{"branch", fromBranch, "watch"}
 	for _, dir := range path {
@@ -29,10 +33,10 @@ func NewWatch(ctx context.Context, client *Client, fromBranch string, path []str
 		return nil, err
 	}
 	offset := int64(0)
-	return &watch{client: client, file: file, offset: offset}, nil
+	return &Watch{watch{client: client, file: file, offset: offset}}, nil
 }
 
-func (w *watch) Next(ctx context.Context) (*Snapshot, error) {
+func (w *Watch) Next(ctx context.Context) (*Snapshot, error) {
 	buf := make([]byte, 512)
 	sawFlush := false
 	for {
@@ -68,6 +72,6 @@ func (w *watch) Next(ctx context.Context) (*Snapshot, error) {
 	}
 }
 
-func (w *watch) Close(ctx context.Context) {
+func (w *Watch) Close(ctx context.Context) {
 	w.file.Close(ctx)
 }

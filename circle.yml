@@ -14,7 +14,7 @@ dependencies:
   - ~/.opam
   override:
   - brew install wget opam dylibbundler
-  - opam init --comp 4.02.3 -n https://github.com/ocaml/opam-repository
+  - opam init --comp 4.02.3 -n https://github.com/ocaml/opam-repository.git
   - opam switch 4.02.3
   - opam update -u
   - opam pin add datakit . -n

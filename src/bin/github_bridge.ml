@@ -130,10 +130,11 @@ let start () sandbox listen_urls
       in
       let _, address = parse_address datakit in
       let host, port = parse_host address in
+      let debug = match Logs.level () with Some Logs.Debug -> " -v" | _ -> "" in
       exec ~name:"datakit-gh-hooks"
         (Lwt_process.shell @@
-         Fmt.strf "%s%s -v -l :%d -b %s -a [%s]:%s"
-           gh_hooks secret webhook_port private_branch host port)
+         Fmt.strf "%s%s%s -l :%d -b %s -a [%s]:%s"
+           gh_hooks secret debug webhook_port private_branch host port)
   in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();

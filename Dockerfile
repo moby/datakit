@@ -10,7 +10,7 @@ RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
-RUN cd /home/opam/src/datakit && scripts/watermark.sh
+RUN cd /home/opam/src/datakit && scripts/watermark.sh && git diff
 RUN opam pin add datakit.dev -k git /home/opam/src/datakit -n -vv
 
 RUN opam install datakit.dev -vv

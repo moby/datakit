@@ -10,7 +10,8 @@ all:
 	ocaml pkg/pkg.ml build --tests $(TESTS) --with-github $(GITHUB)
 
 clean:
-	rm -rf _build $(APP) $(EXE)
+	ocaml pkg/pkg.ml clean
+	rm -rf $(APP) $(EXE) _tests
 	rm -f com.docker.db
 
 test:

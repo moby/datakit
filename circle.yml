@@ -13,12 +13,12 @@ dependencies:
   cache_directories:
   - ~/.opam
   override:
-  - brew install wget opam dylibbundler
-  - opam init --comp 4.02.3 -n https://github.com/ocaml/opam-repository.git
-  - opam switch 4.02.3
+  - brew install wget ocaml opam dylibbundler
+  - opam init --comp system -n https://github.com/ocaml/opam-repository.git
+  - opam switch system
   - opam update -u
   - opam pin add datakit . -n
-  - opam install depext && opam depext datakit
+  - opam install depext && opam depext osx-fsevents datakit
   - opam install datakit
   - opam config exec -- make COMMIT
   - mkdir -p _build/src/bin

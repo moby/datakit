@@ -5,7 +5,8 @@ script: bash -ex .travis-opam.sh
 dist: trusty
 env:
   global:
-  - DEPOPTS=github
+  - EXTRA_DEPS="inotify"
+  - DEPOPTS="github"
   - PINS="github"
   matrix:
   - OCAML_VERSION=4.02

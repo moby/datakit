@@ -33,7 +33,7 @@ depends: [
   "result" "lwt"
   "conduit" "mirage-flow"
   "named-pipe"
-  "hvsock"      {=  "0.8.1"}
+  "hvsock"      {>= "0.8.1"}
   "protocol-9p" {>= "0.7.0"}
   "logs"        {>= "0.5.0"}
   "win-eventlog"

@@ -4,8 +4,9 @@ RUN sudo apk add ncurses-dev
 RUN opam depext ocamlfind && opam install ocamlfind
 
 COPY . /home/opam/src/datakit
+RUN sudo chown -R opam.nogroup /home/opam/src/datakit
+RUN cd /home/opam/src/datakit && git checkout . && scripts/watermark.sh
 
-RUN sudo chown -R opam.nogroup /home/opam/src
 WORKDIR /home/opam/src/datakit
 
 RUN rm _tags

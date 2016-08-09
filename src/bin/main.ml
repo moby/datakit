@@ -78,7 +78,7 @@ let start urls sandbox git =
       exit 1
     ));
   Log.app (fun l ->
-      l "Starting %s %%VERSION%% ..." @@ Filename.basename Sys.argv.(0)
+      l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v
     );
   begin match git with
     | None      -> In_memory_store.connect ()
@@ -184,7 +184,7 @@ let term =
     `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
   ] in
   Term.(pure start $ setup_log $ url $ sandbox $ git $ auto_push),
-  Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
+  Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with
   | `Error _ -> exit 1

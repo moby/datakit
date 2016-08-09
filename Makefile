@@ -10,7 +10,8 @@ all:
 	ocaml pkg/pkg.ml build --tests $(TESTS) --with-github $(GITHUB)
 
 clean:
-	rm -rf _build $(APP) $(EXE)
+	ocaml pkg/pkg.ml clean
+	rm -rf $(APP) $(EXE) _tests
 	rm -f com.docker.db
 
 test:
@@ -36,7 +37,7 @@ COMMIT:
 
 exe:
 	opam remove tls ssl -y
-	$(MAKE) clean
+	rm -rf _build/
 	ocaml pkg/pkg.ml build --tests false --with-github false --pinned true
 	mkdir -p $(EXE)
 	cp _build/src/bin/main.native $(EXE)/datakit.exe

@@ -9,7 +9,7 @@ let opam =
   let lint_deps_excluding = Some ["mirage-tc"; "tc"] in
   Pkg.opam_file ~lint_deps_excluding "opam"
 
-  let () =
+let () =
   Pkg.describe ~opams:[opam] "datakit" @@ fun c ->
   let github = Conf.value c github in
   Ok [

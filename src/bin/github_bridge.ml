@@ -82,8 +82,8 @@ let start () sandbox listen_urls
       exit 1
     ));
   Log.app (fun l ->
-      l "Starting %s %%VERSION%% ...\npublic-branch: %s\nprivate-branch: %s"
-        (Filename.basename Sys.argv.(0)) public_branch private_branch
+      l "Starting %s %s ...\npublic-branch: %s\nprivate-branch: %s"
+        (Filename.basename Sys.argv.(0)) Version.v public_branch private_branch
     );
   let token = match token () with
     | None   -> failwith "Missing datakit GitHub token"
@@ -233,7 +233,7 @@ let term =
   Term.(pure start $ setup_log $ sandbox $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $
         no_webhook $ gh_hooks $ webhook_secret $ webhook_port),
-  Term.info (Filename.basename Sys.argv.(0)) ~version:"%%VERSION%%" ~doc ~man
+  Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with
   | `Error _ -> exit 1

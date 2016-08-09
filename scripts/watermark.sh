@@ -10,8 +10,7 @@ watermark() {
     tmp="${REPO_ROOT}/src/bin/${file}.tmp"
     cp "$path" "$tmp"
     sed -e "s/%%VERSION%%/$(git describe --always --dirty)/g" "$tmp" > "$path"
+    rm -f "$tmp"
 }
 
-watermark main.ml
-watermark github_bridge.ml
-watermark mount.ml
+watermark version.ml

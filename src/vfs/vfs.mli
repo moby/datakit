@@ -204,6 +204,7 @@ module File: sig
   (** {1 Errors} *)
 
   val err_no_entry: 'a or_err
+  val err_read_only: 'a or_err
 
 end
 

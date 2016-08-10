@@ -40,6 +40,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
   module RW = Ivfs_rw.Make(Tree)
   module Merge = Ivfs_merge.Make(Store)(RW)
   module Remote = Ivfs_remote.Make(Store)
+  module View = Irmin.View(Store)
 
   let empty_file = Ivfs_blob.empty
 
@@ -592,6 +593,36 @@ module Make (Store : Ivfs_tree.STORE) = struct
     | None      -> "\n"
     | Some head -> Store.Hash.to_hum head ^ "\n"
 
+  let pp_op ppf = function
+    | `Added _   -> Fmt.string ppf "+"
+    | `Removed _ -> Fmt.string ppf "-"
+    | `Updated _ -> Fmt.string ppf "*"
+
+  let pp_diff ppf (path, op) =
+    let path = Path.to_hum path in
+    let path =
+      if Filename.is_relative path then path
+      else String.with_index_range ~first:1 path
+    in
+    Fmt.pf ppf "%a %s\n" pp_op op path
+
+  let diff make_task store =
+    let lookup name =
+      let store = store "head" in
+      View.of_path store []  >>= fun head_v ->
+      let hash = Store.Hash.of_hum name in
+      let repo = Store.repo store in
+      Store.of_commit_id make_task hash repo >>= fun t ->
+      View.of_path (t "parent") [] >>= fun parent_v ->
+      View.diff parent_v head_v >>= fun diff ->
+      let lines = List.map (Fmt.to_to_string pp_diff) diff in
+      let file  = Vfs.File.ro_of_string (String.concat ~sep:"" lines) in
+      ok (Vfs.Inode.file name file)
+    in
+    let remove () = Vfs.File.err_read_only in
+    let ls () = ok [] in
+    Vfs.Dir.read_only ~ls ~lookup ~remove
+
   let transactions store =
     let lock = Lwt_mutex.create () in
     let items = ref String.Map.empty in
@@ -639,6 +670,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
         Vfs.Inode.file "fast-forward" (fast_forward_merge store);
         Vfs.Inode.file "reflog"       (reflog @@ store "watch");
         Vfs.Inode.file "head"         (Vfs.File.status (status store));
+        Vfs.Inode.dir  "diff"         (diff make_task store);
       ] in
     let contents = ref (make_contents !name) in
     let ls () = !contents >|= fun contents -> Ok contents in

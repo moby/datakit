@@ -139,6 +139,9 @@ Each branch directory contains:
 
 - `watch` can be used to watch specific files or directories for changes.
 
+- `diff/` is a directory containing hidden files. `diff/<commit-id>`
+  contains the diff between the given `commit-id` and the current HEAD.
+
 Note that reading from `head.live` will skip directly to the latest
 commit: even if you read continuously from it, you will not
 necessarily see all intermediate commits.
@@ -272,7 +275,31 @@ one.
 that currently exist. However, these are just suggestions; you can
 watch any path, whether it currently exists or not.
 
-### Fetch
+#### Diff
+
+To see the difference between a given commit ID and the head of a
+branch, use the branch's `diff` directory.
+
+Each file under the `diff` directory contains a line per change of the form:
+- `+ <path>` means that the file `path` has been added between `commit-id` and
+  `HEAD`;
+- `- <path>` means that the file `path` has been removed between `commid-id` and
+  `HEAD`;
+- `* <path>` means that the file `path` has been modified betweeen `commit-id`
+  and `HEAD`.
+
+For instance:
+
+```
+~/db $ cat branches/master/diff/6b2e00a0be59c0335568dd9415a7d93640e7099c
++ foo
+* bar
+```
+
+Means that `foo` have been added and `bar` modified in the `master` branch since
+the commit `6b2e00a0be59c0335568dd9415a7d93640e7099c` took place.
+
+#### Fetch
 
 To fetch from a remote repository, use the `/remotes` root directory.
 This directory is *not persisted* so will disappear across reboots.

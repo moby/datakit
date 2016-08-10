@@ -13,6 +13,8 @@ type status_state =
   | `Error
   | `Failure ]
 
+type 'a diff = [ `Added of 'a | `Removed of 'a | `Updated of 'a ]
+
 module type READABLE_TREE = sig
   type t
   type +'a or_error
@@ -189,6 +191,7 @@ module type CLIENT = sig
     (** [conflicts t] returns the current list of paths that had merge
         conflicts and have not been written to since.  It is not
         possible to commit while this is non-empty. *)
+
   end
 
   module Branch : sig
@@ -239,6 +242,11 @@ module type CLIENT = sig
         been committed when [fn trans] returns, the transaction is
         aborted (and a warning is logged). Use [Transaction.abort] to
         avoid the warning. *)
+
+      val diff: t -> Commit.t -> Datakit_path.t diff list or_error Lwt.t
+    (** [diff t c] returns the paths differences between [c] and [t]'s
+        head. *)
+
   end
 
   module GitHub : sig

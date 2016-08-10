@@ -516,6 +516,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       FS.read_all t.fs (t.path / "parents") >|*= fun data ->
       lines (Cstruct.to_string data)
       |> List.map (fun hash -> {Commit.fs = t.fs; id = hash})
+
   end
 
   module Branch = struct
@@ -599,6 +600,26 @@ module Make(P9p : Protocol_9p_client.S) = struct
              Transaction.abort tr
            )
         )
+
+    let diff t c =
+      FS.read_all t.fs (branch_dir t / "diff" / Commit.id c) >|*= fun data ->
+      let lines = lines (Cstruct.to_string data) in
+      Log.debug (fun l -> l "XXX1 %s %d" (Cstruct.to_string data) (List.length lines));
+      List.fold_left (fun acc line ->
+          let err e = Log.err (fun l -> l "invalid diff line: %s %s" line e) in
+          match String.cut ~sep:" " line with
+          | None            -> err "missing space"; acc
+          | Some (op, path) ->
+            match Datakit_path.of_string path with
+            | Error e -> err e; acc
+            | Ok path -> match op with
+              | "+" -> (`Added path  ) :: acc
+              | "-" -> (`Removed path) :: acc
+              | "*" -> (`Updated path) :: acc
+              | e   -> err e ; acc
+        ) [] lines
+    |> fun lines -> Log.debug (fun l -> l "XXX %d" @@ List.length lines); lines
+
   end
 
   module GitHub = struct

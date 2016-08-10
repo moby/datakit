@@ -185,6 +185,42 @@ let test_merge dk =
     "from-master+pr" (Cstruct.to_string merged);
   Lwt.return ()
 
+let diff: Datakit_path.t Datakit_S.diff Alcotest.testable = (module struct
+    type t = Datakit_path.t Datakit_S.diff
+    let equal = (=)
+    let pp ppf = function
+      | `Added p   -> Fmt.pf ppf "+ %a" Datakit_path.pp p
+      | `Removed p -> Fmt.pf ppf "- %a" Datakit_path.pp p
+      | `Updated p -> Fmt.pf ppf "* %a" Datakit_path.pp p
+  end)
+
+let test_diff dk =
+  DK.branch dk "master" >>*= fun master ->
+  DK.Branch.with_transaction master (fun tr ->
+      DK.Transaction.create_file tr ~dir:(p "") "file" (v "from-master")
+      >>*= fun () ->
+      DK.Transaction.commit tr ~message:"init"
+    ) >>*= fun () ->
+  DK.Branch.head master >>*= fun head1 ->
+  let head1 = match head1 with None -> Alcotest.fail "empty" | Some h -> h in
+  DK.Branch.with_transaction master (fun tr ->
+      DK.Transaction.create_or_replace_file tr ~dir:(p "") "foo"
+        (Cstruct.of_string "foo") >>*= fun () ->
+      DK.Transaction.read_file tr (p "file") >>*= fun old ->
+      DK.Transaction.replace_file tr ~dir:(p "") "file"
+        (Cstruct.append old (v "+pr"))
+      >>*= fun () ->
+      DK.Transaction.commit tr ~message:"mod"
+    ) >>*= fun () ->
+  DK.Branch.head master >>*= fun head2 ->
+  let head2 = match head2 with None -> Alcotest.fail "empty" | Some h -> h in
+  DK.Branch.diff master head1 >>*= fun files1 ->
+  Alcotest.(check (slist diff compare)) "files1"
+    [`Added (p "foo"); `Updated (p "file")] files1;
+  DK.Branch.diff master head2 >>*= fun files2 ->
+  Alcotest.(check (slist diff compare)) "files2" [] files2;
+  Lwt.return_unit
+
 let test_merge_metadata dk =
   (* Put "from-master" on master branch *)
   DK.branch dk "master" >>*= fun master ->
@@ -622,6 +658,7 @@ let test_set = [
   "Truncate"   , `Quick, run test_truncate;
   "Parents"    , `Quick, run test_parents;
   "Merge"      , `Quick, run test_merge;
+  "Diff"       , `Quick, run test_diff;
   "Merge_metadata", `Quick, run test_merge_metadata;
   "Merge empty", `Quick, run test_merge_empty;
   "Conflicts"  , `Quick, run test_conflicts;

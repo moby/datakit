@@ -50,7 +50,7 @@ let check_offset ~offset len =
   if offset < 0L then Vfs.Error.negative_offset offset
   else if offset > len then Vfs.Error.offset_too_large ~offset len
   else Ok ()
-  
+
 let read t ~offset ~count =
   let contents = to_ro_cstruct t in
   check_offset ~offset (Cstruct.len contents) >>!= fun () ->

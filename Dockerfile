@@ -6,7 +6,9 @@ RUN opam depext lwt && opam install lwt alcotest conf-libev
 # cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext datakit && opam install datakit --deps
+RUN opam depext datakit && \
+    opam install lwt inotify && \
+    opam install datakit --deps
 
 COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit

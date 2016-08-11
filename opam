@@ -39,6 +39,7 @@ depends: [
   "win-eventlog"
   "asl"         {>= "0.10"}
   "mtime"
+  "irmin-watcher" {>= "0.1.2"}
   "alcotest"   {test}
 ]
 depopts: ["github"]

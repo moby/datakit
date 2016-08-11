@@ -51,7 +51,8 @@ true: \
 
 <src/bin/main.*>: \
   package(git), package(irmin), package(irmin.git), package(irmin.mem), \
-  package(protocol-9p.unix), package(camlzip)
+  package(protocol-9p.unix), package(camlzip), \
+  package(irmin-watcher), thread
 
 ### datakit-github-bridge
 

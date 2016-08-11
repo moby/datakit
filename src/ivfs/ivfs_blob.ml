@@ -2,6 +2,10 @@ open Result
 
 type t = Cstruct.t list ref (* (reversed) *)
 
+(* FIXME: very expensive! *)
+let compare x y =
+  String.compare (Cstruct.copyv @@ List.rev !x) (Cstruct.copyv @@ List.rev !y)
+
 let ( >>!= ) x f =
   match x with
   | Ok x -> f x

@@ -44,3 +44,7 @@ val of_string: string -> t
 
 val to_string: t -> string
 (** [to_string t] is a string containing the same data as [t]. *)
+
+val compare: t -> t -> int
+(** [compare] is the comparison function for blobs. It is {b very}
+    slow, so use it with care! *)

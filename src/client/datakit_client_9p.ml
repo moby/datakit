@@ -66,6 +66,21 @@ let abort_if_off switch fn =
   | Some sw when Lwt_switch.is_on sw -> fn ()
   | Some _ -> ok `Abort
 
+let diff_of_lines lines =
+  List.fold_left (fun acc line ->
+      let err e = Log.err (fun l -> l "invalid diff line: %s %s" line e) in
+      match String.cut ~sep:" " line with
+      | None            -> err "missing space"; acc
+      | Some (op, path) ->
+        match Datakit_path.of_string path with
+        | Error e -> err e; acc
+        | Ok path -> match op with
+          | "+" -> (`Added path  ) :: acc
+          | "-" -> (`Removed path) :: acc
+          | "*" -> (`Updated path) :: acc
+          | e   -> err e ; acc
+    ) [] lines
+
 module Make(P9p : Protocol_9p_client.S) = struct
 
   type error = Protocol_9p_error.error
@@ -527,6 +542,11 @@ module Make(P9p : Protocol_9p_client.S) = struct
       lines (Cstruct.to_string data)
       |> List.map (fun hash -> {Commit.fs = t.fs; id = hash})
 
+    let diff t c =
+      FS.read_all t.fs (t.path / "diff" / Commit.id c) >|*= fun data ->
+      let lines = lines (Cstruct.to_string data) in
+      diff_of_lines lines
+
   end
 
   module Branch = struct
@@ -616,21 +636,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let diff t c =
       FS.read_all t.fs (branch_dir t / "diff" / Commit.id c) >|*= fun data ->
       let lines = lines (Cstruct.to_string data) in
-      Log.debug (fun l -> l "XXX1 %s %d" (Cstruct.to_string data) (List.length lines));
-      List.fold_left (fun acc line ->
-          let err e = Log.err (fun l -> l "invalid diff line: %s %s" line e) in
-          match String.cut ~sep:" " line with
-          | None            -> err "missing space"; acc
-          | Some (op, path) ->
-            match Datakit_path.of_string path with
-            | Error e -> err e; acc
-            | Ok path -> match op with
-              | "+" -> (`Added path  ) :: acc
-              | "-" -> (`Removed path) :: acc
-              | "*" -> (`Updated path) :: acc
-              | e   -> err e ; acc
-        ) [] lines
-    |> fun lines -> Log.debug (fun l -> l "XXX %d" @@ List.length lines); lines
+      diff_of_lines lines
 
   end
 

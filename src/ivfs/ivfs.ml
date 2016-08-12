@@ -325,6 +325,34 @@ module Make (Store : Ivfs_tree.STORE) = struct
     in
     Cstruct.of_string (String.concat ~sep:"" lines)
 
+  let pp_op ppf = function
+    | `Added _   -> Fmt.string ppf "+"
+    | `Removed _ -> Fmt.string ppf "-"
+    | `Updated _ -> Fmt.string ppf "*"
+
+  let pp_diff ppf (path, op) =
+    let path = Path.to_hum path in
+    let path =
+      if Filename.is_relative path then path
+      else String.with_index_range ~first:1 path
+    in
+    Fmt.pf ppf "%a %s\n" pp_op op path
+
+  let diff repo head =
+    let lookup name =
+      head () >>= fun head_t ->
+      let hash = Store.Hash.of_hum name in
+      Store.of_commit_id Irmin.Task.none hash repo >>= fun t ->
+      Tree.snapshot (t ()) >>= fun parent_t ->
+      Tree.Dir.diff parent_t head_t >>= fun diff ->
+      let lines = List.map (Fmt.to_to_string pp_diff) diff in
+      let file  = Vfs.File.ro_of_string (String.concat ~sep:"" lines) in
+      ok (Vfs.Inode.file name file)
+    in
+    let remove () = Vfs.File.err_read_only in
+    let ls () = ok [] in
+    Vfs.Dir.read_only ~ls ~lookup ~remove
+
   let make_commit root task ~parents =
     let repo = Tree.Dir.repo root in
     Tree.Dir.hash root >>= fun node ->
@@ -380,6 +408,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
     let ctl = Vfs.File.command (transactions_ctl ~merge ~remover) in
     let origin = Vfs.File.ro_of_string (Path.to_hum path) in
+    let diff = diff repo (fun  () -> Lwt.return (RW.root view)) in
     let common =
       empty_inode_map
       |> add stage
@@ -387,6 +416,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       |> add (Vfs.Inode.file "parents" parents_file)
       |> add (Vfs.Inode.file "ctl"     ctl)
       |> add (Vfs.Inode.file "origin"  origin)
+      |> add (Vfs.Inode.dir  "diff"    diff)
     in
     let rec normal_mode () =
       common
@@ -593,36 +623,6 @@ module Make (Store : Ivfs_tree.STORE) = struct
     | None      -> "\n"
     | Some head -> Store.Hash.to_hum head ^ "\n"
 
-  let pp_op ppf = function
-    | `Added _   -> Fmt.string ppf "+"
-    | `Removed _ -> Fmt.string ppf "-"
-    | `Updated _ -> Fmt.string ppf "*"
-
-  let pp_diff ppf (path, op) =
-    let path = Path.to_hum path in
-    let path =
-      if Filename.is_relative path then path
-      else String.with_index_range ~first:1 path
-    in
-    Fmt.pf ppf "%a %s\n" pp_op op path
-
-  let diff make_task store =
-    let lookup name =
-      let store = store "head" in
-      View.of_path store []  >>= fun head_v ->
-      let hash = Store.Hash.of_hum name in
-      let repo = Store.repo store in
-      Store.of_commit_id make_task hash repo >>= fun t ->
-      View.of_path (t "parent") [] >>= fun parent_v ->
-      View.diff parent_v head_v >>= fun diff ->
-      let lines = List.map (Fmt.to_to_string pp_diff) diff in
-      let file  = Vfs.File.ro_of_string (String.concat ~sep:"" lines) in
-      ok (Vfs.Inode.file name file)
-    in
-    let remove () = Vfs.File.err_read_only in
-    let ls () = ok [] in
-    Vfs.Dir.read_only ~ls ~lookup ~remove
-
   let transactions store =
     let lock = Lwt_mutex.create () in
     let items = ref String.Map.empty in
@@ -662,7 +662,9 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let name = ref name in
     let remove () = remove !name in
     let make_contents name =
-      Store.of_branch_id make_task name repo >|= fun store -> [
+      Store.of_branch_id make_task name repo >|= fun store ->
+      let snapshot () = Tree.snapshot (store "snapshot") in
+      [
         read_only ~name:"ro" (store "ro");
         Vfs.Inode.dir  "transactions" (transactions store);
         Vfs.Inode.dir  "watch"        (watch_dir ~path:[] @@ store "watch");
@@ -670,7 +672,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
         Vfs.Inode.file "fast-forward" (fast_forward_merge store);
         Vfs.Inode.file "reflog"       (reflog @@ store "watch");
         Vfs.Inode.file "head"         (Vfs.File.status (status store));
-        Vfs.Inode.dir  "diff"         (diff make_task store);
+        Vfs.Inode.dir  "diff"         (diff repo snapshot);
       ] in
     let contents = ref (make_contents !name) in
     let ls () = !contents >|= fun contents -> Ok contents in

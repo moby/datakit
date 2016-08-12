@@ -198,6 +198,10 @@ module type CLIENT = sig
         conflicts and have not been written to since.  It is not
         possible to commit while this is non-empty. *)
 
+    val diff: t -> Commit.t -> Datakit_path.t diff list or_error Lwt.t
+    (** [diff t c] returns the paths differences between [c] and [t]'s
+        head. *)
+
   end
 
   module Branch : sig

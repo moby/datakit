@@ -257,7 +257,13 @@ module type CLIENT = sig
         aborted (and a warning is logged). Use [Transaction.abort] to
         avoid the warning. *)
 
-      val diff: t -> Commit.t -> Datakit_path.t diff list or_error Lwt.t
+    val transaction: t -> Transaction.t or_error Lwt.t
+    (** [transaction t] creates a new transaction on top of the branch
+        [t]. Must be closed with {!Transaction.abort} or
+        {!Transaction.commit}. Use {!with_transaction} to not have to
+        worry about resource leaks.. *)
+
+    val diff: t -> Commit.t -> Datakit_path.t diff list or_error Lwt.t
     (** [diff t c] returns the paths differences between [c] and [t]'s
         head. *)
 

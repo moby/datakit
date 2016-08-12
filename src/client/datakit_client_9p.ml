@@ -420,11 +420,14 @@ module Make(P9p : Protocol_9p_client.S) = struct
   end
 
   module Transaction = struct
+
     type t = {
       fs : FS.t;
       path : string list;
       mutable closed : bool;
     }
+
+    let closed t = t.closed
 
     type merge_inputs = {
       ours : Tree.t;

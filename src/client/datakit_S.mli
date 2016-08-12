@@ -202,6 +202,10 @@ module type CLIENT = sig
     (** [diff t c] returns the paths differences between [c] and [t]'s
         head. *)
 
+    val closed: t -> bool
+    (** [closed t] is true if [t] is closed and thus it is not valid
+        to read/write on it anymore. *)
+
   end
 
   module Branch : sig

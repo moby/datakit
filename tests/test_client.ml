@@ -201,6 +201,10 @@ let test_diff dk =
   DK.Branch.with_transaction master (fun tr ->
       DK.Transaction.create_file tr ~dir:(p "") "file" (v "from-master")
       >>*= fun () ->
+      DK.Transaction.create_dir tr ~dir:(p "") "src" >>*= fun () ->
+      let makefile = Cstruct.of_string "all: build test" in
+      DK.Transaction.create_file tr ~executable:false ~dir:(p "src")
+        "Makefile" makefile >>*= fun () ->
       DK.Transaction.commit tr ~message:"init"
     ) >>*= fun () ->
   DK.Branch.head master >>*= fun head1 ->

@@ -4,7 +4,6 @@ open Lwt.Infix
 
 module PathSet = Ivfs_merge.PathSet
 
-(* FIXME: remove 9p from the module name! *)
 let src = Logs.Src.create "ivfs" ~doc:"Irmin to VFS"
 module Log = (val Logs.src_log src: Logs.LOG)
 

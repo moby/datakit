@@ -6,6 +6,9 @@ open Result
 type t
 (** A [t] is an immutable sequence of bytes. *)
 
+val pp: t Fmt.t
+(** [pp] is the pretty-printer for blobs. *)
+
 val empty: t
 (** The empty blob. *)
 

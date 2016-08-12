@@ -2,6 +2,9 @@ open Result
 
 type t = Cstruct.t list ref (* (reversed) *)
 
+let pp_buf ppf buf = Fmt.pf ppf "%S" (Cstruct.to_string buf)
+let pp ppf t = Fmt.pf ppf "%a" Fmt.(Dump.list pp_buf) !t
+
 (* FIXME: very expensive! *)
 let compare x y =
   String.compare (Cstruct.copyv @@ List.rev !x) (Cstruct.copyv @@ List.rev !y)

@@ -71,6 +71,12 @@ module type CLIENT = sig
     type t
     (** A [t] is an immutable commit in the database. *)
 
+    val pp: t Fmt.t
+    (** [pp] is the pretty-printer for commits IDs. *)
+
+    val compare: t -> t -> int
+    (** [compare] compares commit IDs. *)
+
     val tree : t -> Tree.t
     (** [tree t] is the content of the commit. *)
 
@@ -191,6 +197,10 @@ module type CLIENT = sig
     (** [conflicts t] returns the current list of paths that had merge
         conflicts and have not been written to since.  It is not
         possible to commit while this is non-empty. *)
+
+    val diff: t -> Commit.t -> Datakit_path.t diff list or_error Lwt.t
+    (** [diff t c] returns the paths differences between [c] and [t]'s
+        head. *)
 
   end
 

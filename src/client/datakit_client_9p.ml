@@ -11,9 +11,15 @@ let rwx = [`Read; `Write; `Execute]
 let rw = [`Read; `Write]
 let rx = [`Read; `Execute]
 let r = [`Read]
-let rwxr_xr_x = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ()
+
+let rwxr_xr_x =
+  Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ()
+
 let rw_r__r__ = Protocol_9p.Types.FileMode.make ~owner:rw ~group:r ~other:r ()
-let symlink = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
+
+let symlink =
+  Protocol_9p.Types.FileMode.make
+    ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
 
 let ( / ) dir leaf = dir @ [leaf]
 let ( /@ ) dir user_path = dir @ Datakit_path.unwrap user_path
@@ -59,6 +65,21 @@ let abort_if_off switch fn =
   | None -> fn ()
   | Some sw when Lwt_switch.is_on sw -> fn ()
   | Some _ -> ok `Abort
+
+let diff_of_lines lines =
+  List.fold_left (fun acc line ->
+      let err e = Log.err (fun l -> l "invalid diff line: %s %s" line e) in
+      match String.cut ~sep:" " line with
+      | None            -> err "missing space"; acc
+      | Some (op, path) ->
+        match Datakit_path.of_string path with
+        | Error e -> err e; acc
+        | Ok path -> match op with
+          | "+" -> (`Added path  ) :: acc
+          | "-" -> (`Removed path) :: acc
+          | "*" -> (`Updated path) :: acc
+          | e   -> err e ; acc
+    ) [] lines
 
 module Make(P9p : Protocol_9p_client.S) = struct
 
@@ -128,7 +149,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
       P9p.mkdir t.conn dir leaf rwxr_xr_x
 
     let write_to_fid t fid ~offset data =
-      let maximum_payload = Int32.to_int (min 0x100000l (P9p.LowLevel.maximum_write_payload t.conn)) in
+      let maximum_payload =
+        Int32.to_int (min 0x100000l (P9p.LowLevel.maximum_write_payload t.conn))
+      in
       let rec loop ~offset remaining =
         let len = Cstruct.len remaining in
         if len = 0 then ok ()
@@ -386,6 +409,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let tree t = { Tree.fs = t.fs; path = path t / "ro" }
     let message t = FS.read_all t.fs (path t / "msg") >|*= Cstruct.to_string
     let id t = t.id
+    let pp ppf t = Fmt.string ppf t.id
+    let compare x y = String.compare x.id y.id
 
     let parents t =
       FS.read_all t.fs (path t / "parents") >|*= fun data ->
@@ -517,6 +542,11 @@ module Make(P9p : Protocol_9p_client.S) = struct
       lines (Cstruct.to_string data)
       |> List.map (fun hash -> {Commit.fs = t.fs; id = hash})
 
+    let diff t c =
+      FS.read_all t.fs (t.path / "diff" / Commit.id c) >|*= fun data ->
+      let lines = lines (Cstruct.to_string data) in
+      diff_of_lines lines
+
   end
 
   module Branch = struct
@@ -589,14 +619,16 @@ module Make(P9p : Protocol_9p_client.S) = struct
            else (
              Transaction.abort tr >|= fun () ->
              (* Make sure the user doesn't think their transaction succeeded *)
-             failwith "Transaction returned Ok without committing or aborting (so forced abort)";
+             failwith "Transaction returned Ok without committing or aborting \
+                       (so forced abort)";
            )
         )
         (fun () ->
            if tr.Transaction.closed then Lwt.return ()
            else (
              (* Just log, so we don't hide the underlying error *)
-             Log.info (fun f -> f "Transaction finished without committing or aborting (will abort)");
+             Log.info (fun f -> f "Transaction finished without committing or \
+                                   aborting (will abort)");
              Transaction.abort tr
            )
         )
@@ -604,21 +636,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let diff t c =
       FS.read_all t.fs (branch_dir t / "diff" / Commit.id c) >|*= fun data ->
       let lines = lines (Cstruct.to_string data) in
-      Log.debug (fun l -> l "XXX1 %s %d" (Cstruct.to_string data) (List.length lines));
-      List.fold_left (fun acc line ->
-          let err e = Log.err (fun l -> l "invalid diff line: %s %s" line e) in
-          match String.cut ~sep:" " line with
-          | None            -> err "missing space"; acc
-          | Some (op, path) ->
-            match Datakit_path.of_string path with
-            | Error e -> err e; acc
-            | Ok path -> match op with
-              | "+" -> (`Added path  ) :: acc
-              | "-" -> (`Removed path) :: acc
-              | "*" -> (`Updated path) :: acc
-              | e   -> err e ; acc
-        ) [] lines
-    |> fun lines -> Log.debug (fun l -> l "XXX %d" @@ List.length lines); lines
+      diff_of_lines lines
 
   end
 

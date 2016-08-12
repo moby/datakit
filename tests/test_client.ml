@@ -194,6 +194,8 @@ let diff: Datakit_path.t Datakit_S.diff Alcotest.testable = (module struct
       | `Updated p -> Fmt.pf ppf "* %a" Datakit_path.pp p
   end)
 
+let diffs = Alcotest.slist diff compare
+
 let test_diff dk =
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun tr ->
@@ -204,8 +206,8 @@ let test_diff dk =
   DK.Branch.head master >>*= fun head1 ->
   let head1 = match head1 with None -> Alcotest.fail "empty" | Some h -> h in
   DK.Branch.with_transaction master (fun tr ->
-      DK.Transaction.create_or_replace_file tr ~dir:(p "") "foo"
-        (Cstruct.of_string "foo") >>*= fun () ->
+      DK.Transaction.create_or_replace_file tr ~dir:(p "") "foo" (v "foo")
+      >>*= fun () ->
       DK.Transaction.read_file tr (p "file") >>*= fun old ->
       DK.Transaction.replace_file tr ~dir:(p "") "file"
         (Cstruct.append old (v "+pr"))
@@ -215,10 +217,23 @@ let test_diff dk =
   DK.Branch.head master >>*= fun head2 ->
   let head2 = match head2 with None -> Alcotest.fail "empty" | Some h -> h in
   DK.Branch.diff master head1 >>*= fun files1 ->
-  Alcotest.(check (slist diff compare)) "files1"
-    [`Added (p "foo"); `Updated (p "file")] files1;
+  Alcotest.(check diffs) "files1" [`Added (p "foo");`Updated (p "file")] files1;
   DK.Branch.diff master head2 >>*= fun files2 ->
   Alcotest.(check (slist diff compare)) "files2" [] files2;
+  DK.Branch.with_transaction master (fun tr ->
+      DK.Transaction.replace_file tr ~dir:(p "") "file" (v "from-master")
+      >>*= fun () ->
+      DK.Transaction.diff tr head1 >>*= fun diff3 ->
+      Alcotest.(check diffs) "diff3" [`Added (p "foo")] diff3;
+      DK.Transaction.diff tr head2 >>*= fun diff4 ->
+      Alcotest.(check diffs) "diff4" [`Updated (p "file")] diff4;
+      DK.Transaction.replace_file tr ~dir:(p "") "file" (v "from-master+pr")
+      >>*= fun () ->
+      DK.Transaction.diff tr head2 >>*= fun diff5 ->
+      Alcotest.(check diffs) "diff5" [] diff5;
+      DK.Transaction.abort tr >>= ok
+    )
+  >>*= fun () ->
   Lwt.return_unit
 
 let test_merge_metadata dk =

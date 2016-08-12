@@ -2,6 +2,13 @@ open Result
 
 type t = Cstruct.t list ref (* (reversed) *)
 
+let pp_buf ppf buf = Fmt.pf ppf "%S" (Cstruct.to_string buf)
+let pp ppf t = Fmt.pf ppf "%a" Fmt.(Dump.list pp_buf) !t
+
+(* FIXME: very expensive! *)
+let compare x y =
+  String.compare (Cstruct.copyv @@ List.rev !x) (Cstruct.copyv @@ List.rev !y)
+
 let ( >>!= ) x f =
   match x with
   | Ok x -> f x
@@ -50,7 +57,7 @@ let check_offset ~offset len =
   if offset < 0L then Vfs.Error.negative_offset offset
   else if offset > len then Vfs.Error.offset_too_large ~offset len
   else Ok ()
-  
+
 let read t ~offset ~count =
   let contents = to_ro_cstruct t in
   check_offset ~offset (Cstruct.len contents) >>!= fun () ->

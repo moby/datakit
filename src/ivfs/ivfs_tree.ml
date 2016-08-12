@@ -8,6 +8,11 @@ type path = string list
 type perm = [ `Normal | `Exec | `Link ]
 
 module Path = Irmin.Path.String_list
+module PathMap = struct
+  include Map.Make(Path)
+  let of_list l = List.fold_left (fun m (k, v) -> add k v m) empty l
+end
+module PathSet = Set.Make(Path)
 
 module type STORE = Irmin.S
   with type key = string list
@@ -43,12 +48,15 @@ module type S = sig
     val get: t -> path -> t option Lwt.t
     val map: t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
     val ls: t -> ([`File | `Directory] * step) list Lwt.t
+    val iter:
+      t -> (path -> (unit -> (File.t * perm) Lwt.t) -> unit Lwt.t) -> unit Lwt.t
     val of_hash: repo -> hash -> t
     val hash: t -> hash Lwt.t
     val repo: t -> repo
     val with_child:
       t -> step -> [`File of File.t * perm | `Directory of t] -> t Lwt.t
     val without_child: t -> step -> t Lwt.t
+    val diff: t -> t -> (path * File.t Irmin.diff) list Lwt.t
   end
   val snapshot: store -> Dir.t Lwt.t
 end
@@ -217,6 +225,93 @@ module Make (Store: STORE) = struct
       map t >|= fun m ->
       let m = String.Map.remove step m in
       { repo = t.repo; value = Map_only m }
+
+    module KV = struct
+        type t = Path.t * File.hash
+        let compare (p1, h1) (p2, h2) =
+          match Path.compare p1 p2 with
+          | 0 -> File.compare_hash h1 h2
+          | i -> i
+    end
+    module KVSet = Set.Make(KV)
+
+    let lookup_dir t n =
+      lookup t n >|= function
+      | `Dir d -> d
+      | _      -> failwith "lookup_dir"
+
+    let lookup_file t n =
+      lookup t n >|= function
+      | `File f -> f
+      | _        -> failwith "lookup_file"
+
+    let iter t fn =
+      let rec aux = function
+        | []            -> Lwt.return_unit
+        | (t, path)::tl ->
+          ls t >>= fun childs ->
+          Lwt_list.fold_left_s (fun acc -> function
+              | `Directory , d ->
+                lookup_dir t d >|= fun t ->
+                (t, path @ [d]) :: acc
+              | `File      , f ->
+                fn (path @ [f]) (fun () -> lookup_file t f) >|= fun () ->
+                acc
+            ) [] childs
+          >>= fun dirs ->
+          let todo = dirs @ tl in
+          aux todo
+      in
+      aux [t, []]
+
+    let diff x y =
+      let set t =
+        let acc = ref KVSet.empty in
+        iter t (fun k v ->
+            v () >>= fun (v, _) ->
+            File.hash v >>= fun v ->
+            acc := KVSet.add (k, v) !acc;
+            Lwt.return_unit
+          ) >>= fun () ->
+        Lwt.return !acc
+      in
+      let find path map =
+        let h = PathMap.find path map in
+        File.of_hash x.repo h
+      in
+      (* FIXME very dumb and slow *)
+      set x >>= fun sx ->
+      set y >>= fun sy ->
+      let added     = KVSet.diff sy sx in
+      let removed   = KVSet.diff sx sy in
+      let added_l   = KVSet.elements added in
+      let removed_l = KVSet.elements removed in
+      let added_m   = PathMap.of_list added_l in
+      let removed_m = PathMap.of_list removed_l in
+      let added_p   = PathSet.of_list (List.map fst added_l) in
+      let removed_p = PathSet.of_list (List.map fst removed_l) in
+      let updated_p = PathSet.inter added_p removed_p in
+      let added_p   = PathSet.diff added_p updated_p in
+      let removed_p = PathSet.diff removed_p updated_p in
+      let added =
+        PathSet.fold (fun path acc ->
+            (path, `Added (find path added_m)) :: acc
+          ) added_p []
+      in
+      let removed =
+        PathSet.fold (fun path acc ->
+            (path, `Removed (find path removed_m)) :: acc
+          ) removed_p []
+      in
+      let updated =
+        PathSet.fold (fun path acc ->
+            let x = find path removed_m in
+            let y = find path added_m in
+            (path, `Updated (x, y)) :: acc
+          ) updated_p []
+      in
+      Lwt.return (added @ updated @ removed)
+
   end
 
   let snapshot store =

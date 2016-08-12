@@ -36,8 +36,8 @@ module type S = sig
     (** The type for file IDs (hashes). *)
 
     val of_data: repo -> Ivfs_blob.t -> t
-    (** [of_data repo data] is a file containing [data], which may later
-        be stored in [repo]. *)
+    (** [of_data repo data] is a file containing [data], which may
+        later be stored in [repo]. *)
 
     val hash: t -> hash Lwt.t
     (** [hash f] is the hash of the contents of [f]. If [f] is not yet
@@ -91,6 +91,10 @@ module type S = sig
     val ls: t -> ([`File | `Directory] * step) list Lwt.t
     (** List the contents of a directory with the type of each item. *)
 
+    val iter:
+      t -> (path -> (unit -> (File.t * perm) Lwt.t) -> unit Lwt.t) -> unit Lwt.t
+    (** [iter t f] applies [f] over all sub-files. *)
+
     val of_hash: repo -> hash -> t
     (** [of_hash repo h] is the directory whose hash is [h] in [repo]. *)
 
@@ -110,11 +114,16 @@ module type S = sig
     (** [without_child dir name] is a copy of [dir] except that it has
         no child called [name]. *)
 
+    val diff: t -> t -> (path * File.t Irmin.diff) list Lwt.t
+    (** [diff x y] is the list of files which are different between
+        [x] and [y]. *)
+
   end
 
   val snapshot: store -> Dir.t Lwt.t
-  (** Convert a branch, which may update while we read it, to a fixed directory
-      by reading its current root. *)
+  (** Convert a branch, which may update while we read it, to a fixed
+      directory by reading its current root. *)
+
 end
 
 module Make (Store: STORE):

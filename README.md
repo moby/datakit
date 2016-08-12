@@ -178,6 +178,10 @@ contain:
 
 - `merge`, which can be used to start a merge (see below).
 
+- `diff/` is a directory containing hidden files. `diff/<commit-id>`
+  contains the diff between the given `commit-id` and the current state
+  of the transaction.
+
 For example, to create a file `somefile`:
 
     ~/db $ mkdir branch/master/transactions/foo
@@ -298,6 +302,8 @@ For instance:
 
 Means that `foo` have been added and `bar` modified in the `master` branch since
 the commit `6b2e00a0be59c0335568dd9415a7d93640e7099c` took place.
+
+Note: this also works when you are inside a transaction.
 
 #### Fetch
 

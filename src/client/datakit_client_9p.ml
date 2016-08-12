@@ -11,9 +11,15 @@ let rwx = [`Read; `Write; `Execute]
 let rw = [`Read; `Write]
 let rx = [`Read; `Execute]
 let r = [`Read]
-let rwxr_xr_x = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ()
+
+let rwxr_xr_x =
+  Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ()
+
 let rw_r__r__ = Protocol_9p.Types.FileMode.make ~owner:rw ~group:r ~other:r ()
-let symlink = Protocol_9p.Types.FileMode.make ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
+
+let symlink =
+  Protocol_9p.Types.FileMode.make
+    ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
 
 let ( / ) dir leaf = dir @ [leaf]
 let ( /@ ) dir user_path = dir @ Datakit_path.unwrap user_path
@@ -128,7 +134,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
       P9p.mkdir t.conn dir leaf rwxr_xr_x
 
     let write_to_fid t fid ~offset data =
-      let maximum_payload = Int32.to_int (min 0x100000l (P9p.LowLevel.maximum_write_payload t.conn)) in
+      let maximum_payload =
+        Int32.to_int (min 0x100000l (P9p.LowLevel.maximum_write_payload t.conn))
+      in
       let rec loop ~offset remaining =
         let len = Cstruct.len remaining in
         if len = 0 then ok ()
@@ -589,14 +597,16 @@ module Make(P9p : Protocol_9p_client.S) = struct
            else (
              Transaction.abort tr >|= fun () ->
              (* Make sure the user doesn't think their transaction succeeded *)
-             failwith "Transaction returned Ok without committing or aborting (so forced abort)";
+             failwith "Transaction returned Ok without committing or aborting \
+                       (so forced abort)";
            )
         )
         (fun () ->
            if tr.Transaction.closed then Lwt.return ()
            else (
              (* Just log, so we don't hide the underlying error *)
-             Log.info (fun f -> f "Transaction finished without committing or aborting (will abort)");
+             Log.info (fun f -> f "Transaction finished without committing or \
+                                   aborting (will abort)");
              Transaction.abort tr
            )
         )

@@ -44,13 +44,20 @@ module type S = sig
         in [repo], calling this will cause it to be written. *)
 
     val content: t -> Ivfs_blob.t Lwt.t
-
-    val equal: t -> t -> bool
-    (** Quick equality check (compares hashes). *)
-
-    val pp_hash: Format.formatter -> hash -> unit
+    (** [content t] is [t]'s contents. *)
 
     val size: t -> int64 Lwt.t
+    (** [size t] is [t]'s size. *)
+
+    val pp: t Fmt.t
+    (** [pp] is a pretty-printer for files. *)
+
+    val pp_hash: Format.formatter -> hash -> unit
+    (** [pp_hash] is the pretty-printer for file's hashes. *)
+
+    val compare_hash: hash -> hash -> int
+    (** [compare_hash] is the comparison function for file hashes. *)
+
   end
 
   module Dir: sig

@@ -26,9 +26,10 @@ module type S = sig
     val of_data: repo -> Ivfs_blob.t -> t
     val hash: t -> hash Lwt.t
     val content: t -> Ivfs_blob.t Lwt.t
-    val equal: t -> t -> bool
-    val pp_hash: Format.formatter -> hash -> unit
     val size: t -> int64 Lwt.t
+    val pp: t Fmt.t
+    val pp_hash: Format.formatter -> hash -> unit
+    val compare_hash: hash -> hash -> int
   end
   module Dir: sig
     type t
@@ -57,6 +58,7 @@ module Make (Store: STORE) = struct
   type repo = Store.Repo.t
 
   module File = struct
+
     type hash = Store.Private.Contents.Key.t
 
     (* For now, a value is either in memory or on disk. In future, we
@@ -86,15 +88,8 @@ module Make (Store: STORE) = struct
         f.value <- Hash hash;
         hash
 
-    let digest_blob b =
-      Store.Private.Contents.Key.digest (Ivfs_blob.to_ro_cstruct b)
-
-    let equal a b =
-      match a.value, b.value with
-      | Hash a, Hash b -> Store.Private.Contents.Key.equal a b
-      | Blob a, Blob b -> a = b
-      | Hash a, Blob b -> Store.Private.Contents.Key.equal a (digest_blob b)
-      | Blob a, Hash b -> Store.Private.Contents.Key.equal b (digest_blob a)
+    let compare_hash a b =
+      Store.Private.Contents.Key.compare a b
 
     let content f =
       match f.value with
@@ -110,6 +105,11 @@ module Make (Store: STORE) = struct
 
     let pp_hash fmt hash =
       Fmt.string fmt (Store.Private.Contents.Key.to_hum hash)
+
+    let pp ppf t = match t.value with
+      | Blob b -> Fmt.pf ppf "blob:%a" Ivfs_blob.pp b
+      | Hash h -> Fmt.pf ppf "hash:%a" pp_hash h
+
   end
 
   module Dir = struct

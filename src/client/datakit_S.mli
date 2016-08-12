@@ -71,6 +71,12 @@ module type CLIENT = sig
     type t
     (** A [t] is an immutable commit in the database. *)
 
+    val pp: t Fmt.t
+    (** [pp] is the pretty-printer for commits IDs. *)
+
+    val compare: t -> t -> int
+    (** [compare] compares commit IDs. *)
+
     val tree : t -> Tree.t
     (** [tree t] is the content of the commit. *)
 

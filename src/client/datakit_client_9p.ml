@@ -394,6 +394,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let tree t = { Tree.fs = t.fs; path = path t / "ro" }
     let message t = FS.read_all t.fs (path t / "msg") >|*= Cstruct.to_string
     let id t = t.id
+    let pp ppf t = Fmt.string ppf t.id
+    let compare x y = String.compare x.id y.id
 
     let parents t =
       FS.read_all t.fs (path t / "parents") >|*= fun data ->

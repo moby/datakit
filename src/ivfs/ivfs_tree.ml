@@ -237,13 +237,13 @@ module Make (Store: STORE) = struct
 
     let lookup_dir t n =
       lookup t n >|= function
-      | `Dir d -> d
-      | _      -> failwith "lookup_dir"
+      | `Directory d -> d
+      | _            -> failwith ("lookup_dir: " ^ n)
 
     let lookup_file t n =
       lookup t n >|= function
       | `File f -> f
-      | _        -> failwith "lookup_file"
+      | _        -> failwith ("lookup_file: " ^ n)
 
     let iter t fn =
       let rec aux = function

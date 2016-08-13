@@ -420,11 +420,14 @@ module Make(P9p : Protocol_9p_client.S) = struct
   end
 
   module Transaction = struct
+
     type t = {
       fs : FS.t;
       path : string list;
       mutable closed : bool;
     }
+
+    let closed t = t.closed
 
     type merge_inputs = {
       ours : Tree.t;
@@ -610,8 +613,10 @@ module Make(P9p : Protocol_9p_client.S) = struct
       FS.write_stream t.fs
         (branch_dir t / "fast-forward") (Cstruct.of_string commit.Commit.id)
 
+    let transaction t = Transaction.create t.fs (branch_dir t)
+
     let with_transaction t fn =
-      Transaction.create t.fs (branch_dir t) >>*= fun tr ->
+      transaction t >>*= fun tr ->
       Lwt.finalize
         (fun () ->
            fn tr >>*= fun result ->

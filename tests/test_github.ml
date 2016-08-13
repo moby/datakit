@@ -198,6 +198,9 @@ let init status events =
   { API.user; repo; status; prs = []; events; ctx; webhooks = [] }
 
 let run f () =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ();
   Test_utils.run (fun _repo conn ->
       let dk = DK.connect conn in
       DK.branch dk pub  >>*= fun pub ->
@@ -265,9 +268,6 @@ let check name tree =
   Lwt.return_unit
 
 let test_events dk =
-  quiet_9p ();
-  quiet_git ();
-  quiet_irmin ();
   let t = init status0 events0 in
   API.apply_events ~user ~repo t;
   let s = VG.empty in
@@ -308,9 +308,6 @@ let find_status t =
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
-  quiet_9p ();
-  quiet_git ();
-  quiet_irmin ();
   let t = init status0 events1 in
   API.apply_events t ~user ~repo;
   let s = VG.empty in
@@ -374,9 +371,6 @@ let test_updates dk =
   Lwt.return_unit
 
 let test_startup dk =
-  quiet_9p ();
-  quiet_git ();
-  quiet_irmin ();
   let t = init status0 events1 in
   API.apply_events t ~user ~repo;
   let s = VG.empty in

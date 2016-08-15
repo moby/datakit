@@ -19,6 +19,7 @@ dependencies:
   - opam update -u
   - opam pin add datakit . -n
   - opam install depext && opam depext osx-fsevents datakit
+  - opam list
   - opam install datakit
   - opam config exec -- make COMMIT
   - mkdir -p _build/src/bin

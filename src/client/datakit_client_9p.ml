@@ -66,20 +66,7 @@ let abort_if_off switch fn =
   | Some sw when Lwt_switch.is_on sw -> fn ()
   | Some _ -> ok `Abort
 
-let diff_of_lines lines =
-  List.fold_left (fun acc line ->
-      let err e = Log.err (fun l -> l "invalid diff line: %s %s" line e) in
-      match String.cut ~sep:" " line with
-      | None            -> err "missing space"; acc
-      | Some (op, path) ->
-        match Datakit_path.of_string path with
-        | Error e -> err e; acc
-        | Ok path -> match op with
-          | "+" -> (`Added path  ) :: acc
-          | "-" -> (`Removed path) :: acc
-          | "*" -> (`Updated path) :: acc
-          | e   -> err e ; acc
-    ) [] lines
+exception Err of string
 
 module Make(P9p : Protocol_9p_client.S) = struct
 
@@ -128,6 +115,27 @@ module Make(P9p : Protocol_9p_client.S) = struct
         t.buffer <- rest;
         ok (`Line line)
   end
+
+  let diff_of_lines lines =
+    try
+      List.fold_left (fun acc line ->
+          let err e =
+            let s = Fmt.strf "invalid diff line: %s %s" line e in
+            raise (Err s)
+          in
+          match String.cut ~sep:" " line with
+          | None            -> err "missing space"
+          | Some (op, path) ->
+            match Datakit_path.of_string path with
+            | Error e -> err e
+            | Ok path -> match op with
+              | "+" -> (`Added path  ) :: acc
+              | "-" -> (`Removed path) :: acc
+              | "*" -> (`Updated path) :: acc
+              | e   -> err e
+        ) [] lines
+      |> ok
+    with Err e -> Lwt.return (Error (`Msg e))
 
   module FS = struct
     (* Low-level wrappers for 9p. *)
@@ -418,7 +426,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       |> List.map (fun hash -> {t with id = hash})
 
     let diff t c =
-      FS.read_all t.fs (path t / "diff" / id c) >|*= fun data ->
+      FS.read_all t.fs (path t / "diff" / id c) >>*= fun data ->
       let lines = lines (Cstruct.to_string data) in
       diff_of_lines lines
   end
@@ -550,7 +558,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       |> List.map (fun hash -> {Commit.fs = t.fs; id = hash})
 
     let diff t c =
-      FS.read_all t.fs (t.path / "diff" / Commit.id c) >|*= fun data ->
+      FS.read_all t.fs (t.path / "diff" / Commit.id c) >>*= fun data ->
       let lines = lines (Cstruct.to_string data) in
       diff_of_lines lines
 

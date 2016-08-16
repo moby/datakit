@@ -522,18 +522,20 @@ module Diff = struct
   type t = {
     user: string;
     repo: string;
-    id  : [ `PR of int | `Status of string * string list ]
+    id  : [ `PR of int | `Status of string * string list | `Unknown ]
   }
 
   let pp_id ppf = function
     | `PR n          -> Fmt.pf ppf "#%d" n
     | `Status (s, l) -> Fmt.pf ppf "%s:%a" s Fmt.(list ~sep:(unit "/") string) l
+    | `Unknown       -> Fmt.pf ppf "?"
 
   let pp ppf t =
     match t.id with
-    | `PR n          -> Fmt.pf ppf "PR: %s/%s#%d" t.user t.repo n
+    | `Unknown       -> Fmt.pf ppf "? %s/%s" t.user t.repo
+    | `PR n          -> Fmt.pf ppf "PR %s/%s#%d" t.user t.repo n
     | `Status (s, l) ->
-      Fmt.pf ppf "Status: %s/%s:%s:%a"
+      Fmt.pf ppf "status %s/%s:%s:%a"
         t.user t.repo s Fmt.(list ~sep:(unit "/") string) l
 
   let compare = Pervasives.compare
@@ -557,7 +559,9 @@ module Diff = struct
   let replace_pr t pr =
     let id = PR.repo pr, pr.PR.number in
     let t = remove_pr t id in
-    { t with Snapshot.prs = PR.Set.add pr t.Snapshot.prs }
+    let repos = Repo.Set.add (PR.repo pr) t.Snapshot.repos in
+    let prs   = PR.Set.add pr t.Snapshot.prs in
+    { t with Snapshot.repos; prs }
 
   let path_of_diff = function
     | `Added f | `Removed f | `Updated f -> Datakit_path.unwrap f
@@ -576,7 +580,9 @@ module Diff = struct
   let replace_status t s =
     let cc = Status.repo s, s.Status.commit, s.Status.context in
     let t = remove_status t cc in
-    { t with Snapshot.status = Status.Set.add s t.Snapshot.status }
+    let repos  = Repo.Set.add (Status.repo s) t.Snapshot.repos in
+    let status = Status.Set.add s t.Snapshot.status in
+    { t with Snapshot.repos; status }
 
   (** Repositories diff *)
 
@@ -595,6 +601,7 @@ module Diff = struct
           | user :: repo :: "commit" :: id :: "status" :: (_ :: _ :: _ as tl) ->
             let context = List.rev (List.tl (List.rev tl)) in
             Some { user; repo; id = `Status (id, context) }
+          | user :: repo :: _ -> Some { user; repo; id = `Unknown }
           | _ -> None
         in
         match t with
@@ -852,6 +859,10 @@ module Conv (DK: Datakit_S.CLIENT) = struct
         | `Status (commit, context) ->
           apply_status_diff !t tree (repo, commit, context) >>*= fun x ->
           t := x;
+          ok ()
+        | `Unknown ->
+          let repos = Repo.Set.add repo !t.Snapshot.repos in
+          t := { !t with Snapshot.repos };
           ok ()
       ) (Diff.Set.elements diff)
     >>*= fun () ->

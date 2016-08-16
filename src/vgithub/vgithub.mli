@@ -182,7 +182,7 @@ module Diff: sig
   type t = {
     user: string;
     repo: string;
-    id  : [ `PR of int | `Status of string * string list ]
+    id  : [ `PR of int | `Status of string * string list | `Unknown ]
   }
   (** The type for filesystem diffs. *)
 

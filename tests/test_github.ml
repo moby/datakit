@@ -2,6 +2,7 @@ open Test_utils
 open Lwt.Infix
 open Vgithub
 open Datakit_path.Infix
+open Result
 
 module Conv = Conv(DK)
 

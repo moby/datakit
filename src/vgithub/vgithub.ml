@@ -444,7 +444,10 @@ let ( >>*= ) x f =
 
 let ok x = Lwt.return (Ok x)
 
-let pool50 = Lwt_pool.create 50 (fun () -> Lwt.return_unit)
+(* our 9p server seems to dead-lock when more than 100 fids are
+   used. In doubt, try to limit the number of 9p operations to
+   50... *)
+let pool9p = Lwt_pool.create 50 (fun () -> Lwt.return_unit)
 
 let list_iter_p f l =
   Lwt_list.map_p f l >|= fun l ->
@@ -460,8 +463,11 @@ let list_iter_s f l =
       | Error e, _ | _, Error e -> Error e
     ) (Ok ()) (List.rev l)
 
-let list_map_p f l =
-  let f x = Lwt_pool.use pool50 (fun () -> f x) in
+let list_map_p ?pool f l =
+  let f x = match pool with
+    | None   -> f x
+    | Some p -> Lwt_pool.use p (fun () -> f x)
+  in
   Lwt_list.map_p f l >|= fun l ->
   List.fold_left (fun acc x -> match acc, x with
       | Ok acc, Ok x            -> Ok (x :: acc)
@@ -723,7 +729,8 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     if not exists then ok PR.Set.empty
     else
       Tree.read_dir t dir >>*=
-      list_map_p (fun num -> pr ~user ~repo tree (int_of_string num))
+      list_map_p ~pool:pool9p
+        (fun num -> pr ~user ~repo tree (int_of_string num))
       >>*= function l ->
       List.fold_left
         (fun acc pr -> match pr with None -> acc | Some x -> PR.Set.add x acc)
@@ -733,7 +740,8 @@ module Conv (DK: Datakit_S.CLIENT) = struct
   let prs ?repos:rs tree =
     Log.debug (fun l -> l "prs");
     (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_p (prs_of_repo tree) (Repo.Set.elements repos) >>*= fun prs ->
+    list_map_p ~pool:pool9p (prs_of_repo tree) (Repo.Set.elements repos)
+    >>*= fun prs ->
     ok (List.fold_left PR.Set.union PR.Set.empty prs)
 
   (* Status *)
@@ -795,7 +803,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     if not exists then ok Status.Set.empty
     else
       Tree.read_dir t dir >>*=
-      list_map_p (fun commit ->
+      list_map_p ~pool:pool9p (fun commit ->
           Log.debug (fun l ->
               l "status_of_repo %a %s" Datakit_path.pp dir commit);
           let dir = dir / commit / "status" in
@@ -810,7 +818,9 @@ module Conv (DK: Datakit_S.CLIENT) = struct
             if not exists then ok Status.Set.empty
             else
               Tree.read_dir t dir >>*= fun child ->
-              list_map_p (fun c -> aux (context @ [c])) child >>*= fun child ->
+              list_map_p ~pool:pool9p
+                (fun c -> aux (context @ [c])) child
+              >>*= fun child ->
               let child = List.fold_left Status.Set.union Status.Set.empty child in
               Tree.exists_file t (dir / "state") >>*= fun exists ->
               if exists then
@@ -828,7 +838,8 @@ module Conv (DK: Datakit_S.CLIENT) = struct
   let statuses ?repos:rs tree =
     Log.debug (fun l -> l "status");
     (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_p (statuses_of_repo tree) (Repo.Set.elements repos) >>*= fun ss ->
+    list_map_p ~pool:pool9p (statuses_of_repo tree) (Repo.Set.elements repos)
+    >>*= fun ss ->
     ok (List.fold_left Status.Set.union Status.Set.empty ss)
 
   (* Diffs *)
@@ -967,34 +978,35 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   (** Import from GitHub *)
 
   (* Import http://github.com/usr/repo state. *)
-  let import_repo t ~token r =
-    Log.debug (fun l -> l "import_repo %a" Repo.pp r);
-    let { Repo.user; repo } = r in
-    Log.debug (fun l -> l "API.prs %a" Repo.pp r);
-    API.prs token ~user ~repo >>= fun prs ->
-    let t = ref (Snapshot.add_repo t r) in
-    list_iter_s (fun pr ->
-        if pr.PR.state = `Closed then ok ()
+  let import_repos t ~token repos =
+    Log.debug (fun l -> l "import_repo %a" Repo.Set.pp repos);
+    let repos = Repo.Set.elements repos in
+    Lwt_list.map_p (fun r ->
+        let { Repo.user; repo } = r in
+        Log.debug (fun l -> l "API.prs %a" Repo.pp r);
+        API.prs token ~user ~repo
+      ) repos
+    >>= fun prs ->
+    let prs = List.flatten prs in
+    Lwt_list.map_p (fun pr ->
+        let { PR.user; repo; _ } = pr in
+        if pr.PR.state = `Closed then Lwt.return_none
         else (
-          Log.debug (fun l -> l "API.status %a:%s" Repo.pp r pr.PR.head);
-          API.status token ~user ~repo ~commit:pr.PR.head >>= fun s ->
-          t := Snapshot.add_pr !t pr;
-          t := Snapshot.add_status !t (Status.Set.of_list s);
-          ok ()
+          Log.debug (fun l -> l "API.status %s/%s:%s" user repo pr.PR.head);
+          API.status token ~user ~repo ~commit:pr.PR.head >|= fun s ->
+          Some (pr, s)
         )
       ) prs
-    >>*= fun () ->
-    ok !t
-
-  let import_repos t ~token s =
-    let t = ref t in
-    list_iter_s (fun r ->
-        import_repo !t ~token r >>*= fun x ->
-        t := x;
-        ok ()
-      ) (Repo.Set.elements s)
-    >>*= fun () ->
-    ok !t
+    >>= fun ss ->
+    let t = List.fold_left Snapshot.add_repo t repos in
+    List.fold_left (fun acc -> function
+        | None         -> acc
+        | Some (pr, s) ->
+          let acc = Snapshot.add_pr acc pr in
+          let acc = Snapshot.add_status acc  (Status.Set.of_list s) in
+          acc
+      ) t ss
+    |> ok
 
   (** Prune *)
 

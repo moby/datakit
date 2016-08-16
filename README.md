@@ -139,9 +139,6 @@ Each branch directory contains:
 
 - `watch` can be used to watch specific files or directories for changes.
 
-- `diff/` is a directory containing hidden files. `diff/<commit-id>`
-  contains the diff between the given `commit-id` and the current HEAD.
-
 Note that reading from `head.live` will skip directly to the latest
 commit: even if you read continuously from it, you will not
 necessarily see all intermediate commits.
@@ -246,6 +243,9 @@ The contents of a snapshot directory are:
 - `msg` contains the commit message.
 
 - `parents` contains the hashes of the parent commits, one per line.
+
+- `diff/` is a directory containing hidden files. `diff/<commit-id>`
+  contains the diff between the given `commit-id` and this snapshot.
 
 
 #### Watches

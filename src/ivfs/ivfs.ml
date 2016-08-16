@@ -663,7 +663,6 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let remove () = remove !name in
     let make_contents name =
       Store.of_branch_id make_task name repo >|= fun store ->
-      let snapshot () = Tree.snapshot (store "snapshot") in
       [
         read_only ~name:"ro" (store "ro");
         Vfs.Inode.dir  "transactions" (transactions store);
@@ -672,7 +671,6 @@ module Make (Store : Ivfs_tree.STORE) = struct
         Vfs.Inode.file "fast-forward" (fast_forward_merge store);
         Vfs.Inode.file "reflog"       (reflog @@ store "watch");
         Vfs.Inode.file "head"         (Vfs.File.status (status store));
-        Vfs.Inode.dir  "diff"         (diff repo snapshot);
       ] in
     let contents = ref (make_contents !name) in
     let ls () = !contents >|= fun contents -> Ok contents in
@@ -824,11 +822,13 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   let snapshot_dir store name =
     let store = store "ro" in
+    let repo = Store.repo store in
     let dirs = Vfs.ok [
         read_only ~name:"ro"     store;
         Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
         Vfs.Inode.file "msg"     (msg_file store name);
-        Vfs.Inode.file "parents" (parents_file store)
+        Vfs.Inode.file "parents" (parents_file store);
+        Vfs.Inode.dir  "diff"    (diff repo (fun () -> Tree.snapshot store));
       ] in
     static_dir name (fun () -> dirs)
 

@@ -276,6 +276,19 @@ let test_snapshot () =
       Alcotest.(check snapshot) "snap diff1" s2 sd1;
       Alcotest.(check snapshot) "snap diff2" s2 sd2;
 
+
+      DK.Branch.with_transaction br (fun tr ->
+          DK.Transaction.make_dirs tr (p "test/toto") >>*= fun () ->
+          DK.Transaction.create_or_replace_file tr ~dir:(p "test/toto") "FOO"
+            (v "") >>*= fun () ->
+          DK.Transaction.commit tr ~message:"test/foo"
+        ) >>*= fun () ->
+      expect_head br >>*= fun head3 ->
+      let tree3 = Conv.tree_of_commit head3 in
+      Conv.diff tree3 head2 >>*= fun diff3 ->
+      let d = { Diff.user; repo = "toto"; id = `Unknown } in
+      Alcotest.(check diffs) "diff3" [d] (Diff.Set.elements diff3);
+
       Lwt.return_unit
     )
 

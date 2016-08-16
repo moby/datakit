@@ -55,7 +55,7 @@ module type S = sig
     val with_child:
       t -> step -> [`File of File.t * perm | `Directory of t] -> t Lwt.t
     val without_child: t -> step -> t Lwt.t
-    val diff: t -> t -> (path * File.t Irmin.diff) list Lwt.t
+    val diff: t -> t -> (path * (File.t * perm) Irmin.diff) list Lwt.t
   end
   val snapshot: store -> Dir.t Lwt.t
 end
@@ -226,10 +226,14 @@ module Make (Store: STORE) = struct
       { repo = t.repo; value = Map_only m }
 
     module KV = struct
-        type t = Path.t * File.hash
-        let compare (p1, h1) (p2, h2) =
+        type t = Path.t * (File.hash * perm)
+        let compare (p1, (h1, perm1)) (p2, (h2, perm2)) =
           match Path.compare p1 p2 with
-          | 0 -> File.compare_hash h1 h2
+          | 0 ->
+            begin match File.compare_hash h1 h2 with
+              | 0 -> Pervasives.compare perm1 perm2
+              | i -> i
+            end
           | i -> i
     end
     module KVSet = Set.Make(KV)
@@ -254,16 +258,16 @@ module Make (Store: STORE) = struct
     let diff x y =
       let set t =
         let acc = ref KVSet.empty in
-        iter t (fun k (v, _) ->
+        iter t (fun k (v, p) ->
             File.hash v >>= fun v ->
-            acc := KVSet.add (k, v) !acc;
+            acc := KVSet.add (k, (v, p)) !acc;
             Lwt.return_unit
           ) >>= fun () ->
         Lwt.return !acc
       in
       let find path map =
-        let h = PathMap.find path map in
-        File.of_hash x.repo h
+        let f, p = PathMap.find path map in
+        File.of_hash x.repo f, p
       in
       (* FIXME very dumb and slow *)
       set x >>= fun sx ->

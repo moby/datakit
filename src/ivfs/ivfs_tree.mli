@@ -113,7 +113,7 @@ module type S = sig
     (** [without_child dir name] is a copy of [dir] except that it has
         no child called [name]. *)
 
-    val diff: t -> t -> (path * File.t Irmin.diff) list Lwt.t
+    val diff: t -> t -> (path * (File.t * perm) Irmin.diff) list Lwt.t
     (** [diff x y] is the list of files which are different between
         [x] and [y]. *)
 

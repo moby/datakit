@@ -1241,13 +1241,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   (* The main synchonisation function: it is called on every change in
      the public or private branch. *)
-  let sync_once ~dry_updates ~token ~old t =
+  let sync_once ~dry_updates ~token ~pub ~priv ~old t =
     Log.debug (fun l -> l "sync_once:@,@[old:%a@,new:%a@]" pp old pp t);
     (* Start by calling GitHub API calls that the user requested. *)
     call_github_api ~dry_updates ~token ~old:old.pub.snapshot t.pub.snapshot
     >>*= fun () ->
     let repos = Repo.Set.union (repos old.pub t.pub) (repos old.priv t.priv) in
-    if Repo.Set.is_empty repos then
+    let merge t =
       prune t.priv.snapshot >>*= fun (_, cleanups) ->
       match cleanups with
       | None ->
@@ -1261,6 +1261,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         let message = Fmt.strf "Pruning %s" t.priv.name in
         DK.Transaction.abort t.pub.tr >>= fun () ->
         DK.Transaction.commit t.priv.tr ~message
+    in
+    if Repo.Set.is_empty repos then merge t >>*= fun () -> ok t
     else
       (* we have new repositories to watch! import them in the private
          branch. *)
@@ -1269,16 +1271,19 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Conv.update_statuses t.priv.tr s.Snapshot.status >>*= fun () ->
       DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
       DK.Transaction.abort t.pub.tr >>= fun () ->
-      if diff = [] then DK.Transaction.abort t.priv.tr >>= ok
+      if diff = [] then DK.Transaction.abort t.priv.tr >>= fun () -> ok t
       else
         let message = Fmt.strf "Import %a from GitHub" Repo.Set.pp repos in
-        DK.Transaction.commit t.priv.tr ~message
+        DK.Transaction.commit t.priv.tr ~message >>*= fun () ->
+        state ~old:(Some t) ~pub ~priv >>*= fun t ->
+        merge t >>*= fun () ->
+        ok t
 
   let sync_once ~dry_updates ~token ~pub ~priv old  =
     assert (DK.Transaction.closed old.priv.tr);
     assert (DK.Transaction.closed old.pub.tr);
     state ~old:(Some old) ~pub ~priv >>*= fun t ->
-    sync_once ~dry_updates ~token ~old t >>*= fun () ->
+    sync_once ~dry_updates ~token ~pub ~priv ~old t >>*= fun t ->
     assert (DK.Transaction.closed t.priv.tr);
     assert (DK.Transaction.closed t.pub.tr);
     ok t

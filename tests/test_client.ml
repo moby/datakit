@@ -220,9 +220,9 @@ let test_diff dk =
     ) >>*= fun () ->
   DK.Branch.head master >>*= fun head2 ->
   let head2 = match head2 with None -> Alcotest.fail "empty" | Some h -> h in
-  DK.Branch.diff master head1 >>*= fun files1 ->
+  DK.Commit.diff head2 head1 >>*= fun files1 ->
   Alcotest.(check diffs) "files1" [`Added (p "foo");`Updated (p "file")] files1;
-  DK.Branch.diff master head2 >>*= fun files2 ->
+  DK.Commit.diff head2 head2 >>*= fun files2 ->
   Alcotest.(check (slist diff compare)) "files2" [] files2;
   DK.Branch.with_transaction master (fun tr ->
       DK.Transaction.replace_file tr ~dir:(p "") "file" (v "from-master")

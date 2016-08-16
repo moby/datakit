@@ -88,6 +88,9 @@ module type CLIENT = sig
 
     val parents : t -> t list or_error Lwt.t
     (** [parents t] is the list of [t]'s parent commits. *)
+
+    val diff: t -> t -> Datakit_path.t diff list or_error Lwt.t
+    (** [diff a b] returns the paths with differences between [a] and [b]. *)
   end
 
   module Transaction : sig
@@ -262,10 +265,6 @@ module type CLIENT = sig
         [t]. Must be closed with {!Transaction.abort} or
         {!Transaction.commit}. Use {!with_transaction} to not have to
         worry about resource leaks.. *)
-
-    val diff: t -> Commit.t -> Datakit_path.t diff list or_error Lwt.t
-    (** [diff t c] returns the paths differences between [c] and [t]'s
-        head. *)
 
   end
 

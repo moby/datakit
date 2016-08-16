@@ -417,6 +417,10 @@ module Make(P9p : Protocol_9p_client.S) = struct
       lines (Cstruct.to_string data)
       |> List.map (fun hash -> {t with id = hash})
 
+    let diff t c =
+      FS.read_all t.fs (path t / "diff" / id c) >|*= fun data ->
+      let lines = lines (Cstruct.to_string data) in
+      diff_of_lines lines
   end
 
   module Transaction = struct
@@ -637,11 +641,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
              Transaction.abort tr
            )
         )
-
-    let diff t c =
-      FS.read_all t.fs (branch_dir t / "diff" / Commit.id c) >|*= fun data ->
-      let lines = lines (Cstruct.to_string data) in
-      diff_of_lines lines
 
   end
 

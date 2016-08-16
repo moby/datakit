@@ -48,8 +48,7 @@ module type S = sig
     val get: t -> path -> t option Lwt.t
     val map: t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
     val ls: t -> ([`File | `Directory] * step) list Lwt.t
-    val iter:
-      t -> (path -> (unit -> (File.t * perm) Lwt.t) -> unit Lwt.t) -> unit Lwt.t
+    val iter: t -> (path -> File.t * perm  -> unit Lwt.t) -> unit Lwt.t
     val of_hash: repo -> hash -> t
     val hash: t -> hash Lwt.t
     val repo: t -> repo
@@ -235,28 +234,16 @@ module Make (Store: STORE) = struct
     end
     module KVSet = Set.Make(KV)
 
-    let lookup_dir t n =
-      lookup t n >|= function
-      | `Directory d -> d
-      | _            -> failwith ("lookup_dir: " ^ n)
-
-    let lookup_file t n =
-      lookup t n >|= function
-      | `File f -> f
-      | _        -> failwith ("lookup_file: " ^ n)
-
     let iter t fn =
       let rec aux = function
         | []            -> Lwt.return_unit
         | (t, path)::tl ->
-          ls t >>= fun childs ->
-          Lwt_list.fold_left_s (fun acc -> function
-              | `Directory , d ->
-                lookup_dir t d >|= fun t ->
-                (t, path @ [d]) :: acc
-              | `File      , f ->
-                fn (path @ [f]) (fun () -> lookup_file t f) >|= fun () ->
-                acc
+          map t >>= fun childs ->
+          let childs = String.Map.bindings childs in
+          Lwt_list.fold_left_s (fun acc (k, v) ->
+              match v with
+              | `Directory  t -> Lwt.return ((t, path @ [k]) :: acc)
+              | `File f       -> fn (path @ [k]) f >|= fun () -> acc
             ) [] childs
           >>= fun dirs ->
           let todo = dirs @ tl in
@@ -267,8 +254,7 @@ module Make (Store: STORE) = struct
     let diff x y =
       let set t =
         let acc = ref KVSet.empty in
-        iter t (fun k v ->
-            v () >>= fun (v, _) ->
+        iter t (fun k (v, _) ->
             File.hash v >>= fun v ->
             acc := KVSet.add (k, v) !acc;
             Lwt.return_unit

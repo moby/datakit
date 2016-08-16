@@ -91,8 +91,7 @@ module type S = sig
     val ls: t -> ([`File | `Directory] * step) list Lwt.t
     (** List the contents of a directory with the type of each item. *)
 
-    val iter:
-      t -> (path -> (unit -> (File.t * perm) Lwt.t) -> unit Lwt.t) -> unit Lwt.t
+    val iter: t -> (path -> File.t * perm -> unit Lwt.t) -> unit Lwt.t
     (** [iter t f] applies [f] over all sub-files. *)
 
     val of_hash: repo -> hash -> t

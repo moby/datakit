@@ -2,6 +2,7 @@ open Test_utils
 open Lwt.Infix
 open Vgithub
 open Datakit_path.Infix
+open Result
 
 module Conv = Conv(DK)
 
@@ -58,7 +59,8 @@ module API = struct
       try Lwt.return (List.assoc commit t.status)
       with Not_found -> Lwt.return_nil
 
-  let set_status_aux t ~user ~repo s =
+  let set_status_aux t s =
+    let { Status.repo; user; _ } = s in
     if not (t.user = user && t.repo = repo) then ()
     else
       let commit = s.Status.commit in
@@ -75,35 +77,35 @@ module API = struct
       let status = (commit, s :: rest) :: status in
       t.status <- status;
       let w br =
-        let root = Datakit_path.(empty / user / repo) in
         DK.Branch.with_transaction br (fun tr ->
-            Conv.update_status tr ~root s >>*= fun () ->
+            Conv.update_status tr s >>*= fun () ->
             DK.Transaction.commit tr ~message:"webhook"
           )
       in
       t.webhooks <- w :: t.webhooks
 
-  let set_status t ~user ~repo s =
+  let set_status t s =
     t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
-    set_status_aux t ~user ~repo s;
+    set_status_aux t s;
     Lwt.return_unit
 
-  let set_pr_aux t ~user ~repo pr =
+  let set_pr_aux t pr =
+    let { PR.user; repo; _ } = pr in
     if not (t.user = user && t.repo = repo) then ()
     else
       let num = pr.PR.number in
       let prs = List.filter (fun pr -> pr.PR.number <> num) t.prs in
       t.prs <- pr :: prs
 
-  let set_pr t ~user ~repo pr =
+  let set_pr t pr =
     t.ctx.Counter.set_pr <- t.ctx.Counter.set_pr + 1;
-    set_pr_aux t ~user ~repo pr;
+    set_pr_aux t pr;
     Lwt.return_unit
 
-  let apply_events ~user ~repo t =
+  let apply_events t =
     List.iter (function
-        | Event.PR pr    -> set_pr_aux t ~user ~repo pr
-        | Event.Status s -> set_status_aux t ~user ~repo s
+        | Event.PR pr    -> set_pr_aux t pr
+        | Event.Status s -> set_status_aux t s
         | Event.Other _  -> ()
       ) t.events
 
@@ -121,42 +123,72 @@ end
 
 module VG = Sync(API)(DK)
 
+let user = "test"
+let repo = "test"
+let pub = "test-pub"
+let priv = "test-priv"
+
 let s1 = {
-  Status.context = Some "foo/bar/baz";
+  Status.context = ["foo"; "bar"; "baz"];
   url            = None;
   description    = Some "foo";
   state          = `Pending;
   commit         = "bar";
+  user; repo;
 }
 
 let s2 = {
-  Status.context = Some "foo/bar/toto";
+  Status.context = ["foo"; "bar"; "toto"];
   url            = Some "toto";
   description    = None;
   state          = `Failure;
   commit         = "bar";
+  user; repo;
 }
 
 let s3 = {
-  Status.context = Some "foo/bar/baz";
+  Status.context = ["foo"; "bar"; "baz"];
   url            = Some "titi";
   description    = Some "foo";
   state          = `Success;
   commit         = "foo";
+  user; repo;
 }
 
 let s4 = {
-  Status.context = Some "foo";
+  Status.context = ["foo"];
   url            = None;
   description    = None;
   state          = `Pending;
   commit         = "bar";
+  user; repo;
 }
 
+let s5 = {
+  Status.context = ["foo"; "bar"; "baz"];
+  url            = Some "titi";
+  description    = None;
+  state          = `Failure;
+  commit         = "foo";
+  user; repo;
+}
+
+let pr1 =
+  { PR.number = 1; state = `Open  ; head = "foo"; title = "";  user; repo }
+
+let pr2 =
+  { PR.number = 1; state = `Closed; head = "foo"; title = "foo"; user; repo }
+
+let pr3 =
+  { PR.number = 2; state = `Open  ; head = "bar"; title = "bar"; user; repo }
+
+let pr4 =
+  { PR.number = 2; state = `Open  ; head = "bar"; title = "toto"; user; repo }
+
 let events0 = [
-  Event.PR { PR.number = 1; state = `Open  ; head = "foo"; title = "";  };
-  Event.PR { PR.number = 1; state = `Closed; head = "foo"; title = "foo"; };
-  Event.PR { PR.number = 2; state = `Open  ; head = "bar"; title = "bar"; };
+  Event.PR pr1;
+  Event.PR pr2;
+  Event.PR pr3;
   Event.Status s1;
   Event.Status s2;
   Event.Status s3;
@@ -164,25 +196,102 @@ let events0 = [
 ]
 
 let events1 = [
-  Event.PR { PR.number = 1; state = `Open  ; head = "foo"; title = "" };
-  Event.PR { PR.number = 2; state = `Open  ; head = "bar"; title = "toto" };
+  Event.PR pr1;
+  Event.PR pr4;
   Event.Status s1;
   Event.Status s2;
   Event.Status s3;
   Event.Status s4;
 ]
 
+let prs0    = [pr1; pr3]
 let status0 = [s1; s2; s3; s4]
 
 let status_state: Status_state.t Alcotest.testable =
   (module struct include Status_state let equal = (=) end)
 
+let snapshot: Snapshot.t Alcotest.testable =
+  (module struct include Snapshot let equal x y = Snapshot.compare x y = 0 end)
+
+let diff: Diff.t Alcotest.testable =
+  (module struct include Diff let equal = (=) end)
+
+let diffs = Alcotest.slist diff Diff.compare
+
+let d id = { Diff.user; repo; id }
+
 let counter: Counter.t Alcotest.testable = (module Counter)
 
-let user = "test"
-let repo = "test"
-let pub = "test-pub"
-let priv = "test-priv"
+let test_snapshot () =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ();
+  Test_utils.run (fun _repo conn ->
+      let dk = DK.connect conn in
+      DK.branch dk "test-snapshot" >>*= fun br ->
+      let update ~prs ~status =
+        DK.Branch.with_transaction br (fun tr ->
+            Lwt_list.iter_p (fun pr ->
+                Conv.update_pr tr pr >>= function
+                | Ok ()   -> Lwt.return_unit
+                | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+              ) prs
+            >>= fun () ->
+            Lwt_list.iter_p (fun s ->
+                Conv.update_status tr s >>= function
+                | Ok ()   -> Lwt.return_unit
+                | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+              ) status
+            >>= fun () ->
+            Conv.snapshot Conv.(tree_of_transaction tr) >>*= fun s ->
+          DK.Transaction.commit tr ~message:"init" >>*= fun () ->
+          ok s)
+      in
+      update ~prs:prs0 ~status:status0 >>*= fun s ->
+      expect_head br >>*= fun head ->
+      let se =
+        let prs = PR.Set.of_list prs0 in
+        let status = Status.Set.of_list status0 in
+        Snapshot.create ~prs ~status ()
+      in
+      Conv.snapshot Conv.(tree_of_commit head) >>*= fun sh ->
+      Alcotest.(check snapshot) "snap transaction" se s;
+      Alcotest.(check snapshot) "snap head" se sh;
+
+      update ~prs:[pr2] ~status:[] >>*= fun s1 ->
+      expect_head br >>*= fun head1 ->
+      let tree1 = Conv.tree_of_commit head1 in
+      Conv.diff tree1 head >>*= fun diff1 ->
+      Alcotest.(check diffs) "diff1" [d (`PR 1)] (Diff.Set.elements diff1);
+      Conv.snapshot ~old:(head, s) tree1 >>*= fun sd ->
+      Alcotest.(check snapshot) "snap diff" s1 sd;
+
+      update ~prs:[] ~status:[s5] >>*= fun s2 ->
+      expect_head br >>*= fun head2 ->
+      let tree2 = Conv.tree_of_commit head2 in
+      Conv.diff tree2 head1 >>*= fun diff2 ->
+      Alcotest.(check diffs) "diff2"
+        [d (`Status ("foo", ["foo";"bar";"baz"]))] (Diff.Set.elements diff2);
+      Conv.snapshot ~old:(head , s ) tree2 >>*= fun sd1 ->
+      Conv.snapshot ~old:(head1, s1) tree2 >>*= fun sd2 ->
+      Alcotest.(check snapshot) "snap diff1" s2 sd1;
+      Alcotest.(check snapshot) "snap diff2" s2 sd2;
+
+
+      DK.Branch.with_transaction br (fun tr ->
+          DK.Transaction.make_dirs tr (p "test/toto") >>*= fun () ->
+          DK.Transaction.create_or_replace_file tr ~dir:(p "test/toto") "FOO"
+            (v "") >>*= fun () ->
+          DK.Transaction.commit tr ~message:"test/foo"
+        ) >>*= fun () ->
+      expect_head br >>*= fun head3 ->
+      let tree3 = Conv.tree_of_commit head3 in
+      Conv.diff tree3 head2 >>*= fun diff3 ->
+      let d = { Diff.user; repo = "toto"; id = `Unknown } in
+      Alcotest.(check diffs) "diff3" [d] (Diff.Set.elements diff3);
+
+      Lwt.return_unit
+    )
 
 let init status events =
   let tbl = Hashtbl.create (List.length status) in
@@ -198,6 +307,9 @@ let init status events =
   { API.user; repo; status; prs = []; events; ctx; webhooks = [] }
 
 let run f () =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ();
   Test_utils.run (fun _repo conn ->
       let dk = DK.connect conn in
       DK.branch dk pub  >>*= fun pub ->
@@ -265,11 +377,8 @@ let check name tree =
   Lwt.return_unit
 
 let test_events dk =
-  quiet_9p ();
-  quiet_git ();
-  quiet_irmin ();
   let t = init status0 events0 in
-  API.apply_events ~user ~repo t;
+  API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub  ->
@@ -308,11 +417,8 @@ let find_status t =
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
-  quiet_9p ();
-  quiet_git ();
-  quiet_irmin ();
   let t = init status0 events1 in
-  API.apply_events t ~user ~repo;
+  API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
@@ -374,11 +480,8 @@ let test_updates dk =
   Lwt.return_unit
 
 let test_startup dk =
-  quiet_9p ();
-  quiet_git ();
-  quiet_irmin ();
   let t = init status0 events1 in
-  API.apply_events t ~user ~repo;
+  API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
@@ -432,10 +535,19 @@ let test_startup dk =
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
 
   (* receive new webhooks *)
-  t.API.webhooks <- [fun br -> update_status br dir `Success];
+  t.API.webhooks <- [fun br -> update_status br dir `Failure];
   API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 6"
+    { Counter.events = 0; prs = 3; status = 6; set_pr = 0; set_status = 2 }
+    t.API.ctx;
+
+  (* changes done in the public branch are never overwritten
+     FIXME: we might want to improve/change this in the future. *)
+  t.API.webhooks <- [fun br -> update_status br dir `Success];
+  API.apply_webhooks t priv >>*= fun () ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  Alcotest.(check counter) "counter: 7"
     { Counter.events = 0; prs = 3; status = 6; set_pr = 0; set_status = 2 }
     t.API.ctx;
   let status_dir = dir / "status" / "foo" / "bar" / "baz" in
@@ -446,12 +558,13 @@ let test_startup dk =
   DK.Tree.exists_file tree (status_dir / "state") >>*= fun file_exists ->
   Alcotest.(check bool) "file exists" true file_exists;
   DK.Tree.read_file tree (status_dir / "state") >>*= fun buf ->
-  Alcotest.(check string) "webhook update" "success\n" (Cstruct.to_string buf);
+  Alcotest.(check string) "webhook update" "failure\n" (Cstruct.to_string buf);
 
   Lwt.return_unit
 
 let test_set = [
-  "events" , `Quick, run test_events;
-  "updates", `Quick, run test_updates;
-  "startup", `Quick, run test_startup;
+  "snapshot", `Quick, test_snapshot;
+  "events"  , `Quick, run test_events;
+  "updates" , `Quick, run test_updates;
+  "startup" , `Quick, run test_startup;
 ]

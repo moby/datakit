@@ -2,6 +2,7 @@
 
 open Vgithub
 open Github_t
+open Astring
 
 type token = Github.Token.t
 
@@ -11,7 +12,8 @@ module PR = struct
 
   include PR
 
-  let of_gh pr = {
+  let of_gh ~user ~repo pr = {
+    user; repo;
     number = pr.pull_number;
     state  = pr.pull_state;
     head   = pr.pull_head.branch_sha;
@@ -24,7 +26,8 @@ module PR = struct
     update_pull_state = Some pr.state;
   }
 
-  let of_event pr = {
+  let of_event ~user ~repo pr = {
+    user; repo;
     number = pr.pull_request_event_number;
     state  = pr.pull_request_event_pull_request.pull_state;
     head   = pr.pull_request_event_pull_request.pull_head.branch_sha;
@@ -37,23 +40,32 @@ module Status = struct
 
   include Status
 
-  let of_gh commit s = {
-    context     = s.status_context;
+  let to_list = function
+    | None   -> ["default"]
+    | Some c -> String.cuts ~empty:false ~sep:"/" c
+
+  let of_list = function
+    | ["default"] -> None
+    | l           -> Some (String.concat ~sep:"/" l)
+
+  let of_gh ~user ~repo ~commit s = {
+    user; repo; commit;
+    context     = to_list s.status_context;
     url         = s.status_target_url;
     description = s.status_description;
     state       = s.status_state;
-    commit;
   }
 
   let to_gh s = {
-    new_status_context     = s.context;
+    new_status_context     = of_list s.context;
     new_status_target_url  = s.url;
     new_status_description = s.description;
     new_status_state       = s.state;
   }
 
-  let of_event s = {
-    context     = s.status_event_context;
+  let of_event ~user ~repo s = {
+    user; repo;
+    context     = to_list s.status_event_context;
     url         = s.status_event_target_url;
     description = s.status_event_description;
     state       = s.status_event_state;
@@ -66,9 +78,14 @@ module Event = struct
 
   include Event
 
-  let of_gh e = match e.event_payload with
-    | `Status s       -> Status (Status.of_event s)
-    | `PullRequest pr -> PR (PR.of_event pr)
+  let of_gh e =
+    let user, repo = match String.cut ~sep:"/" e.event_repo.repo_name with
+      | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
+      | Some r -> r
+    in
+    match e.event_payload with
+    | `Status s       -> Status (Status.of_event ~user ~repo s)
+    | `PullRequest pr -> PR (PR.of_event ~user ~repo pr)
     | `Create _       -> Other "create"
     | `Delete _       -> Other "delete"
     | `Download       -> Other "download"
@@ -127,18 +144,19 @@ let status token ~user ~repo ~commit =
   |> Github.Stream.to_list
   |> run
   >|= fun l -> list_dedup (fun s -> s.status_context) l
-  |> List.map (Status.of_gh commit)
+  |> List.map (Status.of_gh ~user ~repo ~commit)
 
-let set_status token ~user ~repo status =
+let set_status token status =
   let new_status = Status.to_gh status in
-  Github.Status.create ~token ~user ~repo ~sha:status.Status.commit
-    ~status:new_status ()
+  let { Status.user; repo; commit; _ } = status in
+  Github.Status.create ~token ~user ~repo ~sha:commit ~status:new_status ()
   |> run
   >|= ignore
 
-let set_pr token ~user ~repo pr =
+let set_pr token pr =
   let new_pr = PR.to_gh pr in
-  Github.Pull.update ~token ~user ~repo ~num:pr.PR.number ~update_pull:new_pr ()
+  let { PR.user; repo; number; _ } = pr in
+  Github.Pull.update ~token ~user ~repo ~num:number ~update_pull:new_pr ()
   |> run
   >|= ignore
 
@@ -146,7 +164,7 @@ let prs token ~user ~repo =
   Github.Pull.for_repo ~token ~state:`Open ~user ~repo ()
   |> Github.Stream.to_list
   |> run
-  >|= List.map PR.of_gh
+  >|= List.map (PR.of_gh ~user ~repo)
 
 let events token ~user ~repo =
   let open Lwt.Infix in

@@ -5,6 +5,33 @@ open Astring
 let src = Logs.Src.create "Datakit" ~doc:"Datakit 9p server"
 module Log = (val Logs.src_log src : Logs.LOG)
 
+let quiet_9p () =
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "fs9p" then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet_git () =
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "git.value" || Logs.Src.name src = "git.memory"
+      then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet_irmin () =
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "irmin.bc"
+      || Logs.Src.name src = "irmin.commit"
+      || Logs.Src.name src = "irmin.node"
+      then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet () =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ()
+
 (* Hyper-V socket applications use well-known GUIDs. This is ours: *)
 let serviceid = "C378280D-DA14-42C8-A24E-0DE92A1028E2"
 
@@ -66,6 +93,7 @@ let set_signal_if_supported signal handler =
     ()
 
 let start urls sandbox git =
+  quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V

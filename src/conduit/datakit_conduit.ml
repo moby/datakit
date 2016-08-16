@@ -5,7 +5,7 @@ open Astring
 module UnixServer = Fs9p.Make(Flow_lwt_unix)
 module HyperVServer = Fs9p.Make(Flow_lwt_unix_hvsock)
 
-let src = Logs.Src.create "datakit-conduit" ~doc:"Datakit conduit handling"
+let src = Logs.Src.create "conduit" ~doc:"Datakit conduit handling"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Pervasives = struct

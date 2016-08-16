@@ -2,13 +2,39 @@ open Lwt.Infix
 open Astring
 open Result
 
-let src = Logs.Src.create "github-bridge" ~doc:"Github bridge for Datakit "
+let src = Logs.Src.create "gh-bridge" ~doc:"Github bridge for Datakit "
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let src9p = Logs.Src.create "g9p" ~doc:"Github bridge for Datakit (9p) "
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
-let quiet9p () =
-  Logs.Src.set_level src9p (Some Logs.Info)
+
+let quiet_9p () =
+  Logs.Src.set_level src9p (Some Logs.Info);
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "fs9p" then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet_git () =
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "git.value" || Logs.Src.name src = "git.memory"
+      then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet_irmin () =
+  let srcs = Logs.Src.list () in
+  List.iter (fun src ->
+      if Logs.Src.name src = "irmin.bc"
+      || Logs.Src.name src = "irmin.commit"
+      || Logs.Src.name src = "irmin.node"
+      then Logs.Src.set_level src (Some Logs.Info)
+    ) srcs
+
+let quiet () =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ()
 
 module Client9p = Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
@@ -68,7 +94,7 @@ let exec ~name cmd =
 let start () sandbox listen_urls
     datakit private_branch public_branch dry_updates
     no_webhook gh_hooks webhook_secret webhook_port =
-  quiet9p ();
+  quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V

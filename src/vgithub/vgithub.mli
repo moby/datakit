@@ -210,7 +210,7 @@ end
 (** Conversion between GitHub and DataKit states. *)
 module Conv (DK: Datakit_S.CLIENT): sig
 
-  type nonrec 'a result = ('a, DK.error) result Lwt.t
+  type nonrec 'a result = ('a, DK.error) Result.result Lwt.t
   (** The type for conversion results. *)
 
   (** {1 Trees} *)

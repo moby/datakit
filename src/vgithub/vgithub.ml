@@ -474,6 +474,13 @@ let list_map_p ?pool f l =
       | Error e, _ | _, Error e -> Error e
     ) (Ok []) (List.rev l)
 
+let list_map_s f l =
+  Lwt_list.map_s f l >|= fun l ->
+  List.fold_left (fun acc x -> match acc, x with
+      | Ok acc, Ok x            -> Ok (x :: acc)
+      | Error e, _ | _, Error e -> Error e
+    ) (Ok []) (List.rev l)
+
 module Snapshot = struct
 
   type t = {
@@ -803,7 +810,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     if not exists then ok Status.Set.empty
     else
       Tree.read_dir t dir >>*=
-      list_map_p ~pool:pool9p (fun commit ->
+      list_map_s (fun commit ->
           Log.debug (fun l ->
               l "status_of_repo %a %s" Datakit_path.pp dir commit);
           let dir = dir / commit / "status" in

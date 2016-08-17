@@ -17,8 +17,6 @@ RUN opam depext lwt ssl github && \
     opam install lwt base-unix base-threads conf-libev camlp4 ppx_tools \
          alcotest irmin git conduit
 
-RUN opam pin add github --dev -n
-
 # cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n

@@ -7,9 +7,8 @@ env:
   global:
   - EXTRA_DEPS="inotify"
   - DEPOPTS="github"
-  - PINS="inotify"
   matrix:
-  - OCAML_VERSION=4.02
+  - OCAML_VERSION=4.02 PINS="inotify"
   - OCAML_VERSION=4.03
 os:
   - linux

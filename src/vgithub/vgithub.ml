@@ -444,35 +444,12 @@ let ( >>*= ) x f =
 
 let ok x = Lwt.return (Ok x)
 
-(* our 9p server seems to dead-lock when more than 100 fids are
-   used. In doubt, try to limit the number of 9p operations to
-   50... *)
-let pool9p = Lwt_pool.create 50 (fun () -> Lwt.return_unit)
-
-let list_iter_p f l =
-  Lwt_list.map_p f l >|= fun l ->
-  List.fold_left (fun acc x -> match acc, x with
-      | Ok (), Ok ()            -> Ok ()
-      | Error e, _ | _, Error e -> Error e
-    ) (Ok ()) (List.rev l)
-
 let list_iter_s f l =
   Lwt_list.map_s f l >|= fun l ->
   List.fold_left (fun acc x -> match acc, x with
       | Ok (), Ok ()            -> Ok ()
       | Error e, _ | _, Error e -> Error e
     ) (Ok ()) (List.rev l)
-
-let list_map_p ?pool f l =
-  let f x = match pool with
-    | None   -> f x
-    | Some p -> Lwt_pool.use p (fun () -> f x)
-  in
-  Lwt_list.map_p f l >|= fun l ->
-  List.fold_left (fun acc x -> match acc, x with
-      | Ok acc, Ok x            -> Ok (x :: acc)
-      | Error e, _ | _, Error e -> Error e
-    ) (Ok []) (List.rev l)
 
 let list_map_s f l =
   Lwt_list.map_s f l >|= fun l ->
@@ -698,7 +675,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
       DK.Transaction.create_or_replace_file t ~dir "title" title
 
-  let update_prs tr prs = list_iter_p (update_pr tr) (PR.Set.elements prs)
+  let update_prs tr prs = list_iter_s (update_pr tr) (PR.Set.elements prs)
 
   let pr (E ((module Tree), t)) ~user ~repo number =
     let dir = empty / user / repo / "pr" / string_of_int number in
@@ -736,8 +713,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     if not exists then ok PR.Set.empty
     else
       Tree.read_dir t dir >>*=
-      list_map_p ~pool:pool9p
-        (fun num -> pr ~user ~repo tree (int_of_string num))
+      list_map_s (fun num -> pr ~user ~repo tree (int_of_string num))
       >>*= function l ->
       List.fold_left
         (fun acc pr -> match pr with None -> acc | Some x -> PR.Set.add x acc)
@@ -747,7 +723,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
   let prs ?repos:rs tree =
     Log.debug (fun l -> l "prs");
     (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_p ~pool:pool9p (prs_of_repo tree) (Repo.Set.elements repos)
+    list_map_s (prs_of_repo tree) (Repo.Set.elements repos)
     >>*= fun prs ->
     ok (List.fold_left PR.Set.union PR.Set.empty prs)
 
@@ -765,7 +741,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       "state"      , Some (Status_state.to_string s.Status.state);
       "target_url" , s.Status.url;
     ] in
-    list_iter_p (fun (k, v) -> match v with
+    list_iter_s (fun (k, v) -> match v with
         | None   ->
           DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
           if not exists then ok () else DK.Transaction.remove t (dir / k)
@@ -775,7 +751,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       ) kvs
 
   let update_statuses tr s =
-    list_iter_p (update_status tr) (Status.Set.elements s)
+    list_iter_s (update_status tr) (Status.Set.elements s)
 
   let status (E ((module Tree), t)) ~user ~repo ~commit ~context =
     let context = Datakit_path.of_steps_exn context in
@@ -825,9 +801,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
             if not exists then ok Status.Set.empty
             else
               Tree.read_dir t dir >>*= fun child ->
-              list_map_p ~pool:pool9p
-                (fun c -> aux (context @ [c])) child
-              >>*= fun child ->
+              list_map_s (fun c -> aux (context @ [c])) child >>*= fun child ->
               let child = List.fold_left Status.Set.union Status.Set.empty child in
               Tree.exists_file t (dir / "state") >>*= fun exists ->
               if exists then
@@ -845,8 +819,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
   let statuses ?repos:rs tree =
     Log.debug (fun l -> l "status");
     (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_p ~pool:pool9p (statuses_of_repo tree) (Repo.Set.elements repos)
-    >>*= fun ss ->
+    list_map_s (statuses_of_repo tree) (Repo.Set.elements repos) >>*= fun ss ->
     ok (List.fold_left Status.Set.union Status.Set.empty ss)
 
   (* Diffs *)
@@ -1070,12 +1043,12 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         else
           let root = Datakit_path.empty / repo.Repo.user / repo.Repo.repo in
           let f tr =
-            list_iter_p (fun pr ->
+            list_iter_s (fun pr ->
                 let dir = root / "pr" / string_of_int pr.PR.number in
                 DK.Transaction.remove tr dir
               ) (PR.Set.elements closed_prs)
             >>*= fun () ->
-            list_iter_p (fun s ->
+            list_iter_s (fun s ->
                 DK.Transaction.remove tr (root / "commit" / s.Status.commit)
               ) (Status.Set.elements closed_status)
           in
@@ -1145,7 +1118,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             request and the state of imported events from
             GitHub. *)
          let { DK.Transaction.ours; theirs; _ } = m in
-         list_iter_p (fun path ->
+         list_iter_s (fun path ->
              let dir, file =
                match List.rev @@ Datakit_path.unwrap path with
                | [] -> failwith "TODO"

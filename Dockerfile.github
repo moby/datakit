@@ -1,6 +1,6 @@
 FROM ocaml/opam:alpine
 
-# setting-up Go env for datakit-gh-hooks
+# setting-up Go env for datakit-github-webhook
 RUN sudo apk add go
 ENV GOPATH /go/
 COPY bridge/github/webhook /go/src/github.com/docker/datakit/bridge/github/webhook
@@ -13,30 +13,35 @@ RUN go build
 
 RUN opam update
 RUN sudo apk add ncurses-dev libev-dev
-RUN opam depext lwt ssl github && \
-    opam install lwt base-unix base-threads conf-libev camlp4 ppx_tools \
-         alcotest irmin git conduit
+RUN opam depext ssl lwt react lambda-term && \
+    opam install ssl react lwt base-unix base-threads conf-libev lambda-term
 
-# cache opam install of dependencies
-COPY opam /home/opam/src/datakit/opam
-RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext datakit && \
-    opam install github ssl && opam install datakit --deps
+# cache opam install of client github dependencies
+
+COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
+RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
+COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
+RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
+RUN opam depext datakit-client datakit-github && \
+    opam install github && opam install datakit-client --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && git checkout . && scripts/watermark.sh
-RUN opam pin add datakit.dev -k git /home/opam/src/datakit -n -vv
+RUN opam update datakit-client datakit-github && \
+    opam install datakit-github --deps
 
-RUN opam install datakit.dev -vv
+RUN opam info datakit-client --raw
+RUN opam info datakit-github --raw
+
+RUN opam install datakit-github.dev -vv
 
 EXPOSE 5640
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
-    sudo cp $(opam config exec -- which datakit)        /usr/bin/ && \
     sudo cp $(opam config exec -- which datakit-mount)  /usr/bin/ && \
     sudo cp $(opam config exec -- which datakit-github) /usr/bin/ && \
-    sudo cp webhook                                     /usr/bin/datakit-github-webhook
+    sudo cp webhook /usr/bin/datakit-github-webhook
 
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 

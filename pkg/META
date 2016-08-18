@@ -56,25 +56,3 @@ package "fs9p" (
  plugin(native) = "fs9p.cmxs"
  exists_if = "fs9p.cma"
 )
-
-package "client" (
- version = "%%VERSION%%"
- description = "9p client for Datakit"
- requires = "protocol-9p uri"
- archive(byte) = "datakit-client.cma"
- archive(native) = "datakit-client.cmxa"
- plugin(byte) = "datakit-client.cma"
- plugin(native) = "datakit-client.cmxs"
- exists_if = "datakit-client.cma"
-)
-
-package "github" (
-  version = "%%VERSION%%"
-  description = "Use Datakit to interact with the GitHub API"
-  requires = "datakit.client datakit.vfs github"
-  archive(byte) = "datakit-github.cma"
-  archive(native) = "datakit-github.cmxa"
-  plugin(byte) = "datakit-github.cma"
-  plugin(native) = "datakit-github.cmxs"
-  exists_if = "datakit-github.cma"
-)

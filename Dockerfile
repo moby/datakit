@@ -16,7 +16,7 @@ RUN cd /home/opam/src/datakit && \
     git diff && git status --porcelain && \
     git checkout . && scripts/watermark.sh && \
     git status --porcelain
-RUN opam pin add datakit.dev -k git /home/opam/src/datakit -n -vv
+RUN opam update datakit
 
 RUN opam install datakit.dev -vv
 

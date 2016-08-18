@@ -72,6 +72,12 @@ module Status: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for status values. *)
 
+  val path: t -> Datakit_path.t
+  (** [path t] is path corresponding to [t]'s context. The empty list
+      is rewritten into ["default"] to match the GitHub
+      API. Otherwise, segments are concatenated using ["/"] as a
+      separator. *)
+
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
@@ -128,14 +134,6 @@ module type API = sig
   (** [event t ~user ~repo] is the list of events attached to
       [user/repo]. Note: can be slow/costly if multiple pages of
       events. *)
-
-end
-
-module Make (API: API): sig
-
-  val create: API.token -> Vfs.Inode.t
-  (** [create token] is the virtual filesystem in which GitHub API calls
-      are replaced to filesystem accesses. *)
 
 end
 
@@ -224,7 +222,7 @@ module Conv (DK: Datakit_S.CLIENT): sig
   val tree_of_commit: DK.Commit.t -> tree
   (** [tree_of_commit c] is [c]'s filesystem {!tree}. *)
 
-  (** {1 Repositories. *)
+  (** {1 Repositories} *)
 
   val repos: tree -> Repo.Set.t result
   (** [repos t] is the list of repositories stored in [t]. *)

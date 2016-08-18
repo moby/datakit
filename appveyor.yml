@@ -12,10 +12,11 @@ install:
 
 build_script:
   - "%CYG_BASH% '${APPVEYOR_BUILD_FOLDER}/appveyor-opam.sh'"
-  - "%CYG_BASH% -c 'cd ${APPVEYOR_BUILD_FOLDER}; make exe'"
+  - "%CYG_BASH% -c 'cd ${APPVEYOR_BUILD_FOLDER}; make exe COMMIT'"
   - cmd: copy %APPVEYOR_BUILD_FOLDER%\Datakit\datakit.exe c:\projects\datakit\com.docker.db.exe
   - cmd: copy %APPVEYOR_BUILD_FOLDER%\Datakit\zlib1.dll c:\projects\datakit\zlib1.dll
 
 artifacts:
   - path: "com.docker.db.exe"
   - path: "zlib1.dll"
+  - path: "COMMIT"

@@ -6,5 +6,5 @@ PKG asl win-eventlog
 
 S src/**
 S tests/
-B _build/src/**
-B _build/tests/
+S bridge/github/**
+B _build/**

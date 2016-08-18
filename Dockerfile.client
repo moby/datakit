@@ -1,18 +1,27 @@
 FROM ocaml/opam:alpine
 
-RUN sudo apk add ncurses-dev
-RUN opam depext ocamlfind && opam install ocamlfind
+RUN sudo apk add ncurses-dev libev-dev
+RUN opam depext lwt && opam install lwt alcotest conf-libev
+
+# cache opam install of dependencies
+COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
+RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
+RUN opam depext datakit-client && \
+    opam install datakit-client --deps
 
 COPY . /home/opam/src/datakit
-RUN sudo chown -R opam.nogroup /home/opam/src/datakit
-RUN cd /home/opam/src/datakit && git checkout . && scripts/watermark.sh
+RUN sudo chown opam.nogroup -R /home/opam/src/datakit
+RUN cd /home/opam/src/datakit && \
+    git diff && git status --porcelain && \
+    git checkout . && scripts/watermark.sh && \
+    git status --porcelain
+RUN opam update datakit-client
+RUN opam info datakit-client --raw
 
-WORKDIR /home/opam/src/datakit
+RUN opam install datakit-client.dev -vv
 
-RUN rm _tags
-RUN opam config exec -- ocamlbuild -use-ocamlfind -pkgs cmdliner,unix src/bin/mount.native
-
-RUN sudo cp /home/opam/src/datakit/_build/src/bin/mount.native /usr/bin/datakit-mount
+RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
+    sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
 
 CMD bash -c "/usr/bin/datakit-mount -h $(getent hosts datakit | awk '{print $1}')"; \
     bash

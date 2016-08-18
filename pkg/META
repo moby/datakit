@@ -1,21 +1,11 @@
-version = "%%VERSION%%"
 description = "A Git-like database with a filesystem interface"
+version = "%%VERSION%%"
 requires = "lwt logs fmt astring rresult cstruct"
 
-package "vgithub" (
- version = "%%VERSION%%"
- description = "GitHub API to VFS layer"
- requires = "github datakit.vfs"
- archive(byte) = "vgithub.cma"
- archive(native) = "vgithub.cmxa"
- plugin(byte) = "vgithub.cma"
- plugin(native) = "vgithub.cmxs"
- exists_if = "vgithub.cma"
-)
-
 package "vfs" (
- version = "%%VERSION%%"
+ directory = "vfs"
  description = "Datakit's VFS description"
+ version = "%%VERSION%%"
  requires = ""
  archive(byte) = "vfs.cma"
  archive(native) = "vfs.cmxa"
@@ -25,8 +15,9 @@ package "vfs" (
 )
 
 package "ivfs" (
- version = "%%VERSION%%"
+ directory = "ivfs"
  description = "Irmin to Datakit's VFS layer"
+ version = "%%VERSION%%"
  requires = "irmin datakit.vfs"
  archive(byte) = "ivfs.cma"
  archive(native) = "ivfs.cmxa"
@@ -35,35 +26,14 @@ package "ivfs" (
  exists_if = "ivfs.cma"
 )
 
-package "irmin-io" (
- version = "%%VERSION%%"
- description = "Specialized I/O function for Irmin (do not depend on GMP)"
- requires = "camlzip uri lwt.unix git irmin conduit.lwt-unix"
- archive(byte) = "irmin-io.cma"
- archive(native) = "irmin-io.cmxa"
- plugin(byte) = "irmin-io.cma"
- plugin(native) = "irmin-io.cmxs"
- exists_if = "irmin-io.cma"
-)
-
 package "fs9p" (
- version = "%%VERSION%%"
+ directory = "fs9p"
  description = "Datakit's VFS to 9p layer"
+ version = "%%VERSION%%"
  requires = "protocol-9p.unix datakit.vfs"
  archive(byte) = "fs9p.cma"
  archive(native) = "fs9p.cmxa"
  plugin(byte) = "fs9p.cma"
  plugin(native) = "fs9p.cmxs"
  exists_if = "fs9p.cma"
-)
-
-package "client" (
- version = "%%VERSION%%"
- description = "9p client for Datakit"
- requires = "protocol-9p uri"
- archive(byte) = "datakit-client.cma"
- archive(native) = "datakit-client.cmxa"
- plugin(byte) = "datakit-client.cma"
- plugin(native) = "datakit-client.cmxs"
- exists_if = "datakit-client.cma"
 )

@@ -8,14 +8,9 @@ bug-reports:  "https://github.com/docker/datakit"
 dev-repo:     "https://github.com/docker/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
-build: [
-  "ocaml" "pkg/pkg.ml" "build" "--pinned" pinned
-    "--with-github" github:installed
-]
+build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%"]
 build-test: [
-  ["ocaml" "pkg/pkg.ml" "build" "--pinned" pinned
-    "--with-github" github:installed
-    "--tests" "true"]
+  ["ocaml" "pkg/pkg.ml" "build" "--tests" "true"]
   ["ocaml" "pkg/pkg.ml" "test"]
 ]
 
@@ -42,5 +37,4 @@ depends: [
   "irmin-watcher" {>= "0.1.3"}
   "alcotest"   {test}
 ]
-depopts: ["github"]
 available: [ocaml-version >= "4.02.0"]

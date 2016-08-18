@@ -6,9 +6,10 @@ dist: trusty
 env:
   global:
   - EXTRA_DEPS="inotify"
-  - DEPOPTS="github"
   matrix:
-  - OCAML_VERSION=4.02 PINS="inotify"
-  - OCAML_VERSION=4.03
+  - OCAML_VERSION=4.02 PACKAGE "datakit" PINS="inotify"
+  - OCAML_VERSION=4.03 PACKAGE "datakit" PINS="inotify"
+  - OCAML_VERSION=4.03 PACKAGE="datakit-client"
+  - OCAML_VERSION=4.03 PACKAGE="datakit-github"
 os:
   - linux

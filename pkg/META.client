@@ -1,5 +1,5 @@
-version = "%%VERSION%%"
 description = "9p client for Datakit"
+version = "%%VERSION%%"
 requires = "protocol-9p uri"
 archive(byte) = "datakit-client.cma"
 archive(native) = "datakit-client.cmxa"
@@ -8,9 +8,9 @@ plugin(native) = "datakit-client.cmxs"
 exists_if = "datakit-client.cma"
 
 package "vfs" (
- version = "%%VERSION%%"
- description = "Datakit's VFS description"
  directory = "vfs"
+ description = "Datakit's VFS description"
+ version = "%%VERSION%%"
  requires = ""
  archive(byte) = "vfs.cma"
  archive(native) = "vfs.cmxa"

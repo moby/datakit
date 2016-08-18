@@ -1,5 +1,5 @@
-version = "%%VERSION%%"
 description = "Use Datakit to interact with the GitHub API"
+version = "%%VERSION%%"
 requires = "datakit-client datakit-client.vfs github"
 archive(byte) = "datakit-github.cma"
 archive(native) = "datakit-github.cmxa"

@@ -22,30 +22,29 @@ let () =
   Pkg.describe ~opams ~metas "datakit" @@ fun c ->
   match Conf.pkg_name c with
   | "datakit" -> Ok [
-      Pkg.lib "pkg/META";
-      Pkg.lib "opam";
-      Pkg.mllib "src/fs9p/fs9p.mllib";
-      Pkg.mllib "src/irmin-io/irmin-io.mllib";
-      Pkg.mllib "src/ivfs/ivfs.mllib";
-      Pkg.mllib "src/vfs/vfs.mllib";
-      Pkg.bin ~dst:"datakit" "src/bin/main";
-      Pkg.bin ~dst:"datakit-mount" "src/bin/mount";
+      Pkg.lib   "pkg/META";
+      Pkg.lib   "opam";
+      Pkg.mllib "src/fs9p/fs9p.mllib"         ~dst_dir:"fs9p";
+      Pkg.mllib "src/ivfs/ivfs.mllib"         ~dst_dir:"ivfs";
+      Pkg.mllib "src/vfs/vfs.mllib"           ~dst_dir:"vfs";
+      Pkg.bin   "src/bin/main"  ~dst:"datakit";
+      Pkg.bin   "src/bin/mount" ~dst:"datakit-mount" ;
       Pkg.test "tests/test" ~args:(Cmd.v "-q");
     ]
   | "datakit-client" -> Ok [
-      Pkg.lib "pkg/META.client" ~dst:"META";
-      Pkg.lib "datakit-client.opam" ~dst:"opam";
+      Pkg.lib   "pkg/META.client"     ~dst:"META";
+      Pkg.lib   "datakit-client.opam" ~dst:"opam";
       Pkg.mllib "src/client/datakit-client.mllib";
-      Pkg.lib "src/client/datakit_S.mli";
-      Pkg.lib "src/client/datakit_S.cmi";
+      Pkg.lib   "src/client/datakit_S.mli";
+      Pkg.lib   "src/client/datakit_S.cmi";
       Pkg.mllib "src/vfs/vfs.mllib" ~dst_dir:"vfs";
-      Pkg.bin ~dst:"datakit-mount" "src/bin/mount";
-      Pkg.test ~run:false "examples/ocaml-client/example";
+      Pkg.bin   "src/bin/mount" ~dst:"datakit-mount" ;
+      Pkg.test  "examples/ocaml-client/example" ~run:false ;
     ]
   | "datakit-github" -> Ok [
-      Pkg.lib "pkg/META.github" ~dst:"META";
-      Pkg.lib "datakit-github.opam" ~dst:"opam";
+      Pkg.lib   "pkg/META.github"     ~dst:"META";
+      Pkg.lib   "datakit-github.opam" ~dst:"opam";
       Pkg.mllib "bridge/github/src/datakit-github.mllib";
-      Pkg.bin ~dst:"datakit-github" "bridge/github/main";
+      Pkg.bin   "bridge/github/main" ~dst:"datakit-github" ;
     ]
   | other -> R.error_msgf "unknown package name: %s" other

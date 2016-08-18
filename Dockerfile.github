@@ -36,7 +36,7 @@ RUN opam info datakit-github --raw
 
 RUN opam install datakit-github.dev -vv
 
-EXPOSE 5640
+EXPOSE 5641
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp $(opam config exec -- which datakit-mount)  /usr/bin/ && \

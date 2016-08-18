@@ -40,9 +40,8 @@ module Client9p = Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
 
 module VG = struct
-  open Vgithub
-  include Make(Vgithub_api)
-  module Sync = Sync(Vgithub_api)(DK)
+  include Datakit_github_vfs.Make(Datakit_github_api)
+  module Sync = Datakit_github.Sync(Datakit_github_api)(DK)
 end
 
 (* Hyper-V socket applications use well-known GUIDs. This is ours: *)

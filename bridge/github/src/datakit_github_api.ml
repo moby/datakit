@@ -1,6 +1,6 @@
 (* Implement API with direct GitHub API calls. *)
 
-open Vgithub
+open Datakit_github
 open Github_t
 open Astring
 

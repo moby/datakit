@@ -67,3 +67,14 @@ package "client" (
  plugin(native) = "datakit-client.cmxs"
  exists_if = "datakit-client.cma"
 )
+
+package "github" (
+  version = "%%VERSION%%"
+  description = "Use Datakit to interact with the GitHub API"
+  requires = "datakit.client datakit.vfs github"
+  archive(byte) = "datakit-github.cma"
+  archive(native) = "datakit-github.cmxa"
+  plugin(byte) = "datakit-github.cma"
+  plugin(native) = "datakit-github.cmxs"
+  exists_if = "datakit-github.cma"
+)

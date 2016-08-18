@@ -20,10 +20,10 @@ let () =
     Pkg.mllib "src/irmin-io/irmin-io.mllib";
     Pkg.mllib "src/ivfs/ivfs.mllib";
     Pkg.mllib "src/vfs/vfs.mllib";
-    Pkg.mllib ~cond:github "src/vgithub/vgithub.mllib";
+    Pkg.mllib ~cond:github "bridge/github/src/datakit-github.mllib";
     Pkg.bin ~dst:"datakit" "src/bin/main";
     Pkg.bin ~dst:"datakit-mount" "src/bin/mount";
-    Pkg.bin ~cond:github ~dst:"datakit-gh-bridge" "src/bin/github_bridge";
+    Pkg.bin ~cond:github ~dst:"datakit-github" "bridge/github/main";
     Pkg.test "tests/test" ~args:(Cmd.v "-q");
     Pkg.test ~run:false "examples/ocaml-client/example";
   ]

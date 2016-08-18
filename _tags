@@ -37,14 +37,15 @@ true: \
 
 ### Bridges
 
-<src/vgithub/vgithub_api.*>: package(github)
+<bridge/github/src/datakit_github_api.*>: package(github)
 
 ## Binaries
 
 <src/conduit>: include
 <src/log>: include
+<src>: include
 
-<src/bin/*>: \
+<src/bin/*> | <bridge/github/main.*>: \
   package(cmdliner), package(fmt.cli), package(fmt.tty), package(logs.fmt)
 
 ### datakit
@@ -57,19 +58,20 @@ true: \
 ### datakit-github-bridge
 
 <src/client>: include
-<src/vgithub>: include
-<src/bin/github_bridge.*>: package(github.unix)
+<bridge/github/src>: include
+<bridge/github/main.*>: package(github.unix)
 
 ### because of src/conduit
 
-<src/bin/{main,github_bridge}.*>: \
+<src/bin/main.*> | <bridge/github/main.*>: \
   package(threads), thread, \
-  package(conduit.lwt-unix), package(hvsock.lwt), package(hvsock.lwt-unix), package(named-pipe.lwt), \
-  package(uri), package(mirage-flow), package(protocol-9p.unix)
+  package(conduit.lwt-unix), package(hvsock.lwt), package(hvsock.lwt-unix), \
+  package(named-pipe.lwt), package(uri), package(mirage-flow), \
+  package(protocol-9p.unix)
 
 ### because of src/log
 
-<src/bin/{main,github_bridge}.*>: \
+<src/bin/main.*> | <bridge/github/main.*>: \
   package(asl), package(win-eventlog), package(mtime.os), package(logs.cli), \
   package(lwt.unix)
 

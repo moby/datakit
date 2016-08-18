@@ -1,6 +1,6 @@
 open Test_utils
 open Lwt.Infix
-open Vgithub
+open Datakit_github
 open Datakit_path.Infix
 open Result
 

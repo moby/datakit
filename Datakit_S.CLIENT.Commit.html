@@ -17,9 +17,12 @@
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
-<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
-<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Datakit_S.CLIENT.Commit</title>
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
+<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_S.CLIENT.Commit</title>
 </head>
 <body>
 <div class="navbar"><a class="pre" href="Datakit_S.CLIENT.Tree.html" title="Datakit_S.CLIENT.Tree">Previous</a>
@@ -36,6 +39,14 @@ A <code class="code">t</code> is an immutable commit in the database.<br>
 </div>
 
 
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp</code> is the pretty-printer for commits IDs.<br>
+</div>
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -> <a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+<code class="code">compare</code> compares commit IDs.<br>
+</div>
+
 <pre><span id="VALtree"><span class="keyword">val</span> tree</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -> Datakit_S.CLIENT.Tree.t</code></pre><div class="info ">
 <code class="code">tree t</code> is the content of the commit.<br>
 </div>
@@ -50,5 +61,9 @@ A <code class="code">t</code> is an immutable commit in the database.<br>
 
 <pre><span id="VALparents"><span class="keyword">val</span> parents</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
 <code class="code">parents t</code> is the list of <code class="code">t</code>'s parent commits.<br>
+</div>
+
+<pre><span id="VALdiff"><span class="keyword">val</span> diff</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> <a href="Datakit_S.html#TYPEdiff">Datakit_S.diff</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">diff a b</code> returns the paths with differences between <code class="code">a</code> and <code class="code">b</code>.<br>
 </div>
 </body></html>

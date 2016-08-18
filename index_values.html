@@ -13,9 +13,12 @@
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
-<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
-<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Index of values</title>
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
+<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Index of values</title>
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
@@ -47,6 +50,12 @@
       and returns when the connection has beenn closed.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALapply">apply</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">apply s d</code> is the snapshot obtained by applying <code class="code">d</code> on top of
+      <code class="code">s</code>.
+</div>
+</td></tr>
 <tr><td align="left"><br>B</td></tr>
 <tr><td><a href="Vfs.Inode.html#VALbasename">basename</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
@@ -64,9 +73,21 @@
 </div>
 </td></tr>
 <tr><td align="left"><br>C</td></tr>
+<tr><td><a href="Datakit_github.Diff.html#VALchanges">changes</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
+<td><div class="info">
+<code class="code">changes d</code> is the set of GitHub changes carried over in the
+      filesystem changes <code class="code">d</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALchmod">chmod</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">chmod t mode</code> changes the mode of <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALclosed">closed</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">closed t</code> is true if <code class="code">t</code> is closed and thus it is not valid
+        to read/write on it anymore.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALcommand">command</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
@@ -87,9 +108,34 @@
 <code class="code">commit t hash</code> is the commit with ID <code class="code">hash</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Diff.html#VALcompare">compare</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
+<td><div class="info">
+<code class="code">compare</code> is the comparison function for diff values.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALcompare">compare</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">compare</code> is the comparison function for snapshots.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALcompare">compare</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">compare</code> compares commit IDs.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_path.html#VALcompare">compare</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 <code class="code">compare</code> is the comparison function for paths.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALcompare">compare</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">compare</code> is the comparison function for blobs.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_tree.S.File.html#VALcompare_hash">compare_hash</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
+<td><div class="info">
+<code class="code">compare_hash</code> is the comparison function for file hashes.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALconflicts">conflicts</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
@@ -104,7 +150,23 @@
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALcontent">content</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
-<td></td></tr>
+<td><div class="info">
+<code class="code">content t</code> is <code class="code">t</code>'s contents.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github_vfs.Make.html#VALcreate">create</a> [<a href="Datakit_github_vfs.Make.html">Datakit_github_vfs.Make</a>]</td>
+<td><div class="info">
+<code class="code">create token</code> is the virtual filesystem in which GitHub API calls
+      are replaced by filesystem accesses.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALcreate">create</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">create ?repos ~status ~prs ()</code> is a new snapshot <code class="code">t</code> with
+      pull-requests <code class="code">prs</code>, build status <code class="code">status</code> and repositories the
+      unions of <code class="code">repos</code>, the repositories of <code class="code">status</code> and <code class="code">prs</code>.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_remote.Make.html#VALcreate">create</a> [<a href="Ivfs_remote.Make.html">Ivfs_remote.Make</a>]</td>
 <td><div class="info">
 Create the /remotes/ virtual directory.
@@ -162,6 +224,29 @@ Create an open file object.
 <tr><td align="left"><br>D</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALdescr">descr</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALdiff">diff</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">diff tree c</code> computes the Github diff between the branch <code class="code">b</code>
+      and the commit <code class="code">c</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALdiff">diff</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
+<td><div class="info">
+<code class="code">diff t c</code> returns the paths differences between <code class="code">c</code> and <code class="code">t</code>'s
+        head.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALdiff">diff</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">diff a b</code> returns the paths with differences between <code class="code">a</code> and <code class="code">b</code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_tree.S.Dir.html#VALdiff">diff</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
+<td><div class="info">
+<code class="code">diff x y</code> is the list of files which are different between
+        <code class="code">x</code> and <code class="code">y</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Inode.html#VALdir">dir</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
 <code class="code">dir name d</code> is the inode <code class="code">t</code> such that <code class="code">basename t</code> is <code class="code">name</code>
@@ -180,6 +265,16 @@ Create an open file object.
 </div>
 </td></tr>
 <tr><td align="left"><br>E</td></tr>
+<tr><td><a href="Datakit_github.Sync.html#VALempty">empty</a> [<a href="Datakit_github.Sync.html">Datakit_github.Sync</a>]</td>
+<td><div class="info">
+Create an empty sync state.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALempty">empty</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+The empty snapshot.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_path.html#VALempty">empty</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 The empty path.
@@ -197,11 +292,6 @@ The empty blob.
 <code class="code">empty</code> is the empty directory.
 </div>
 </td></tr>
-<tr><td><a href="Ivfs_tree.S.File.html#VALequal">equal</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
-<td><div class="info">
-Quick equality check (compares hashes).
-</div>
-</td></tr>
 <tr><td><a href="Vfs.Dir.html#VALerr_already_exists">err_already_exists</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
 <td></td></tr>
 <tr><td><a href="Vfs.Dir.html#VALerr_dir_only">err_dir_only</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
@@ -215,6 +305,8 @@ Quick equality check (compares hashes).
 Errors
 </div>
 </td></tr>
+<tr><td><a href="Vfs.File.html#VALerr_read_only">err_read_only</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#VALerror">error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
 <td><div class="info">
 <code class="code">error</code> raises user-defined errors.
@@ -223,6 +315,12 @@ Errors
 <tr><td><a href="Vfs.html#VALerror">error</a> [<a href="Vfs.html">Vfs</a>]</td>
 <td><div class="info">
 <code class="code">error fmt</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Error</span> &lt;fmt&gt;)</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.API.html#VALevents">events</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">event t ~user ~repo</code> is the list of events attached to
+      <code class="code">user/repo</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.READABLE_TREE.html#VALexists">exists</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
@@ -310,6 +408,11 @@ Look up a sub-directory node.
 <tr><td><a href="Vfs.Error.html#VALis_dir">is_dir</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">is_dir</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Isdir</span></code>.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_tree.S.Dir.html#VALiter">iter</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
+<td><div class="info">
+<code class="code">iter t f</code> applies <code class="code">f</code> over all sub-files.
 </div>
 </td></tr>
 <tr><td align="left"><br>K</td></tr>
@@ -403,8 +506,8 @@ The <code class="code">mkfile</code> command.
 <tr><td align="left"><br>O</td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALof_data">of_data</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
 <td><div class="info">
-<code class="code">of_data repo data</code> is a file containing <code class="code">data</code>, which may later
-        be stored in <code class="code">repo</code>.
+<code class="code">of_data repo data</code> is a file containing <code class="code">data</code>, which may
+        later be stored in <code class="code">repo</code>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALof_hash">of_hash</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
@@ -457,6 +560,12 @@ Converts a list of the form <code class="code"><span class="string">"a"</span>; 
     the stream <code class="code">s ()</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Status_state.html#VALof_string">of_string</a> [<a href="Datakit_github.Status_state.html">Datakit_github.Status_state</a>]</td>
+<td><div class="info">
+<code class="code">of_string s</code> is the value v such that <code class="code">of_string s</code> is <code class="code"><span class="constructor">Some</span>
+      v</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_path.html#VALof_string">of_string</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 Converts a path of the form <code class="code"><span class="string">"a/b/c"</span></code> to a path.
@@ -502,14 +611,77 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <code class="code">parents t</code> is the list of <code class="code">t</code>'s parent commits.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Status.html#VALpath">path</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+<code class="code">path t</code> is path corresponding to <code class="code">t</code>'s context.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.html#VALperm">perm</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">perm</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Perm</span></code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Diff.Set.html#VALpp">pp</a> [<a href="Datakit_github.Diff.Set.html">Datakit_github.Diff.Set</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Diff.html#VALpp">pp</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for diff values.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALpp">pp</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for snapshots.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Event.html#VALpp">pp</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for event values.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status.Set.html#VALpp">pp</a> [<a href="Datakit_github.Status.Set.html">Datakit_github.Status.Set</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Status.html#VALpp">pp</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for status values.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.PR.Set.html#VALpp">pp</a> [<a href="Datakit_github.PR.Set.html">Datakit_github.PR.Set</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.PR.html#VALpp">pp</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for pull-request values.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Repo.Set.html#VALpp">pp</a> [<a href="Datakit_github.Repo.Set.html">Datakit_github.Repo.Set</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Repo.html#VALpp">pp</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for Github repositories.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status_state.html#VALpp">pp</a> [<a href="Datakit_github.Status_state.html">Datakit_github.Status_state</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for status states.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Commit.html#VALpp">pp</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for commits IDs.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_path.html#VALpp">pp</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 <code class="code">pp</code> is a formatter for human-readable paths.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_blob.html#VALpp">pp</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for blobs.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_tree.S.File.html#VALpp">pp</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is a pretty-printer for files.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Inode.html#VALpp">pp</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
@@ -535,10 +707,35 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALpp_hash">pp_hash</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
-<td></td></tr>
+<td><div class="info">
+<code class="code">pp_hash</code> is the pretty-printer for file's hashes.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALpr">pr</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">pr t ~user ~repo n</code> is the <code class="code">n</code>'th pull-request of the repostiry
+      <code class="code">user/repo</code> in <code class="code">t</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.html#VALpr">pr</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
 <td><div class="info">
 <code class="code">pr t ~user ~project id</code> is PR <code class="code">id</code> under "github.com/user/project"
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.API.html#VALprs">prs</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">pr t ~user ~repo</code> is the list of open pull-requests for the
+      repo <code class="code">user/repo</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALprs">prs</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">prs t</code> is the list of pull requests stored in <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALprs">prs</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">prs t</code> are <code class="code">t</code>'s pull-requests.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.html#VALprs">prs</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
@@ -559,7 +756,8 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 </td></tr>
 <tr><td><a href="Ivfs_blob.html#VALread">read</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
-<code class="code">read t ~offset ~count</code> is the <code class="code">count</code> bytes in <code class="code">t</code> starting at <code class="code">offset</code>.
+<code class="code">read t ~offset ~count</code> is the <code class="code">count</code> bytes in <code class="code">t</code> starting at
+    <code class="code">offset</code>.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALread">read</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
@@ -649,6 +847,32 @@ The <code class="code">rename</code> command.
 <code class="code">repo dir</code> is the repository in which <code class="code">dir</code> lives.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.API.html#VALrepo_exists">repo_exists</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">exists_repo t ~user ~repo</code> is true iff <code class="code">user/repo</code> exists.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.API.html#VALrepos">repos</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">repos t ~user</code> is the list of repositories owned by user
+      <code class="code">user</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALrepos">repos</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">repos t</code> is the list of repositories stored in <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Diff.html#VALrepos">repos</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
+<td><div class="info">
+<code class="code">repos d</code> is the set of repositories appearing in <code class="code">d</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALrepos">repos</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">repos t</code> are <code class="code">t</code>'s repository.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALro_of_string">ro_of_string</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">ro_of_string s</code> is the static file containing <code class="code">s</code>.
@@ -687,21 +911,39 @@ The <code class="code">rename</code> command.
         parents.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.API.html#VALset_pr">set_pr</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">set_pr t pr</code> updates the PR number <code class="code"><span class="constructor">PR</span>.number pr</code> with <code class="code">pr</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_state">set_state</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.API.html#VALset_status">set_status</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">set_status t s</code> updates <code class="code"><span class="constructor">Status</span>.commit s</code>'s status with <code class="code">s</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_url">set_url</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
 <td></td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALsize">size</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
-<td></td></tr>
+<td><div class="info">
+<code class="code">size t</code> is <code class="code">t</code>'s size.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALsize">size</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">size t</code> is <code class="code">t</code>'s size.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALsnapshot">snapshot</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">snapshot ?old t</code> is a snapshot of the tree <code class="code">t</code>.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.html#VALsnapshot">snapshot</a> [<a href="Ivfs_tree.S.html">Ivfs_tree.S</a>]</td>
 <td><div class="info">
-Convert a branch, which may update while we read it, to a fixed directory
-      by reading its current root.
+Convert a branch, which may update while we read it, to a fixed
+      directory by reading its current root.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.READABLE_TREE.html#VALstat">stat</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
@@ -721,11 +963,39 @@ Convert a branch, which may update while we read it, to a fixed directory
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALstate">state</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.API.html#VALstatus">status</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">status t ~user ~repo ~commit</code> returns the list of status
+      attached to <code class="code">commit</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALstatus">status</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">status t ~user ~repo ~commit ~context</code> is the commit's
+      build status for the repository <code class="code">user/repo</code> in the tree <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALstatus">status</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">status t</code> are <code class="code">t</code>'s build status.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.PR.html#VALstatus">status</a> [<a href="Datakit_S.CLIENT.GitHub.PR.html">Datakit_S.CLIENT.GitHub.PR</a>]</td>
 <td></td></tr>
 <tr><td><a href="Vfs.File.html#VALstatus">status</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">status f</code> is the file containing the result of <code class="code">f</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALstatuses">statuses</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">statuses t</code> is the list of status stored in <code class="code">t</code>..
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Sync.html#VALsync">sync</a> [<a href="Datakit_github.Sync.html">Datakit_github.Sync</a>]</td>
+<td><div class="info">
+<code class="code">sync t ~pub ~priv ~token</code> mirror GitHub changes in the DataKit
+    public branch <code class="code">pub</code>.
 </div>
 </td></tr>
 <tr><td align="left"><br>T</td></tr>
@@ -736,12 +1006,24 @@ Convert to a string, in the same format as <code class="code">pp</code>.
 </td></tr>
 <tr><td><a href="Ivfs_blob.html#VALto_ro_cstruct">to_ro_cstruct</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
-<code class="code">to_ro_cstruct t</code> is a read-only Cstruct with the same data as <code class="code">t</code>.
+<code class="code">to_ro_cstruct t</code> is a read-only Cstruct with the same data as
+    <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status_state.html#VALto_string">to_string</a> [<a href="Datakit_github.Status_state.html">Datakit_github.Status_state</a>]</td>
+<td><div class="info">
+<code class="code">to_string v</code> is the string represenation of <code class="code">v</code>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_blob.html#VALto_string">to_string</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
 <code class="code">to_string t</code> is a string containing the same data as <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_S.CLIENT.Branch.html#VALtransaction">transaction</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
+<td><div class="info">
+<code class="code">transaction t</code> creates a new transaction on top of the branch
+        <code class="code">t</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Commit.html#VALtree">tree</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
@@ -752,6 +1034,16 @@ Convert to a string, in the same format as <code class="code">pp</code>.
 <tr><td><a href="Datakit_S.CLIENT.html#VALtree">tree</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
 <td><div class="info">
 <code class="code">tree t id</code> is the tree with ID <code class="code">id</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALtree_of_commit">tree_of_commit</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">tree_of_commit c</code> is <code class="code">c</code>'s filesystem <code class="code">tree</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALtree_of_transaction">tree_of_transaction</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">tree_of_transaction t</code> is <code class="code">t</code>'s filesystem <code class="code">tree</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALtruncate">truncate</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
@@ -776,13 +1068,35 @@ Check the type of a path.
 </div>
 </td></tr>
 <tr><td align="left"><br>U</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALunion">union</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">union x y</code> is the union of the snapshots <code class="code">x</code> and <code class="code">y</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_path.html#VALunwrap">unwrap</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 Cast to a list of strings
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALupdate_pr">update_pr</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">update_pr t ~user ~repo pr</code> applies the pull-request <code class="code">pr</code> of
+      the repository <code class="code">user/repo</code> to the transaction <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Conv.html#VALupdate_status">update_status</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<td><div class="info">
+<code class="code">update_status t ~user ~repo s</code> applies the status <code class="code">s</code> of the
+      repository <code class="code">user/repo</code> to the transaction <code class="code">t</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALurl">url</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.API.html#VALuser_exists">user_exists</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">exist_user t ~user</code> is true iff <code class="code">user</code> exists.
+</div>
+</td></tr>
 <tr><td align="left"><br>W</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwait_for_head">wait_for_head</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
 <td><div class="info">
@@ -798,7 +1112,8 @@ Cast to a list of strings
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALwith_child">with_child</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
-<code class="code">with_child dir name child</code> is a copy of <code class="code">dir</code> except that <code class="code">name</code> links to <code class="code">child</code>.
+<code class="code">with_child dir name child</code> is a copy of <code class="code">dir</code> except that
+        <code class="code">name</code> links to <code class="code">child</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwith_transaction">with_transaction</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
@@ -809,12 +1124,14 @@ Cast to a list of strings
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALwithout_child">without_child</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
-<code class="code">without_child dir name</code> is a copy of <code class="code">dir</code> except that it has no child called <code class="code">name</code>.
+<code class="code">without_child dir name</code> is a copy of <code class="code">dir</code> except that it has
+        no child called <code class="code">name</code>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_blob.html#VALwrite">write</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
-<code class="code">write t ~offset data</code> is the blob <code class="code">t</code> overwritten with <code class="code">data</code> at <code class="code">offset</code>.
+<code class="code">write t ~offset data</code> is the blob <code class="code">t</code> overwritten with <code class="code">data</code> at
+    <code class="code">offset</code>.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALwrite">write</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>

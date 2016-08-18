@@ -17,9 +17,12 @@
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
-<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
-<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><link title="Reading" rel="Section" href="#2_Reading">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
+<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><link title="Reading" rel="Section" href="#2_Reading">
 <link title="Writing" rel="Section" href="#2_Writing">
 <link title="Finishing" rel="Section" href="#2_Finishing">
 <link title="Merging and history" rel="Section" href="#2_Mergingandhistory">
@@ -33,10 +36,6 @@
 <h1>Module <a href="type_Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a></h1>
 
 <pre><span class="keyword">module</span> Transaction: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Transaction.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
-<br>
-All changes to a branch are made in transactions. When a
-        transaction is committed, it is merged with the current
-        contents of the branch.<br>
 <br>
 All changes to a branch are made in transactions. When a
         transaction is committed, it is merged with the current
@@ -177,5 +176,15 @@ When performing a merge, these three directories can be used
 <code class="code">conflicts t</code> returns the current list of paths that had merge
         conflicts and have not been written to since.  It is not
         possible to commit while this is non-empty.<br>
+</div>
+
+<pre><span id="VALdiff"><span class="keyword">val</span> diff</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> <a href="Datakit_S.html#TYPEdiff">Datakit_S.diff</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">diff t c</code> returns the paths differences between <code class="code">c</code> and <code class="code">t</code>'s
+        head.<br>
+</div>
+
+<pre><span id="VALclosed"><span class="keyword">val</span> closed</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> bool</code></pre><div class="info ">
+<code class="code">closed t</code> is true if <code class="code">t</code> is closed and thus it is not valid
+        to read/write on it anymore.<br>
 </div>
 </body></html>

@@ -17,9 +17,12 @@
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
-<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
-<link title="Datakit_S" rel="Chapter" href="Datakit_S.html"><title>Vfs.Dir</title>
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
+<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Vfs.Dir</title>
 </head>
 <body>
 <div class="navbar"><a class="pre" href="Vfs.File.html" title="Vfs.File">Previous</a>
@@ -71,7 +74,7 @@ The <code class="code">rename</code> command.<br>
 <code class="code">empty</code> is the empty directory.<br>
 </div>
 
-<pre><span id="VALof_list"><span class="keyword">val</span> of_list</span> : <code class="type">(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALof_list"><span class="keyword">val</span> of_list</span> : <code class="type">(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">of_list l</code> is a read-only, static directory containing only the
       inodes <code class="code">l</code>. The sub-directories are re-evaluated on every <code class="code">ls</code>
       and <code class="code">read</code>.<br>

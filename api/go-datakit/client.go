@@ -69,7 +69,8 @@ func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
 
 func (c *Client) Close(ctx context.Context) {
 	if err := c.session.Clunk(ctx, c.root); err != nil {
-		log.Println("Failed to Clunk root fid")
+		log.Println("Failed to Clunk root fid", err)
+	} else {
 		c.usedFids[c.root] = false
 	}
 	c.m.Lock()

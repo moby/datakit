@@ -1,7 +1,7 @@
 open Result
 open Astring
 
-let src = Logs.Src.create "pont9" ~doc:"Github to Git bridge"
+let src = Logs.Src.create "dkt-github" ~doc:"Github to Git bridge"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module type ELT = sig

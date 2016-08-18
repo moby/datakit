@@ -1,7 +1,7 @@
 open Astring
 open Datakit_github
 
-let src = Logs.Src.create "pont9.vfs" ~doc:"Github to VFS"
+let src = Logs.Src.create "dkt-github.vfs" ~doc:"Github to VFS"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let err_invalid_status s = Vfs.error "%S: invalid status" s

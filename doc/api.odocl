@@ -11,6 +11,6 @@ src/client/Datakit_path
 src/client/Datakit_S
 src/client/Datakit_client_9p
 
-hook/github/src/Datakit_github
-hook/github/src/Datakit_github_api
-hook/github/src/Datakit_github_vfs
+bridge/github/src/Datakit_github
+bridge/github/src/Datakit_github_api
+bridge/github/src/Datakit_github_vfs

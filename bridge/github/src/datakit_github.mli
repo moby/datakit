@@ -222,7 +222,7 @@ module Conv (DK: Datakit_S.CLIENT): sig
   val tree_of_commit: DK.Commit.t -> tree
   (** [tree_of_commit c] is [c]'s filesystem {!tree}. *)
 
-  (** {1 Repositories. *)
+  (** {1 Repositories} *)
 
   val repos: tree -> Repo.Set.t result
   (** [repos t] is the list of repositories stored in [t]. *)

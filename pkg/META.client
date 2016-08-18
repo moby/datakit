@@ -10,6 +10,7 @@ exists_if = "datakit-client.cma"
 package "vfs" (
  version = "%%VERSION%%"
  description = "Datakit's VFS description"
+ directory = "vfs"
  requires = ""
  archive(byte) = "vfs.cma"
  archive(native) = "vfs.cmxa"

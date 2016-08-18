@@ -38,7 +38,7 @@ let () =
       Pkg.mllib "src/client/datakit-client.mllib";
       Pkg.lib "src/client/datakit_S.mli";
       Pkg.lib "src/client/datakit_S.cmi";
-      Pkg.mllib "src/vfs/vfs.mllib"; (* it's probably OK to duplicate vfs... *)
+      Pkg.mllib "src/vfs/vfs.mllib" ~dst_dir:"vfs";
       Pkg.bin ~dst:"datakit-mount" "src/bin/mount";
       Pkg.test ~run:false "examples/ocaml-client/example";
     ]

@@ -96,8 +96,8 @@ module PR = struct
     | `Closed -> Fmt.string ppf "closed"
 
   let pp ppf t =
-    Fmt.pf ppf "[%s/%s#%d, state: %a, head: %s, title: %S]"
-      t.user t.repo t.number pp_state t.state t.head t.title
+    Fmt.pf ppf "[%s/%s:%d:%s: %a (%S)]"
+      t.user t.repo t.number t.head pp_state t.state t.title
 
   let repo { user; repo; _ } = { Repo.user; repo }
 
@@ -516,16 +516,16 @@ module Diff = struct
   }
 
   let pp_id ppf = function
-    | `PR n          -> Fmt.pf ppf "#%d" n
-    | `Status (s, l) -> Fmt.pf ppf "%s:%a" s Fmt.(list ~sep:(unit "/") string) l
+    | `PR n          -> Fmt.pf ppf "%d" n
+    | `Status (s, l) -> Fmt.pf ppf "%s[%a]" s Fmt.(list ~sep:(unit "/") string) l
     | `Unknown       -> Fmt.pf ppf "?"
 
   let pp ppf t =
     match t.id with
     | `Unknown       -> Fmt.pf ppf "? %s/%s" t.user t.repo
-    | `PR n          -> Fmt.pf ppf "PR %s/%s#%d" t.user t.repo n
+    | `PR n          -> Fmt.pf ppf "%s/%s:%d" t.user t.repo n
     | `Status (s, l) ->
-      Fmt.pf ppf "status %s/%s:%s:%a"
+      Fmt.pf ppf "%s/%s:%s[%a]"
         t.user t.repo s Fmt.(list ~sep:(unit "/") string) l
 
   let compare = Pervasives.compare

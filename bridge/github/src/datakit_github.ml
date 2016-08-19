@@ -806,20 +806,22 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
     let result = ref Snapshot.empty in
-    let cleanup = ref None in
+    let cleanup = ref [] in
     list_iter_s (fun r ->
         aux r >>*= fun (x, c) ->
         result := Snapshot.union !result x;
-        let () = match c, !cleanup with
-          | None  , None   -> ()
-          | None  , Some c
-          | Some c, None   -> cleanup := Some c
-          | Some x, Some y -> cleanup := Some (fun t -> x t >>*= fun () -> y t)
+        let () = match c with
+          | None   -> ()
+          | Some c -> cleanup := c :: !cleanup
         in
         ok ()
       ) (Repo.Set.elements t.Snapshot.repos)
     >>*= fun () ->
-    ok (!result, !cleanup)
+    let cleanup = match !cleanup with
+      | [] -> None
+      | l  -> Some (fun tr -> list_iter_s (fun c -> c tr) l)
+    in
+    ok (!result, cleanup)
 
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be. *)

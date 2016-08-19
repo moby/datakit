@@ -81,11 +81,11 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 		if head == nil {
 			return fmt.Errorf("PR %d has an invalid head", *e.Number)
 		}
-		tr.Write(ctx, append(dir, "head"), *head)
-		tr.Write(ctx, append(dir, "state"), "open")
+		tr.Write(ctx, append(dir, "head"), *head+"\n")
+		tr.Write(ctx, append(dir, "state"), "open\n")
 		title := e.PullRequest.Title
 		if title != nil {
-			tr.Write(ctx, append(dir, "title"), *title)
+			tr.Write(ctx, append(dir, "title"), *title+"\n")
 		}
 	}
 
@@ -151,17 +151,75 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 	dir = append(dir, strings.Split(*context, "/")...)
 
 	if e.Description != nil {
-		tr.Write(ctx, append(dir, "description"), *e.Description)
+		tr.Write(ctx, append(dir, "description"), *e.Description+"\n")
 	}
 	if e.State != nil {
-		tr.Write(ctx, append(dir, "state"), *e.State)
+		tr.Write(ctx, append(dir, "state"), *e.State+"\n")
 	}
 	if e.TargetURL != nil {
-		tr.Write(ctx, append(dir, "target_url"), *e.TargetURL)
+		tr.Write(ctx, append(dir, "target_url"), *e.TargetURL+"\n")
 	}
 
 	// commit the changes to the hook's branch
 	err = tr.Commit(ctx, fmt.Sprintf("Status event: %s", g.GitHubDelivery))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *Server) RefDir(e github.PushEvent) ([]string, error) {
+
+	if e.Repo.Owner.Name == nil {
+		return nil, fmt.Errorf("Empty user")
+	}
+	user := *e.Repo.Owner.Name
+
+	if e.Repo.Name == nil {
+		return nil, fmt.Errorf("Empty repo")
+	}
+	repo := *e.Repo.Name
+
+	if e.Ref == nil {
+		return nil, fmt.Errorf("Empty Ref")
+	}
+	ref := *e.Ref
+
+	h.logger.Debugf("user=%s, repo=%s", user, repo)
+	dir := []string{user, repo, "ref"}
+	refDir := append(dir, strings.Split(ref, "/")...)
+	return refDir, nil
+}
+
+func (h *Server) HandlePushEvent(g GithubHeaders, e github.PushEvent) error {
+
+	// maybe we want to move Dial in the parent function
+	ctx := context.Background()
+	client, err := datakit.Dial(ctx, h.proto, h.address)
+	if err != nil {
+		return err
+	}
+	defer client.Close(ctx)
+
+	// create a new transaction in the DB
+	tr, err := datakit.NewTransaction(ctx, client, h.branch, h.branch+"-"+g.GitHubDelivery)
+	if err != nil {
+		return err
+	}
+
+	// project the event in the the filesystem
+	dir, err := h.RefDir(e)
+	if err != nil {
+		return err
+	}
+
+	if e.Head != nil {
+		tr.Write(ctx, append(dir, "head"), *e.Head+"\n")
+	}
+
+	// commit the changes to the hook's branch
+	err = tr.Commit(ctx, fmt.Sprintf("Push event: %s", g.GitHubDelivery))
 	if err != nil {
 		return err
 	}

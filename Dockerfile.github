@@ -14,7 +14,8 @@ RUN go build
 RUN opam update
 RUN sudo apk add ncurses-dev libev-dev
 RUN opam depext ssl lwt react lambda-term && \
-    opam install ssl react lwt base-unix base-threads conf-libev lambda-term
+    opam install ssl react lwt base-unix base-threads conf-libev \
+         lambda-term mirage-types-lwt
 
 # cache opam install of client github dependencies
 

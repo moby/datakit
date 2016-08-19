@@ -439,6 +439,10 @@ end
 
 module Conv (DK: Datakit_S.CLIENT) = struct
 
+  let safe_remove t path =
+    DK.Transaction.exists t path >>*= fun exists ->
+    if exists then DK.Transaction.remove t path else ok ()
+
   type nonrec 'a result = ('a, DK.error) result Lwt.t
 
   (* conversion between GitHub and DataKit states. *)
@@ -499,9 +503,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     in
     Log.debug (fun l -> l "update_pr %s" @@ Datakit_path.to_hum dir);
     match pr.PR.state with
-    | `Closed ->
-      DK.Transaction.exists t dir >>*= fun exists ->
-      if exists then DK.Transaction.remove t dir else ok ()
+    | `Closed -> safe_remove t dir
     | `Open   ->
       DK.Transaction.make_dirs t dir >>*= fun () ->
       let head = Cstruct.of_string (pr.PR.head ^ "\n")in
@@ -578,9 +580,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       "target_url" , s.Status.url;
     ] in
     list_iter_s (fun (k, v) -> match v with
-        | None   ->
-          DK.Transaction.exists_file t (dir / k) >>*= fun exists ->
-          if not exists then ok () else DK.Transaction.remove t (dir / k)
+        | None   -> safe_remove t (dir / k)
         | Some v ->
           let v = Cstruct.of_string (v ^ "\n") in
           DK.Transaction.create_or_replace_file t ~dir k v
@@ -949,12 +949,18 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           let f tr =
             list_iter_s (fun pr ->
                 let dir = root / "pr" / string_of_int pr.PR.number in
-                DK.Transaction.remove tr dir
+                Conv.safe_remove tr dir
               ) (PR.Set.elements closed_prs)
             >>*= fun () ->
-            list_iter_s (fun s ->
-                DK.Transaction.remove tr (root / "commit" / s.Status.commit)
-              ) (Status.Set.elements closed_status)
+            let commits =
+              Status.Set.fold (fun s acc ->
+                  Commit.Set.add (Status.commit s) acc
+                ) closed_status Commit.Set.empty
+              |> Commit.Set.elements
+            in
+            list_iter_s (fun c ->
+                Conv.safe_remove tr (root / "commit" / c.Commit.id)
+              ) commits
           in
           Some f
       in

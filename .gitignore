@@ -8,5 +8,5 @@ Datakit.app/
 *.install
 *.native
 *.byte
-hooks/datakit-gh/datakit-gh
-hooks/datakit-gh-hooks/datakit-gh-hooks
+bridge/github/webhook/webhook
+COMMIT

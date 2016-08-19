@@ -156,7 +156,7 @@ let start () sandbox no_listen listen_urls
       let _, address = parse_address datakit in
       let host, port = parse_host address in
       let debug = match Logs.level () with Some Logs.Debug -> " -v" | _ -> "" in
-      exec ~name:"datakit-gh-hooks"
+      exec ~name:webhook
         (Lwt_process.shell @@
          Fmt.strf "%s%s%s -l :%d -b %s -a [%s]:%s"
            webhook secret debug webhook_port private_branch host port)

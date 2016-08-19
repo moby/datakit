@@ -90,9 +90,9 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Logs.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () sandbox listen_urls
+let start () sandbox no_listen listen_urls
     datakit private_branch public_branch dry_updates
-    no_webhook gh_hooks webhook_secret webhook_port =
+    no_webhook webhook webhook_secret webhook_port =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -138,7 +138,7 @@ let start () sandbox listen_urls
         | Ok pub  -> VG.Sync.sync t ~dry_updates ~priv ~pub ~token >|= ignore
   in
   let accept_connections () =
-    if listen_urls = [] then Lwt.return_unit
+    if no_listen || listen_urls = [] then Lwt.return_unit
     else
       let root = VG.create token in
       let make_root () = Vfs.Dir.of_list (fun () -> Vfs.ok [root]) in
@@ -146,7 +146,7 @@ let start () sandbox listen_urls
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls
   in
-  let start_datakit_gh_hooks () =
+  let start_webhook () =
     if no_webhook then Lwt.return_unit
     else
       let secret = match webhook_secret with
@@ -156,15 +156,15 @@ let start () sandbox listen_urls
       let _, address = parse_address datakit in
       let host, port = parse_host address in
       let debug = match Logs.level () with Some Logs.Debug -> " -v" | _ -> "" in
-      exec ~name:"datakit-gh-hooks"
+      exec ~name:webhook
         (Lwt_process.shell @@
          Fmt.strf "%s%s%s -l :%d -b %s -a [%s]:%s"
-           gh_hooks secret debug webhook_port private_branch host port)
+           webhook secret debug webhook_port private_branch host port)
   in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();
     accept_connections ();
-    start_datakit_gh_hooks ();
+    start_webhook ();
   ]
 
 open Cmdliner
@@ -180,13 +180,20 @@ let setup_log =
   Term.(const Datakit_log.setup $ Fmt_cli.style_renderer ()
         $ Datakit_log.log_destination $ Logs_cli.level ~env ())
 
+let no_listen =
+  let doc =
+    Arg.info ~doc:"Do not expose the GitHub API over 9p" ["no-listen"]
+  in
+  Arg.(value & flag doc)
+
 let listen_urls =
   let doc =
     Arg.info ~doc:
-      "A comma-separated list of URLs to listen on of the form \
+      "Expose the GitHub API over 9p endpoints. That command-line argument \
+       takes a comma-separated list of URLs to listen on of the form \
        file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
        or hyperv-connect://vmid/serviceid or hyperv-accept://vmid/serviceid"
-      ["l"; "listen"]
+      ["l"; "listen-urls"]
   in
   (* FIXME: maybe we want to not listen by default *)
   Arg.(value & opt (list string) [ "tcp://127.0.0.1:5641" ] doc)
@@ -201,7 +208,9 @@ let sandbox =
   Arg.(value & flag & doc)
 
 let datakit =
-  let doc = Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"] in
+  let doc =
+    Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"]
+  in
   Arg.(value & opt string "tcp:127.0.0.1:5640" doc)
 
 let private_branch =
@@ -222,22 +231,21 @@ let public_branch =
   Arg.(value & opt string "github-metadata" doc)
 
 let no_webhook =
-  let doc = Arg.info ~doc:"Disable webhook handling" ["disable-webhooks"] in
+  let doc = Arg.info ~doc:"Disable webhook handling" ["no-webhook"] in
   Arg.(value & flag doc)
 
-let gh_hooks =
+let webhook =
   let doc =
-    Arg.info ~doc:"Location of the datakit-gh-hooks webhook command"
-      ["gh-hooks"]
+    Arg.info ~doc:"Location of the datakit-github-webhook command" ["webhook"]
   in
-  Arg.(value & opt string "datakit-gh-hooks" doc)
+  Arg.(value & opt string "datakit-github-webhook" doc)
 
 let webhook_secret =
-  let doc = Arg.info ~doc:"Webhook secret" ["s";"secret"] in
+  let doc = Arg.info ~doc:"Webhook secret" ["s";"webhook-secret"] in
   Arg.(value & opt (some string) None doc)
 
 let webhook_port =
-  let doc = Arg.info ~doc:"Webhook port" ["p";"port"] in
+  let doc = Arg.info ~doc:"Webhook port" ["p";"webhook-port"] in
   Arg.(value & opt int 80 doc)
 
 let dry_updates =
@@ -255,9 +263,9 @@ let term =
         filesystem. Also connect to a Datakit instance and ensure a \
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in
-  Term.(pure start $ setup_log $ sandbox $ listen_urls $
+  Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $
-        no_webhook $ gh_hooks $ webhook_secret $ webhook_port),
+        no_webhook $ webhook $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

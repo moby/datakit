@@ -6,14 +6,17 @@ TESTS = true
 
 .PHONY: all clean test bundle COMMIT exe
 
-all:
+all: datakit client github
+	@
+
+datakit:
 	ocaml pkg/pkg.ml build --tests $(TESTS)
 
 client:
 	ocaml pkg/pkg.ml build -n datakit-client
 
 github:
-	ocaml pkg/pkg.ml build -b datakit-github
+	ocaml pkg/pkg.ml build -n datakit-github
 
 clean:
 	ocaml pkg/pkg.ml clean

@@ -120,6 +120,16 @@ let start urls sandbox git =
     (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
     urls
 
+let exec ~name cmd =
+  Lwt_process.exec cmd >|= function
+  | Unix.WEXITED 0   -> ()
+  | Unix.WEXITED i   ->
+    Logs.err (fun l -> l "%s exited with code %d" name i)
+  | Unix. WSIGNALED i ->
+    Logs.err (fun l -> l "%s killed by signal %d)" name i)
+  | Unix.WSTOPPED i  ->
+    Logs.err (fun l -> l "%s stopped by signal %d" name i)
+
 let start () url sandbox git auto_push =
   let start () = start url sandbox git in
   Lwt_main.run begin
@@ -136,23 +146,14 @@ let start () url sandbox git auto_push =
           Lazy.force Git_fs_store.listener;
           let prefix = if sandbox then "." else "" in
           let path = prefix ^ path in
-          let exec ~name cmd =
-            Lwt_process.exec cmd >|= function
-            | Unix.WEXITED 0   -> ()
-            | Unix.WEXITED i   ->
-              Logs.err (fun l -> l "%s to %s exited with code %d" name remote i)
-            | Unix. WSIGNALED i ->
-              Logs.err (fun l -> l "%s to %s killed by signal %d)" name remote i)
-            | Unix.WSTOPPED i  ->
-              Logs.err (fun l -> l "%s to %s stopped by signal %d" name remote i)
-          in
           let push br =
-            Logs.debug (fun l -> l "Pushing %s to %s:%s" path remote br);
+            Logs.info (fun l -> l "Pushing %s to %s:%s" path remote br);
             let cmd =
               Lwt_process.shell @@
               Printf.sprintf "cd %S && git push %S %S --force" path remote br
             in
-            exec ~name:"auto-push" cmd
+            let name = Fmt.strf "auto-push to %s" remote in
+            exec ~name cmd
           in
           Git_fs_store.repo path >>= fun repo ->
           Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)

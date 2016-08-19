@@ -81,11 +81,11 @@ func (h *Server) HandlePullRequestEvent(g GithubHeaders, e github.PullRequestEve
 		if head == nil {
 			return fmt.Errorf("PR %d has an invalid head", *e.Number)
 		}
-		tr.Write(ctx, append(dir, "head"), *head)
-		tr.Write(ctx, append(dir, "state"), "open")
+		tr.Write(ctx, append(dir, "head"), *head+"\n")
+		tr.Write(ctx, append(dir, "state"), "open\n")
 		title := e.PullRequest.Title
 		if title != nil {
-			tr.Write(ctx, append(dir, "title"), *title)
+			tr.Write(ctx, append(dir, "title"), *title+"\n")
 		}
 	}
 
@@ -151,13 +151,13 @@ func (h *Server) HandleStatusEvent(g GithubHeaders, e github.StatusEvent) error 
 	dir = append(dir, strings.Split(*context, "/")...)
 
 	if e.Description != nil {
-		tr.Write(ctx, append(dir, "description"), *e.Description)
+		tr.Write(ctx, append(dir, "description"), *e.Description+"\n")
 	}
 	if e.State != nil {
-		tr.Write(ctx, append(dir, "state"), *e.State)
+		tr.Write(ctx, append(dir, "state"), *e.State+"\n")
 	}
 	if e.TargetURL != nil {
-		tr.Write(ctx, append(dir, "target_url"), *e.TargetURL)
+		tr.Write(ctx, append(dir, "target_url"), *e.TargetURL+"\n")
 	}
 
 	// commit the changes to the hook's branch

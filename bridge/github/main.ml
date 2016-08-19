@@ -259,7 +259,7 @@ let term =
   let doc = "Bridge between GiHub API and Datakit." in
   let man = [
     `S "DESCRIPTION";
-    `P "$(i, datakit-github-bridge) exposes a subset of the GitHub API as a 9p \
+    `P "$(tname) exposes a subset of the GitHub API as a 9p \
         filesystem. Also connect to a Datakit instance and ensure a \
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in

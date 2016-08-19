@@ -212,7 +212,7 @@ let term =
   let doc = "A git-like database with a 9p interface." in
   let man = [
     `S "DESCRIPTION";
-    `P "$(i, com.docker.db) is a Git-like database with a 9p interface.";
+    `P "$(tname) is a Git-like database with a 9p interface.";
   ] in
   Term.(pure start $ setup_log $ url $ sandbox $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man

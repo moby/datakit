@@ -11,15 +11,18 @@ module Counter = struct
     mutable events    : int;
     mutable prs       : int;
     mutable status    : int;
+    mutable refs      : int;
     mutable set_status: int;
     mutable set_pr    : int;
   }
 
-  let zero () = { events = 0; prs = 0; status = 0; set_status = 0; set_pr = 0 }
+  let zero () = {
+    events = 0; prs = 0; status = 0; set_status = 0; set_pr = 0; refs = 0;
+  }
 
   let pp ppf t =
-    Fmt.pf ppf "event:%d prs:%d status:%d set-status:%d set-pr:%d"
-      t.events t.prs t.status t.set_status t.set_pr
+    Fmt.pf ppf "event:%d prs:%d status:%d refs:%d set-status:%d set-pr:%d"
+      t.events t.prs t.status t.refs t.set_status t.set_pr
 
   let equal x y = Pervasives.compare x y = 0
 end
@@ -32,6 +35,7 @@ module API = struct
     mutable status: (string * Status.t list) list;
     mutable prs   : PR.t list;
     mutable events: Event.t list;
+    mutable refs  : Ref.t list;
     ctx: Counter.t;
     mutable webhooks: (DK.Branch.t -> (unit, DK.error) Result.result Lwt.t) list;
   }
@@ -102,10 +106,19 @@ module API = struct
     set_pr_aux t pr;
     Lwt.return_unit
 
+  let set_ref_aux t r =
+    let { Ref.user; repo; _ } = r in
+    if not (t.user = user && t.repo = repo) then ()
+    else
+      let name = r.Ref.name in
+      let refs = List.filter (fun r -> r.Ref.name <> name) t.refs in
+      t.refs <- r :: refs
+
   let apply_events t =
     List.iter (function
         | Event.PR pr    -> set_pr_aux t pr
         | Event.Status s -> set_status_aux t s
+        | Event.Ref r    -> set_ref_aux t r
         | Event.Other _  -> ()
       ) t.events
 
@@ -118,6 +131,11 @@ module API = struct
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
     if not (t.user = user && t.repo = repo) then Lwt.return_nil
     else Lwt.return t.events
+
+  let refs t ~user ~repo =
+    t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
+    if not (t.user = user && t.repo = repo) then Lwt.return_nil
+    else Lwt.return t.refs
 
 end
 
@@ -185,6 +203,9 @@ let pr3 =
 let pr4 =
   { PR.number = 2; state = `Open  ; head = "bar"; title = "toto"; user; repo }
 
+let ref1 ={ Ref.user; repo; name = ["heads";"master"]; head = "bar" }
+let ref2 ={ Ref.user; repo; name = ["heads";"master"]; head = "foo" }
+
 let events0 = [
   Event.PR pr1;
   Event.PR pr2;
@@ -206,6 +227,7 @@ let events1 = [
 
 let prs0    = [pr1; pr3]
 let status0 = [s1; s2; s3; s4]
+let refs0   = [ref1]
 
 let status_state: Status_state.t Alcotest.testable =
   (module struct include Status_state let equal = (=) end)
@@ -229,36 +251,44 @@ let test_snapshot () =
   Test_utils.run (fun _repo conn ->
       let dk = DK.connect conn in
       DK.branch dk "test-snapshot" >>*= fun br ->
-      let update ~prs ~status =
+      let update ~prs ~status ~refs =
+        let err e = Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e in
         DK.Branch.with_transaction br (fun tr ->
             Lwt_list.iter_p (fun pr ->
                 Conv.update_pr tr pr >>= function
                 | Ok ()   -> Lwt.return_unit
-                | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+                | Error e -> err e
               ) prs
             >>= fun () ->
             Lwt_list.iter_p (fun s ->
                 Conv.update_status tr s >>= function
                 | Ok ()   -> Lwt.return_unit
-                | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+                | Error e -> err e
               ) status
+            >>= fun () ->
+            Lwt_list.iter_p (fun r ->
+                Conv.update_ref tr r >>= function
+                | Ok ()   -> Lwt.return_unit
+                | Error e -> err e
+              ) refs
             >>= fun () ->
             Conv.snapshot Conv.(tree_of_transaction tr) >>*= fun s ->
           DK.Transaction.commit tr ~message:"init" >>*= fun () ->
           ok s)
       in
-      update ~prs:prs0 ~status:status0 >>*= fun s ->
+      update ~prs:prs0 ~status:status0 ~refs:refs0 >>*= fun s ->
       expect_head br >>*= fun head ->
       let se =
         let prs = PR.Set.of_list prs0 in
         let status = Status.Set.of_list status0 in
-        Snapshot.create ~prs ~status ()
+        let refs = Ref.Set.of_list refs0 in
+        Snapshot.create ~prs ~status ~refs ()
       in
       Conv.snapshot Conv.(tree_of_commit head) >>*= fun sh ->
       Alcotest.(check snapshot) "snap transaction" se s;
       Alcotest.(check snapshot) "snap head" se sh;
 
-      update ~prs:[pr2] ~status:[] >>*= fun s1 ->
+      update ~prs:[pr2] ~status:[] ~refs:[] >>*= fun s1 ->
       expect_head br >>*= fun head1 ->
       let tree1 = Conv.tree_of_commit head1 in
       Conv.diff tree1 head >>*= fun diff1 ->
@@ -266,17 +296,18 @@ let test_snapshot () =
       Conv.snapshot ~old:(head, s) tree1 >>*= fun sd ->
       Alcotest.(check snapshot) "snap diff" s1 sd;
 
-      update ~prs:[] ~status:[s5] >>*= fun s2 ->
+      update ~prs:[] ~status:[s5] ~refs:[ref2] >>*= fun s2 ->
       expect_head br >>*= fun head2 ->
       let tree2 = Conv.tree_of_commit head2 in
       Conv.diff tree2 head1 >>*= fun diff2 ->
       Alcotest.(check diffs) "diff2"
-        [d (`Status ("foo", ["foo";"bar";"baz"]))] (Diff.Set.elements diff2);
+        [d (`Status ("foo", ["foo";"bar";"baz"]));
+         d (`Ref ["heads";"master"])]
+        (Diff.Set.elements diff2);
       Conv.snapshot ~old:(head , s ) tree2 >>*= fun sd1 ->
       Conv.snapshot ~old:(head1, s1) tree2 >>*= fun sd2 ->
       Alcotest.(check snapshot) "snap diff1" s2 sd1;
       Alcotest.(check snapshot) "snap diff2" s2 sd2;
-
 
       DK.Branch.with_transaction br (fun tr ->
           DK.Transaction.make_dirs tr (p "test/toto") >>*= fun () ->
@@ -293,7 +324,7 @@ let test_snapshot () =
       Lwt.return_unit
     )
 
-let init status events =
+let init status refs events =
   let tbl = Hashtbl.create (List.length status) in
   List.iter (fun s ->
       let v =
@@ -304,7 +335,7 @@ let init status events =
     ) status;
   let status = Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl [] in
   let ctx = Counter.zero () in
-  { API.user; repo; status; prs = []; events; ctx; webhooks = [] }
+  { API.user; repo; status; refs; prs = []; events; ctx; webhooks = [] }
 
 let run f () =
   quiet_9p ();
@@ -314,7 +345,7 @@ let run f () =
       let dk = DK.connect conn in
       DK.branch dk pub  >>*= fun pub ->
       DK.branch dk priv >>*= fun priv ->
-      let t = init [] [] in
+      let t = init [] [] [] in
       let s = VG.empty in
       VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
       DK.Branch.with_transaction pub (fun tr ->
@@ -376,14 +407,16 @@ let check name tree =
 
   Lwt.return_unit
 
+open Counter
+
 let test_events dk =
-  let t = init status0 events0 in
+  let t = init status0 refs0 events0 in
   API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub  ->
   Alcotest.(check counter) "counter: 0"
-    { Counter.events = 0; prs = 0; status = 0; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 0; status = 0; refs = 0; set_pr = 0; set_status = 0 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
@@ -392,11 +425,11 @@ let test_events dk =
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 1"
-    { Counter.events = 0; prs = 1; status = 1; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 1; status = 1; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 2"
-    { Counter.events = 0; prs = 1; status = 1; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 1; status = 1; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
   expect_head priv >>*= fun head ->
   check "priv" (DK.Commit.tree head) >>= fun () ->
@@ -417,21 +450,21 @@ let find_status t =
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
-  let t = init status0 events1 in
+  let t = init status0 refs0 events1 in
   API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
   Alcotest.(check counter) "counter: 0"
-    { Counter.events = 0; prs = 0; status = 0; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 0; status = 0; refs = 0; set_pr = 0; set_status = 0 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 1"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 1'"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
 
   (* test status update *)
@@ -445,11 +478,11 @@ let test_updates dk =
   update_status pub dir `Pending >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 2"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 1 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 3"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 1 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
   let status = find_status t in
   Alcotest.(check status_state) "update status" `Pending status.Status.state;
@@ -470,7 +503,7 @@ let test_updates dk =
     ) >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 4"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 1; set_status = 1 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 1; set_status = 1 }
     t.API.ctx;
   let pr =
     try List.find (fun pr -> pr.PR.number = 2) t.API.prs
@@ -480,7 +513,7 @@ let test_updates dk =
   Lwt.return_unit
 
 let test_startup dk =
-  let t = init status0 events1 in
+  let t = init status0 refs0 events1 in
   API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
@@ -489,16 +522,16 @@ let test_startup dk =
 
   (* start from scratch *)
   Alcotest.(check counter) "counter: 1"
-    { Counter.events = 0; prs = 0; status = 0; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 0; status = 0; refs = 0; set_pr = 0; set_status = 0 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 2"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 0 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
   update_status pub dir `Pending >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 3"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 1 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
 
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
@@ -506,7 +539,7 @@ let test_startup dk =
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 3'"
-    { Counter.events = 0; prs = 1; status = 2; set_pr = 0; set_status = 1 }
+    { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
 
   (* stop the app, apply the webhooks and restart *)
@@ -514,12 +547,12 @@ let test_startup dk =
   API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 4"
-    { Counter.events = 0; prs = 2; status = 4; set_pr = 0; set_status = 1 }
+    { events = 0; prs = 2; status = 4; refs = 2; set_pr = 0; set_status = 1 }
     t.API.ctx;
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 4'"
-    { Counter.events = 0; prs = 2; status = 4; set_pr = 0; set_status = 1 }
+    { events = 0; prs = 2; status = 4; refs = 2; set_pr = 0; set_status = 1 }
     t.API.ctx;
 
   (* restart with dirty public branch *)
@@ -529,7 +562,7 @@ let test_startup dk =
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 5"
-    { Counter.events = 0; prs = 3; status = 6; set_pr = 0; set_status = 2 }
+    { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
   let status = find_status t in
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
@@ -539,7 +572,7 @@ let test_startup dk =
   API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 6"
-    { Counter.events = 0; prs = 3; status = 6; set_pr = 0; set_status = 2 }
+    { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
 
   (* changes done in the public branch are never overwritten
@@ -548,7 +581,7 @@ let test_startup dk =
   API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 7"
-    { Counter.events = 0; prs = 3; status = 6; set_pr = 0; set_status = 2 }
+    { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
   let status_dir = dir / "status" / "foo" / "bar" / "baz" in
   expect_head pub >>*= fun h ->

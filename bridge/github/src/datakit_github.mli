@@ -86,12 +86,34 @@ module Status: sig
 
 end
 
+module Ref: sig
+
+  type t = {
+    user: string;
+    repo: string;
+    name: string list;
+    head: string;
+  }
+  (** The type for Git references. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for references. *)
+
+  module Set: sig
+    include Set.S with type elt = t
+    val pp: t Fmt.t
+  end
+  (** Sets of Git references. *)
+
+end
+
 module Event: sig
 
   (** The type for event values. *)
   type t =
     | PR of PR.t
     | Status of Status.t
+    | Ref of Ref.t
     | Other of string
 
   val pp: t Fmt.t
@@ -127,8 +149,12 @@ module type API = sig
   (** [set_pr t pr] updates the PR number [PR.number pr] with [pr]. *)
 
   val prs: token -> user:string -> repo:string -> PR.t list Lwt.t
-  (** [pr t ~user ~repo] is the list of open pull-requests for the
+  (** [prs t ~user ~repo] is the list of open pull-requests for the
       repo [user/repo]. *)
+
+  val refs: token -> user:string -> repo:string -> Ref.t list Lwt.t
+  (** [refs t ~user ~repo name] is the commit ID of the reference
+      [name]. *)
 
   val events: token -> user:string -> repo:string -> Event.t list Lwt.t
   (** [event t ~user ~repo] is the list of events attached to
@@ -148,7 +174,8 @@ module Snapshot: sig
   (** The empty snapshot. *)
 
   val create:
-    ?repos:Repo.Set.t -> status:Status.Set.t -> prs:PR.Set.t -> unit -> t
+    ?repos:Repo.Set.t -> status:Status.Set.t -> prs:PR.Set.t -> refs:Ref.Set.t
+    -> unit -> t
   (** [create ?repos ~status ~prs ()] is a new snapshot [t] with
       pull-requests [prs], build status [status] and repositories the
       unions of [repos], the repositories of [status] and [prs]. *)
@@ -171,16 +198,28 @@ module Snapshot: sig
   val status: t -> Status.Set.t
   (** [status t] are [t]'s build status. *)
 
+  val refs: t -> Ref.Set.t
+  (** [refs t] are [t]'s Git references. *)
+
 end
 
 module Diff: sig
 
   (** {1 Github diffs} *)
 
+
+  type id = [
+    | `PR of int
+    | `Status of string * string list
+    | `Ref of string list
+    | `Unknown
+  ]
+  (** The type for diff identifiers. *)
+
   type t = {
     user: string;
     repo: string;
-    id  : [ `PR of int | `Status of string * string list | `Unknown ]
+    id  : id;
   }
   (** The type for filesystem diffs. *)
 
@@ -239,8 +278,8 @@ module Conv (DK: Datakit_S.CLIENT): sig
   (** [statuses t] is the list of status stored in [t].. *)
 
   val update_status: DK.Transaction.t -> Status.t -> unit result
-  (** [update_status t ~user ~repo s] applies the status [s] of the
-      repository [user/repo] to the transaction [t]. *)
+  (** [update_status t s] applies the status [s] to the transaction
+      [t]. *)
 
   (** {1 Pull requests} *)
 
@@ -252,8 +291,14 @@ module Conv (DK: Datakit_S.CLIENT): sig
   (** [prs t] is the list of pull requests stored in [t]. *)
 
   val update_pr: DK.Transaction.t -> PR.t -> unit result
-  (** [update_pr t ~user ~repo pr] applies the pull-request [pr] of
-      the repository [user/repo] to the transaction [t]. *)
+  (** [update_pr t pr] applies the pull-request [pr] to the
+      transaction [t]. *)
+
+  (** {1 Git References} *)
+
+  val update_ref: DK.Transaction.t -> Ref.t -> unit result
+  (** [update_ref t r] applies the Git reference [r] to the
+      transaction [t]. *)
 
   (** {1 Snapshots and diffs} *)
 

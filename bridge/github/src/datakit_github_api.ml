@@ -74,6 +74,27 @@ module Status = struct
 
 end
 
+module Ref = struct
+
+  include Ref
+
+  let to_list s = match String.cuts ~empty:false ~sep:"/" s with
+    | "refs" :: l | l -> l
+
+  let of_gh ~user ~repo r = {
+    user; repo;
+    name = to_list r.git_ref_name;
+    head = r.git_ref_obj.obj_sha;
+  }
+
+  let of_event ~user ~repo r = {
+    user; repo;
+    name = to_list r.push_event_ref;
+    head = r.push_event_head;
+  }
+
+end
+
 module Event = struct
 
   include Event
@@ -86,6 +107,7 @@ module Event = struct
     match e.event_payload with
     | `Status s       -> Status (Status.of_event ~user ~repo s)
     | `PullRequest pr -> PR (PR.of_event ~user ~repo pr)
+    | `Push p         -> Ref (Ref.of_event ~user ~repo p)
     | `Create _       -> Other "create"
     | `Delete _       -> Other "delete"
     | `Download       -> Other "download"
@@ -98,7 +120,6 @@ module Event = struct
     | `Issues _       -> Other "issues"
     | `Member _       -> Other "member"
     | `Public         -> Other "public"
-    | `Push _         -> Other "push"
     | `Release _      -> Other "release"
     | `Watch _        -> Other "watch"
     | `PullRequestReviewComment _ -> Other "pull-request-review-comment"
@@ -165,6 +186,19 @@ let prs token ~user ~repo =
   |> Github.Stream.to_list
   |> run
   >|= List.map (PR.of_gh ~user ~repo)
+
+let refs token ~user ~repo =
+  let refs ty =
+    Github.Repo.refs ~ty ~token ~user ~repo ()
+    |> Github.Stream.to_list
+    |> run
+    >|= List.map (Ref.of_gh ~user ~repo)
+  in
+  refs "heads" >>= fun heads ->
+  Logs.debug (fun l -> l "heads=%a" Fmt.(Dump.list Ref.pp) heads);
+  refs "tags"  >|= fun tags  ->
+  Logs.debug (fun l -> l "tags=%a" Fmt.(Dump.list Ref.pp) tags);
+  heads @ tags
 
 let events token ~user ~repo =
   let open Lwt.Infix in

@@ -83,6 +83,13 @@ func (h *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if err := h.HandleStatusEvent(g, e); err != nil {
 			logrus.Error(err)
 		}
+	} else if g.GitHubEvent == "push" {
+		var e github.PushEvent
+		if err := json.Unmarshal(data, &e); err != nil {
+			logrus.Error(err)
+		} else if err := h.HandlePushEvent(g, e); err != nil {
+			logrus.Error(err)
+		}
 	} else {
 		requestLog.Printf("Ignoring unknown event kind")
 	}

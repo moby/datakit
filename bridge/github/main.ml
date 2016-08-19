@@ -90,7 +90,7 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Logs.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () sandbox listen_urls
+let start () sandbox no_listen listen_urls
     datakit private_branch public_branch dry_updates
     no_webhook webhook webhook_secret webhook_port =
   quiet ();
@@ -138,7 +138,7 @@ let start () sandbox listen_urls
         | Ok pub  -> VG.Sync.sync t ~dry_updates ~priv ~pub ~token >|= ignore
   in
   let accept_connections () =
-    if listen_urls = [] then Lwt.return_unit
+    if no_listen || listen_urls = [] then Lwt.return_unit
     else
       let root = VG.create token in
       let make_root () = Vfs.Dir.of_list (fun () -> Vfs.ok [root]) in
@@ -180,13 +180,20 @@ let setup_log =
   Term.(const Datakit_log.setup $ Fmt_cli.style_renderer ()
         $ Datakit_log.log_destination $ Logs_cli.level ~env ())
 
+let no_listen =
+  let doc =
+    Arg.info ~doc:"Do not expose the GitHub API over 9p" ["no-listen"]
+  in
+  Arg.(value & flag doc)
+
 let listen_urls =
   let doc =
     Arg.info ~doc:
-      "A comma-separated list of URLs to listen on of the form \
+      "Expose the GitHub API over 9p endpoints. That command-line argument \
+       takes a comma-separated list of URLs to listen on of the form \
        file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
        or hyperv-connect://vmid/serviceid or hyperv-accept://vmid/serviceid"
-      ["l"; "listen"]
+      ["l"; "listen-urls"]
   in
   (* FIXME: maybe we want to not listen by default *)
   Arg.(value & opt (list string) [ "tcp://127.0.0.1:5641" ] doc)
@@ -201,7 +208,9 @@ let sandbox =
   Arg.(value & flag & doc)
 
 let datakit =
-  let doc = Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"] in
+  let doc =
+    Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"]
+  in
   Arg.(value & opt string "tcp:127.0.0.1:5640" doc)
 
 let private_branch =
@@ -254,7 +263,7 @@ let term =
         filesystem. Also connect to a Datakit instance and ensure a \
         bi-directional mapping between the GitHub API and a Git branch.";
   ] in
-  Term.(pure start $ setup_log $ sandbox $ listen_urls $
+  Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $
         no_webhook $ webhook $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man

@@ -13,7 +13,7 @@ client:
 	ocaml pkg/pkg.ml build -n datakit-client
 
 github:
-	ocaml pkg/pkg.ml build -b datakit-github
+	ocaml pkg/pkg.ml build -n datakit-github
 
 clean:
 	ocaml pkg/pkg.ml clean

@@ -92,7 +92,7 @@ let exec ~name cmd =
 
 let start () sandbox listen_urls
     datakit private_branch public_branch dry_updates
-    no_webhook gh_hooks webhook_secret webhook_port =
+    no_webhook webhook webhook_secret webhook_port =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -146,7 +146,7 @@ let start () sandbox listen_urls
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls
   in
-  let start_datakit_gh_hooks () =
+  let start_webhook () =
     if no_webhook then Lwt.return_unit
     else
       let secret = match webhook_secret with
@@ -159,12 +159,12 @@ let start () sandbox listen_urls
       exec ~name:"datakit-gh-hooks"
         (Lwt_process.shell @@
          Fmt.strf "%s%s%s -l :%d -b %s -a [%s]:%s"
-           gh_hooks secret debug webhook_port private_branch host port)
+           webhook secret debug webhook_port private_branch host port)
   in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();
     accept_connections ();
-    start_datakit_gh_hooks ();
+    start_webhook ();
   ]
 
 open Cmdliner
@@ -222,22 +222,21 @@ let public_branch =
   Arg.(value & opt string "github-metadata" doc)
 
 let no_webhook =
-  let doc = Arg.info ~doc:"Disable webhook handling" ["disable-webhooks"] in
+  let doc = Arg.info ~doc:"Disable webhook handling" ["no-webhook"] in
   Arg.(value & flag doc)
 
-let gh_hooks =
+let webhook =
   let doc =
-    Arg.info ~doc:"Location of the datakit-gh-hooks webhook command"
-      ["gh-hooks"]
+    Arg.info ~doc:"Location of the datakit-github-webhook command" ["webhook"]
   in
-  Arg.(value & opt string "datakit-gh-hooks" doc)
+  Arg.(value & opt string "datakit-github-webhook" doc)
 
 let webhook_secret =
-  let doc = Arg.info ~doc:"Webhook secret" ["s";"secret"] in
+  let doc = Arg.info ~doc:"Webhook secret" ["s";"webhook-secret"] in
   Arg.(value & opt (some string) None doc)
 
 let webhook_port =
-  let doc = Arg.info ~doc:"Webhook port" ["p";"port"] in
+  let doc = Arg.info ~doc:"Webhook port" ["p";"webhook-port"] in
   Arg.(value & opt int 80 doc)
 
 let dry_updates =
@@ -257,7 +256,7 @@ let term =
   ] in
   Term.(pure start $ setup_log $ sandbox $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $
-        no_webhook $ gh_hooks $ webhook_secret $ webhook_port),
+        no_webhook $ webhook $ webhook_secret $ webhook_port),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

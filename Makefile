@@ -6,7 +6,10 @@ TESTS = true
 
 .PHONY: all clean test bundle COMMIT exe
 
-all:
+all: datakit client github
+	@
+
+datakit:
 	ocaml pkg/pkg.ml build --tests $(TESTS)
 
 client:

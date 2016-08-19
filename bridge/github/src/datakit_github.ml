@@ -1046,12 +1046,19 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       let t = ref t in
       let updates = ref false in
       let cond = Lwt_condition.create () in
+      let pp ppf = function
+        | Starting -> Fmt.string ppf "<starting>"
+        | State t  ->
+          let repos = Snapshot.repos t.priv.snapshot in
+          Fmt.pf ppf "active repos: %a" Repo.Set.pp repos
+      in
       let rec react () =
         if not (continue switch) then Lwt.return_unit
         else
           (if not !updates then Lwt_condition.wait cond else Lwt.return_unit)
           >>= fun () ->
           updates := false;
+          Log.info (fun l -> l "Processing new entry -- %a" pp !t);
           sync_once !t >>= function
           | Ok s    -> t := State s; react ()
           | Error e ->

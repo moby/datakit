@@ -29,6 +29,7 @@ module Counter = struct
 end
 
 module API = struct
+
   type repo = {
     user  : string;
     repo  : string;
@@ -59,33 +60,37 @@ module API = struct
 
   type token = state
 
-  let lookup t ~user ~repo =
+  let lookup t { Repo.user; repo }  =
     match String.Map.find user t.users with
     | None -> None
     | Some user -> String.Map.find repo user.repos
 
-  let lookup_exn t ~user ~repo =
-    match lookup t ~user ~repo with
-    | None -> failwith (Fmt.strf "Unknown user/repo: %s/%s" user repo)
+  let lookup_exn t repo =
+    match lookup t repo with
+    | None -> failwith (Fmt.strf "Unknown user/repo: %a" Repo.pp repo)
     | Some repo -> repo
 
   let user_exists t ~user = Lwt.return (String.Map.mem user t.users)
-  let repo_exists t ~user ~repo = Lwt.return (lookup t ~user ~repo <> None)
+  let repo_exists t repo  = Lwt.return (lookup t repo <> None)
+
   let repos t ~user =
     match String.Map.find user t.users with
-    | None -> Lwt.return_nil
-    | Some user -> String.Map.dom user.repos |> String.Set.elements |> Lwt.return
+    | None   -> Lwt.return_nil
+    | Some u ->
+      String.Map.dom u.repos
+      |> String.Set.elements
+      |> List.map (fun repo -> { Repo.user; repo })
+      |> Lwt.return
 
-  let status t ~user ~repo ~commit =
+  let status t commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;
-    let repo = lookup_exn t ~user ~repo in
-    try Lwt.return (List.assoc commit repo.status)
+    let repo = lookup_exn t (Commit.repo commit) in
+    try Lwt.return (List.assoc (Commit.id commit) repo.status)
     with Not_found -> Lwt.return_nil
 
   let set_status_aux t s =
-    let { Status.repo; user; _ } = s in
-    let repo = lookup_exn t ~user ~repo in
-    let commit = s.Status.commit in
+    let repo = lookup_exn t (Status.repo s) in
+    let commit = Status.commit_id s in
     let keep (c, _) = c <> commit in
     let status = List.filter keep repo.status in
     let rest =
@@ -112,8 +117,7 @@ module API = struct
     Lwt.return_unit
 
   let set_pr_aux t pr =
-    let { PR.user; repo; _ } = pr in
-    let repo = lookup_exn t ~user ~repo in
+    let repo = lookup_exn t (PR.repo pr) in
     let num = pr.PR.number in
     let prs = List.filter (fun pr -> pr.PR.number <> num) repo.prs in
     repo.prs <- pr :: prs
@@ -124,8 +128,7 @@ module API = struct
     Lwt.return_unit
 
   let set_ref_aux t r =
-    let { Ref.user; repo; _ } = r in
-    let repo = lookup_exn t ~user ~repo in
+    let repo = lookup_exn t (Ref.repo r) in
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.refs in
     repo.refs <- r :: refs
@@ -139,19 +142,19 @@ module API = struct
     | Event.Ref r    -> set_ref_aux t r
     | Event.Other _  -> ()
 
-  let prs t ~user ~repo =
+  let prs t repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
-    let repo = lookup_exn t ~user ~repo in
+    let repo = lookup_exn t repo in
     Lwt.return repo.prs
 
-  let events t ~user ~repo =
+  let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
-    let repo = lookup_exn t ~user ~repo in
+    let repo = lookup_exn t repo in
     Lwt.return repo.events
 
-  let refs t ~user ~repo =
+  let refs t repo =
     t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
-    let repo = lookup_exn t ~user ~repo in
+    let repo = lookup_exn t repo in
     Lwt.return repo.refs
 
 end
@@ -163,13 +166,16 @@ let repo = "test"
 let pub = "test-pub"
 let priv = "test-priv"
 
+let repo = { Repo.user; repo }
+let commit_bar = { Commit.repo; id = "bar" }
+let commit_foo = { Commit.repo; id = "foo" }
+
 let s1 = {
   Status.context = ["foo"; "bar"; "baz"];
   url            = None;
   description    = Some "foo";
   state          = `Pending;
-  commit         = "bar";
-  user; repo;
+  commit = commit_bar;
 }
 
 let s2 = {
@@ -177,8 +183,7 @@ let s2 = {
   url            = Some "toto";
   description    = None;
   state          = `Failure;
-  commit         = "bar";
-  user; repo;
+  commit = commit_bar;
 }
 
 let s3 = {
@@ -186,8 +191,7 @@ let s3 = {
   url            = Some "titi";
   description    = Some "foo";
   state          = `Success;
-  commit         = "foo";
-  user; repo;
+  commit = commit_foo;
 }
 
 let s4 = {
@@ -195,8 +199,7 @@ let s4 = {
   url            = None;
   description    = None;
   state          = `Pending;
-  commit         = "bar";
-  user; repo;
+  commit = commit_bar;
 }
 
 let s5 = {
@@ -204,24 +207,16 @@ let s5 = {
   url            = Some "titi";
   description    = None;
   state          = `Failure;
-  commit         = "foo";
-  user; repo;
+  commit = commit_foo;
 }
 
-let pr1 =
-  { PR.number = 1; state = `Open  ; head = "foo"; title = "";  user; repo }
+let pr1 = { PR.number = 1; state = `Open  ; head = commit_foo; title = "" }
+let pr2 = { PR.number = 1; state = `Closed; head = commit_foo; title = "foo" }
+let pr3 = { PR.number = 2; state = `Open  ; head = commit_bar; title = "bar" }
+let pr4 = { PR.number = 2; state = `Open  ; head = commit_bar; title = "toto" }
 
-let pr2 =
-  { PR.number = 1; state = `Closed; head = "foo"; title = "foo"; user; repo }
-
-let pr3 =
-  { PR.number = 2; state = `Open  ; head = "bar"; title = "bar"; user; repo }
-
-let pr4 =
-  { PR.number = 2; state = `Open  ; head = "bar"; title = "toto"; user; repo }
-
-let ref1 ={ Ref.user; repo; name = ["heads";"master"]; head = "bar" }
-let ref2 ={ Ref.user; repo; name = ["heads";"master"]; head = "foo" }
+let ref1 = { Ref.head = commit_bar; name = ["heads";"master"] }
+let ref2 = { Ref.head = commit_foo; name = ["heads";"master"] }
 
 let events0 = [
   Event.PR pr1;
@@ -245,9 +240,8 @@ let events1 = [
 let prs0    = [pr1; pr3]
 let status0 = [s1; s2; s3; s4]
 let refs0   = [ref1]
-let repos0   = [ { Repo.user; repo } ]
-let commits0 =
-  [ { Commit.user; repo; id = "foo" }; { Commit.user; repo; id = "bar" } ]
+let repos0   = [repo]
+let commits0 = [ commit_foo; commit_bar ]
 
 let status_state: Status_state.t Alcotest.testable =
   (module struct include Status_state let equal = (=) end)
@@ -260,7 +254,7 @@ let diff: Diff.t Alcotest.testable =
 
 let diffs = Alcotest.slist diff Diff.compare
 
-let d id = { Diff.user; repo; id }
+let d id = { Diff.repo; id }
 
 let counter: Counter.t Alcotest.testable = (module Counter)
 
@@ -340,7 +334,7 @@ let test_snapshot () =
       expect_head br >>*= fun head3 ->
       let tree3 = Conv.tree_of_commit head3 in
       Conv.diff tree3 head2 >>*= fun diff3 ->
-      let d = { Diff.user; repo = "toto"; id = `Unknown } in
+      let d = { Diff.repo = { Repo. user; repo = "toto" }; id = `Unknown } in
       Alcotest.(check diffs) "diff3" [d] (Diff.Set.elements diff3);
 
       Lwt.return_unit
@@ -355,14 +349,16 @@ let init status refs events =
       in
       Hashtbl.replace tbl s.Status.commit (s :: v)
     ) status;
-  let status = Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl [] in
+  let status = Hashtbl.fold (fun k v acc -> (Commit.id k, v) :: acc) tbl [] in
   let ctx = Counter.zero () in
   let users = String.Map.singleton user {
-      API.repos = String.Map.singleton repo {
-          API.user; repo; status; refs; prs = []; events
+      API.repos = String.Map.singleton repo.Repo.repo {
+          API.user; repo = repo.Repo.repo; status; refs; prs = []; events
         }
     } in
   { API.users; ctx; webhooks = [] }
+
+let root { Repo.user; repo } = Datakit_path.(empty / user / repo)
 
 let run f () =
   quiet_9p ();
@@ -376,7 +372,7 @@ let run f () =
       let s = VG.empty in
       VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
       DK.Branch.with_transaction pub (fun tr ->
-          let dir = Datakit_path.(empty / user / repo) in
+          let dir = root repo in
           DK.Transaction.make_dirs tr dir >>*= fun () ->
           DK.Transaction.create_or_replace_file tr ~dir
             "README" (Cstruct.of_string "trigger an import of test/test\n")
@@ -392,7 +388,7 @@ let check_data msg x y = Alcotest.(check string) msg x (Cstruct.to_string y)
 
 let check name tree =
   (* check test/test/commit *)
-  let commit = Datakit_path.empty / user / repo / "commit" in
+  let commit = root repo / "commit" in
   DK.Tree.exists_dir tree commit >>*= fun exists ->
   Alcotest.(check bool) (name ^ " commit dir exists")  exists true;
   DK.Tree.read_dir tree commit >>*= fun dirs ->
@@ -420,7 +416,7 @@ let check name tree =
   check_dirs "status 3" ["target_url";"state"] dirs;
 
   (* check test/test/pr *)
-  let pr = Datakit_path.empty / user / repo / "pr" in
+  let pr = root repo / "pr" in
   DK.Tree.exists_dir tree pr >>*= fun exists ->
   Alcotest.(check bool) "pr dir exists" true exists;
   DK.Tree.read_dir tree pr >>*= fun dirs ->
@@ -472,9 +468,14 @@ let update_status br dir state =
       DK.Transaction.commit tr ~message:"Test"
     )
 
-let find_status t ~user ~repo =
-  let repo = API.lookup_exn t ~user ~repo in
+let find_status t repo =
+  let repo = API.lookup_exn t repo in
   try List.find (fun (c, _) -> c = "foo") repo.API.status |> snd |> List.hd
+  with Not_found -> Alcotest.fail "foo not found"
+
+let find_pr t repo =
+  let repo = API.lookup_exn t repo in
+  try List.find (fun pr -> pr.PR.number = 2) repo.API.prs
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
@@ -496,7 +497,7 @@ let test_updates dk =
     t.API.ctx;
 
   (* test status update *)
-  let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
+  let dir = root repo / "commit" / "foo" in
   expect_head priv >>*= fun h ->
   DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist private commit/foo" true exists;
@@ -512,11 +513,11 @@ let test_updates dk =
   Alcotest.(check counter) "counter: 3"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
-  let status = find_status t ~user ~repo in
+  let status = find_status t repo in
   Alcotest.(check status_state) "update status" `Pending status.Status.state;
 
   (* test PR update *)
-  let dir = Datakit_path.empty / user / repo / "pr" / "2" in
+  let dir = root repo / "pr" / "2" in
   expect_head priv >>*= fun h ->
   DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist private commit/foo" true exists;
@@ -533,11 +534,7 @@ let test_updates dk =
   Alcotest.(check counter) "counter: 4"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 1; set_status = 1 }
     t.API.ctx;
-  let pr =
-    let repo = API.lookup_exn t ~user ~repo in
-    try List.find (fun pr -> pr.PR.number = 2) repo.API.prs
-    with Not_found -> Alcotest.fail "foo not found"
-  in
+  let pr = find_pr t repo in
   Alcotest.(check string) "update pr's title" "hahaha" pr.PR.title;
   Lwt.return_unit
 
@@ -547,7 +544,7 @@ let test_startup dk =
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
-  let dir = Datakit_path.empty / user / repo / "commit" / "foo" in
+  let dir = root repo / "commit" / "foo" in
 
   (* start from scratch *)
   Alcotest.(check counter) "counter: 1"
@@ -593,7 +590,7 @@ let test_startup dk =
   Alcotest.(check counter) "counter: 5"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
-  let status = find_status t ~user ~repo in
+  let status = find_status t repo in
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
 
   (* receive new webhooks *)

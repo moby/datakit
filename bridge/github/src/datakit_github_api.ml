@@ -12,13 +12,13 @@ module PR = struct
 
   include PR
 
-  let of_gh ~user ~repo pr = {
-    user; repo;
-    number = pr.pull_number;
-    state  = pr.pull_state;
-    head   = pr.pull_head.branch_sha;
-    title  = pr.pull_title;
-  }
+  let of_gh repo pr =
+    let head = { Commit.repo; id = pr.pull_head.branch_sha } in
+    { head;
+      number = pr.pull_number;
+      state  = pr.pull_state;
+      title  = pr.pull_title;
+    }
 
   let to_gh pr = {
     update_pull_title = Some pr.title;
@@ -26,13 +26,15 @@ module PR = struct
     update_pull_state = Some pr.state;
   }
 
-  let of_event ~user ~repo pr = {
-    user; repo;
-    number = pr.pull_request_event_number;
-    state  = pr.pull_request_event_pull_request.pull_state;
-    head   = pr.pull_request_event_pull_request.pull_head.branch_sha;
-    title  = pr.pull_request_event_pull_request.pull_title;
-  }
+  let of_event repo pr =
+    let id = pr.pull_request_event_pull_request.pull_head.branch_sha in
+    let head = { Commit.repo; id } in
+    {
+      head;
+      number = pr.pull_request_event_number;
+      state  = pr.pull_request_event_pull_request.pull_state;
+      title  = pr.pull_request_event_pull_request.pull_title;
+    }
 
 end
 
@@ -48,13 +50,13 @@ module Status = struct
     | ["default"] -> None
     | l           -> Some (String.concat ~sep:"/" l)
 
-  let of_gh ~user ~repo ~commit s = {
-    user; repo; commit;
-    context     = to_list s.status_context;
-    url         = s.status_target_url;
-    description = s.status_description;
-    state       = s.status_state;
-  }
+  let of_gh commit s =
+    { commit;
+      context     = to_list s.status_context;
+      url         = s.status_target_url;
+      description = s.status_description;
+      state       = s.status_state;
+    }
 
   let to_gh s = {
     new_status_context     = of_list s.context;
@@ -63,14 +65,14 @@ module Status = struct
     new_status_state       = s.state;
   }
 
-  let of_event ~user ~repo s = {
-    user; repo;
-    context     = to_list s.status_event_context;
-    url         = s.status_event_target_url;
-    description = s.status_event_description;
-    state       = s.status_event_state;
-    commit      = s.status_event_sha;
-  }
+  let of_event repo s =
+    let commit = { Commit.repo; id = s.status_event_sha } in
+    { commit;
+      context     = to_list s.status_event_context;
+      url         = s.status_event_target_url;
+      description = s.status_event_description;
+      state       = s.status_event_state;
+    }
 
 end
 
@@ -81,17 +83,13 @@ module Ref = struct
   let to_list s = match String.cuts ~empty:false ~sep:"/" s with
     | "refs" :: l | l -> l
 
-  let of_gh ~user ~repo r = {
-    user; repo;
-    name = to_list r.git_ref_name;
-    head = r.git_ref_obj.obj_sha;
-  }
+  let of_gh repo r =
+    let head = { Commit.repo; id = r.git_ref_obj.obj_sha } in
+    { head; name = to_list r.git_ref_name }
 
-  let of_event ~user ~repo r = {
-    user; repo;
-    name = to_list r.push_event_ref;
-    head = r.push_event_head;
-  }
+  let of_event repo r =
+    let head = { Commit.repo; id = r.push_event_head } in
+    { head; name = to_list r.push_event_ref }
 
 end
 
@@ -100,14 +98,14 @@ module Event = struct
   include Event
 
   let of_gh e =
-    let user, repo = match String.cut ~sep:"/" e.event_repo.repo_name with
+    let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
       | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
-      | Some r -> r
+      | Some (user, repo) -> { Repo.user; repo }
     in
     match e.event_payload with
-    | `Status s       -> Status (Status.of_event ~user ~repo s)
-    | `PullRequest pr -> PR (PR.of_event ~user ~repo pr)
-    | `Push p         -> Ref (Ref.of_event ~user ~repo p)
+    | `Status s       -> Status (Status.of_event repo s)
+    | `PullRequest pr -> PR (PR.of_event repo pr)
+    | `Push p         -> Ref (Ref.of_event repo p)
     | `Create _       -> Other "create"
     | `Delete _       -> Other "delete"
     | `Download       -> Other "download"
@@ -137,7 +135,7 @@ let user_exists token ~user =
   with Github.Message _ ->
     Lwt.return_false
 
-let repo_exists token ~user ~repo =
+let repo_exists token { Repo.user; repo } =
   try
     Github.Repo.info ~token ~user ~repo ()
     |> run
@@ -149,7 +147,7 @@ let repos token ~user =
   Github.User.repositories ~token ~user ()
   |> Github.Stream.to_list
   |> run
-  >|= List.map (fun r -> r.repository_name)
+  >|= List.map (fun r -> { Repo.user; repo = r.repository_name})
 
 let list_dedup f l =
   let tbl = Hashtbl.create (List.length l) in
@@ -160,39 +158,49 @@ let list_dedup f l =
     ) [] l
   |> List.rev
 
-let status token ~user ~repo ~commit =
-  Github.Status.for_ref ~token ~user ~repo ~git_ref:commit ()
+let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
+
+let status token commit =
+  let user, repo = user_repo commit in
+  let git_ref = Commit.id commit in
+  Github.Status.for_ref ~token ~user ~repo ~git_ref ()
   |> Github.Stream.to_list
   |> run
   >|= fun l -> list_dedup (fun s -> s.status_context) l
-  |> List.map (Status.of_gh ~user ~repo ~commit)
+  |> List.map (Status.of_gh commit)
 
 let set_status token status =
   let new_status = Status.to_gh status in
-  let { Status.user; repo; commit; _ } = status in
-  Github.Status.create ~token ~user ~repo ~sha:commit ~status:new_status ()
+  let user, repo = user_repo (Status.commit status) in
+  let sha = Status.commit_id status in
+  Github.Status.create ~token ~user ~repo ~sha ~status:new_status ()
   |> run
   >|= ignore
+
+let user_repo pr = user_repo (PR.commit pr)
 
 let set_pr token pr =
   let new_pr = PR.to_gh pr in
-  let { PR.user; repo; number; _ } = pr in
-  Github.Pull.update ~token ~user ~repo ~num:number ~update_pull:new_pr ()
+  let user, repo = user_repo pr in
+  let num = PR.number pr in
+  Github.Pull.update ~token ~user ~repo ~num ~update_pull:new_pr ()
   |> run
   >|= ignore
 
-let prs token ~user ~repo =
+let prs token r =
+  let { Repo.user; repo } = r in
   Github.Pull.for_repo ~token ~state:`Open ~user ~repo ()
   |> Github.Stream.to_list
   |> run
-  >|= List.map (PR.of_gh ~user ~repo)
+  >|= List.map (PR.of_gh r)
 
-let refs token ~user ~repo =
+let refs token r =
+  let { Repo.user; repo } = r in
   let refs ty =
     Github.Repo.refs ~ty ~token ~user ~repo ()
     |> Github.Stream.to_list
     |> run
-    >|= List.map (Ref.of_gh ~user ~repo)
+    >|= List.map (Ref.of_gh r)
   in
   refs "heads" >>= fun heads ->
   Logs.debug (fun l -> l "heads=%a" Fmt.(Dump.list Ref.pp) heads);
@@ -200,7 +208,8 @@ let refs token ~user ~repo =
   Logs.debug (fun l -> l "tags=%a" Fmt.(Dump.list Ref.pp) tags);
   heads @ tags
 
-let events token ~user ~repo =
+let events token r =
+  let { Repo.user; repo } = r in
   let open Lwt.Infix in
   let events = Github.Event.for_repo ~token ~user ~repo () in
   Github.Monad.run @@ Github.Stream.to_list events >>= fun events ->

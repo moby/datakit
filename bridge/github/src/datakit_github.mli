@@ -33,6 +33,22 @@ module Repo: sig
 
 end
 
+module Commit: sig
+
+  type t = { user :string; repo: string; id: string }
+  (** The type for commits. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for commits. *)
+
+  module Set: sig
+    include Set.S with type elt = t
+    val pp: t Fmt.t
+  end
+  (** Sets of commits. *)
+
+end
+
 module PR: sig
 
   (** The type for pull-requests values. *)
@@ -174,8 +190,8 @@ module Snapshot: sig
   (** The empty snapshot. *)
 
   val create:
-    ?repos:Repo.Set.t -> status:Status.Set.t -> prs:PR.Set.t -> refs:Ref.Set.t
-    -> unit -> t
+    repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
+    prs:PR.Set.t -> refs:Ref.Set.t -> unit -> t
   (** [create ?repos ~status ~prs ()] is a new snapshot [t] with
       pull-requests [prs], build status [status] and repositories the
       unions of [repos], the repositories of [status] and [prs]. *)
@@ -191,6 +207,9 @@ module Snapshot: sig
 
   val repos: t -> Repo.Set.t
   (** [repos t] are [t]'s repository. *)
+
+  val commits: t -> Commit.Set.t
+  (** [commits t] are [t]'s commits. *)
 
   val prs: t -> PR.Set.t
   (** [prs t] are [t]'s pull-requests. *)
@@ -274,7 +293,7 @@ module Conv (DK: Datakit_S.CLIENT): sig
   (** [status t ~user ~repo ~commit ~context] is the commit's
       build status for the repository [user/repo] in the tree [t]. *)
 
-  val statuses: ?repos:Repo.Set.t -> tree -> Status.Set.t result
+  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t result
   (** [statuses t] is the list of status stored in [t].. *)
 
   val update_status: DK.Transaction.t -> Status.t -> unit result

@@ -78,6 +78,8 @@ module Commit = struct
 
   let pp ppf t = Fmt.pf ppf "%s/%s:%s" t.user t.repo t.id
 
+  let repo { user; repo; _ } = { Repo.user; repo }
+
   module Set = Set(struct
       type nonrec t = t
       let pp = pp
@@ -237,8 +239,13 @@ open Datakit_path.Infix
 
 let ( >>*= ) x f =
   x >>= function
-  | Ok x -> f x
+  | Ok x         -> f x
   | Error _ as e -> Lwt.return e
+
+let ( >|*= ) x f =
+  x >|= function
+  | Ok x         -> Ok (f x)
+  | Error _ as e -> e
 
 let ok x = Lwt.return (Ok x)
 
@@ -259,43 +266,57 @@ let list_map_s f l =
 module Snapshot = struct
 
   type t = {
-    repos : Repo.Set.t;
-    status: Status.Set.t;
-    prs   : PR.Set.t;
-    refs  : Ref.Set.t;
+    repos  : Repo.Set.t;
+    commits: Commit.Set.t;
+    status : Status.Set.t;
+    prs    : PR.Set.t;
+    refs   : Ref.Set.t;
   }
 
   let repos t = t.repos
   let status t = t.status
   let prs t = t.prs
   let refs t = t.refs
+  let commits t = t.commits
 
   let empty =
     { repos = Repo.Set.empty;
+      commits = Commit.Set.empty;
       status = Status.Set.empty;
       prs = PR.Set.empty;
       refs = Ref.Set.empty }
 
   let union x y = {
-    repos  = Repo.Set.union x.repos y.repos;
-    status = Status.Set.union x.status y.status;
-    prs    = PR.Set.union x.prs y.prs;
-    refs   = Ref.Set.union x.refs y.refs;
+    repos   = Repo.Set.union x.repos y.repos;
+    commits = Commit.Set.union x.commits y.commits;
+    status  = Status.Set.union x.status y.status;
+    prs     = PR.Set.union x.prs y.prs;
+    refs    = Ref.Set.union x.refs y.refs;
   }
 
-  let create ?(repos=Repo.Set.empty) ~status ~prs ~refs () =
-    let repos =
-      Status.Set.fold (fun x s -> Repo.Set.add (Status.repo x) s) status repos
+  let create ~repos  ~commits ~status ~prs ~refs () =
+    let repos, commits =
+      Status.Set.fold (fun x (repos, commits) ->
+          Repo.Set.add (Status.repo x) repos,
+          Commit.Set.add (Status.commit x) commits
+        ) status (repos, commits)
     in
-    let repos =
-      PR.Set.fold (fun x s -> Repo.Set.add (PR.repo x) s) prs repos
+    let repos, commits =
+      PR.Set.fold (fun x (repos, commits) ->
+          Repo.Set.add (PR.repo x) repos,
+          Commit.Set.add (PR.commit x) commits
+        ) prs (repos, commits)
     in
-    let repos =
-      Ref.Set.fold (fun x s -> Repo.Set.add (Ref.repo x) s) refs repos
+    let repos, commits =
+      Ref.Set.fold (fun x (repos, commits) ->
+          Repo.Set.add (Ref.repo x) repos,
+          Commit.Set.add (Ref.commit x) commits
+        ) refs (repos, commits)
     in
-    { repos; status; prs; refs }
+    { repos; commits; status; prs; refs }
 
   let compare_repos x y = Repo.Set.compare x.repos y.repos
+  let compare_commits x y = Commit.Set.compare x.commits y.commits
   let compare_status x y = Status.Set.compare x.status y.status
   let compare_prs x y = PR.Set.compare x.prs y.prs
   let compare_refs x y = Ref.Set.compare x.refs y.refs
@@ -309,15 +330,16 @@ module Snapshot = struct
 
   let compare = compare_fold [
       compare_repos;
+      compare_commits;
       compare_status;
       compare_prs;
       compare_refs
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "@[repos: %a@, status: %a@, prs: %a@, refs: %a]"
-      Repo.Set.pp t.repos Status.Set.pp t.status PR.Set.pp t.prs
-      Ref.Set.pp t.refs
+    Fmt.pf ppf "@[repos: %a@, commits: %a@, status: %a@, prs: %a@, refs: %a]"
+      Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
+      PR.Set.pp t.prs Ref.Set.pp t.refs
 
 end
 
@@ -454,6 +476,36 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   type tree = E: (module TREE with type t = 'a) * 'a -> tree
 
+  let error fmt = Fmt.kstrf (fun str -> DK.error "conv: %s" str) fmt
+
+  let walk
+      (type elt) (type t) (module Set: SET with type elt = elt and type t = t)
+      tree root (file, fn) =
+    let E ((module Tree), t) = tree in
+    let rec aux context =
+      let ctx = match Datakit_path.of_steps context with
+        | Ok x    -> ok x
+        | Error e -> error "%s" e
+      in
+      ctx >>*= fun ctx ->
+      let dir = root /@ ctx in
+      Tree.exists_dir t dir >>*= fun exists ->
+      if not exists then ok Set.empty
+      else (
+        Tree.read_dir t dir >>*= fun child ->
+        list_map_s (fun c -> aux (context @ [c])) child >>*= fun child ->
+        let child = List.fold_left Set.union Set.empty child in
+        Tree.exists_file t (dir / file) >>*= fun exists ->
+        if exists then
+          fn context >>*= function
+          | None   -> ok child
+          | Some s -> ok (Set.add s child)
+        else
+          ok child
+      )
+    in
+    aux []
+
   let tree_of_commit c =
     let module Tree = struct
       include DK.Tree
@@ -467,8 +519,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       let diff x = DK.Transaction.diff tr x >>*= fun d -> ok (Diff.changes d)
     end in
     E ((module Tree), tr)
-
-  let error fmt = Fmt.kstrf (fun str -> DK.error "conv: %s" str) fmt
 
   let empty = Datakit_path.empty
 
@@ -565,6 +615,26 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     >>*= fun prs ->
     ok (List.fold_left PR.Set.union PR.Set.empty prs)
 
+  (* Commits *)
+
+  let commits_of_repo tree { Repo.user; repo } =
+    Log.debug (fun l -> l "commits_of_repo %s/%s" user repo);
+    let E ((module Tree), t) = tree in
+    let dir = empty / user / repo / "commit" in
+    Tree.exists_dir t dir >>*= fun exists ->
+    if not exists then ok Commit.Set.empty
+    else
+      Tree.read_dir t dir >|*= fun childs ->
+      List.fold_left (fun s id ->
+          Commit.Set.add { Commit.user; repo; id } s
+        ) Commit.Set.empty childs
+
+  let commits ?repos:rs tree =
+    Log.debug (fun l -> l "commits");
+    (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
+    list_map_s (commits_of_repo tree) (Repo.Set.elements repos) >>*= fun rs ->
+    ok (List.fold_left Commit.Set.union Commit.Set.empty rs)
+
   (* Status *)
 
   let update_status t s =
@@ -614,57 +684,22 @@ module Conv (DK: Datakit_S.CLIENT) = struct
         Some { Status.user; repo; state; commit; context; description; url }
         |> ok
 
-  let walk
-      (type elt) (type t) (module Set: SET with type elt = elt and type t = t)
-      tree root (file, fn) =
-    let E ((module Tree), t) = tree in
-    let rec aux context =
-      let ctx = match Datakit_path.of_steps context with
-        | Ok x    -> ok x
-        | Error e -> error "%s" e
-      in
-      ctx >>*= fun ctx ->
-      let dir = root /@ ctx in
-      Tree.exists_dir t dir >>*= fun exists ->
-      if not exists then ok Set.empty
-      else (
-        Tree.read_dir t dir >>*= fun child ->
-        list_map_s (fun c -> aux (context @ [c])) child >>*= fun child ->
-        let child = List.fold_left Set.union Set.empty child in
-        Tree.exists_file t (dir / file) >>*= fun exists ->
-        if exists then
-          fn context >>*= function
-          | None   -> ok child
-          | Some s -> ok (Set.add s child)
-        else
-          ok child
-      )
-    in
-    aux []
+  let statuses_of_commits tree commits =
+    Log.debug (fun l -> l "status_of_commits");
+    list_map_s (fun { Commit.user; repo; id } ->
+        let dir = empty / user / repo / "commit" in
+        Log.debug (fun l -> l "status_of_commit %a/%s" Datakit_path.pp dir id);
+        let dir = dir / id / "status" in
+        walk (module Status.Set) tree dir
+          ("state", fun context -> status tree ~user ~repo ~commit:id ~context)
+      ) (Commit.Set.elements commits)
+    >>*= fun status ->
+    ok (List.fold_left Status.Set.union Status.Set.empty status)
 
-  let statuses_of_repo tree { Repo.user; repo } =
-    Log.debug (fun l -> l "status_of_repo");
-    let E ((module Tree), t) = tree in
-    let dir = empty / user / repo / "commit" in
-    Tree.exists_dir t dir >>*= fun exists ->
-    if not exists then ok Status.Set.empty
-    else
-      Tree.read_dir t dir >>*=
-      list_map_s (fun commit ->
-          Log.debug (fun l ->
-              l "status_of_repo %a %s" Datakit_path.pp dir commit);
-          let dir = dir / commit / "status" in
-          walk (module Status.Set) tree dir
-            ("state", fun context -> status tree ~user ~repo ~commit ~context)
-        )
-      >>*= fun status ->
-      ok (List.fold_left Status.Set.union Status.Set.empty status)
-
-  let statuses ?repos:rs tree =
+  let statuses ?commits:cs tree =
     Log.debug (fun l -> l "status");
-    (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_s (statuses_of_repo tree) (Repo.Set.elements repos) >>*= fun ss ->
-    ok (List.fold_left Status.Set.union Status.Set.empty ss)
+    (match cs with None -> commits tree | Some c -> ok c) >>*= fun commits ->
+    statuses_of_commits tree commits
 
   (* Refs *)
 
@@ -759,10 +794,11 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     if not is_dir then ok Snapshot.empty
     else
       repos t >>*= fun repos ->
+      commits ~repos t >>*= fun commits ->
       prs ~repos t >>*= fun prs ->
-      statuses ~repos t >>*= fun status ->
-      refs ~repos t >>*= fun refs ->
-      ok { Snapshot.repos; status; prs; refs }
+      statuses ~commits t >>*= fun status ->
+      refs ~repos t >|*= fun refs ->
+      Snapshot.create ~repos ~status ~prs ~refs ~commits ()
 
   (* compute all the active hooks for a given DataKit commit *)
   let snapshot ?old tree =
@@ -839,12 +875,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     ok { snapshot; tr; head; name }
 
   let state ~old ~pub ~priv =
+    if old = None then Log.info (fun l -> l "Loading full state");
     let mk b = (b.head, b.snapshot) in
     let pub_o  = match old with None -> None | Some o -> Some (mk o.pub)  in
     let priv_o = match old with None -> None | Some o -> Some (mk o.priv) in
     branch ?old:pub_o pub   >>*= fun pub ->
-    branch ?old:priv_o priv >>*= fun priv ->
-    ok { pub; priv }
+    branch ?old:priv_o priv >|*= fun priv ->
+    { pub; priv }
 
   (** Import from GitHub *)
 
@@ -879,14 +916,14 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         Status.Set.of_list
       ) (Commit.Set.elements commits)
     >>= fun status ->
-    let status = List.fold_left Status.Set.union Status.Set.empty status in
-    ok {
-      Snapshot.
-      repos  = Repo.Set.union t.Snapshot.repos (Repo.Set.of_list repos);
-      prs    = PR.Set.union t.Snapshot.prs prs;
-      status = Status.Set.union t.Snapshot.status status;
-      refs   = Ref.Set.union t.Snapshot.refs refs;
-    }
+    let status  = List.fold_left Status.Set.union Status.Set.empty status in
+    let commits = Commit.Set.union t.Snapshot.commits commits in
+    let repos   = Repo.Set.union t.Snapshot.repos (Repo.Set.of_list repos) in
+    let prs     = PR.Set.union t.Snapshot.prs prs in
+    let status  = Status.Set.union t.Snapshot.status status in
+    let refs    = Ref.Set.union t.Snapshot.refs refs in
+    Snapshot.create  ~repos  ~commits ~status ~prs  ~refs ()
+    |> ok
 
   (** Prune *)
 
@@ -897,52 +934,61 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "prune");
     let status = Status.Set.index t.Snapshot.status Status.repo in
     let prs = PR.Set.index t.Snapshot.prs PR.repo in
+    let refs = Ref.Set.index t.Snapshot.refs Ref.repo in
+    let commits = Commit.Set.index t.Snapshot.commits Commit.repo in
+    let find r x = try Hashtbl.find x r with Not_found -> []  in
     let aux repo =
-      let status = try Hashtbl.find status repo with Not_found -> [] in
-      let prs = try Hashtbl.find prs repo with Not_found -> [] in
+      let status  = find repo status  |> Status.Set.of_list in
+      let prs     = find repo prs     |> PR.Set.of_list in
+      let refs    = find repo refs    |> Ref.Set.of_list in
+      let commits = find repo commits |> Commit.Set.of_list in
       Log.debug (fun l -> l "prune %a" Repo.pp repo);
-      Log.debug (fun l ->
-          l "status:@ %a@ prs:@ %a"
-            Fmt.(Dump.list Status.pp) status Fmt.(Dump.list PR.pp) prs
-        );
-      (* 1. Prune closed PRs. *)
+      Log.debug
+        (fun l -> l "status:@ %a@ prs:@ %a" Status.Set.pp status PR.Set.pp prs);
       let open_prs, closed_prs =
-        List.fold_left (fun (open_prs, closed_prs) pr ->
+        PR.Set.fold (fun pr (open_prs, closed_prs) ->
             match pr.PR.state with
             | `Open   -> PR.Set.add pr open_prs, closed_prs
             | `Closed -> open_prs, PR.Set.add pr closed_prs
-          ) (PR.Set.empty, PR.Set.empty) prs
-      in
-      let is_open s =
-        PR.Set.exists (fun pr ->
-            pr.PR.head = s.Status.commit && pr.PR.state = `Open
-          ) open_prs ||
-        Ref.Set.exists (fun r ->
-            r.Ref.head = s.Status.commit
-          ) t.Snapshot.refs
+          ) prs (PR.Set.empty, PR.Set.empty)
       in
       Log.debug (fun l -> l "open_prs:%a" PR.Set.pp open_prs);
       Log.debug (fun l -> l "closed_prs:%a" PR.Set.pp closed_prs);
-      (* 2. Prune commits which doesn't belong to an open PR. *)
+      let is_status_open s =
+        PR.Set.exists (fun pr ->
+            pr.PR.head = s.Status.commit && pr.PR.state = `Open
+          ) open_prs ||
+        Ref.Set.exists (fun r -> r.Ref.head = s.Status.commit) refs
+      in
       let open_status, closed_status =
-        List.fold_left (fun (open_status, closed_status) s ->
-            match is_open s with
-            | false ->
-              open_status, Status.Set.add s closed_status
-            | true  ->
-              Status.Set.add s open_status, closed_status
-          ) (Status.Set.empty, Status.Set.empty) status
+        Status.Set.fold (fun s (open_status, closed_status) ->
+            match is_status_open s with
+            | false -> open_status, Status.Set.add s closed_status
+            | true  -> Status.Set.add s open_status, closed_status
+          ) status (Status.Set.empty, Status.Set.empty)
       in
       Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
       Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
-      let t = {
-        Snapshot.repos = Repo.Set.singleton repo ;
-        status         = open_status;
-        prs            = open_prs;
-        refs           = t.Snapshot.refs;
-      } in
+      let is_commit_open c =
+        Status.Set.exists (fun s -> Status.commit s = c) open_status
+      in
+      let open_commits, closed_commits =
+        Commit.Set.fold (fun c (open_commit, closed_commit) ->
+            match is_commit_open c with
+            | false -> open_commit, Commit.Set.add c closed_commit
+            | true  -> Commit.Set.add c open_commit, closed_commit
+          ) commits (Commit.Set.empty, Commit.Set.empty)
+      in
+      let repos   = Repo.Set.singleton repo in
+      let status  = open_status in
+      let prs     = open_prs in
+      let commits = open_commits in
+      let t = Snapshot.create ~repos ~status ~prs ~refs ~commits () in
       let cleanup =
-        if PR.Set.is_empty closed_prs && Status.Set.is_empty closed_status then
+        if PR.Set.is_empty closed_prs
+        && Status.Set.is_empty closed_status
+        && Commit.Set.is_empty closed_commits
+        then
           None
         else
           let root = Datakit_path.empty / repo.Repo.user / repo.Repo.repo in

@@ -245,6 +245,9 @@ let events1 = [
 let prs0    = [pr1; pr3]
 let status0 = [s1; s2; s3; s4]
 let refs0   = [ref1]
+let repos0   = [ { Repo.user; repo } ]
+let commits0 =
+  [ { Commit.user; repo; id = "foo" }; { Commit.user; repo; id = "bar" } ]
 
 let status_state: Status_state.t Alcotest.testable =
   (module struct include Status_state let equal = (=) end)
@@ -299,7 +302,9 @@ let test_snapshot () =
         let prs = PR.Set.of_list prs0 in
         let status = Status.Set.of_list status0 in
         let refs = Ref.Set.of_list refs0 in
-        Snapshot.create ~prs ~status ~refs ()
+        let repos = Repo.Set.of_list repos0 in
+        let commits = Commit.Set.of_list commits0 in
+        Snapshot.create ~repos ~commits ~prs ~status ~refs ()
       in
       Conv.snapshot Conv.(tree_of_commit head) >>*= fun sh ->
       Alcotest.(check snapshot) "snap transaction" se s;

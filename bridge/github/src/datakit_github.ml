@@ -1157,6 +1157,41 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       in
       ok (t, Some f)
 
+  let sync_repos ~token ~pub ~priv t repos =
+    import_repos ~token t.priv.snapshot repos >>*= fun priv_s ->
+    prune priv_s >>*= fun (priv_s, cleanups) ->
+    maybe_clean t.priv.tr cleanups >>*= fun () ->
+    Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
+    Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
+    Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
+    DK.Transaction.diff t.priv.tr t.priv.head >>*= fun d ->
+    let d = Diff.changes d in
+    begin
+      if cleanups = None && Diff.Set.is_empty d then
+        DK.Transaction.abort t.priv.tr >>= ok
+      else
+        let message = Fmt.strf "Resync for %a" Repo.Set.pp repos in
+        DK.Transaction.commit t.priv.tr ~message
+    end >>*= fun () ->
+    DK.Transaction.abort t.pub.tr >>= fun () ->
+    state ~old:(Some t) ~pub ~priv >>*= fun t ->
+    Log.debug (fun l -> l "first_sync: initial state %a" pp t);
+    DK.Transaction.abort t.priv.tr >>= fun () ->
+    merge t >>*= fun () ->
+    state ~old:(Some t) ~pub ~priv >>*= fun t ->
+    prune t.pub.snapshot >>*= fun (_, cleanups) ->
+    begin match cleanups with
+      | None   -> ok t
+      | Some f ->
+        f t.pub.tr >>*= fun () ->
+        DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
+        DK.Transaction.abort t.priv.tr >>= fun () ->
+        state ~old:(Some t) ~pub ~priv
+    end >>*= fun t ->
+    Log.debug (fun l -> l "first_sync: after merge %a" pp t);
+    abort t >>= fun () ->
+    ok t
+
   (* On startup, build the initial state by looking at the active
      repository in the public and private branch. Import the new
      repositories in the private branch, then merge it in the public
@@ -1175,41 +1210,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
     else
-      import_repos ~token t.priv.snapshot repos >>*= fun priv_s ->
-      prune priv_s >>*= fun (priv_s, cleanups) ->
-      maybe_clean t.priv.tr cleanups >>*= fun () ->
-      Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
-      Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
-      Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
-      DK.Transaction.diff t.priv.tr t.priv.head >>*= fun d ->
-      let d = Diff.changes d in
-      begin
-        if cleanups = None && Diff.Set.is_empty d then
-          DK.Transaction.abort t.priv.tr >>= ok
-        else
-          let message = Fmt.strf "Resync for %a" Repo.Set.pp repos in
-          DK.Transaction.commit t.priv.tr ~message
-      end >>*= fun () ->
-      DK.Transaction.abort t.pub.tr >>= fun () ->
-      state ~old:(Some t) ~pub ~priv >>*= fun t ->
-      Log.debug (fun l -> l "first_sync: initial state %a" pp t);
-      DK.Transaction.abort t.priv.tr >>= fun () ->
-      merge t >>*= fun () ->
-      state ~old:(Some t) ~pub ~priv >>*= fun t ->
+      sync_repos ~token ~pub ~priv t repos >>*= fun t ->
       call_github_api ~token ~dry_updates ~old:t.priv.snapshot t.pub.snapshot
-      >>*= fun () ->
-      prune t.pub.snapshot >>*= fun (_, cleanups) ->
-      begin match cleanups with
-        | None   -> ok t
-        | Some f ->
-          f t.pub.tr >>*= fun () ->
-          DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
-          DK.Transaction.abort t.priv.tr >>= fun () ->
-          state ~old:(Some t) ~pub ~priv
-      end >>*= fun t ->
-      Log.debug (fun l -> l "first_sync: after merge %a" pp t);
-      abort t >>= fun () ->
-      ok t
+      >>*= fun () -> ok t
 
   let repos old t =
     let old = Snapshot.repos old.snapshot in
@@ -1224,37 +1227,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     call_github_api ~dry_updates ~token ~old:old.pub.snapshot t.pub.snapshot
     >>*= fun () ->
     let repos = Repo.Set.union (repos old.pub t.pub) (repos old.priv t.priv) in
-    let merge t =
-      prune t.priv.snapshot >>*= fun (_, cleanups) ->
-      match cleanups with
-      | None ->
-        Log.debug (fun l -> l "nothing to prune");
-        (* nothing to prune *)
-        DK.Transaction.abort t.priv.tr >>= fun () ->
-        merge t
-      | Some fn ->
-        (* the private branch needs some cleanup *)
-        fn t.priv.tr >>*= fun () ->
-        let message = Fmt.strf "Pruning %s" t.priv.name in
-        DK.Transaction.abort t.pub.tr >>= fun () ->
-        DK.Transaction.commit t.priv.tr ~message
-    in
-    if Repo.Set.is_empty repos then merge t >>*= fun () -> ok t
-    else
-      (* we have new repositories to watch! import them in the private
-         branch. *)
-      import_repos t.priv.snapshot ~token repos >>*= fun s ->
-      Conv.update_prs t.priv.tr s.Snapshot.prs >>*= fun () ->
-      Conv.update_statuses t.priv.tr s.Snapshot.status >>*= fun () ->
-      DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
-      DK.Transaction.abort t.pub.tr >>= fun () ->
-      if diff = [] then DK.Transaction.abort t.priv.tr >>= fun () -> ok t
-      else
-        let message = Fmt.strf "Import %a from GitHub" Repo.Set.pp repos in
-        DK.Transaction.commit t.priv.tr ~message >>*= fun () ->
-        state ~old:(Some t) ~pub ~priv >>*= fun t ->
-        merge t >>*= fun () ->
-        ok t
+    sync_repos ~token ~pub ~priv t repos
 
   let sync_once ~dry_updates ~token ~pub ~priv old  =
     assert (DK.Transaction.closed old.priv.tr);

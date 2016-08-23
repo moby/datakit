@@ -335,6 +335,39 @@ module Snapshot = struct
       Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
       PR.Set.pp t.prs Ref.Set.pp t.refs
 
+  let remove_pr t (r, id) =
+    let keep pr = r  <> PR.repo pr || id <>  pr.PR.number in
+    { t with prs = PR.Set.filter keep t.prs }
+
+  let replace_pr t pr =
+    let id = PR.repo pr, pr.PR.number in
+    let t = remove_pr t id in
+    let repos = Repo.Set.add (PR.repo pr) t.repos in
+    let prs   = PR.Set.add pr t.prs in
+    { t with repos; prs }
+
+  let remove_status t (s, l) =
+    let keep x = s <> Status.commit x || l <> x.Status.context in
+    { t with status = Status.Set.filter keep t.status }
+
+  let replace_status t s =
+    let cc = s.Status.commit, s.Status.context in
+    let t = remove_status t cc in
+    let repos  = Repo.Set.add (Status.repo s) t.repos in
+    let status = Status.Set.add s t.status in
+    { t with repos; status }
+
+  let remove_ref t (r, l) =
+    let keep x = r <> Ref.repo x || l <> x.Ref.name in
+    { t with refs = Ref.Set.filter keep t.refs }
+
+  let replace_ref t r =
+    let name = Ref.repo r, r.Ref.name in
+    let t = remove_ref t name in
+    let repos = Repo.Set.add (Ref.repo r) t.repos in
+    let refs = Ref.Set.add r t.refs in
+    { t with repos; refs }
+
 end
 
 module Diff = struct
@@ -366,49 +399,8 @@ module Diff = struct
       let pp = pp
     end)
 
-  (** PR diffs *)
-
-  let remove_pr t (r, id) =
-    let keep pr = r  <> PR.repo pr || id <>  pr.PR.number in
-    { t with Snapshot.prs = PR.Set.filter keep t.Snapshot.prs }
-
-  let replace_pr t pr =
-    let id = PR.repo pr, pr.PR.number in
-    let t = remove_pr t id in
-    let repos = Repo.Set.add (PR.repo pr) t.Snapshot.repos in
-    let prs   = PR.Set.add pr t.Snapshot.prs in
-    { t with Snapshot.repos; prs }
-
   let path_of_diff = function
     | `Added f | `Removed f | `Updated f -> Datakit_path.unwrap f
-
-  (** Status diffs *)
-
-  let remove_status t (s, l) =
-    let keep x = s <> Status.commit x || l <> x.Status.context in
-    { t with Snapshot.status = Status.Set.filter keep t.Snapshot.status }
-
-  let replace_status t s =
-    let cc = s.Status.commit, s.Status.context in
-    let t = remove_status t cc in
-    let repos  = Repo.Set.add (Status.repo s) t.Snapshot.repos in
-    let status = Status.Set.add s t.Snapshot.status in
-    { t with Snapshot.repos; status }
-
-  (** References diff *)
-
-  let remove_ref t (r, l) =
-    let keep x = r <> Ref.repo x || l <> x.Ref.name in
-    { t with Snapshot.refs = Ref.Set.filter keep t.Snapshot.refs }
-
-  let replace_ref t r =
-    let name = Ref.repo r, r.Ref.name in
-    let t = remove_ref t name in
-    let repos = Repo.Set.add (Ref.repo r) t.Snapshot.repos in
-    let refs = Ref.Set.add r t.Snapshot.refs in
-    { t with Snapshot.repos; refs }
-
-  (** Repositories diff *)
 
   let repos diff =
     List.fold_left (fun acc d ->
@@ -729,18 +721,18 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   let apply_pr_diff t tree (r, id as x)  =
     pr tree r id >>*= function
-    | None    -> Diff.remove_pr t x |> ok
-    | Some pr -> Diff.replace_pr t pr |> ok
+    | None    -> Snapshot.remove_pr t x |> ok
+    | Some pr -> Snapshot.replace_pr t pr |> ok
 
   let apply_status_diff t tree (c, context as x) =
     status tree c context >>*= function
-    | None   -> Diff.remove_status t x |> ok
-    | Some s -> Diff.replace_status t s |> ok
+    | None   -> Snapshot.remove_status t x |> ok
+    | Some s -> Snapshot.replace_status t s |> ok
 
   let apply_ref_diff t tree (r, name as x) =
     ref_ tree r name >>*= function
-    | None   -> Diff.remove_ref t x |> ok
-    | Some r -> Diff.replace_ref t r |> ok
+    | None   -> Snapshot.remove_ref t x |> ok
+    | Some r -> Snapshot.replace_ref t r |> ok
 
   let apply (t:Snapshot.t) (tree, diff) =
     let t = ref t in

@@ -142,6 +142,9 @@ module Ref: sig
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
+  val commit: t -> Commit.t
+  (** [commit t] is [t]'s commit. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
 
@@ -217,8 +220,8 @@ module Snapshot: sig
 
   val create:
     repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
-    prs:PR.Set.t -> refs:Ref.Set.t -> unit -> t
-  (** [create ?repos ~status ~prs ()] is a new snapshot [t] with
+    prs:PR.Set.t -> refs:Ref.Set.t -> t
+  (** [create ?repos ~status ~prs] is a new snapshot [t] with
       pull-requests [prs], build status [status] and repositories the
       unions of [repos], the repositories of [status] and [prs]. *)
 
@@ -246,6 +249,10 @@ module Snapshot: sig
   val refs: t -> Ref.Set.t
   (** [refs t] are [t]'s Git references. *)
 
+  val prune: t -> [`Clean | `Prune of t * PR.Set.t * Commit.Set.t]
+  (** [prune t] is either [`Clean] if the snapshot is clean or [`Prune
+      (t, prs, commits)] where [t] is a clean snapshot, [prs] are the pull
+      requests to close and [commits] the commits to close. *)
 end
 
 module Diff: sig

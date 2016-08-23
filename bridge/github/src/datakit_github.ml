@@ -288,7 +288,7 @@ module Snapshot = struct
     refs    = Ref.Set.union x.refs y.refs;
   }
 
-  let create ~repos  ~commits ~status ~prs ~refs () =
+  let create ~repos  ~commits ~status ~prs ~refs =
     let repos, commits =
       Status.Set.fold (fun x (repos, commits) ->
           Repo.Set.add (Status.repo x) repos,
@@ -335,38 +335,143 @@ module Snapshot = struct
       Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
       PR.Set.pp t.prs Ref.Set.pp t.refs
 
+  let remove_commit t (r, id) =
+    let keep x = r <> Commit.repo x || id <> Commit.id x in
+    { t with commits = Commit.Set.filter keep t.commits }
+
+  let add_commit c t =
+    let commits = Commit.Set.add c t.commits in
+    let repos   = Repo.Set.add (Commit.repo c) t.repos in
+    { t with repos; commits }
+
+  let replace_commit c t =
+    let id = Commit.repo c, Commit.id c in
+    add_commit c (remove_commit t id)
+
   let remove_pr t (r, id) =
     let keep pr = r  <> PR.repo pr || id <>  pr.PR.number in
     { t with prs = PR.Set.filter keep t.prs }
 
-  let replace_pr t pr =
+  let add_pr pr t =
+    let prs     = PR.Set.add pr t.prs in
+    let repos   = Repo.Set.add (PR.repo pr) t.repos in
+    { t with prs; repos }
+
+  let replace_pr pr t =
     let id = PR.repo pr, pr.PR.number in
-    let t = remove_pr t id in
-    let repos = Repo.Set.add (PR.repo pr) t.repos in
-    let prs   = PR.Set.add pr t.prs in
-    { t with repos; prs }
+    add_pr pr (remove_pr t id)
 
   let remove_status t (s, l) =
     let keep x = s <> Status.commit x || l <> x.Status.context in
     { t with status = Status.Set.filter keep t.status }
 
-  let replace_status t s =
+  let add_status s t =
+    let status  = Status.Set.add s t.status in
+    let repos   = Repo.Set.add (Status.repo s) t.repos in
+    let commits = Commit.Set.add (Status.commit s) t.commits in
+    { t with status; repos; commits }
+
+  let replace_status s t =
     let cc = s.Status.commit, s.Status.context in
-    let t = remove_status t cc in
-    let repos  = Repo.Set.add (Status.repo s) t.repos in
-    let status = Status.Set.add s t.status in
-    { t with repos; status }
+    add_status s (remove_status t cc)
 
   let remove_ref t (r, l) =
     let keep x = r <> Ref.repo x || l <> x.Ref.name in
     { t with refs = Ref.Set.filter keep t.refs }
 
-  let replace_ref t r =
+  let add_ref r t =
+    let refs    = Ref.Set.add r t.refs in
+    let repos   = Repo.Set.add (Ref.repo r) t.repos in
+    { t with refs; repos }
+
+  let replace_ref r t =
     let name = Ref.repo r, r.Ref.name in
-    let t = remove_ref t name in
-    let repos = Repo.Set.add (Ref.repo r) t.repos in
-    let refs = Ref.Set.add r t.refs in
-    { t with repos; refs }
+    add_ref r (remove_ref t name)
+
+  (* [prune t] is [t] with all the closed PRs pruned. *)
+  let prune t =
+    let status = Status.Set.index t.status Status.repo in
+    let prs = PR.Set.index t.prs PR.repo in
+    let refs = Ref.Set.index t.refs Ref.repo in
+    let commits = Commit.Set.index t.commits Commit.repo in
+    let find r x = try Hashtbl.find x r with Not_found -> []  in
+    let aux repo =
+      let status  = find repo status  |> Status.Set.of_list in
+      let prs     = find repo prs     |> PR.Set.of_list in
+      let refs    = find repo refs    |> Ref.Set.of_list in
+      let commits = find repo commits |> Commit.Set.of_list in
+      Log.debug (fun l -> l "prune %a" Repo.pp repo);
+      Log.debug
+        (fun l -> l "status:@ %a@ prs:@ %a" Status.Set.pp status PR.Set.pp prs);
+      let open_prs, closed_prs =
+        PR.Set.fold (fun pr (open_prs, closed_prs) ->
+            match pr.PR.state with
+            | `Open   -> PR.Set.add pr open_prs, closed_prs
+            | `Closed -> open_prs, PR.Set.add pr closed_prs
+          ) prs (PR.Set.empty, PR.Set.empty)
+      in
+      Log.debug (fun l -> l "open_prs:%a" PR.Set.pp open_prs);
+      Log.debug (fun l -> l "closed_prs:%a" PR.Set.pp closed_prs);
+      let is_status_open s =
+        PR.Set.exists (fun pr ->
+            pr.PR.head = s.Status.commit && pr.PR.state = `Open
+          ) open_prs ||
+        Ref.Set.exists (fun r -> r.Ref.head = s.Status.commit) refs
+      in
+      let open_status, closed_status =
+        Status.Set.fold (fun s (open_status, closed_status) ->
+            match is_status_open s with
+            | false -> open_status, Status.Set.add s closed_status
+            | true  -> Status.Set.add s open_status, closed_status
+          ) status (Status.Set.empty, Status.Set.empty)
+      in
+      Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
+      Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
+      let is_commit_open c =
+        Status.Set.exists (fun s -> Status.commit s = c) open_status
+      in
+      let open_commits, closed_commits =
+        Commit.Set.fold (fun c (open_commit, closed_commit) ->
+            match is_commit_open c with
+            | false -> open_commit, Commit.Set.add c closed_commit
+            | true  -> Commit.Set.add c open_commit, closed_commit
+          ) commits (Commit.Set.empty, Commit.Set.empty)
+      in
+      Log.debug (fun l -> l "open_commits:%a" Commit.Set.pp open_commits);
+      Log.debug (fun l -> l "closed_commits:%a" Commit.Set.pp closed_commits);
+      let repos   = Repo.Set.singleton repo in
+      let status  = open_status in
+      let prs     = open_prs in
+      let commits = open_commits in
+      let t = create ~repos ~status ~prs ~refs ~commits in
+      let cleanup =
+        if PR.Set.is_empty closed_prs && Commit.Set.is_empty closed_commits
+        then `Clean
+        else `Closed (closed_prs, closed_commits)
+      in
+      (t, cleanup)
+    in
+    (* status cannot be removed, so simply monitor updates in
+       [new_status]. *)
+    let result, prs, commits =
+      Repo.Set.fold (fun r (result, prs, commits) ->
+          let (x, c) = aux r in
+          let result = union result x in
+          let prs, commits = match c with
+            | `Clean         -> (prs, commits)
+            | `Closed (p, c) ->
+              let prs = PR.Set.union prs p in
+              let commits = Commit.Set.union commits c in
+              (prs, commits)
+          in
+          result, prs, commits
+        ) t.repos (empty, PR.Set.empty, Commit.Set.empty)
+    in
+    if PR.Set.is_empty prs && Commit.Set.is_empty commits then (
+      assert (compare t result = 0);
+      `Clean
+    ) else
+      `Prune (result, prs, commits)
 
 end
 
@@ -438,7 +543,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   let safe_remove t path =
     DK.Transaction.exists t path >>*= fun exists ->
-    if exists then DK.Transaction.remove t path else ok ()
+    if not exists then ok () else DK.Transaction.remove t path
 
   type nonrec 'a result = ('a, DK.error) result Lwt.t
 
@@ -518,8 +623,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
               ) acc repos
         ) (ok Repo.Set.empty) users
 
-  let repos_of_commit c = repos (tree_of_commit c)
-
   (* PRs *)
 
   let root r = empty / r.Repo.user / r.Repo.repo
@@ -591,6 +694,13 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     ok (List.fold_left PR.Set.union PR.Set.empty prs)
 
   (* Commits *)
+
+  let commit (E ((module Tree), t)) repo id =
+    let dir = root repo / "commit" / id in
+    Tree.exists_dir t dir >|*= fun exists ->
+    Log.debug (fun l -> l "commit %a %b" Datakit_path.pp dir exists);
+    if not exists then None
+    else Some { Commit.repo; id }
 
   let commits_of_repo tree repo =
     Log.debug (fun l -> l "commits_of_repo %a" Repo.pp repo);
@@ -721,18 +831,23 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   let apply_pr_diff t tree (r, id as x)  =
     pr tree r id >>*= function
-    | None    -> Snapshot.remove_pr t x |> ok
-    | Some pr -> Snapshot.replace_pr t pr |> ok
+    | None    -> Snapshot.remove_pr t x   |> ok
+    | Some pr -> Snapshot.replace_pr pr t |> ok
 
   let apply_status_diff t tree (c, context as x) =
     status tree c context >>*= function
-    | None   -> Snapshot.remove_status t x |> ok
-    | Some s -> Snapshot.replace_status t s |> ok
+    | None   -> Snapshot.remove_status t x  |> ok
+    | Some s -> Snapshot.replace_status s t |> ok
 
   let apply_ref_diff t tree (r, name as x) =
     ref_ tree r name >>*= function
-    | None   -> Snapshot.remove_ref t x |> ok
-    | Some r -> Snapshot.replace_ref t r |> ok
+    | None   -> Snapshot.remove_ref t x  |> ok
+    | Some r -> Snapshot.replace_ref r t |> ok
+
+  let apply_commit_diff t tree (r, id as x) =
+    commit tree r id >>*= function
+    | None   -> Snapshot.remove_commit t x  |> ok
+    | Some c -> Snapshot.replace_commit c t |> ok
 
   let apply (t:Snapshot.t) (tree, diff) =
     let t = ref t in
@@ -746,6 +861,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
         | `Status (id, context) ->
           let commit = { Commit.repo; id } in
           apply_status_diff !t tree (commit, context) >>*= fun x ->
+          apply_commit_diff x tree (repo, id) >>*= fun x ->
           t := x;
           ok ()
         | `Ref name ->
@@ -774,7 +890,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       prs ~repos t >>*= fun prs ->
       statuses ~commits t >>*= fun status ->
       refs ~repos t >|*= fun refs ->
-      Snapshot.create ~repos ~status ~prs ~refs ~commits ()
+      Snapshot.create ~repos ~status ~prs ~refs ~commits
 
   (* compute all the active hooks for a given DataKit commit *)
   let snapshot ?old tree =
@@ -829,6 +945,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     priv    : branch; (* the private branch, where webhook events are written *)
   }
 
+  let _compare x y =
+    match compare_branch x.priv y.priv with
+    | 0 -> compare_branch x.pub y.pub
+    | i -> i
+
   let pp ppf t =
     Fmt.pf ppf "@[[pub: %a@, priv: %a@]@]" pp_branch t.pub pp_branch t.priv
 
@@ -864,147 +985,41 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   (* Import http://github.com/usr/repo state. *)
   let import_repos t ~token repos =
     Log.debug (fun l -> l "import_repo %a" Repo.Set.pp repos);
-    let repos = Repo.Set.elements repos in
+    let repos_l = Repo.Set.elements repos in
     Lwt_list.map_p (fun r ->
         Log.info (fun l -> l "API.prs %a" Repo.pp r);
         API.prs token r >|= fun prs ->
         List.filter (fun pr -> pr.PR.state = `Open) prs |> PR.Set.of_list
-      ) repos
-    >>= fun prs ->
-    let prs = List.fold_left PR.Set.union PR.Set.empty prs in
+      ) repos_l
+    >>= fun new_prs ->
+    let new_prs = List.fold_left PR.Set.union PR.Set.empty new_prs in
     Lwt_list.map_p (fun r ->
         Log.info (fun l -> l "API.refs %a" Repo.pp r);
         API.refs token r >|= fun refs ->
         Ref.Set.of_list refs
-      ) repos
-    >>= fun refs ->
-    let refs = List.fold_left Ref.Set.union Ref.Set.empty refs in
-    let commits =
+      ) repos_l
+    >>= fun new_refs ->
+    let new_refs = List.fold_left Ref.Set.union Ref.Set.empty new_refs in
+    let new_commits =
       Commit.Set.empty
-      |> PR.Set.fold (fun pr acc -> Commit.Set.add (PR.commit pr) acc) prs
-      |> Ref.Set.fold (fun r acc -> Commit.Set.add (Ref.commit r) acc) refs
+      |> PR.Set.fold (fun pr acc -> Commit.Set.add (PR.commit pr) acc) new_prs
+      |> Ref.Set.fold (fun r acc -> Commit.Set.add (Ref.commit r) acc) new_refs
     in
     Lwt_list.map_p (fun c ->
         Log.info (fun l -> l "API.status %a" Commit.pp c);
         API.status token c >|=
         Status.Set.of_list
-      ) (Commit.Set.elements commits)
-    >>= fun status ->
-    let status  = List.fold_left Status.Set.union Status.Set.empty status in
-    let commits = Commit.Set.union t.Snapshot.commits commits in
-    let repos   = Repo.Set.union t.Snapshot.repos (Repo.Set.of_list repos) in
-    let prs     = PR.Set.union t.Snapshot.prs prs in
-    let status  = Status.Set.union t.Snapshot.status status in
-    let refs    = Ref.Set.union t.Snapshot.refs refs in
-    Snapshot.create  ~repos  ~commits ~status ~prs  ~refs ()
+      ) (Commit.Set.elements new_commits)
+    >>= fun new_status ->
+    let new_status =
+      List.fold_left Status.Set.union Status.Set.empty new_status
+    in
+    t
+    |> PR.Set.fold Snapshot.replace_pr new_prs
+    |> Ref.Set.fold Snapshot.replace_ref new_refs
+    |> Commit.Set.fold Snapshot.replace_commit new_commits
+    |> Status.Set.fold Snapshot.replace_status new_status
     |> ok
-
-  (** Prune *)
-
-  (* [prune t] is [t] with all the closed PRs pruned as well as a
-     cleanup function which can be used to cleanup an existing
-     file-system projection of [t]. *)
-  let prune t =
-    Log.debug (fun l -> l "prune");
-    let status = Status.Set.index t.Snapshot.status Status.repo in
-    let prs = PR.Set.index t.Snapshot.prs PR.repo in
-    let refs = Ref.Set.index t.Snapshot.refs Ref.repo in
-    let commits = Commit.Set.index t.Snapshot.commits Commit.repo in
-    let find r x = try Hashtbl.find x r with Not_found -> []  in
-    let aux repo =
-      let status  = find repo status  |> Status.Set.of_list in
-      let prs     = find repo prs     |> PR.Set.of_list in
-      let refs    = find repo refs    |> Ref.Set.of_list in
-      let commits = find repo commits |> Commit.Set.of_list in
-      Log.debug (fun l -> l "prune %a" Repo.pp repo);
-      Log.debug
-        (fun l -> l "status:@ %a@ prs:@ %a" Status.Set.pp status PR.Set.pp prs);
-      let open_prs, closed_prs =
-        PR.Set.fold (fun pr (open_prs, closed_prs) ->
-            match pr.PR.state with
-            | `Open   -> PR.Set.add pr open_prs, closed_prs
-            | `Closed -> open_prs, PR.Set.add pr closed_prs
-          ) prs (PR.Set.empty, PR.Set.empty)
-      in
-      Log.debug (fun l -> l "open_prs:%a" PR.Set.pp open_prs);
-      Log.debug (fun l -> l "closed_prs:%a" PR.Set.pp closed_prs);
-      let is_status_open s =
-        PR.Set.exists (fun pr ->
-            pr.PR.head = s.Status.commit && pr.PR.state = `Open
-          ) open_prs ||
-        Ref.Set.exists (fun r -> r.Ref.head = s.Status.commit) refs
-      in
-      let open_status, closed_status =
-        Status.Set.fold (fun s (open_status, closed_status) ->
-            match is_status_open s with
-            | false -> open_status, Status.Set.add s closed_status
-            | true  -> Status.Set.add s open_status, closed_status
-          ) status (Status.Set.empty, Status.Set.empty)
-      in
-      Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
-      Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
-      let is_commit_open c =
-        Status.Set.exists (fun s -> Status.commit s = c) open_status
-      in
-      let open_commits, closed_commits =
-        Commit.Set.fold (fun c (open_commit, closed_commit) ->
-            match is_commit_open c with
-            | false -> open_commit, Commit.Set.add c closed_commit
-            | true  -> Commit.Set.add c open_commit, closed_commit
-          ) commits (Commit.Set.empty, Commit.Set.empty)
-      in
-      let repos   = Repo.Set.singleton repo in
-      let status  = open_status in
-      let prs     = open_prs in
-      let commits = open_commits in
-      let t = Snapshot.create ~repos ~status ~prs ~refs ~commits () in
-      let cleanup =
-        if PR.Set.is_empty closed_prs
-        && Status.Set.is_empty closed_status
-        && Commit.Set.is_empty closed_commits
-        then
-          None
-        else
-          let root = Datakit_path.empty / repo.Repo.user / repo.Repo.repo in
-          let f tr =
-            list_iter_s (fun pr ->
-                let dir = root / "pr" / string_of_int pr.PR.number in
-                Conv.safe_remove tr dir
-              ) (PR.Set.elements closed_prs)
-            >>*= fun () ->
-            let commits =
-              Status.Set.fold (fun s acc ->
-                  Commit.Set.add (Status.commit s) acc
-                ) closed_status Commit.Set.empty
-              |> Commit.Set.elements
-            in
-            list_iter_s (fun c ->
-                Conv.safe_remove tr (root / "commit" / c.Commit.id)
-              ) commits
-          in
-          Some f
-      in
-      ok (t, cleanup)
-    in
-    (* status cannot be removed, so simply monitor updates in
-       [new_status]. *)
-    let result = ref Snapshot.empty in
-    let cleanup = ref [] in
-    list_iter_s (fun r ->
-        aux r >>*= fun (x, c) ->
-        result := Snapshot.union !result x;
-        let () = match c with
-          | None   -> ()
-          | Some c -> cleanup := c :: !cleanup
-        in
-        ok ()
-      ) (Repo.Set.elements t.Snapshot.repos)
-    >>*= fun () ->
-    let cleanup = match !cleanup with
-      | [] -> None
-      | l  -> Some (fun tr -> list_iter_s (fun c -> c tr) l)
-    in
-    ok (!result, cleanup)
 
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be. *)
@@ -1077,7 +1092,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           Fmt.(list ~sep:(unit "\n") Diff.pp) ppf (Diff.Set.elements diff)
         in
         let msg =
-          Fmt.strf "Merging with %s\n\n%a%s" t.priv.name pp diff conflict_msg
+          Fmt.strf "Merging with %s\n\nChanges:\n%a%s"
+            t.priv.name pp diff conflict_msg
         in
         Log.debug (fun l -> l "merge commit: %s" msg);
         DK.Transaction.commit t.pub.tr ~message:msg
@@ -1121,43 +1137,79 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     DK.Transaction.abort t.priv.tr >>= fun () ->
     DK.Transaction.abort t.pub.tr
 
+  let maybe_clean tr = function None -> ok () | Some f -> f tr
+
+  let prune t =
+    match Snapshot.prune t with
+    | `Clean -> ok (t, None)
+    | `Prune (t, prs, commits) ->
+      let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
+      let f tr =
+        list_iter_s (fun pr ->
+            let dir = root (PR.repo pr) / "pr" / string_of_int pr.PR.number in
+            Conv.safe_remove tr dir
+          ) (PR.Set.elements prs)
+        >>*= fun () ->
+        list_iter_s (fun c ->
+            let dir = root (Commit.repo c) / "commit" / c.Commit.id in
+            Conv.safe_remove tr dir
+          ) (Commit.Set.elements commits)
+      in
+      ok (t, Some f)
+
   (* On startup, build the initial state by looking at the active
      repository in the public and private branch. Import the new
      repositories in the private branch, then merge it in the public
      branch. Finally call the GitHub API with the diff between the
      public and the private branch. *)
   let first_sync ~token ~dry_updates ~pub ~priv =
-    with_head pub (fun pub_c ->
-        DK.Branch.with_transaction priv (fun priv_tr ->
-            tr_head priv_tr >>*= fun priv_c ->
-            Log.debug (fun l ->
-                l "first_sync priv=%a pub=%a"
-                  DK.Commit.pp priv_c DK.Commit.pp pub_c);
-            Conv.repos_of_commit priv_c >>*= fun priv_r ->
-            Conv.repos_of_commit pub_c  >>*= fun pub_r  ->
-            let repos = Repo.Set.union priv_r pub_r in
-            if Repo.Set.is_empty repos then DK.Transaction.abort priv_tr >>= ok
-            else
-              import_repos ~token Snapshot.empty repos >>*= fun t ->
-              Conv.update_prs priv_tr t.Snapshot.prs >>*= fun () ->
-              Conv.update_statuses priv_tr t.Snapshot.status >>*= fun () ->
-              Conv.update_refs priv_tr t.Snapshot.refs >>*= fun () ->
-              Conv.diff Conv.(tree_of_transaction priv_tr) priv_c >>*= fun d ->
-              if Diff.Set.is_empty d then DK.Transaction.abort priv_tr >>= ok
-              else
-                let message = Fmt.strf "Resync for %a" Repo.Set.pp repos in
-                DK.Transaction.commit priv_tr ~message))
-    >>*= fun () ->
     state ~old:None ~pub ~priv >>*= fun t ->
-    DK.Transaction.abort t.priv.tr >>= fun () ->
-    Log.debug (fun l -> l "first_sync: initial state %a" pp t);
-    merge t >>*= fun () ->
-    state ~old:(Some t) ~pub ~priv >>*= fun t ->
-    Log.debug (fun l -> l "first_sync: after merge %a" pp t);
-    call_github_api ~token ~dry_updates ~old:t.priv.snapshot t.pub.snapshot
-    >>*= fun () ->
-    abort t >>= fun () ->
-    ok t
+    Log.debug (fun l ->
+        l "first_sync priv=%a pub=%a"
+          DK.Commit.pp t.priv.head
+          DK.Commit.pp t.pub.head
+      );
+    let repos =
+      let r t = t.snapshot.Snapshot.repos in
+      Repo.Set.union (r t.priv) (r t.pub)
+    in
+    if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
+    else
+      import_repos ~token t.priv.snapshot repos >>*= fun priv_s ->
+      prune priv_s >>*= fun (priv_s, cleanups) ->
+      maybe_clean t.priv.tr cleanups >>*= fun () ->
+      Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
+      Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
+      Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
+      DK.Transaction.diff t.priv.tr t.priv.head >>*= fun d ->
+      let d = Diff.changes d in
+      begin
+        if cleanups = None && Diff.Set.is_empty d then
+          DK.Transaction.abort t.priv.tr >>= ok
+        else
+          let message = Fmt.strf "Resync for %a" Repo.Set.pp repos in
+          DK.Transaction.commit t.priv.tr ~message
+      end >>*= fun () ->
+      DK.Transaction.abort t.pub.tr >>= fun () ->
+      state ~old:(Some t) ~pub ~priv >>*= fun t ->
+      Log.debug (fun l -> l "first_sync: initial state %a" pp t);
+      DK.Transaction.abort t.priv.tr >>= fun () ->
+      merge t >>*= fun () ->
+      state ~old:(Some t) ~pub ~priv >>*= fun t ->
+      call_github_api ~token ~dry_updates ~old:t.priv.snapshot t.pub.snapshot
+      >>*= fun () ->
+      prune t.pub.snapshot >>*= fun (_, cleanups) ->
+      begin match cleanups with
+        | None   -> ok t
+        | Some f ->
+          f t.pub.tr >>*= fun () ->
+          DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
+          DK.Transaction.abort t.priv.tr >>= fun () ->
+          state ~old:(Some t) ~pub ~priv
+      end >>*= fun t ->
+      Log.debug (fun l -> l "first_sync: after merge %a" pp t);
+      abort t >>= fun () ->
+      ok t
 
   let repos old t =
     let old = Snapshot.repos old.snapshot in

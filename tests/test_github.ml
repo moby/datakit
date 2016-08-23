@@ -39,9 +39,25 @@ module API = struct
     mutable refs  : Ref.t list;
   }
 
+  let prune_repo r =
+    let prs = List.filter (fun pr -> PR.state pr = `Open) r.prs in
+    let commits =
+      let prs = Commit.Set.of_list (List.map PR.commit prs) in
+      let refs = Commit.Set.of_list (List.map Ref.commit r.refs) in
+      Commit.Set.union prs refs
+    in
+    let status =
+      List.filter (fun (id, _) ->
+          Commit.Set.exists (fun c -> Commit.id c = id) commits
+        ) r.status
+    in
+    { r with prs; status }
+
   type user = {
     mutable repos : repo String.Map.t;
   }
+
+  let prune_user u = { repos = String.Map.map prune_repo u.repos }
 
   type state = {
     mutable users : user String.Map.t;
@@ -298,7 +314,7 @@ let test_snapshot () =
         let refs = Ref.Set.of_list refs0 in
         let repos = Repo.Set.of_list repos0 in
         let commits = Commit.Set.of_list commits0 in
-        Snapshot.create ~repos ~commits ~prs ~status ~refs ()
+        Snapshot.create ~repos ~commits ~prs ~status ~refs
       in
       Conv.snapshot Conv.(tree_of_commit head) >>*= fun sh ->
       Alcotest.(check snapshot) "snap transaction" se s;
@@ -623,6 +639,9 @@ let test_startup dk =
 
 module Users = struct
   type t = API.user String.Map.t
+
+  let prune t = String.Map.map API.prune_user t
+
   let pp_status f = function
     | `Open   -> Fmt.string f "open"
     | `Closed -> Fmt.string f "closed"
@@ -683,6 +702,7 @@ module Users = struct
   let equal a b =
     String.Map.equal equal_user a b
 end
+
 let users = (module Users : Alcotest.TESTABLE with type t = Users.t)
 
 let opt_read_file tree path =
@@ -779,7 +799,7 @@ let ensure_in_sync ~msg github pub =
           DataKit:@\n@[%a@]@."
          Users.pp github.API.users
          Users.pp pub_users;
-  Alcotest.check users msg github.API.users pub_users;
+  Alcotest.check users msg (Users.prune github.API.users) pub_users;
   Lwt.return ()
 
 let test_contexts = [|

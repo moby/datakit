@@ -4,6 +4,10 @@ open Result
 
 let () = Printexc.record_backtrace true
 
+let default d = function
+  | None -> d
+  | Some x -> x
+
 let p = function
   | "" -> Datakit_path.empty
   | path -> Datakit_path.of_string_exn path

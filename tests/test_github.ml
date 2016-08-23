@@ -1,3 +1,4 @@
+open Astring
 open Test_utils
 open Lwt.Infix
 open Datakit_github
@@ -28,16 +29,23 @@ module Counter = struct
 end
 
 module API = struct
-
-  type state = {
+  type repo = {
     user  : string;
     repo  : string;
     mutable status: (string * Status.t list) list;
     mutable prs   : PR.t list;
     mutable events: Event.t list;
     mutable refs  : Ref.t list;
-    ctx: Counter.t;
+  }
+
+  type user = {
+    mutable repos : repo String.Map.t;
+  }
+
+  type state = {
+    mutable users : user String.Map.t;
     mutable webhooks: (DK.Branch.t -> (unit, DK.error) Result.result Lwt.t) list;
+    ctx: Counter.t;
   }
 
   let apply_webhooks t priv =
@@ -51,42 +59,52 @@ module API = struct
 
   type token = state
 
-  let user_exists t ~user = user = t.user |> Lwt.return
-  let repo_exists t ~user ~repo = (user = t.user && repo = t.repo) |> Lwt.return
+  let lookup t ~user ~repo =
+    match String.Map.find user t.users with
+    | None -> None
+    | Some user -> String.Map.find repo user.repos
+
+  let lookup_exn t ~user ~repo =
+    match lookup t ~user ~repo with
+    | None -> failwith (Fmt.strf "Unknown user/repo: %s/%s" user repo)
+    | Some repo -> repo
+
+  let user_exists t ~user = Lwt.return (String.Map.mem user t.users)
+  let repo_exists t ~user ~repo = Lwt.return (lookup t ~user ~repo <> None)
   let repos t ~user =
-    if not (t.user = user) then Lwt.return_nil else Lwt.return [t.repo]
+    match String.Map.find user t.users with
+    | None -> Lwt.return_nil
+    | Some user -> String.Map.dom user.repos |> String.Set.elements |> Lwt.return
 
   let status t ~user ~repo ~commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;
-    if not (t.user = user && t.repo = repo) then Lwt.return_nil
-    else
-      try Lwt.return (List.assoc commit t.status)
-      with Not_found -> Lwt.return_nil
+    let repo = lookup_exn t ~user ~repo in
+    try Lwt.return (List.assoc commit repo.status)
+    with Not_found -> Lwt.return_nil
 
   let set_status_aux t s =
     let { Status.repo; user; _ } = s in
-    if not (t.user = user && t.repo = repo) then ()
-    else
-      let commit = s.Status.commit in
-      let keep (c, _) = c <> commit in
-      let status = List.filter keep t.status in
-      let rest =
-        try
-          List.find (fun x -> not (keep x)) t.status
-          |> snd
-          |> List.filter (fun y -> y.Status.context <> s.Status.context)
-        with Not_found ->
-          []
-      in
-      let status = (commit, s :: rest) :: status in
-      t.status <- status;
-      let w br =
-        DK.Branch.with_transaction br (fun tr ->
-            Conv.update_status tr s >>*= fun () ->
-            DK.Transaction.commit tr ~message:"webhook"
-          )
-      in
-      t.webhooks <- w :: t.webhooks
+    let repo = lookup_exn t ~user ~repo in
+    let commit = s.Status.commit in
+    let keep (c, _) = c <> commit in
+    let status = List.filter keep repo.status in
+    let rest =
+      try
+        List.find (fun x -> not (keep x)) repo.status
+        |> snd
+        |> List.filter (fun y -> y.Status.context <> s.Status.context)
+      with Not_found ->
+        []
+    in
+    let status = (commit, s :: rest) :: status in
+    repo.status <- status;
+    let w br =
+      DK.Branch.with_transaction br (fun tr ->
+          Conv.update_status tr s >>*= fun () ->
+          DK.Transaction.commit tr ~message:"webhook"
+        )
+    in
+    t.webhooks <- w :: t.webhooks
 
   let set_status t s =
     t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
@@ -95,11 +113,10 @@ module API = struct
 
   let set_pr_aux t pr =
     let { PR.user; repo; _ } = pr in
-    if not (t.user = user && t.repo = repo) then ()
-    else
-      let num = pr.PR.number in
-      let prs = List.filter (fun pr -> pr.PR.number <> num) t.prs in
-      t.prs <- pr :: prs
+    let repo = lookup_exn t ~user ~repo in
+    let num = pr.PR.number in
+    let prs = List.filter (fun pr -> pr.PR.number <> num) repo.prs in
+    repo.prs <- pr :: prs
 
   let set_pr t pr =
     t.ctx.Counter.set_pr <- t.ctx.Counter.set_pr + 1;
@@ -108,34 +125,34 @@ module API = struct
 
   let set_ref_aux t r =
     let { Ref.user; repo; _ } = r in
-    if not (t.user = user && t.repo = repo) then ()
-    else
-      let name = r.Ref.name in
-      let refs = List.filter (fun r -> r.Ref.name <> name) t.refs in
-      t.refs <- r :: refs
+    let repo = lookup_exn t ~user ~repo in
+    let name = r.Ref.name in
+    let refs = List.filter (fun r -> r.Ref.name <> name) repo.refs in
+    repo.refs <- r :: refs
 
   let apply_events t =
-    List.iter (function
-        | Event.PR pr    -> set_pr_aux t pr
-        | Event.Status s -> set_status_aux t s
-        | Event.Ref r    -> set_ref_aux t r
-        | Event.Other _  -> ()
-      ) t.events
+    t.users |> String.Map.iter @@ fun _ user ->
+    user.repos |> String.Map.iter @@ fun _ repo ->
+    repo.events |> List.iter @@ function
+    | Event.PR pr    -> set_pr_aux t pr
+    | Event.Status s -> set_status_aux t s
+    | Event.Ref r    -> set_ref_aux t r
+    | Event.Other _  -> ()
 
   let prs t ~user ~repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
-    if not (t.user = user && t.repo = repo) then Lwt.return_nil
-    else Lwt.return t.prs
+    let repo = lookup_exn t ~user ~repo in
+    Lwt.return repo.prs
 
   let events t ~user ~repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
-    if not (t.user = user && t.repo = repo) then Lwt.return_nil
-    else Lwt.return t.events
+    let repo = lookup_exn t ~user ~repo in
+    Lwt.return repo.events
 
   let refs t ~user ~repo =
     t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
-    if not (t.user = user && t.repo = repo) then Lwt.return_nil
-    else Lwt.return t.refs
+    let repo = lookup_exn t ~user ~repo in
+    Lwt.return repo.refs
 
 end
 
@@ -335,7 +352,12 @@ let init status refs events =
     ) status;
   let status = Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl [] in
   let ctx = Counter.zero () in
-  { API.user; repo; status; refs; prs = []; events; ctx; webhooks = [] }
+  let users = String.Map.singleton user {
+      API.repos = String.Map.singleton repo {
+          API.user; repo; status; refs; prs = []; events
+        }
+    } in
+  { API.users; ctx; webhooks = [] }
 
 let run f () =
   quiet_9p ();
@@ -445,8 +467,9 @@ let update_status br dir state =
       DK.Transaction.commit tr ~message:"Test"
     )
 
-let find_status t =
-  try List.find (fun (c, _) -> c = "foo") t.API.status |> snd |> List.hd
+let find_status t ~user ~repo =
+  let repo = API.lookup_exn t ~user ~repo in
+  try List.find (fun (c, _) -> c = "foo") repo.API.status |> snd |> List.hd
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
@@ -484,7 +507,7 @@ let test_updates dk =
   Alcotest.(check counter) "counter: 3"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
-  let status = find_status t in
+  let status = find_status t ~user ~repo in
   Alcotest.(check status_state) "update status" `Pending status.Status.state;
 
   (* test PR update *)
@@ -506,7 +529,8 @@ let test_updates dk =
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 1; set_status = 1 }
     t.API.ctx;
   let pr =
-    try List.find (fun pr -> pr.PR.number = 2) t.API.prs
+    let repo = API.lookup_exn t ~user ~repo in
+    try List.find (fun pr -> pr.PR.number = 2) repo.API.prs
     with Not_found -> Alcotest.fail "foo not found"
   in
   Alcotest.(check string) "update pr's title" "hahaha" pr.PR.title;
@@ -564,7 +588,7 @@ let test_startup dk =
   Alcotest.(check counter) "counter: 5"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
-  let status = find_status t in
+  let status = find_status t ~user ~repo in
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
 
   (* receive new webhooks *)

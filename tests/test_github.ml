@@ -303,8 +303,8 @@ let test_snapshot () =
               ) refs
             >>= fun () ->
             Conv.snapshot Conv.(tree_of_transaction tr) >>*= fun s ->
-          DK.Transaction.commit tr ~message:"init" >>*= fun () ->
-          ok s)
+            DK.Transaction.commit tr ~message:"init" >>*= fun () ->
+            ok s)
       in
       update ~prs:prs0 ~status:status0 ~refs:refs0 >>*= fun s ->
       expect_head br >>*= fun head ->
@@ -715,30 +715,30 @@ let rec read_state ~user ~repo ~commit tree path context =
   DK.Tree.read_dir tree path >>= function
   | Error _ -> Lwt.return []
   | Ok items ->
-  let open Datakit_path.Infix in
-  DK.Tree.read_file tree (path / "state") >>= begin function
-  | Error _ -> Lwt.return []
-  | Ok status ->
-    opt_read_file tree (path / "description") >>= fun description ->
-    opt_read_file tree (path / "target_url") >>= fun url ->
-    let state =
-      let status = String.trim (Cstruct.to_string status) in
-      match Status_state.of_string status with
-      | None -> failwith (Fmt.strf "Bad state %S" status)
-      | Some x -> x
-    in
-    let repo = { Repo.user; repo } in
-    let commit = { Commit.repo; id = commit } in
-    Lwt.return [{ Status.commit; state; context; description; url }]
-  end
-  >>= fun this_state ->
-  items |> Lwt_list.map_s (function
-      | "status" | "description" | "target_url" -> Lwt.return []
-      | item ->
-        read_state ~user ~repo ~commit tree (path / item) (context @ [item])
-    )
-  >>= fun children ->
-  Lwt.return (this_state @ List.concat children)
+    let open Datakit_path.Infix in
+    DK.Tree.read_file tree (path / "state") >>= begin function
+      | Error _ -> Lwt.return []
+      | Ok status ->
+        opt_read_file tree (path / "description") >>= fun description ->
+        opt_read_file tree (path / "target_url") >>= fun url ->
+        let state =
+          let status = String.trim (Cstruct.to_string status) in
+          match Status_state.of_string status with
+          | None -> failwith (Fmt.strf "Bad state %S" status)
+          | Some x -> x
+        in
+        let repo = { Repo.user; repo } in
+        let commit = { Commit.repo; id = commit } in
+        Lwt.return [{ Status.commit; state; context; description; url }]
+    end
+    >>= fun this_state ->
+    items |> Lwt_list.map_s (function
+        | "status" | "description" | "target_url" -> Lwt.return []
+        | item ->
+          read_state ~user ~repo ~commit tree (path / item) (context @ [item])
+      )
+    >>= fun children ->
+    Lwt.return (this_state @ List.concat children)
 
 let read_opt_dir tree path =
   DK.Tree.read_dir tree path >|= function
@@ -797,8 +797,8 @@ let ensure_in_sync ~msg github pub =
   state_of_branch pub >>= fun pub_users ->
   Fmt.pr "GitHub:@\n@[%a@]@.\
           DataKit:@\n@[%a@]@."
-         Users.pp github.API.users
-         Users.pp pub_users;
+    Users.pp github.API.users
+    Users.pp pub_users;
   Alcotest.check users msg (Users.prune github.API.users) pub_users;
   Lwt.return ()
 
@@ -818,22 +818,19 @@ let random_state ~random ~user ~repo ~old_prs ~old_commits =
   in
   let old_prs = List.rev old_prs in
   let old_commits = String.Map.of_list old_commits in
-  let next_pr = ref (
-      match old_prs with
-      | [] -> 0
-      | x::_ -> x.PR.number + 1
-    )
-  in
-  let old_prs = old_prs |> List.map (fun pr ->
-      let state =
-        match pr.PR.state with
-        (* | `Open when Random.State.bool random -> `Closed *)  (* TODO: Depends on #235 *)
-        | s -> s
-      in
-      let id = random_choice ~random [| "123"; "456"; "789" |] in
-      let head = { pr.PR.head with Commit.id } in
-      { pr with PR.state; head }
-    )
+  let next_pr = ref (match old_prs with [] -> 0 | x::_ -> x.PR.number + 1) in
+  let old_prs =
+    old_prs
+    |> List.map (fun pr ->
+        let state =
+          match pr.PR.state with
+          (* | `Open when Random.State.bool random -> `Closed *)  (* TODO: Depends on #235 *)
+          | s -> s
+        in
+        let id = random_choice ~random [| "123"; "456"; "789" |] in
+        let head = { pr.PR.head with Commit.id } in
+        { pr with PR.state; head }
+      )
   in
   let commits = ref (String.Map.dom old_commits) in
   let rec make_prs acc = function
@@ -855,11 +852,14 @@ let random_state ~random ~user ~repo ~old_prs ~old_commits =
   in
   let prs = make_prs old_prs n_prs |> List.rev in
   let commits =
-    String.Set.elements !commits |> List.map (fun commit ->
+    String.Set.elements !commits
+    |> List.map (fun commit ->
         let description = Some "Testing..." in
         let old_status = String.Map.find commit old_commits |> default [] in
         let status =
-          test_contexts |> Array.to_list |> List.map (fun context ->
+          test_contexts
+          |> Array.to_list
+          |> List.map (fun context ->
               if Random.State.bool random then (
                 match
                   List.find (fun s -> s.Status.context = context) old_status

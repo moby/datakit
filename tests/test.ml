@@ -134,30 +134,30 @@ let test_merge _repo conn =
   >>= function
   | Ok () -> Alcotest.fail "Commit not in store!"
   | Error _ ->
-  write_file conn ["branch"; "pr"; "fast-forward"] merge_a >>*= fun () ->
-  with_transaction conn ~branch:"pr" "mod" (fun t ->
-      read_file conn (t @ ["rw"; "file"]) >>= fun old ->
-      write_file conn (t @ ["rw"; "file"]) (old ^ "+pr") >>*=
-      Lwt.return
-    ) >>= fun () ->
-  head conn "pr" >>= fun merge_b ->
-  (* Merge pr into master *)
-  with_transaction conn ~branch:"master" "merge" (fun t ->
-      create_file conn (t @ ["rw"]) "mine" "pre-merge" >>= fun () ->
-      write_file conn (t @ ["merge"]) merge_b >>*= fun () ->
-      check_file conn (t @ ["ours"; "mine"]) "Ours" "pre-merge" >>= fun () ->
-      check_file conn (t @ ["theirs"; "file"]) "Theirs" "from-master+pr"
-      >>= fun () ->
-      check_file conn (t @ ["base"; "file"]) "Base" "from-master"
-    ) >>= fun () ->
-  head conn "master" >>= fun merge_commit ->
-  read_file conn ["snapshots"; merge_commit; "parents"] >>= fun parents ->
-  let parents = Str.(split (regexp "\n")) parents in
-  Alcotest.(check @@ slist string String.compare) "Merge parents"
-    [merge_b; merge_a] parents;
-  read_file conn ["branch"; "master"; "ro"; "file"] >>= fun merged ->
-  Alcotest.(check string) "Merge result" "from-master+pr" merged;
-  Lwt.return ()
+    write_file conn ["branch"; "pr"; "fast-forward"] merge_a >>*= fun () ->
+    with_transaction conn ~branch:"pr" "mod" (fun t ->
+        read_file conn (t @ ["rw"; "file"]) >>= fun old ->
+        write_file conn (t @ ["rw"; "file"]) (old ^ "+pr") >>*=
+        Lwt.return
+      ) >>= fun () ->
+    head conn "pr" >>= fun merge_b ->
+    (* Merge pr into master *)
+    with_transaction conn ~branch:"master" "merge" (fun t ->
+        create_file conn (t @ ["rw"]) "mine" "pre-merge" >>= fun () ->
+        write_file conn (t @ ["merge"]) merge_b >>*= fun () ->
+        check_file conn (t @ ["ours"; "mine"]) "Ours" "pre-merge" >>= fun () ->
+        check_file conn (t @ ["theirs"; "file"]) "Theirs" "from-master+pr"
+        >>= fun () ->
+        check_file conn (t @ ["base"; "file"]) "Base" "from-master"
+      ) >>= fun () ->
+    head conn "master" >>= fun merge_commit ->
+    read_file conn ["snapshots"; merge_commit; "parents"] >>= fun parents ->
+    let parents = Str.(split (regexp "\n")) parents in
+    Alcotest.(check @@ slist string String.compare) "Merge parents"
+      [merge_b; merge_a] parents;
+    read_file conn ["branch"; "master"; "ro"; "file"] >>= fun merged ->
+    Alcotest.(check string) "Merge result" "from-master+pr" merged;
+    Lwt.return ()
 
 let test_merge_metadata _repo conn =
   (* Put "from-master" on master branch *)
@@ -396,30 +396,30 @@ let test_rename_branch repo conn =
 let test_rename_file _repo conn =
   make_branch conn "master" >>= fun () ->
   with_transaction conn ~branch:"master" "rename" (fun t ->
-    create_file conn (t @ ["rw"]) "old" "data" >>= fun () ->
-    Client.with_fid conn (fun newfid ->
-      Client.walk_from_root conn newfid (t @ ["rw"; "old"]) >>*= fun _ ->
-      Client.LowLevel.update conn ~name:"new" newfid >>*= fun () ->
-      check_dir conn (t @ ["rw"]) "New files" ["new"] >>= fun () ->
-      (* Check rename detects errors
-         Note: we currently allow overwriting an empty directory *)
-      Client.mkdir conn (t @ ["rw"]) "dir" rwxr_xr_x >>*= fun () ->
-      create_file conn (t @ ["rw"; "dir"]) "precious" "data" >>= fun () ->
-      Client.LowLevel.update conn ~name:"dir" newfid >>= function
-      | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
-      | Error (`Msg e) ->
-      Alcotest.(check string) "Rename over dir" "Is a directory" e;
-      (* Rename when source has been deleted. Ideally, we should also
-         check it hasn't been replaced by something with the same
-         name. *)
-      Client.remove conn (t @ ["rw"; "new"]) >>*= fun () ->
-      Client.LowLevel.update conn ~name:"reborn" newfid >>= function
-      | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
-      | Error (`Msg e) ->
-      Alcotest.(check string) "Source deleted" "No such file or directory" e;
-      Lwt.return (Ok ())
-    )
-  ) >>*= fun () ->
+      create_file conn (t @ ["rw"]) "old" "data" >>= fun () ->
+      Client.with_fid conn (fun newfid ->
+          Client.walk_from_root conn newfid (t @ ["rw"; "old"]) >>*= fun _ ->
+          Client.LowLevel.update conn ~name:"new" newfid >>*= fun () ->
+          check_dir conn (t @ ["rw"]) "New files" ["new"] >>= fun () ->
+          (* Check rename detects errors
+             Note: we currently allow overwriting an empty directory *)
+          Client.mkdir conn (t @ ["rw"]) "dir" rwxr_xr_x >>*= fun () ->
+          create_file conn (t @ ["rw"; "dir"]) "precious" "data" >>= fun () ->
+          Client.LowLevel.update conn ~name:"dir" newfid >>= function
+          | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
+          | Error (`Msg e) ->
+            Alcotest.(check string) "Rename over dir" "Is a directory" e;
+            (* Rename when source has been deleted. Ideally, we should also
+               check it hasn't been replaced by something with the same
+               name. *)
+            Client.remove conn (t @ ["rw"; "new"]) >>*= fun () ->
+            Client.LowLevel.update conn ~name:"reborn" newfid >>= function
+            | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
+            | Error (`Msg e) ->
+              Alcotest.(check string) "Source deleted" "No such file or directory" e;
+              Lwt.return (Ok ())
+        )
+    ) >>*= fun () ->
   check_dir conn ["branch"; "master"; "ro"] "New files" ["dir"]
 
 let test_truncate _repo conn =
@@ -503,16 +503,16 @@ let test_stable_inodes _repo conn =
   let inode x = Int64.to_string Protocol_9p.(x.Types.Stat.qid.Types.Qid.id) in
   make_branch conn "master" >>= fun () ->
   with_transaction conn ~branch:"master" "stable" (fun t ->
-    create_file conn (t @ ["rw"]) "file" "data" >>= fun () ->
-    Client.stat conn
-      ["branch"; "master"; "transactions"; "stable"; "rw"; "file"]
-    >>*= fun info1 ->
-    Client.stat conn
-      ["branch"; "master"; "transactions"; "stable"; "rw"; "file"]
-    >>*= fun info2 ->
-    Alcotest.(check string) "Inode same" (inode info1) (inode info2);
-    Lwt.return (Ok ())
-  ) >>*= Lwt.return
+      create_file conn (t @ ["rw"]) "file" "data" >>= fun () ->
+      Client.stat conn
+        ["branch"; "master"; "transactions"; "stable"; "rw"; "file"]
+      >>*= fun info1 ->
+      Client.stat conn
+        ["branch"; "master"; "transactions"; "stable"; "rw"; "file"]
+      >>*= fun info2 ->
+      Alcotest.(check string) "Inode same" (inode info1) (inode info2);
+      Lwt.return (Ok ())
+    ) >>*= Lwt.return
 
 module Unit = struct
   type t = unit
@@ -662,9 +662,9 @@ let test_streams () =
       | "" when saw_flush -> Alcotest.fail "End-of-file!"
       | "" -> read ~saw_flush:true expect
       | data ->
-      offset := Int64.add !offset (Int64.of_int (String.length data));
-      Alcotest.(check string) "read" expect data;
-      Lwt.return () in
+        offset := Int64.add !offset (Int64.of_int (String.length data));
+        Alcotest.(check string) "read" expect data;
+        Lwt.return () in
     read "0" >>= fun () ->
     Vfs.File.Stream.publish session 1;
     read "1" >>= fun () ->

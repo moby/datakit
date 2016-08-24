@@ -355,7 +355,8 @@ module Snapshot = struct
   let add_pr pr t =
     let prs     = PR.Set.add pr t.prs in
     let repos   = Repo.Set.add (PR.repo pr) t.repos in
-    { t with prs; repos }
+    let commits = Commit.Set.add (PR.commit pr) t.commits in
+    { t with prs; repos; commits }
 
   let replace_pr pr t =
     let id = PR.repo pr, pr.PR.number in

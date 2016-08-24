@@ -812,10 +812,7 @@ let random_choice ~random options =
   options.(Random.State.int random (Array.length options))
 
 let random_state ~random ~user ~repo ~old_prs ~old_commits =
-  (* let n_prs = Random.State.int random 4 in *)
-  let n_prs =
-    if (user, repo) = ("a", "a") then Random.State.int random 3 else 0
-  in
+  let n_prs = Random.State.int random 4 in
   let old_prs = List.rev old_prs in
   let old_commits = String.Map.of_list old_commits in
   let next_pr = ref (match old_prs with [] -> 0 | x::_ -> x.PR.number + 1) in

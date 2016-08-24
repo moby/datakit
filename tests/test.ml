@@ -2,7 +2,7 @@ open Lwt.Infix
 open Test_utils
 open Result
 
-let root_entries = ["branch"; "snapshots"; "trees"; "remotes"]
+let root_entries = ["branch"; "debug"; "snapshots"; "trees"; "remotes"]
 
 let test_transaction repo conn =
   check_dir conn [] "Root entries" root_entries >>= fun () ->

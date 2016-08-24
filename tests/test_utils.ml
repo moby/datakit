@@ -4,6 +4,10 @@ open Result
 
 let () = Printexc.record_backtrace true
 
+let default d = function
+  | None -> d
+  | Some x -> x
+
 let p = function
   | "" -> Datakit_path.empty
   | path -> Datakit_path.of_string_exn path
@@ -143,7 +147,7 @@ let run fn =
     Store.Repo.create config >>= fun repo ->
     Store.Repo.branches repo >>= fun branches ->
     Lwt_list.iter_s (fun branch ->
-      Store.Repo.remove_branch repo branch
+        Store.Repo.remove_branch repo branch
       ) branches
     >>= fun () ->
     let for_client, for_server = Test_flow.create () in
@@ -257,7 +261,7 @@ let chmod conn path perm =
   in
   with_file conn path (fun fid ->
       Client.LowLevel.update ~mode conn fid >>*= Lwt.return
-  )
+    )
 
 let read_file conn path =
   Client.stat conn path >>*= fun info ->

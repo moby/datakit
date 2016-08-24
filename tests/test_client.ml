@@ -16,23 +16,23 @@ let test_transaction dk =
   DK.Branch.head master >>*= function
   | None -> Alcotest.fail "Branch does not exist!"
   | Some head ->
-  let root = DK.Commit.tree head in
-  DK.Tree.stat root (p "src/Makefile") >>*= function
-  | None -> Alcotest.fail "Missing Makefile!"
-  | Some {Datakit_S.size; _} ->
-  Alcotest.(check int) "File size" 15 (Int64.to_int size);
-  DK.Commit.message head >>*= fun msg ->
-  Alcotest.(check string) "Message" "My commit\n" msg;
-  Lwt.return_unit
+    let root = DK.Commit.tree head in
+    DK.Tree.stat root (p "src/Makefile") >>*= function
+    | None -> Alcotest.fail "Missing Makefile!"
+    | Some {Datakit_S.size; _} ->
+      Alcotest.(check int) "File size" 15 (Int64.to_int size);
+      DK.Commit.message head >>*= fun msg ->
+      Alcotest.(check string) "Message" "My commit\n" msg;
+      Lwt.return_unit
 
 let test_parents dk =
   let check_parents name branch expected =
     let expected = List.map DK.Commit.id expected in
     DK.Branch.head branch >>*= begin function
-    | None -> Lwt.return []
-    | Some commit ->
-      DK.Commit.parents commit >>*= fun parents ->
-      Lwt.return (List.map DK.Commit.id parents)
+      | None -> Lwt.return []
+      | Some commit ->
+        DK.Commit.parents commit >>*= fun parents ->
+        Lwt.return (List.map DK.Commit.id parents)
     end
     >|= Alcotest.(check (list string)) name expected in
   DK.branch dk "dev" >>*= fun dev ->
@@ -95,9 +95,9 @@ let test_parents dk =
       DK.Transaction.parents t1 >>*= function
       | [] | _::_::_ -> Alcotest.fail "Expected one parent"
       | [real_parent] ->
-      DK.Transaction.set_parents t1 [real_parent; dev_head] >>*= fun () ->
-      DK.Transaction.commit t1 ~message:"From outer" >>*= fun () ->
-      Lwt.return (Ok (real_parent, after_inner))
+        DK.Transaction.set_parents t1 [real_parent; dev_head] >>*= fun () ->
+        DK.Transaction.commit t1 ~message:"From outer" >>*= fun () ->
+        Lwt.return (Ok (real_parent, after_inner))
     ) >>*= fun (orig_parent, after_inner) ->
   (* Now we should have two merges: master is a merge of t1 and t2,
      and t1 is a merge of master and dev. *)
@@ -135,8 +135,8 @@ let check_kind msg expected stat =
   stat >>*= function
   | None -> Alcotest.fail "Missing file"
   | Some actual ->
-  Alcotest.(check (of_pp pp_kind)) msg expected actual.Datakit_S.kind;
-  Lwt.return ()
+    Alcotest.(check (of_pp pp_kind)) msg expected actual.Datakit_S.kind;
+    Lwt.return ()
 
 let test_merge dk =
   (* Put "from-master" on master branch *)
@@ -153,39 +153,40 @@ let test_merge dk =
   DK.Branch.fast_forward pr bad_commit >>= function
   | Ok () -> Alcotest.fail "Commit not in store!"
   | Error _ ->
-  DK.Branch.fast_forward pr merge_a >>*= fun () ->
-  DK.Branch.with_transaction pr (fun tr ->
-      DK.Transaction.read_file tr (p "file") >>*= fun old ->
-      DK.Transaction.replace_file tr ~dir:(p "") "file"
-        (Cstruct.append old (v "+pr"))
-      >>*= fun () ->
-      DK.Transaction.commit tr ~message:"mod"
-    ) >>*= fun () ->
-  expect_head pr >>*= fun merge_b ->
-  (* Merge pr into master *)
-  DK.Branch.with_transaction master (fun tr ->
-      DK.Transaction.create_file tr ~dir:(p "") "mine" (v "pre-merge") >>*= fun () ->
-      DK.Transaction.merge tr merge_b
-      >>*= fun ({DK.Transaction.ours; theirs; base}, conflicts) ->
-      if conflicts <> [] then Alcotest.fail "Conflicts on merge!";
-      DK.Tree.read_file ours   (p "mine") |> check_file "Ours" "pre-merge"
-      >>= fun () ->
-      DK.Tree.read_file theirs (p "file") |> check_file "Theirs" "from-master+pr"
-      >>= fun () ->
-      DK.Tree.read_file base   (p "file") |> check_file "Base" "from-master"
-      >>= fun () ->
-      DK.Transaction.commit tr ~message:"merge"
-    ) >>*= fun () ->
-  expect_head master >>*= fun merge_commit ->
-  DK.Commit.parents merge_commit >>*= fun parents ->
-  Alcotest.(check @@ slist commit compare_commit) "Merge parents"
-    [merge_b; merge_a] parents;
-  DK.Tree.read_file (DK.Commit.tree merge_commit) (p "file") >>*= fun merged ->
-  Alcotest.(check string) "Merge result"
-    "from-master+pr" (Cstruct.to_string merged);
-  Lwt.return ()
+    DK.Branch.fast_forward pr merge_a >>*= fun () ->
+    DK.Branch.with_transaction pr (fun tr ->
+        DK.Transaction.read_file tr (p "file") >>*= fun old ->
+        DK.Transaction.replace_file tr ~dir:(p "") "file"
+          (Cstruct.append old (v "+pr"))
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"mod"
+      ) >>*= fun () ->
+    expect_head pr >>*= fun merge_b ->
+    (* Merge pr into master *)
+    DK.Branch.with_transaction master (fun tr ->
+        DK.Transaction.create_file tr ~dir:(p "") "mine" (v "pre-merge") >>*= fun () ->
+        DK.Transaction.merge tr merge_b
+        >>*= fun ({DK.Transaction.ours; theirs; base}, conflicts) ->
+        if conflicts <> [] then Alcotest.fail "Conflicts on merge!";
+        DK.Tree.read_file ours   (p "mine") |> check_file "Ours" "pre-merge"
+        >>= fun () ->
+        DK.Tree.read_file theirs (p "file") |> check_file "Theirs" "from-master+pr"
+        >>= fun () ->
+        DK.Tree.read_file base   (p "file") |> check_file "Base" "from-master"
+        >>= fun () ->
+        DK.Transaction.commit tr ~message:"merge"
+      ) >>*= fun () ->
+    expect_head master >>*= fun merge_commit ->
+    DK.Commit.parents merge_commit >>*= fun parents ->
+    Alcotest.(check @@ slist commit compare_commit) "Merge parents"
+      [merge_b; merge_a] parents;
+    DK.Tree.read_file (DK.Commit.tree merge_commit) (p "file") >>*= fun merged ->
+    Alcotest.(check string) "Merge result"
+      "from-master+pr" (Cstruct.to_string merged);
+    Lwt.return ()
 
-let diff: Datakit_path.t Datakit_S.diff Alcotest.testable = (module struct
+let diff: Datakit_path.t Datakit_S.diff Alcotest.testable =
+  (module struct
     type t = Datakit_path.t Datakit_S.diff
     let equal = (=)
     let pp ppf = function
@@ -452,9 +453,9 @@ let expect_dir_event msg events expected =
   Lwt_stream.next events >>= function
   | None | Some (`Link _|`Exec _|`File _) -> Alcotest.fail "Expected dir"
   | Some (`Dir tree) ->
-  DK.Tree.read_dir tree (p "") >>*= fun items ->
-  Alcotest.(check (slist string String.compare)) msg expected items;
-  Lwt.return ()
+    DK.Tree.read_dir tree (p "") >>*= fun items ->
+    Alcotest.(check (slist string String.compare)) msg expected items;
+    Lwt.return ()
 
 let expect_file_event msg events expected =
   Lwt_stream.next events >>= fun event ->
@@ -480,47 +481,47 @@ let test_watch dk =
   Lwt_stream.next doc_events >>= function
   | Some _ -> Alcotest.fail "Docs tree should initially be None"
   | None ->
-  (* Create /src/Makefile *)
-  create_in_trans master (p "src") "Makefile" (v "all: build") >>*= fun () ->
-  expect_dir_event "Top event" root_events ["src"] >>= fun () ->
-  (* Start monitoring /src/Makefile *)
-  with_events master (p "src/Makefile") @@ fun makefile_events ->
-  expect_file_event "Makefile" makefile_events (Some (`File (v "all: build")))
-  >>= fun () ->
-  (* Modify file under doc *)
-  create_in_trans master (p "doc") "README" (v "Instructions") >>*= fun () ->
-  expect_dir_event "Doc event" doc_events ["README"] >>= fun () ->
-  expect_dir_event "Top event" root_events ["doc"; "src"] >>= fun () ->
-  let next_makefile_event = Lwt_stream.next makefile_events in
-  Alcotest.(check bool) "No Makefile update" true
-    (Lwt.state next_makefile_event = Lwt.Sleep);
-  (* Make executable *)
-  DK.Branch.with_transaction master (fun t ->
-      DK.Transaction.set_executable t (p "src/Makefile") true >>*= fun () ->
-      DK.Transaction.commit t ~message:"exec"
-    )
-  >>*= fun () ->
-  next_makefile_event >>= fun event ->
-  Alcotest.(check (option file_event)) "Makefile"
-    (Some (`Exec (v "all: build"))) event;
-  (* Make symlink *)
-  DK.Branch.with_transaction master (fun t ->
-      DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
-      DK.Transaction.create_symlink t ~dir:(p "src") "Makefile" "my-target"
-      >>*= fun () ->
-      DK.Transaction.commit t ~message:"symlink"
-    )
-  >>*= fun () ->
-  expect_file_event "Makefile" makefile_events (Some (`Link "my-target"))
-  >>= fun () ->
-  (* Remove *)
-  DK.Branch.with_transaction master (fun t ->
-      DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
-      DK.Transaction.commit t ~message:"symlink"
-    )
-  >>*= fun () ->
-  expect_file_event "Makefile" makefile_events None >>= fun () ->
-  Lwt.return_unit
+    (* Create /src/Makefile *)
+    create_in_trans master (p "src") "Makefile" (v "all: build") >>*= fun () ->
+    expect_dir_event "Top event" root_events ["src"] >>= fun () ->
+    (* Start monitoring /src/Makefile *)
+    with_events master (p "src/Makefile") @@ fun makefile_events ->
+    expect_file_event "Makefile" makefile_events (Some (`File (v "all: build")))
+    >>= fun () ->
+    (* Modify file under doc *)
+    create_in_trans master (p "doc") "README" (v "Instructions") >>*= fun () ->
+    expect_dir_event "Doc event" doc_events ["README"] >>= fun () ->
+    expect_dir_event "Top event" root_events ["doc"; "src"] >>= fun () ->
+    let next_makefile_event = Lwt_stream.next makefile_events in
+    Alcotest.(check bool) "No Makefile update" true
+      (Lwt.state next_makefile_event = Lwt.Sleep);
+    (* Make executable *)
+    DK.Branch.with_transaction master (fun t ->
+        DK.Transaction.set_executable t (p "src/Makefile") true >>*= fun () ->
+        DK.Transaction.commit t ~message:"exec"
+      )
+    >>*= fun () ->
+    next_makefile_event >>= fun event ->
+    Alcotest.(check (option file_event)) "Makefile"
+      (Some (`Exec (v "all: build"))) event;
+    (* Make symlink *)
+    DK.Branch.with_transaction master (fun t ->
+        DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
+        DK.Transaction.create_symlink t ~dir:(p "src") "Makefile" "my-target"
+        >>*= fun () ->
+        DK.Transaction.commit t ~message:"symlink"
+      )
+    >>*= fun () ->
+    expect_file_event "Makefile" makefile_events (Some (`Link "my-target"))
+    >>= fun () ->
+    (* Remove *)
+    DK.Branch.with_transaction master (fun t ->
+        DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
+        DK.Transaction.commit t ~message:"symlink"
+      )
+    >>*= fun () ->
+    expect_file_event "Makefile" makefile_events None >>= fun () ->
+    Lwt.return_unit
 
 let test_rename_branch dk =
   DK.branch dk "old" >>*= fun branch ->
@@ -540,41 +541,41 @@ let test_rename_branch dk =
 let test_rename_dir dk =
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun t ->
-    DK.Transaction.create_dir t ~dir:(p "") "old" >>*= fun () ->
-    DK.Transaction.rename t (p "old") "new" >>*= fun () ->
-    DK.Transaction.read_dir t (p "") >>*= fun items ->
-    Alcotest.(check (list string)) "New files" ["new"] items;
-    DK.Transaction.abort t >>= fun () ->
-    Lwt.return (Ok ())
-  ) >>*= fun () ->
+      DK.Transaction.create_dir t ~dir:(p "") "old" >>*= fun () ->
+      DK.Transaction.rename t (p "old") "new" >>*= fun () ->
+      DK.Transaction.read_dir t (p "") >>*= fun items ->
+      Alcotest.(check (list string)) "New files" ["new"] items;
+      DK.Transaction.abort t >>= fun () ->
+      Lwt.return (Ok ())
+    ) >>*= fun () ->
   Lwt.return ()
 
 let test_rename_file dk =
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun t ->
-    DK.Transaction.create_file t ~dir:(p "") "old" (v "data") >>*= fun () ->
-    DK.Transaction.rename t (p "old") "new" >>*= fun () ->
-    DK.Transaction.read_dir t (p "") >>*= fun items ->
-    Alcotest.(check (list string)) "New files" ["new"] items;
-    (* Check rename detects errors
-       Note: we currently allow overwriting an empty directory *)
-    DK.Transaction.create_dir t ~dir:(p "") "dir" >>*= fun () ->
-    DK.Transaction.create_file t ~dir:(p "dir") "precious" (v "data")
-    >>*= fun () ->
-    DK.Transaction.rename t (p "new") "dir" >>= function
-    | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
-    | Error (`Msg e) ->
-    Alcotest.(check string) "Rename over dir" "Is a directory" e;
-    (* Rename when source has been deleted. Ideally, we should also
-       check it hasn't been replaced by something with the same
-       name. *)
-    DK.Transaction.remove t (p "new") >>*= fun () ->
-    DK.Transaction.rename t (p "new") "reborn" >>= function
-    | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
-    | Error (`Msg e) ->
-    Alcotest.(check string) "Source deleted" "No such file or directory" e;
-    DK.Transaction.commit t ~message:"rename"
-  ) >>*= fun () ->
+      DK.Transaction.create_file t ~dir:(p "") "old" (v "data") >>*= fun () ->
+      DK.Transaction.rename t (p "old") "new" >>*= fun () ->
+      DK.Transaction.read_dir t (p "") >>*= fun items ->
+      Alcotest.(check (list string)) "New files" ["new"] items;
+      (* Check rename detects errors
+         Note: we currently allow overwriting an empty directory *)
+      DK.Transaction.create_dir t ~dir:(p "") "dir" >>*= fun () ->
+      DK.Transaction.create_file t ~dir:(p "dir") "precious" (v "data")
+      >>*= fun () ->
+      DK.Transaction.rename t (p "new") "dir" >>= function
+      | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
+      | Error (`Msg e) ->
+        Alcotest.(check string) "Rename over dir" "Is a directory" e;
+        (* Rename when source has been deleted. Ideally, we should also
+           check it hasn't been replaced by something with the same
+           name. *)
+        DK.Transaction.remove t (p "new") >>*= fun () ->
+        DK.Transaction.rename t (p "new") "reborn" >>= function
+        | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
+        | Error (`Msg e) ->
+          Alcotest.(check string) "Source deleted" "No such file or directory" e;
+          DK.Transaction.commit t ~message:"rename"
+    ) >>*= fun () ->
   expect_head master >>*= fun head ->
   DK.Tree.read_dir (DK.Commit.tree head) (p "") >>*= fun items ->
   Alcotest.(check (list string)) "New files" ["dir"] items;

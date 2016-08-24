@@ -33,17 +33,55 @@ module Repo: sig
 
 end
 
+module Commit: sig
+
+  type t = { repo: Repo.t; id: string }
+  (** The type for commits. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for commits. *)
+
+  val repo: t -> Repo.t
+  (** [repo t] is [t]'s repository. *)
+
+  val id: t -> string
+  (** [id t] is [t]'s SHA1. *)
+
+  module Set: sig
+    include Set.S with type elt = t
+    val pp: t Fmt.t
+  end
+  (** Sets of commits. *)
+
+end
+
 module PR: sig
 
   (** The type for pull-requests values. *)
   type t = {
-    user: string;
-    repo: string;
+    head: Commit.t;
     number: int;
     state: [`Open | `Closed];
-    head: string; (* SHA1 *)
     title: string;
   }
+
+  val repo: t -> Repo.t
+  (** [repo t] is [t]'s repostiory. *)
+
+  val commit: t -> Commit.t
+  (** [commit t] is [t]'s commit. *)
+
+  val commit_id: t -> string
+  (** [commit_id t] is the SHA1 of [t]'s commit. *)
+
+  val number: t -> int
+  (** [number t] is [t]'s number. *)
+
+  val state: t -> [`Open | `Closed]
+  (** [state t] is [t]'s state. *)
+
+  val title: t -> string
+  (** [title t] is [t]'s title. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for pull-request values. *)
@@ -60,14 +98,21 @@ module Status: sig
 
   (** The type for status values. *)
   type t = {
-    user: string;
-    repo: string;
-    commit: string;
+    commit: Commit.t;
     context: string list;
     url: string option;
     description: string option;
     state: Status_state.t;
   }
+
+  val repo: t -> Repo.t
+  (** [repo t] is [t]'s repository. *)
+
+  val commit: t -> Commit.t
+  (** [commit t] is [t]'s commit. *)
+
+  val commit_id: t -> string
+  (** [commit_id t] is [t]'s commit ID. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for status values. *)
@@ -89,12 +134,16 @@ end
 module Ref: sig
 
   type t = {
-    user: string;
-    repo: string;
+    head: Commit.t;
     name: string list;
-    head: string;
   }
   (** The type for Git references. *)
+
+  val repo: t -> Repo.t
+  (** [repo t] is [t]'s repository. *)
+
+  val commit: t -> Commit.t
+  (** [commit t] is [t]'s commit. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
@@ -130,17 +179,16 @@ module type API = sig
   val user_exists: token -> user:string -> bool Lwt.t
   (** [exist_user t ~user] is true iff [user] exists. *)
 
-  val repo_exists: token -> user:string -> repo:string -> bool Lwt.t
-  (** [exists_repo t ~user ~repo] is true iff [user/repo] exists. *)
+  val repo_exists: token -> Repo.t -> bool Lwt.t
+  (** [exists_repo t r] is true iff the repository [r] exists. *)
 
-  val repos: token -> user:string -> string list Lwt.t
+  val repos: token -> user:string -> Repo.t list Lwt.t
   (** [repos t ~user] is the list of repositories owned by user
       [user]. *)
 
-  val status: token -> user:string -> repo:string -> commit:string ->
-    Status.t list Lwt.t
-  (** [status t ~user ~repo ~commit] returns the list of status
-      attached to [commit]. *)
+  val status: token -> Commit.t -> Status.t list Lwt.t
+  (** [status t c] returns the list of status attached to the commit
+      [c]. *)
 
   val set_status: token -> Status.t -> unit Lwt.t
   (** [set_status t s] updates [Status.commit s]'s status with [s]. *)
@@ -148,18 +196,15 @@ module type API = sig
   val set_pr: token -> PR.t -> unit Lwt.t
   (** [set_pr t pr] updates the PR number [PR.number pr] with [pr]. *)
 
-  val prs: token -> user:string -> repo:string -> PR.t list Lwt.t
-  (** [prs t ~user ~repo] is the list of open pull-requests for the
-      repo [user/repo]. *)
+  val prs: token -> Repo.t -> PR.t list Lwt.t
+  (** [prs t r] is the list of open pull-requests for the repo [r]. *)
 
-  val refs: token -> user:string -> repo:string -> Ref.t list Lwt.t
-  (** [refs t ~user ~repo name] is the commit ID of the reference
-      [name]. *)
+  val refs: token -> Repo.t -> Ref.t list Lwt.t
+  (** [refs t r] is the list of references for the the repo [r]. *)
 
-  val events: token -> user:string -> repo:string -> Event.t list Lwt.t
-  (** [event t ~user ~repo] is the list of events attached to
-      [user/repo]. Note: can be slow/costly if multiple pages of
-      events. *)
+  val events: token -> Repo.t -> Event.t list Lwt.t
+  (** [event t r] is the list of events attached to the repository
+      [r]. Note: can be slow/costly if multiple pages of events. *)
 
 end
 
@@ -174,9 +219,9 @@ module Snapshot: sig
   (** The empty snapshot. *)
 
   val create:
-    ?repos:Repo.Set.t -> status:Status.Set.t -> prs:PR.Set.t -> refs:Ref.Set.t
-    -> unit -> t
-  (** [create ?repos ~status ~prs ()] is a new snapshot [t] with
+    repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
+    prs:PR.Set.t -> refs:Ref.Set.t -> t
+  (** [create ?repos ~status ~prs] is a new snapshot [t] with
       pull-requests [prs], build status [status] and repositories the
       unions of [repos], the repositories of [status] and [prs]. *)
 
@@ -192,6 +237,9 @@ module Snapshot: sig
   val repos: t -> Repo.Set.t
   (** [repos t] are [t]'s repository. *)
 
+  val commits: t -> Commit.Set.t
+  (** [commits t] are [t]'s commits. *)
+
   val prs: t -> PR.Set.t
   (** [prs t] are [t]'s pull-requests. *)
 
@@ -201,6 +249,10 @@ module Snapshot: sig
   val refs: t -> Ref.Set.t
   (** [refs t] are [t]'s Git references. *)
 
+  val prune: t -> [`Clean | `Prune of t * PR.Set.t * Commit.Set.t]
+  (** [prune t] is either [`Clean] if the snapshot is clean or [`Prune
+      (t, prs, commits)] where [t] is a clean snapshot, [prs] are the pull
+      requests to close and [commits] the commits to close. *)
 end
 
 module Diff: sig
@@ -217,8 +269,7 @@ module Diff: sig
   (** The type for diff identifiers. *)
 
   type t = {
-    user: string;
-    repo: string;
+    repo: Repo.t;
     id  : id;
   }
   (** The type for filesystem diffs. *)
@@ -268,13 +319,11 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Status} *)
 
-  val status: tree ->
-    user:string -> repo:string -> commit:string -> context:string list ->
-    Status.t option result
-  (** [status t ~user ~repo ~commit ~context] is the commit's
-      build status for the repository [user/repo] in the tree [t]. *)
+  val status: tree -> Commit.t -> string list -> Status.t option result
+  (** [status t c s] is the commit's build status [s] for the commit
+      [c] in the tree [t]. *)
 
-  val statuses: ?repos:Repo.Set.t -> tree -> Status.Set.t result
+  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t result
   (** [statuses t] is the list of status stored in [t].. *)
 
   val update_status: DK.Transaction.t -> Status.t -> unit result
@@ -283,9 +332,9 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Pull requests} *)
 
-  val pr: tree -> user:string -> repo:string -> int -> PR.t option result
-  (** [pr t ~user ~repo n] is the [n]'th pull-request of the repostiry
-      [user/repo] in [t]. *)
+  val pr: tree -> Repo.t -> int -> PR.t option result
+  (** [pr t r n] is the [n]'th pull-request of the repostiry [r] in
+      [t]. *)
 
   val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t result
   (** [prs t] is the list of pull requests stored in [t]. *)

@@ -12,15 +12,12 @@ module Make (API: API) = struct
 
   type t = {
     token: API.token;
-    user: string;
-    repo: string;
+    repo: Repo.t;
   }
 
   (* /github.com/${USER}/${REPO}/commit/${SHA1}/status/${S} *)
   let commit_status_dir t ?(extra_dirs=fun () -> []) s =
-    Logs.debug (fun l ->
-        l "commit_status_file %s/%s %a" t.user t.repo Status.pp s
-      );
+    Logs.debug (fun l -> l "commit_status_file %a" Status.pp s);
     let current_descr = ref None in
     let current_url = ref None in
     let current_state = ref s.Status.state in
@@ -100,10 +97,8 @@ module Make (API: API) = struct
 
   (* /github.com/${USER}/${REPO}/commit/${SHA1}/status *)
   let commit_status_root t commit =
-    Log.debug (fun l -> l "commit_status_root %s/%s %s" t.user t.repo commit);
-    let status =
-      ref @@ lazy (API.status t.token ~user:t.user ~repo:t.repo ~commit)
-    in
+    Log.debug (fun l -> l "commit_status_root %a" Commit.pp commit);
+    let status = ref @@ lazy (API.status t.token commit) in
     let rec inodes childs =
       let root_status =
         try Some (List.find (fun (p, _) -> p = []) childs |> snd)
@@ -140,14 +135,14 @@ module Make (API: API) = struct
     let mkdir name =
       Log.debug (fun l -> l "mkdir %s" name);
       let new_status = {
-        user = t.user; repo = t.repo; commit;
+        commit;
         Status.context = [name];
         url = None;
         description = None;
         state = `Pending;
       } in
       API.set_status t.token new_status >>= fun () ->
-      status := lazy (API.status t.token ~user:t.user ~repo:t.repo ~commit);
+      status := lazy (API.status t.token commit);
       Vfs.ok @@ Vfs.Inode.dir name @@ commit_status_dir t new_status
     in
     let mkfile _ _ = Vfs.error "TODO" in
@@ -156,11 +151,12 @@ module Make (API: API) = struct
     Vfs.Dir.create ~ls ~lookup ~mkfile ~mkdir ~remove ~rename
 
   let commit_root t =
-    Logs.debug (fun l -> l "commit_root %s%s" t.user t.repo);
+    Logs.debug (fun l -> l "commit_root %a" Repo.pp t.repo);
     let ls () = Vfs.ok [] in
-    let lookup commit =
+    let lookup id =
+      let commit = { Commit.repo = t.repo; id } in
       let status = Vfs.Inode.dir "status" @@ commit_status_root t commit in
-      Vfs.Inode.dir commit @@ Vfs.Dir.of_list (fun () -> Vfs.ok [status])
+      Vfs.Inode.dir id @@ Vfs.Dir.of_list (fun () -> Vfs.ok [status])
       |> Vfs.ok
     in
     let mkdir commit = (* TODO *) lookup commit in
@@ -170,15 +166,14 @@ module Make (API: API) = struct
 
   (* /github.com/${USER}/${REPO}/pr/${PR}/head *)
   let pr_head t pr =
-    Logs.debug (fun l ->
-        l "pr_dir %s/%s %d" t.user t.repo pr.PR.number);
-    let file, _ = Vfs.File.rw_of_string (pr.PR.head ^ "\n") in
+    Logs.debug (fun l -> l "pr_dir %a %d" Repo.pp t.repo pr.PR.number);
+    let head = PR.commit_id pr in
+    let file, _ = Vfs.File.rw_of_string (head ^ "\n") in
     file
 
   (* /github.com/${USER}/${REPO}/pr/${PR} *)
   let pr_dir t pr =
-    Logs.debug (fun l ->
-        l "pr_dir %s/%s %d" t.user t.repo pr.PR.number);
+    Logs.debug (fun l -> l "pr_dir %a %d" Repo.pp t.repo pr.PR.number);
     let dirs () = Vfs.ok [
       Vfs.Inode.file "head"  @@ pr_head t pr;
     ] in
@@ -186,9 +181,9 @@ module Make (API: API) = struct
 
   (* /github.com/${USER}/${REPO}/pr *)
   let pr_root t =
-    Logs.debug (fun l -> l "pr_root %s/%s" t.user t.repo);
+    Logs.debug (fun l -> l "pr_root %a" Repo.pp t.repo);
     let prs () =
-      API.prs t.token ~user:t.user ~repo:t.repo >>= fun prs ->
+      API.prs t.token t.repo >>= fun prs ->
       List.map (fun pr ->
           Vfs.Inode.dir (string_of_int pr.PR.number) @@ pr_dir t pr
         ) prs
@@ -199,11 +194,11 @@ module Make (API: API) = struct
   (* /github.com/${USER}/${REPO}/events *)
   let repo_events t =
     let open Lwt.Infix in
-    Logs.debug (fun l -> l "repo_events %s/%s" t.user t.repo);
+    Logs.debug (fun l -> l "repo_events %a" Repo.pp t.repo);
     let data () =
       let buf = Buffer.create 1024 in
       let ppf = Format.formatter_of_buffer buf in
-      API.events t.token ~user:t.user ~repo:t.repo >|= fun events ->
+      API.events t.token t.repo >|= fun events ->
       List.iter (Fmt.pf ppf "%a\n" Event.pp) events;
       Buffer.contents buf
     in
@@ -212,8 +207,8 @@ module Make (API: API) = struct
 
   (* /github.com/${USER}/${REPO} *)
   let repo_dir t =
-    Logs.debug (fun l -> l "repo_root %s/%s" t.user t.repo);
-    API.repo_exists t.token ~user:t.user ~repo:t.repo >|= fun repo_exists ->
+    Logs.debug (fun l -> l "repo_root %a" Repo.pp t.repo);
+    API.repo_exists t.token t.repo >|= fun repo_exists ->
     if not repo_exists then None
     else
       let files = Vfs.ok [
@@ -222,7 +217,7 @@ module Make (API: API) = struct
         Vfs.Inode.dir  "commit" @@ commit_root t;
       ] in
       let dir = Vfs.Dir.of_list (fun () -> files) in
-      Some (Vfs.Inode.dir t.repo dir)
+      Some (Vfs.Inode.dir t.repo.Repo.repo dir)
 
   (* /github.com/${USER}/ *)
   let user_dir ~token ~user =
@@ -231,8 +226,8 @@ module Make (API: API) = struct
     if not exists_user then Vfs.Dir.err_no_entry
     else
       let ls () =
-        API.repos token ~user >>= fun r ->
-        Lwt_list.rev_map_p (fun repo -> repo_dir { token; user; repo }) r
+        API.repos token ~user >>= fun repos ->
+        Lwt_list.rev_map_p (fun repo -> repo_dir { token; repo }) repos
         >>= fun r ->
         List.fold_left (fun acc -> function
             | None   -> acc
@@ -242,7 +237,8 @@ module Make (API: API) = struct
       in
       let remove _ = Vfs.Dir.err_read_only in
       let lookup repo =
-        repo_dir { token; user; repo } >>= function
+        let repo = { Repo.user; repo } in
+        repo_dir { token; repo } >>= function
         | None   -> Vfs.Dir.err_no_entry
         | Some x -> Vfs.ok x
       in

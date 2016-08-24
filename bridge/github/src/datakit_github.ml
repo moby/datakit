@@ -1014,7 +1014,25 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let new_status =
       List.fold_left Status.Set.union Status.Set.empty new_status
     in
-    t
+    Log.debug (fun l ->
+        l "new-prs:%a new-refs:%a new-status:%a"
+          PR.Set.pp new_prs Ref.Set.pp new_refs Status.Set.pp new_status);
+    let prs =
+      (* as API.prs only return open PRs, we need to manually close
+         the open PR that we already know of *)
+      PR.Set.fold (fun pr acc ->
+        let { PR.head; state; number; _ } = pr in
+        let same pr = PR.commit pr = head && PR.number pr = number in
+        if state = `Open
+        && Repo.Set.mem (PR.repo pr) repos
+        && not (PR.Set.exists same new_prs) then (
+          Log.debug (fun l -> l "closing %a" PR.pp pr);
+          PR.Set.add { pr with PR.state = `Closed } acc
+        ) else
+          PR.Set.add pr acc
+      ) t.Snapshot.prs PR.Set.empty
+    in
+    { t with Snapshot.prs }
     |> PR.Set.fold Snapshot.replace_pr new_prs
     |> Ref.Set.fold Snapshot.replace_ref new_refs
     |> Commit.Set.fold Snapshot.replace_commit new_commits
@@ -1164,15 +1182,12 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
     Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
     Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
-    DK.Transaction.diff t.priv.tr t.priv.head >>*= fun d ->
-    let d = Diff.changes d in
-    begin
-      if cleanups = None && Diff.Set.is_empty d then
-        DK.Transaction.abort t.priv.tr >>= ok
-      else
-        let message = Fmt.strf "Resync for %a" Repo.Set.pp repos in
-        DK.Transaction.commit t.priv.tr ~message
-    end >>*= fun () ->
+    DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
+    (if cleanups = None && diff = [] then DK.Transaction.abort t.priv.tr >>= ok
+     else
+       let message = Fmt.strf "Sync with %a" Repo.Set.pp repos in
+       DK.Transaction.commit t.priv.tr ~message)
+    >>*= fun () ->
     DK.Transaction.abort t.pub.tr >>= fun () ->
     state ~old:(Some t) ~pub ~priv >>*= fun t ->
     Log.debug (fun l -> l "first_sync: initial state %a" pp t);

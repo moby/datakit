@@ -824,7 +824,7 @@ let random_state ~random ~user ~repo ~old_prs ~old_commits =
     |> List.map (fun pr ->
         let state =
           match pr.PR.state with
-          (* | `Open when Random.State.bool random -> `Closed *)  (* TODO: Depends on #235 *)
+          | `Open when Random.State.bool random -> `Closed
           | s -> s
         in
         let id = random_choice ~random [| "123"; "456"; "789" |] in

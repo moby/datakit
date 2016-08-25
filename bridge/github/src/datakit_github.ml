@@ -1316,11 +1316,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           >>= fun () ->
           updates := false;
           Log.info (fun l -> l "Processing new entry -- %a" pp !t);
-          sync_once !t >>= function
-          | Ok s    -> t := State s; react ()
-          | Error e ->
-            Log.err (fun l -> l "sync error: %a" DK.pp_error e);
-            react ()
+          Lwt.catch
+            (fun () -> sync_once !t >|= function
+               | Ok s    -> t := State s
+               | Error e -> Log.err (fun l -> l "sync error: %a" DK.pp_error e))
+            (fun e ->
+               Log.err (fun l -> l "error: %s" (Printexc.to_string e));
+               Lwt.return_unit)
+          >>=
+          react
       in
       let watch br =
         let notify _ =

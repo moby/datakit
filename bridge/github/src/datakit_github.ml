@@ -95,7 +95,7 @@ module PR = struct
     title: string;
   }
 
-  let compare = Pervasives.compare
+  let compare: t -> t -> int = Pervasives.compare
 
   let string_of_state = function
     | `Open   -> "open"
@@ -139,7 +139,7 @@ module Status = struct
     state: Status_state.t;
   }
 
-  let compare = Pervasives.compare
+  let compare: t -> t -> int = Pervasives.compare
 
   let pp ppf t =
     let pp_opt k ppf v = match v with
@@ -178,8 +178,7 @@ module Ref = struct
     name: string list;
   }
 
-  let compare = Pervasives.compare
-
+  let compare: t -> t -> int  = Pervasives.compare
   let repo t = t.head.Commit.repo
   let commit t = t.head
   let commit_id t = t.head.Commit.id
@@ -402,9 +401,10 @@ module Snapshot = struct
       let prs     = find repo prs     |> PR.Set.of_list in
       let refs    = find repo refs    |> Ref.Set.of_list in
       let commits = find repo commits |> Commit.Set.of_list in
-      Log.debug (fun l -> l "prune %a" Repo.pp repo);
-      Log.debug
-        (fun l -> l "status:@ %a@ prs:@ %a" Status.Set.pp status PR.Set.pp prs);
+      Log.debug (fun l ->
+          l "prune %a:@ refs:%a@ prs:%a@ status:%a"
+            Repo.pp repo Ref.Set.pp refs PR.Set.pp prs Status.Set.pp status
+        );
       let open_prs, closed_prs =
         PR.Set.fold (fun pr (open_prs, closed_prs) ->
             match pr.PR.state with
@@ -414,23 +414,9 @@ module Snapshot = struct
       in
       Log.debug (fun l -> l "open_prs:%a" PR.Set.pp open_prs);
       Log.debug (fun l -> l "closed_prs:%a" PR.Set.pp closed_prs);
-      let is_status_open s =
-        PR.Set.exists (fun pr ->
-            pr.PR.head = s.Status.commit && pr.PR.state = `Open
-          ) open_prs ||
-        Ref.Set.exists (fun r -> r.Ref.head = s.Status.commit) refs
-      in
-      let open_status, closed_status =
-        Status.Set.fold (fun s (open_status, closed_status) ->
-            match is_status_open s with
-            | false -> open_status, Status.Set.add s closed_status
-            | true  -> Status.Set.add s open_status, closed_status
-          ) status (Status.Set.empty, Status.Set.empty)
-      in
-      Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
-      Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
       let is_commit_open c =
-        Status.Set.exists (fun s -> Status.commit s = c) open_status
+        PR.Set.exists (fun pr -> PR.commit pr = c) open_prs
+        || Ref.Set.exists (fun r -> Ref.commit r = c) refs
       in
       let open_commits, closed_commits =
         Commit.Set.fold (fun c (open_commit, closed_commit) ->
@@ -441,11 +427,23 @@ module Snapshot = struct
       in
       Log.debug (fun l -> l "open_commits:%a" Commit.Set.pp open_commits);
       Log.debug (fun l -> l "closed_commits:%a" Commit.Set.pp closed_commits);
+      let is_status_open s =
+        Commit.Set.exists (fun c -> s.Status.commit = c ) open_commits
+      in
+      let open_status, closed_status =
+        Status.Set.fold (fun s (open_status, closed_status) ->
+            match is_status_open s with
+            | false -> open_status, Status.Set.add s closed_status
+            | true  -> Status.Set.add s open_status, closed_status
+          ) status (Status.Set.empty, Status.Set.empty)
+      in
+      Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
+      Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
       let repos   = Repo.Set.singleton repo in
       let status  = open_status in
       let prs     = open_prs in
       let commits = open_commits in
-      let t = create ~repos ~status ~prs ~refs ~commits in
+      let t = { repos; status; prs; refs; commits } in
       let cleanup =
         if PR.Set.is_empty closed_prs && Commit.Set.is_empty closed_commits
         then `Clean
@@ -498,7 +496,7 @@ module Diff = struct
     | `Ref l         -> Fmt.pf ppf "%a:%a" Repo.pp t.repo pp_path l
     | `Status (s, l) -> Fmt.pf ppf "%a:%s[%a]" Repo.pp t.repo s pp_path l
 
-  let compare = Pervasives.compare
+  let compare: t -> t -> int = Pervasives.compare
 
   module Set = Set(struct
       type nonrec t = t
@@ -1192,6 +1190,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     match Snapshot.prune t with
     | `Clean -> ok (t, None)
     | `Prune (t, prs, commits) ->
+      Log.debug (fun l ->
+          l "to-prune: prs=%a commits=%a" PR.Set.pp prs Commit.Set.pp commits);
       let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
       let f tr =
         list_iter_s (fun pr ->

@@ -838,6 +838,8 @@ let test_contexts = [|
   ["ci"; "circleci"];
 |]
 
+let test_pr_commits =  [| "123"; "456"; "789"; "0ab" |]
+let test_ref_commits = [| "123"; "456"; "abc"; "def" |]
 
 let test_names = [|
   ["heads"; "master"];
@@ -860,13 +862,34 @@ let test_state = [|
 let random_choice ~random options =
   options.(Random.State.int random (Array.length options))
 
-let random_commit ~random ~repo =
-  let id = random_choice ~random [| "123"; "456"; "789" |] in
+let random_pr_commit ~random ~repo =
+  let id = random_choice ~random test_pr_commits in
+  { Commit.repo; id }
+
+let random_ref_commit ~random ~repo =
+  let id = random_choice ~random test_ref_commits in
   { Commit.repo; id }
 
 let random_description ~random = random_choice ~random test_descriptions
 
 let random_state ~random = random_choice ~random test_state
+
+let random_refs ~random ~repo ~old_refs =
+  test_names
+  |> Array.to_list
+  |> List.map (fun name ->
+      if Random.State.bool random then (
+        match List.find (fun r -> r.Ref.name = name) old_refs with
+        | exception Not_found -> []
+        | old_ref ->
+          if Random.State.bool random then [] else
+            let head = random_ref_commit ~random ~repo in
+            [{ old_ref with Ref.head }]
+      ) else (
+        let head = random_ref_commit ~random ~repo in
+        [{ Ref.head; name }]
+      ))
+  |> List.concat
 
 let random_status ~random ~old_status commit =
   let old_status = match List.assoc (Commit.id commit) old_status with
@@ -897,7 +920,7 @@ let random_prs ~random ~repo ~old_prs =
           | `Open when Random.State.bool random -> `Closed
           | s -> s
         in
-        let head = random_commit ~random ~repo in
+        let head = random_pr_commit ~random ~repo in
         { pr with PR.state; head }
       ) old_prs
   in
@@ -905,7 +928,7 @@ let random_prs ~random ~repo ~old_prs =
   let rec make_prs acc = function
     | 0 -> acc
     | n ->
-      let head = random_commit ~random ~repo in
+      let head = random_pr_commit ~random ~repo in
       let number = !next_pr in
       incr next_pr;
       let pr = {
@@ -918,9 +941,9 @@ let random_prs ~random ~repo ~old_prs =
   in
   make_prs old_prs n_prs |> List.rev
 
-let random_state ~random ~repo ~old_prs ~old_status ~old_refs:_ =
+let random_state ~random ~repo ~old_prs ~old_status ~old_refs =
   let prs = random_prs ~random ~repo ~old_prs in
-  let refs = [] (* TODO: refs *) in
+  let refs = random_refs ~random ~repo ~old_refs in
   let commits =
     Commit.Set.union
       (Commit.Set.of_list @@ List.map PR.commit prs)

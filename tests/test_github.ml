@@ -30,6 +30,14 @@ end
 
 module API = struct
 
+  let error_rate = ref None
+
+  let return x = match !error_rate with
+    | None   -> Lwt.return (Ok x)
+    | Some n ->
+      if Random.float 1. > n then Lwt.return (Ok x)
+      else Lwt.return (Error "Randam error")
+
   type repo = {
     user  : string;
     repo  : string;
@@ -76,6 +84,8 @@ module API = struct
 
   type token = state
 
+  type 'a result = ('a, string) Result.result Lwt.t
+
   let lookup t { Repo.user; repo }  =
     match String.Map.find user t.users with
     | None -> None
@@ -86,23 +96,23 @@ module API = struct
     | None -> failwith (Fmt.strf "Unknown user/repo: %a" Repo.pp repo)
     | Some repo -> repo
 
-  let user_exists t ~user = Lwt.return (String.Map.mem user t.users)
-  let repo_exists t repo  = Lwt.return (lookup t repo <> None)
+  let user_exists t ~user = return (String.Map.mem user t.users)
+  let repo_exists t repo  = return (lookup t repo <> None)
 
   let repos t ~user =
     match String.Map.find user t.users with
-    | None   -> Lwt.return_nil
+    | None   -> return []
     | Some u ->
       String.Map.dom u.repos
       |> String.Set.elements
       |> List.map (fun repo -> { Repo.user; repo })
-      |> Lwt.return
+      |> return
 
   let status t commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;
     let repo = lookup_exn t (Commit.repo commit) in
-    try Lwt.return (List.assoc (Commit.id commit) repo.status)
-    with Not_found -> Lwt.return_nil
+    try return (List.assoc (Commit.id commit) repo.status)
+    with Not_found -> return []
 
   let set_status_aux t s =
     let repo = lookup_exn t (Status.repo s) in
@@ -130,7 +140,7 @@ module API = struct
   let set_status t s =
     t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
     set_status_aux t s;
-    Lwt.return_unit
+    return ()
 
   let set_pr_aux t pr =
     let repo = lookup_exn t (PR.repo pr) in
@@ -141,7 +151,7 @@ module API = struct
   let set_pr t pr =
     t.ctx.Counter.set_pr <- t.ctx.Counter.set_pr + 1;
     set_pr_aux t pr;
-    Lwt.return_unit
+    return ()
 
   let set_ref_aux t r =
     let repo = lookup_exn t (Ref.repo r) in
@@ -161,17 +171,17 @@ module API = struct
   let prs t repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
     let repo = lookup_exn t repo in
-    Lwt.return repo.prs
+    return repo.prs
 
   let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
     let repo = lookup_exn t repo in
-    Lwt.return repo.events
+    return repo.events
 
   let refs t repo =
     t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
     let repo = lookup_exn t repo in
-    Lwt.return repo.refs
+    return repo.refs
 
 end
 

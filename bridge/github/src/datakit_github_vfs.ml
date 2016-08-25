@@ -1,14 +1,29 @@
 open Astring
 open Datakit_github
+open Rresult
+open Lwt.Infix
 
 let src = Logs.Src.create "dkt-github.vfs" ~doc:"Github to VFS"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let err_invalid_status s = Vfs.error "%S: invalid status" s
 
-module Make (API: API) = struct
+let ( >>*= ) x f =
+  x >>= function
+  | Ok x         -> f x
+  | Error _ as e -> Lwt.return e
 
-  open Lwt.Infix
+let ( >>@=) x f  =
+  x >>= function
+  | Ok x    -> f x
+  | Error e -> Vfs.error "%s" e
+
+let (>|@=) x f =
+  x >|= function
+  | Ok x    -> Ok (f x)
+  | Error e -> Vfs.Error.other "%s" e
+
+module Make (API: API) = struct
 
   type t = {
     token: API.token;
@@ -36,24 +51,24 @@ module Make (API: API) = struct
           if s = !current_state then Vfs.ok (str ^ "\n")
           else (
             current_state := s;
-            set_status () >>= fun () ->
-            Vfs.ok (Status_state.to_string s ^ "\n");
+            set_status () >|@= fun () ->
+            Status_state.to_string s ^ "\n"
           )
       ) in
     let descr = Vfs.File.command ~init:"" (fun str ->
         if Some str = !current_descr then Vfs.ok (str ^ "\n")
         else (
           current_descr := Some str;
-          set_status () >>= fun () ->
-          Vfs.ok (str ^ "\n")
+          set_status () >|@= fun () ->
+          str ^ "\n"
         )
       ) in
     let url = Vfs.File.command ~init:"" (fun str ->
         if Some str = !current_url then Vfs.ok (str ^ "\n")
         else (
           current_url := Some str;
-          set_status () >>= fun () ->
-          Vfs.ok (str ^ "\n")
+          set_status () >|@= fun () ->
+          str ^ "\n"
         )
       ) in
     let dir = [
@@ -112,23 +127,26 @@ module Make (API: API) = struct
       | None   -> Vfs.Dir.of_list (fun () -> Vfs.ok @@ childs ())
       | Some s -> commit_status_dir t ~extra_dirs:childs s
     in
-    let ls () =
-      Lazy.force !status >>= fun s -> s
-      |> List.map (fun s -> Datakit_path.unwrap (Status.path s), s)
-      |> sort_by_hd
-      |> List.map (fun (name, childs) -> Vfs.Inode.dir name @@ inodes childs)
-      |> Vfs.ok
+    let with_status f =
+      Lazy.force !status >>= function
+      | Error e -> Vfs.error "incorrect status %s" e
+      | Ok s    -> f s
+    in
+    let ls () = with_status (fun s ->
+        List.map (fun s -> Datakit_path.unwrap (Status.path s), s) s
+        |> sort_by_hd
+        |> List.map (fun (name, childs) -> Vfs.Inode.dir name @@ inodes childs)
+        |> Vfs.ok)
     in
     let lookup name =
       Log.debug (fun l -> l "lookup %s" name);
-      try
-        Lazy.force !status >>= fun s -> s
-        |> List.map (fun s -> Datakit_path.unwrap (Status.path s), s)
-        |> sort_by_hd
-        |> List.assoc name
-        |> inodes
-        |> Vfs.Inode.dir name
-        |> Vfs.ok
+      try with_status (fun s ->
+          List.map (fun s -> Datakit_path.unwrap (Status.path s), s) s
+          |> sort_by_hd
+          |> List.assoc name
+          |> inodes
+          |> Vfs.Inode.dir name
+          |> Vfs.ok)
       with Not_found ->
         Vfs.File.err_no_entry
     in
@@ -141,9 +159,11 @@ module Make (API: API) = struct
         description = None;
         state = `Pending;
       } in
-      API.set_status t.token new_status >>= fun () ->
-      status := lazy (API.status t.token commit);
-      Vfs.ok @@ Vfs.Inode.dir name @@ commit_status_dir t new_status
+      API.set_status t.token new_status >>= function
+      | Error e -> Vfs.error "set-status %s" e
+      | Ok ()   ->
+        status := lazy (API.status t.token commit);
+        Vfs.ok @@ Vfs.Inode.dir name @@ commit_status_dir t new_status
     in
     let mkfile _ _ = Vfs.error "TODO" in
     let remove _ = Vfs.error "TODO" in
@@ -183,11 +203,13 @@ module Make (API: API) = struct
   let pr_root t =
     Logs.debug (fun l -> l "pr_root %a" Repo.pp t.repo);
     let prs () =
-      API.prs t.token t.repo >>= fun prs ->
-      List.map (fun pr ->
-          Vfs.Inode.dir (string_of_int pr.PR.number) @@ pr_dir t pr
-        ) prs
-      |> Vfs.ok
+      API.prs t.token t.repo >>= function
+      | Error e -> Vfs.error "prs: %s" e
+      | Ok prs  ->
+        List.map (fun pr ->
+            Vfs.Inode.dir (string_of_int pr.PR.number) @@ pr_dir t pr
+          ) prs
+        |> Vfs.ok
     in
     Vfs.Dir.of_list prs
 
@@ -198,9 +220,11 @@ module Make (API: API) = struct
     let data () =
       let buf = Buffer.create 1024 in
       let ppf = Format.formatter_of_buffer buf in
-      API.events t.token t.repo >|= fun events ->
-      List.iter (Fmt.pf ppf "%a\n" Event.pp) events;
-      Buffer.contents buf
+      API.events t.token t.repo >|= function
+      | Error e   -> Fmt.strf "error: %s" e
+      | Ok events ->
+        List.iter (Fmt.pf ppf "%a\n" Event.pp) events;
+        Buffer.contents buf
     in
     let length () = Lwt.return 0 in
     Vfs.File.status ~length data
@@ -208,7 +232,7 @@ module Make (API: API) = struct
   (* /github.com/${USER}/${REPO} *)
   let repo_dir t =
     Logs.debug (fun l -> l "repo_root %a" Repo.pp t.repo);
-    API.repo_exists t.token t.repo >|= fun repo_exists ->
+    API.repo_exists t.token t.repo >|@= fun repo_exists ->
     if not repo_exists then None
     else
       let files = Vfs.ok [
@@ -222,23 +246,24 @@ module Make (API: API) = struct
   (* /github.com/${USER}/ *)
   let user_dir ~token ~user =
     Logs.debug (fun l -> l "user_root %s/" user);
-    API.user_exists token ~user >>= fun exists_user ->
+    API.user_exists token ~user >>@= fun exists_user ->
     if not exists_user then Vfs.Dir.err_no_entry
     else
       let ls () =
-        API.repos token ~user >>= fun repos ->
+        API.repos token ~user >>@= fun repos ->
         Lwt_list.rev_map_p (fun repo -> repo_dir { token; repo }) repos
         >>= fun r ->
         List.fold_left (fun acc -> function
-            | None   -> acc
-            | Some x -> x :: acc)
-          [] r
+            | Ok (Some r) -> r :: acc
+            | Error e     -> Log.err (fun l -> l "error: %a" Vfs.Error.pp e); acc
+            | Ok None     -> acc
+          ) [] r
         |> Vfs.ok
       in
       let remove _ = Vfs.Dir.err_read_only in
       let lookup repo =
         let repo = { Repo.user; repo } in
-        repo_dir { token; repo } >>= function
+        repo_dir { token; repo } >>*= function
         | None   -> Vfs.Dir.err_no_entry
         | Some x -> Vfs.ok x
       in

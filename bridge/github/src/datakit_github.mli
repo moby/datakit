@@ -176,33 +176,36 @@ module type API = sig
   type token
   (** The type for API tokens. *)
 
-  val user_exists: token -> user:string -> bool Lwt.t
+  type 'a result = ('a, string) Result.result Lwt.t
+  (** The type for results. *)
+
+  val user_exists: token -> user:string -> bool result
   (** [exist_user t ~user] is true iff [user] exists. *)
 
-  val repo_exists: token -> Repo.t -> bool Lwt.t
+  val repo_exists: token -> Repo.t -> bool result
   (** [exists_repo t r] is true iff the repository [r] exists. *)
 
-  val repos: token -> user:string -> Repo.t list Lwt.t
+  val repos: token -> user:string -> Repo.t list result
   (** [repos t ~user] is the list of repositories owned by user
       [user]. *)
 
-  val status: token -> Commit.t -> Status.t list Lwt.t
+  val status: token -> Commit.t -> Status.t list result
   (** [status t c] returns the list of status attached to the commit
       [c]. *)
 
-  val set_status: token -> Status.t -> unit Lwt.t
+  val set_status: token -> Status.t -> unit result
   (** [set_status t s] updates [Status.commit s]'s status with [s]. *)
 
-  val set_pr: token -> PR.t -> unit Lwt.t
+  val set_pr: token -> PR.t -> unit result
   (** [set_pr t pr] updates the PR number [PR.number pr] with [pr]. *)
 
-  val prs: token -> Repo.t -> PR.t list Lwt.t
+  val prs: token -> Repo.t -> PR.t list result
   (** [prs t r] is the list of open pull-requests for the repo [r]. *)
 
-  val refs: token -> Repo.t -> Ref.t list Lwt.t
+  val refs: token -> Repo.t -> Ref.t list result
   (** [refs t r] is the list of references for the the repo [r]. *)
 
-  val events: token -> Repo.t -> Event.t list Lwt.t
+  val events: token -> Repo.t -> Event.t list result
   (** [event t r] is the list of events attached to the repository
       [r]. Note: can be slow/costly if multiple pages of events. *)
 

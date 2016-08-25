@@ -217,15 +217,16 @@ end
 
 module type API = sig
   type token
-  val user_exists: token -> user:string -> bool Lwt.t
-  val repo_exists: token -> Repo.t -> bool Lwt.t
-  val repos: token -> user:string -> Repo.t list Lwt.t
-  val status: token -> Commit.t -> Status.t list Lwt.t
-  val set_status: token -> Status.t -> unit Lwt.t
-  val set_pr: token -> PR.t -> unit Lwt.t
-  val prs: token -> Repo.t -> PR.t list Lwt.t
-  val refs: token -> Repo.t -> Ref.t list Lwt.t
-  val events: token -> Repo.t -> Event.t list Lwt.t
+  type 'a result = ('a, string) Result.result Lwt.t
+  val user_exists: token -> user:string -> bool result
+  val repo_exists: token -> Repo.t -> bool result
+  val repos: token -> user:string -> Repo.t list result
+  val status: token -> Commit.t -> Status.t list result
+  val set_status: token -> Status.t -> unit result
+  val set_pr: token -> PR.t -> unit result
+  val prs: token -> Repo.t -> PR.t list result
+  val refs: token -> Repo.t -> Ref.t list result
+  val events: token -> Repo.t -> Event.t list result
 end
 
 open Lwt.Infix
@@ -989,18 +990,34 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let repos_l = Repo.Set.elements repos in
     Lwt_list.map_p (fun r ->
         Log.info (fun l -> l "API.prs %a" Repo.pp r);
-        API.prs token r >|= fun prs ->
-        List.filter (fun pr -> pr.PR.state = `Open) prs |> PR.Set.of_list
+        API.prs token r >|= function
+        | Error e -> Error (r, e)
+        | Ok prs  ->
+          List.filter (fun pr -> pr.PR.state = `Open) prs
+          |> PR.Set.of_list
+          |> fun x -> Ok x
       ) repos_l
     >>= fun new_prs ->
-    let new_prs = List.fold_left PR.Set.union PR.Set.empty new_prs in
+    let new_prs = List.fold_left (fun new_prs -> function
+        | Ok prs       -> PR.Set.union prs new_prs
+        | Error (r, e) ->
+          Log.err (fun l -> l "API.prs %a: %s" Repo.pp r e);
+          new_prs
+      ) PR.Set.empty new_prs in
     Lwt_list.map_p (fun r ->
         Log.info (fun l -> l "API.refs %a" Repo.pp r);
-        API.refs token r >|= fun refs ->
-        Ref.Set.of_list refs
+        API.refs token r >|= function
+        | Error e -> Error (r, e)
+        | Ok refs -> Ok (Ref.Set.of_list refs)
       ) repos_l
     >>= fun new_refs ->
-    let new_refs = List.fold_left Ref.Set.union Ref.Set.empty new_refs in
+    let new_refs = List.fold_left (fun new_refs -> function
+        | Ok refs      -> Ref.Set.union refs new_refs
+        | Error (r, e) ->
+          Log.err (fun l -> l "API.refs %a: %s" Repo.pp r e);
+          new_refs
+      ) Ref.Set.empty new_refs
+    in
     let new_commits =
       Commit.Set.empty
       |> PR.Set.fold (fun pr acc -> Commit.Set.add (PR.commit pr) acc) new_prs
@@ -1008,12 +1025,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     Lwt_list.map_p (fun c ->
         Log.info (fun l -> l "API.status %a" Commit.pp c);
-        API.status token c >|=
-        Status.Set.of_list
+        API.status token c >|= function
+        | Error e   -> Error (c, e)
+        | Ok status -> Ok (Status.Set.of_list status)
       ) (Commit.Set.elements new_commits)
     >>= fun new_status ->
-    let new_status =
-      List.fold_left Status.Set.union Status.Set.empty new_status
+    let new_status = List.fold_left (fun new_status -> function
+        | Ok status    -> Status.Set.union status new_status
+        | Error (c, e) ->
+          Log.err (fun l -> l "API.status %a: %s" Commit.pp c e);
+          new_status
+      ) Status.Set.empty new_status
     in
     Log.debug (fun l ->
         l "new-prs:%a new-refs:%a new-status:%a"
@@ -1057,12 +1079,20 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         Log.info
           (fun l -> l "API.set-status %a (was %a)"
               Status.pp s Fmt.(option Status.pp) old);
-        if not dry_updates then API.set_status token s else  Lwt.return_unit
+        if not dry_updates then
+          API.set_status token s >|= function
+          | Ok ()   -> ()
+          | Error e -> Log.err (fun l -> l "API.set-status %a: %s" Status.pp s e)
+        else  Lwt.return_unit
       ) (Status.Set.elements status)
     >>= fun () ->
     Lwt_list.iter_p (fun pr ->
         Log.info (fun l -> l "API.set-pr %a" PR.pp pr);
-        if not dry_updates then API.set_pr token pr else Lwt.return_unit
+        if not dry_updates then
+          API.set_pr token pr >|= function
+          | Ok ()   -> ()
+          | Error e -> Log.err (fun l -> l "API.set-pr %a: %s" PR.pp pr e)
+        else Lwt.return_unit
       ) (PR.Set.elements prs)
     >>= fun () ->
     ok ()

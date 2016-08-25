@@ -784,6 +784,26 @@ let read_prs tree ~user ~repo =
       Lwt.return { PR.head; number; state = `Open; title; }
     )
 
+let read_refs tree ~user ~repo =
+  let path = Datakit_path.of_steps_exn [user; repo; "ref"] in
+  let rec aux acc name =
+    let path = Datakit_path.(path /@ of_steps_exn name) in
+    DK.Tree.read_file tree (path / "head") >>= begin function
+      | Error _ -> Lwt.return acc
+      | Ok head ->
+        let head = String.trim (Cstruct.to_string head) in
+        let repo = { Repo.user; repo } in
+        let head = { Commit.repo; id = head } in
+        Lwt.return ({ Ref.head; name} :: acc )
+    end
+    >>= fun acc ->
+    DK.Tree.read_dir tree path >>= function
+    | Error _   -> Lwt.return acc
+    | Ok childs ->
+      Lwt_list.fold_left_s (fun acc n -> aux acc (name @ [n])) acc childs
+  in
+  aux [] []
+
 let state_of_branch b =
   expect_head b >>*= fun head ->
   let tree = DK.Commit.tree head in
@@ -794,8 +814,8 @@ let state_of_branch b =
       Lwt_list.fold_left_s (fun acc repo ->
           read_commits tree ~user ~repo >>= fun status ->
           read_prs tree ~user ~repo >>= fun prs ->
-          (* TODO: refs *)
-          let v = { API.user; repo; status; prs; refs = []; events = [] } in
+          read_refs tree ~user ~repo >>= fun refs ->
+          let v = { API.user; repo; status; prs; refs; events = [] } in
           String.Map.add repo v acc
           |> Lwt.return
         ) String.Map.empty
@@ -818,37 +838,76 @@ let test_contexts = [|
   ["ci"; "circleci"];
 |]
 
+
+let test_names = [|
+  ["heads"; "master"];
+  ["tags" ; "foo"; "bar"];
+  ["heads"; "gh-pages"];
+|]
+
+let test_descriptions = [|
+  Some "Testing...";
+  None;
+|]
+
+let test_state = [|
+  `Pending;
+  `Success;
+  `Failure;
+  `Error;
+|]
+
 let random_choice ~random options =
   options.(Random.State.int random (Array.length options))
 
-let random_state ~random ~user ~repo ~old_prs ~old_commits =
+let random_commit ~random ~repo =
+  let id = random_choice ~random [| "123"; "456"; "789" |] in
+  { Commit.repo; id }
+
+let random_description ~random = random_choice ~random test_descriptions
+
+let random_state ~random = random_choice ~random test_state
+
+let random_status ~random ~old_status commit =
+  let old_status = match List.assoc (Commit.id commit) old_status with
+    | exception Not_found -> []
+    | old_status -> old_status
+  in
+  test_contexts
+  |> Array.to_list
+  |> List.map (fun context ->
+      if Random.State.bool random then (
+        match List.find (fun s -> s.Status.context = context) old_status with
+        | exception Not_found -> []
+        | old_status -> [old_status]    (* GitHub can't delete statuses *)
+      ) else (
+        let state = random_state ~random in
+        let description = random_description ~random in
+        [{ Status.state; commit; description; url = None; context }]
+      ))
+  |> List.concat
+
+let random_prs ~random ~repo ~old_prs =
   let n_prs = Random.State.int random 4 in
   let old_prs = List.rev old_prs in
-  let old_commits = String.Map.of_list old_commits in
-  let next_pr = ref (match old_prs with [] -> 0 | x::_ -> x.PR.number + 1) in
   let old_prs =
-    old_prs
-    |> List.map (fun pr ->
+    List.map (fun pr ->
         let state =
           match pr.PR.state with
           | `Open when Random.State.bool random -> `Closed
           | s -> s
         in
-        let id = random_choice ~random [| "123"; "456"; "789" |] in
-        let head = { pr.PR.head with Commit.id } in
+        let head = random_commit ~random ~repo in
         { pr with PR.state; head }
-      )
+      ) old_prs
   in
-  let commits = ref (String.Map.dom old_commits) in
+  let next_pr = ref (match old_prs with [] -> 0 | x::_ -> x.PR.number + 1) in
   let rec make_prs acc = function
     | 0 -> acc
     | n ->
-      let commit = random_choice ~random [| "123"; "456"; "789" |] in
-      commits := String.Set.add commit !commits;
+      let head = random_commit ~random ~repo in
       let number = !next_pr in
       incr next_pr;
-      let repo = { Repo.user; repo } in
-      let head = { Commit.repo; id = commit } in
       let pr = {
         PR.head;
         number;
@@ -857,37 +916,22 @@ let random_state ~random ~user ~repo ~old_prs ~old_commits =
       } in
       make_prs (pr :: acc) (n - 1)
   in
-  let prs = make_prs old_prs n_prs |> List.rev in
+  make_prs old_prs n_prs |> List.rev
+
+let random_state ~random ~repo ~old_prs ~old_status ~old_refs:_ =
+  let prs = random_prs ~random ~repo ~old_prs in
+  let refs = [] (* TODO: refs *) in
   let commits =
-    String.Set.elements !commits
-    |> List.map (fun commit ->
-        let description = Some "Testing..." in
-        let old_status = String.Map.find commit old_commits |> default [] in
-        let status =
-          test_contexts
-          |> Array.to_list
-          |> List.map (fun context ->
-              if Random.State.bool random then (
-                match
-                  List.find (fun s -> s.Status.context = context) old_status
-                with
-                | exception Not_found -> []
-                | old_status -> [old_status]    (* GitHub can't delete statuses *)
-              ) else (
-                let state = random_choice ~random
-                    [| `Pending; `Success; `Failure; `Error |]
-                in
-                let repo = { Repo.user; repo } in
-                let commit = { Commit.repo; id = commit } in
-                [{ Status.state; commit; description; url = None; context }]
-              )
-            )
-          |> List.concat
-        in
-        commit, status
-      )
+    Commit.Set.union
+      (Commit.Set.of_list @@ List.map PR.commit prs)
+      (Commit.Set.of_list @@ List.map Ref.commit refs)
   in
-  prs, commits
+  let status =
+    Commit.Set.fold (fun c acc ->
+        (Commit.id c, random_status ~random ~old_status c) :: acc
+      ) commits []
+  in
+  prs, status, refs
 
 let random_repos ?(old=String.Map.empty) ~random =
   let user_names = ["a"; "b"] in
@@ -898,16 +942,16 @@ let random_repos ?(old=String.Map.empty) ~random =
       in
       let repos =
         repo_names |> List.map (fun repo ->
-            let old_prs, old_commits =
+            let r = { Repo.user; repo } in
+            let old_prs, old_status, old_refs =
               match String.Map.find repo old_user.API.repos with
-              | None -> [], []
-              | Some repo -> repo.API.prs, repo.API.status
+              | None      -> [], [], []
+              | Some repo -> repo.API.prs, repo.API.status, repo.API.refs
             in
-            let prs, status =
-              random_state ~random ~user ~repo ~old_prs ~old_commits
+            let prs, status, refs =
+              random_state ~random ~repo:r ~old_prs ~old_status ~old_refs
             in
-            (* TODO: refs *)
-            repo, { API.user; repo; status; prs; refs = []; events = [] }
+            repo, { API.user; repo; status; prs; refs; events = [] }
           )
         |> String.Map.of_list
       in

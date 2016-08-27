@@ -69,18 +69,9 @@ module API = struct
 
   type state = {
     mutable users : user String.Map.t;
-    mutable webhooks: (DK.Branch.t -> (unit, DK.error) Result.result Lwt.t) list;
+    mutable webhooks: Event.t list;
     ctx: Counter.t;
   }
-
-  let apply_webhooks t priv =
-    let rec aux = function
-      | []   -> ok ()
-      | h::t -> h priv >>*= fun () -> aux t
-    in
-    aux t.webhooks >>*= fun () ->
-    t.webhooks <- [];
-    ok ()
 
   type token = state
 
@@ -129,13 +120,7 @@ module API = struct
     in
     let status = (commit, s :: rest) :: status in
     repo.status <- status;
-    let w br =
-      DK.Branch.with_transaction br (fun tr ->
-          Conv.update_status tr s >>*= fun () ->
-          DK.Transaction.commit tr ~message:"webhook"
-        )
-    in
-    t.webhooks <- w :: t.webhooks
+    t.webhooks <- (Event.Status s) :: t.webhooks
 
   let set_status t s =
     t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
@@ -146,7 +131,8 @@ module API = struct
     let repo = lookup_exn t (PR.repo pr) in
     let num = pr.PR.number in
     let prs = List.filter (fun pr -> pr.PR.number <> num) repo.prs in
-    repo.prs <- pr :: prs
+    repo.prs <- pr :: prs;
+    t.webhooks <- (Event.PR pr) :: t.webhooks
 
   let set_pr t pr =
     t.ctx.Counter.set_pr <- t.ctx.Counter.set_pr + 1;
@@ -157,7 +143,8 @@ module API = struct
     let repo = lookup_exn t (Ref.repo r) in
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.refs in
-    repo.refs <- r :: refs
+    repo.refs <- r :: refs;
+    t.webhooks <- (Event.Ref r) :: t.webhooks
 
   let apply_events t =
     t.users |> String.Map.iter @@ fun _ user ->
@@ -183,6 +170,18 @@ module API = struct
     let repo = lookup_exn t repo in
     return repo.refs
 
+  module Webhook = struct
+    type t = { mutable repos: Repo.Set.t; state: state }
+    let create state _ = { state; repos = Repo.Set.empty }
+    let listen  _ = let t, _ = Lwt.task () in t
+    let watch t r = t.repos <- Repo.Set.add r t.repos; Lwt.return_unit
+    let repos t = t.repos
+
+    let pop t =
+      let x = List.rev t.state.webhooks in
+      t.state.webhooks <- [];
+      List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x
+  end
 end
 
 module VG = Sync(API)(DK)
@@ -596,7 +595,6 @@ let test_startup dk =
 
   (* stop the app, apply the webhooks and restart *)
   let s = VG.empty in
-  API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   Alcotest.(check counter) "counter: 4"
     { events = 0; prs = 2; status = 4; refs = 2; set_pr = 0; set_status = 1 }
@@ -620,8 +618,6 @@ let test_startup dk =
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
 
   (* receive new webhooks *)
-  t.API.webhooks <- [fun br -> update_status br dir `Failure];
-  API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 6"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
@@ -629,8 +625,6 @@ let test_startup dk =
 
   (* changes done in the public branch are never overwritten
      FIXME: we might want to improve/change this in the future. *)
-  t.API.webhooks <- [fun br -> update_status br dir `Success];
-  API.apply_webhooks t priv >>*= fun () ->
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   Alcotest.(check counter) "counter: 7"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }

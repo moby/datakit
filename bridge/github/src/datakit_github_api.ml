@@ -100,26 +100,27 @@ module Event = struct
       | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
       | Some (user, repo) -> { Repo.user; repo }
     in
+    let other str = Other (repo, str) in
     match e.event_payload with
     | `Status s       -> Status (Status.of_event repo s)
     | `PullRequest pr -> PR (PR.of_event repo pr)
     | `Push p         -> Ref (Ref.of_event repo p)
-    | `Create _       -> Other "create"
-    | `Delete _       -> Other "delete"
-    | `Download       -> Other "download"
-    | `Follow         -> Other "follow"
-    | `Fork _         -> Other "fork"
-    | `ForkApply      -> Other "fork-apply"
-    | `Gist           -> Other "gist"
-    | `Gollum _       -> Other "gollum"
-    | `IssueComment _ -> Other "issue-comment"
-    | `Issues _       -> Other "issues"
-    | `Member _       -> Other "member"
-    | `Public         -> Other "public"
-    | `Release _      -> Other "release"
-    | `Watch _        -> Other "watch"
-    | `PullRequestReviewComment _ -> Other "pull-request-review-comment"
-    | `CommitComment _            -> Other "commit-comment"
+    | `Create _       -> other "create"
+    | `Delete _       -> other "delete"
+    | `Download       -> other "download"
+    | `Follow         -> other "follow"
+    | `Fork _         -> other "fork"
+    | `ForkApply      -> other "fork-apply"
+    | `Gist           -> other "gist"
+    | `Gollum _       -> other "gollum"
+    | `IssueComment _ -> other "issue-comment"
+    | `Issues _       -> other "issues"
+    | `Member _       -> other "member"
+    | `Public         -> other "public"
+    | `Release _      -> other "release"
+    | `Watch _        -> other "watch"
+    | `PullRequestReviewComment _ -> other "pull-request-review-comment"
+    | `CommitComment _            -> other "commit-comment"
 
 end
 
@@ -230,3 +231,8 @@ let events token r =
   Github.Stream.to_list events
   |> Github.Monad.map (List.map Event.of_gh)
   |> run
+
+module Webhook = struct
+  include Datakit_github_webhook
+  let pop t = List.map event (pop t)
+end

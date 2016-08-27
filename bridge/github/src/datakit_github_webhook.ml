@@ -277,19 +277,22 @@ module Webhook = struct
 
 end
 
-type routes = {
+type s = {
   uri     : Uri.t;
   registry: (string, Webhook.t) Hashtbl.t;
-  callback: Github_t.event -> unit Lwt.t;
+  events  : Github_t.event Queue.t;
+  token   : Github.Token.t;
+  mutable repos: Repo.Set.t
 }
 
-type t = {
-  routes: routes;
-  http: HTTP.t;
-  mutable repos: Repo.Set.t;
-}
+type t = { s: s; http: HTTP.t }
 
-let empty uri callback = { uri; registry = Hashtbl.create 10; callback }
+let empty token uri =
+  let events = Queue.create () in
+  let registry = Hashtbl.create 10 in
+  let repos = Repo.Set.empty in
+  { uri; registry; events; token; repos }
+
 let notify_query = "notify"
 let path_seg = Re.(rep1 (compl [char '/']))
 let github_error_str = Fmt.strf "GitHub connection for %a failed:" Repo.pp
@@ -297,30 +300,23 @@ let notify_re =
   Re.(seq [str "github/"; group path_seg; char '/'; group path_seg])
 
 let notification_handler t repo _id _req body =
-  Lwt.async (fun () ->
-    Cohttp_lwt_body.to_string body >>= fun body ->
-    Lwt.catch
-      (fun () -> t.callback (Github_j.event_of_string body))
-      (fun e  ->
-         Log.err (fun l ->
-             l "notification for %a: %s" Repo.pp repo @@ Printexc.to_string e);
-         Lwt.return_unit)
-  );
+  Cohttp_lwt_body.to_string body >>= fun body ->
+  Queue.add (Github_j.event_of_string body) t.s.events;
   let body = Fmt.strf "Got event for %a\n" Repo.pp repo in
   Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
   >|= some
 
-let watch t token repo =
-  if Repo.Set.mem repo t.repos then (
-    Log.debug (fun l -> l "Alreday watching %a" Repo.Set.pp t.repos);
+let watch t repo =
+  if Repo.Set.mem repo t.s.repos then (
+    Log.debug (fun l -> l "Alreday watching %a" Repo.Set.pp t.s.repos);
     Lwt.return_unit
   ) else
-    let url = Uri.resolve "" t.routes.uri (Uri.of_string ("?"^notify_query)) in
+    let url = Uri.resolve "" t.s.uri (Uri.of_string ("?"^notify_query)) in
     Log.info (fun l ->
         l "Connecting GitHub to callback %s\n%!" (Uri.to_string url));
     let err = github_error_str repo in
-    Webhook.connect ~token t.routes.registry url
-      (repo, notification_handler t.routes repo)
+    Webhook.connect ~token:t.s.token t.s.registry url
+      (repo, notification_handler t repo)
     >|= fun endpoint -> match endpoint.Webhook.status with
     | Webhook.Indicated    -> Log.err (fun l -> l "%s wedged prerequest" err)
     | Webhook.Pending      -> Log.err (fun l -> l "%s wedged pending" err)
@@ -328,7 +324,7 @@ let watch t token repo =
     | Webhook.Unauthorized -> Log.err (fun l -> l "%s authorization failed" err)
     | Webhook.Connected    ->
       Log.info (fun l -> l "%a connected" Repo.pp repo);
-      t.repos <- Repo.Set.add repo t.repos
+      t.s.repos <- Repo.Set.add repo t.s.repos
 
 let service { uri; registry; _ } service_fn =
   let root = Uri.path uri in
@@ -345,13 +341,21 @@ let service { uri; registry; _ } service_fn =
   in
   service_fn  ~routes ~handler
 
-let create uri callback =
+let create token uri =
   let port = match Uri.port uri with None -> 80 | Some p -> p in
-  let http    = HTTP.create port in
-  let routes  = empty uri callback in
-  let service = service routes (HTTP.service "GitHub listener") in
+  let http = HTTP.create port in
+  let s  = empty token uri in
+  let service = service s (HTTP.service "GitHub listener") in
   let http = HTTP.with_service http service in
-  { routes; http; repos = Repo.Set.empty }
+  { s; http }
 
-let repos t = t.repos
+let pop t =
+  let rec aux acc =
+    match Queue.pop t.s.events with
+    | exception Queue.Empty -> List.rev acc
+    | h -> aux (h :: acc)
+  in
+  aux []
+
+let repos t = t.s.repos
 let listen t = HTTP.listen t.http

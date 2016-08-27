@@ -104,21 +104,6 @@ let start () sandbox no_listen listen_urls
     | None   -> failwith "Missing datakit GitHub token"
     | Some t -> t
   in
-  let events = Queue.create () in
-  let watch, start_webhook = match webhook with
-    | None   -> (fun _repo -> Lwt.return_unit), (fun () -> Lwt.return_unit)
-    | Some w ->
-      Log.app (fun l -> l "Listening for webhooks on %s" w);
-      let webhook = Uri.of_string w in
-      let t = Datakit_github_webhook.create webhook (fun e ->
-          let e = Datakit_github_api.event e in
-          Queue.add e events;
-          Lwt.return_unit
-        ) in
-      (Datakit_github_webhook.watch t token,
-       fun () -> Datakit_github_webhook.listen t)
-  in
-  let webhook = { Datakit_github.events; watch } in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
     Log.app (fun l -> l "Connecting to %s." datakit);
@@ -141,7 +126,7 @@ let start () sandbox no_listen listen_urls
         DK.branch dk public_branch >>= function
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
         | Ok pub  ->
-          VG.Sync.sync t ~webhook ~dry_updates ~priv ~pub ~token
+          VG.Sync.sync t ?webhook ~dry_updates ~priv ~pub ~token
           >|= ignore
   in
   let accept_connections () =
@@ -156,7 +141,6 @@ let start () sandbox no_listen listen_urls
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();
     accept_connections ();
-    start_webhook ();
   ]
 
 open Cmdliner
@@ -222,11 +206,16 @@ let public_branch =
   in
   Arg.(value & opt string "github-metadata" doc)
 
+let uri =
+  let parse str = `Ok (Uri.of_string str) in
+  let print ppf uri = Fmt.string ppf @@ Uri.to_string uri in
+  parse, print
+
 let webhook =
   let doc =
     Arg.info ~doc:"Pubic URI of the GitHub webook server" ["webhook"]
   in
-  Arg.(value & opt (some string) None doc)
+  Arg.(value & opt (some uri) None doc)
 
 let webhook_secret =
   let doc = Arg.info ~doc:"Webhook secret" ["s";"webhook-secret"] in

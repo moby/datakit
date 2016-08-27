@@ -163,10 +163,13 @@ module Event: sig
     | PR of PR.t
     | Status of Status.t
     | Ref of Ref.t
-    | Other of string
+    | Other of (Repo.t * string)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for event values. *)
+
+  val repo: t -> Repo.t
+  (** [repo e] is [e]'s repository. *)
 
 end
 
@@ -208,6 +211,32 @@ module type API = sig
   val events: token -> Repo.t -> Event.t list result
   (** [event t r] is the list of events attached to the repository
       [r]. Note: can be slow/costly if multiple pages of events. *)
+
+  module Webhook: sig
+
+    type t
+    (** The type for the webhook server state. *)
+
+    val create: token -> Uri.t -> t
+    (** [create tok uri] is the webhook server state configured to
+        listen for incoming webhook events to the public address [uri]
+        and using the token [tok] to perform GitHub API calls. *)
+
+    val pop: t -> Event.t list
+    (** [pop t] is the list of events received by [t]. The state will
+        be emptied. *)
+
+    val listen: t -> unit Lwt.t
+    (** [listen t] runs the webook listener. Received events are
+        available via {!events}. *)
+
+    val repos: t -> Repo.Set.t
+    (** The list of watched repository. *)
+
+    val watch: t -> Repo.t -> unit Lwt.t
+    (** [watch t r] makes [t] watch the repo [r]. *)
+
+  end
 
 end
 
@@ -377,12 +406,6 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
 end
 
-type webhook = {
-  events: Event.t Queue.t;
-  watch : Repo.t -> unit Lwt.t;
-}
-(** The type for webhook state. *)
-
 module Sync (API: API) (DK: Datakit_S.CLIENT): sig
 
   type t
@@ -392,7 +415,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   (** Create an empty sync state. *)
 
   val sync:
-    ?webhook:webhook ->
+    ?webhook:Uri.t  ->
     ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?dry_updates:bool ->
     pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
     t -> t Lwt.t

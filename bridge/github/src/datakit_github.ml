@@ -199,13 +199,19 @@ module Event = struct
     | PR of PR.t
     | Status of Status.t
     | Ref of Ref.t
-    | Other of string
+    | Other of (Repo.t * string)
 
   let pp ppf = function
     | PR pr    -> Fmt.pf ppf "PR: %a" PR.pp pr
     | Status s -> Fmt.pf ppf "Status: %a" Status.pp s
     | Ref r    -> Fmt.pf ppf "Ref: %a" Ref.pp r
-    | Other s  -> Fmt.pf ppf "Other: %s" s
+    | Other o  -> Fmt.pf ppf "Other: %s" @@ snd o
+
+  let repo = function
+    | PR pr    -> PR.repo pr
+    | Status s -> Status.repo s
+    | Ref r    -> Ref.repo r
+    | Other o  -> fst o
 
   module Set = Set(struct
       type nonrec t = t
@@ -226,6 +232,14 @@ module type API = sig
   val prs: token -> Repo.t -> PR.t list result
   val refs: token -> Repo.t -> Ref.t list result
   val events: token -> Repo.t -> Event.t list result
+  module Webhook: sig
+    type t
+    val create: token -> Uri.t -> t
+    val pop: t -> Event.t list
+    val listen: t -> unit Lwt.t
+    val repos: t -> Repo.Set.t
+    val watch: t -> Repo.t -> unit Lwt.t
+  end
 end
 
 open Lwt.Infix
@@ -829,7 +843,9 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | Event.PR pr    -> update_pr t pr
     | Event.Status s -> update_status t s
     | Event.Ref r    -> update_ref t r
-    | Event.Other o  -> Log.debug (fun l -> l "ignoring event: %s" o); ok ()
+    | Event.Other o  ->
+      Log.debug (fun l -> l "ignoring event: %s" @@ snd o);
+      ok ()
 
   (* Diffs *)
 
@@ -912,14 +928,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       ok s
 
 end
-
-type webhook = {
-  events: Event.t Queue.t;
-  watch : Repo.t -> unit Lwt.t;
-}
-
-let empty_webhook () =
-  { events = Queue.create (); watch = fun _ -> Lwt.return_unit }
 
 module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
@@ -1257,24 +1265,20 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     ok t
 
   let sync_webhooks t webhook repos ~priv ~pub =
-    (* register new webhooks *)
-    Lwt_list.iter_p (fun r -> webhook.watch r) (Repo.Set.elements repos)
-    >>= fun () ->
-    (* apply the webhook events *)
-    let events =
-      let rec aux acc =
-        match Queue.pop webhook.events with
-        | e -> aux (e :: acc)
-        | exception Queue.Empty -> List.rev acc
-      in
-      aux []
-    in
-    if events = [] then ok t
-    else
-      state ~old:(Some t) ~priv ~pub >>*= fun t ->
-      list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
-      abort t >>= fun () ->
-      ok t
+    match webhook with
+    | None   -> ok t
+    | Some w ->
+      (* register new webhooks *)
+      Lwt_list.iter_p (fun r -> API.Webhook.watch w r) (Repo.Set.elements repos)
+      >>= fun () ->
+      (* apply the webhook events *)
+      match API.Webhook.pop w with
+      | []     -> ok t
+      | events ->
+        state ~old:(Some t) ~priv ~pub >>*= fun t ->
+        list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
+        abort t >>= fun () ->
+        ok t
 
   (* On startup, build the initial state by looking at the active
      repository in the public and private branch. Import the new
@@ -1333,7 +1337,16 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | Some s -> Lwt_switch.is_on s
     | None   -> true
 
+  let create_webhook token = function
+    | None     -> None
+    | Some uri -> Some (API.Webhook.create token uri)
+
   let run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy =
+    let webhook = create_webhook token webhook in
+    let run_webhook () = match webhook with
+      | None   -> let t, _ = Lwt.task () in t
+      | Some w -> API.Webhook.listen w
+    in
     let sync_once = function
       | Starting -> first_sync ~webhook ~dry_updates ~token ~priv ~pub
       | State t  -> sync_once ~webhook ~dry_updates ~token ~priv ~pub t
@@ -1378,10 +1391,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         | Ok _    -> Lwt.return_unit
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
       in
-      Lwt.join [ react () ; watch priv; watch pub ] >>= fun () ->
+      Lwt.choose [ react () ; watch priv; watch pub; run_webhook () ]
+      >>= fun () ->
       ok (`Finish !t)
 
-  let sync ?(webhook=empty_webhook ()) ?switch ?(policy=`Repeat)
+  let sync ?webhook ?switch ?(policy=`Repeat)
       ?(dry_updates=false) ~pub ~priv ~token t =
     Log.debug (fun l ->
         l "sync pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)

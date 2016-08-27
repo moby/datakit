@@ -37,8 +37,8 @@ true: \
 
 ### Bridges
 
+<bridge/github/src/*>: package(uri)
 <bridge/github/src/datakit_github_api.*>: package(github)
-
 <bridge/github/src/datakit_github_webhook.*>: package(github), package(conduit.lwt)
 <bridge/github/src/datakit_github_webhook.*>: package(nocrypto), package(hex), package(re.str)
 

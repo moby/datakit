@@ -1,15 +1,22 @@
 (** Management of Github webhook events. *)
 
+open Datakit_github
+
 type t
 (** The type for the webhook server state. *)
 
-val serve: Uri.t -> (Github_t.event -> unit Lwt.t) -> t * (unit -> unit Lwt.t)
-(** [serve uri f] is a pair [(t, l)] where [t] is the webhook server
-    state and [l ()] an Lwt blocking thread listening for incoming
-    webhook events to the public address [uri]. Every new event [e]
-    trigger an asynchronous call to [f e].  *)
+val create: Uri.t -> (Github_t.event -> unit Lwt.t) -> t
+(** [create uri f] is a pair is the webhook server state configured to
+    listen for incoming webhook events to the public address
+    [uri]. Every new event [e] will trigger an asynchronous call to [f
+    e].  *)
 
-val watch: t -> dry_updates:bool -> Github.Token.t -> Datakit_github.Repo.t ->
-  unit Lwt.t
+val listen: t -> unit Lwt.t
+(** [listen t] runs the webook listener. *)
+
+val repos: t -> Repo.Set.t
+(** The list of watched repository. *)
+
+val watch: t -> Github.Token.t -> Repo.t -> unit Lwt.t
 (** [watch t tok r] makes [t] watch the repo [r] using the token
     [tok]. *)

@@ -110,12 +110,13 @@ let start () sandbox no_listen listen_urls
     | Some w ->
       Log.app (fun l -> l "Listening for webhooks on %s" w);
       let webhook = Uri.of_string w in
-      let t, th = Datakit_github_webhook.serve webhook (fun e ->
+      let t = Datakit_github_webhook.create webhook (fun e ->
           let e = Datakit_github_api.event e in
           Queue.add e events;
           Lwt.return_unit
         ) in
-      (Datakit_github_webhook.watch t ~dry_updates token, th)
+      (Datakit_github_webhook.watch t token,
+       fun () -> Datakit_github_webhook.listen t)
   in
   let webhook = { Datakit_github.events; watch } in
   let connect_to_datakit () =

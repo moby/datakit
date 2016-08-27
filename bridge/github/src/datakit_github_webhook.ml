@@ -71,13 +71,12 @@ module HTTP = struct
 
   let create port = { port; services=[]; dispatch = make_dispatch [] }
 
-  let register_service server service =
+  let with_service server service =
     let services = service::server.services in
     let dispatch = make_dispatch services in
-    server.services <- services;
-    server.dispatch <- dispatch
+    { server with services; dispatch }
 
-  let run server =
+  let listen server =
     let port = server.port in
     let rec callback kfn conn_id req body =
       kfn conn_id req body >>= fun {service; continue} ->
@@ -278,13 +277,19 @@ module Webhook = struct
 
 end
 
-type t = {
+type routes = {
   uri     : Uri.t;
   registry: (string, Webhook.t) Hashtbl.t;
   callback: Github_t.event -> unit Lwt.t;
 }
 
-let create uri callback = { uri; registry = Hashtbl.create 10; callback }
+type t = {
+  routes: routes;
+  http: HTTP.t;
+  mutable repos: Repo.Set.t;
+}
+
+let empty uri callback = { uri; registry = Hashtbl.create 10; callback }
 let notify_query = "notify"
 let path_seg = Re.(rep1 (compl [char '/']))
 let github_error_str = Fmt.strf "GitHub connection for %a failed:" Repo.pp
@@ -305,20 +310,25 @@ let notification_handler t repo _id _req body =
   Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
   >|= some
 
-let watch t ~dry_updates token repo =
-  let url = Uri.resolve "" t.uri (Uri.of_string ("?"^notify_query)) in
-  Log.info (fun l ->
-      l "Connecting GitHub to callback %s\n%!" (Uri.to_string url));
-  let err = github_error_str repo in
-  if dry_updates then Lwt.return_unit
-  else
-    Webhook.connect ~token t.registry url (repo, notification_handler t repo)
+let watch t token repo =
+  if Repo.Set.mem repo t.repos then (
+    Log.debug (fun l -> l "Alreday watching %a" Repo.Set.pp t.repos);
+    Lwt.return_unit
+  ) else
+    let url = Uri.resolve "" t.routes.uri (Uri.of_string ("?"^notify_query)) in
+    Log.info (fun l ->
+        l "Connecting GitHub to callback %s\n%!" (Uri.to_string url));
+    let err = github_error_str repo in
+    Webhook.connect ~token t.routes.registry url
+      (repo, notification_handler t.routes repo)
     >|= fun endpoint -> match endpoint.Webhook.status with
-    | Webhook.Connected    -> Log.info (fun l -> l "%a connected" Repo.pp repo)
     | Webhook.Indicated    -> Log.err (fun l -> l "%s wedged prerequest" err)
     | Webhook.Pending      -> Log.err (fun l -> l "%s wedged pending" err)
     | Webhook.Timeout      -> Log.err (fun l -> l "%s handshake timeout" err)
     | Webhook.Unauthorized -> Log.err (fun l -> l "%s authorization failed" err)
+    | Webhook.Connected    ->
+      Log.info (fun l -> l "%a connected" Repo.pp repo);
+      t.repos <- Repo.Set.add repo t.repos
 
 let service { uri; registry; _ } service_fn =
   let root = Uri.path uri in
@@ -335,10 +345,13 @@ let service { uri; registry; _ } service_fn =
   in
   service_fn  ~routes ~handler
 
-let serve uri callback =
+let create uri callback =
   let port = match Uri.port uri with None -> 80 | Some p -> p in
-  let t = create uri callback in
-  let service = service t (HTTP.service "GitHub listener") in
-  let server = HTTP.create port in
-  HTTP.register_service server service;
-  t, fun () -> HTTP.run server
+  let http    = HTTP.create port in
+  let routes  = empty uri callback in
+  let service = service routes (HTTP.service "GitHub listener") in
+  let http = HTTP.with_service http service in
+  { routes; http; repos = Repo.Set.empty }
+
+let repos t = t.repos
+let listen t = HTTP.listen t.http

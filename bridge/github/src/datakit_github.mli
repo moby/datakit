@@ -217,18 +217,16 @@ module type API = sig
     type t
     (** The type for the webhook server state. *)
 
-    val create: token -> Uri.t -> t
-    (** [create tok uri] is the webhook server state configured to
+    val create: token -> Uri.t -> (Event.t -> unit Lwt.t) -> t
+    (** [create tok uri f] is the webhook server state configured to
         listen for incoming webhook events to the public address [uri]
-        and using the token [tok] to perform GitHub API calls. *)
+        and using the token [tok] to perform GitHub API calls. The
+        function [f] will be called everytime a new event is
+        received. *)
 
-    val pop: t -> Event.t list
-    (** [pop t] is the list of events received by [t]. The state will
-        be emptied. *)
-
-    val listen: t -> unit Lwt.t
-    (** [listen t] runs the webook listener. Received events are
-        available via {!events}. *)
+    val run: t -> unit Lwt.t
+    (** [run t] is a blocking lwt thread which runs the webook
+        listener. *)
 
     val repos: t -> Repo.Set.t
     (** The list of watched repository. *)

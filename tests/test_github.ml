@@ -171,17 +171,36 @@ module API = struct
     return repo.refs
 
   module Webhook = struct
-    type t = { mutable repos: Repo.Set.t; state: state }
-    let create state _ = { state; repos = Repo.Set.empty }
-    let listen  _ = let t, _ = Lwt.task () in t
+
+    type t = {
+      mutable repos: Repo.Set.t;
+      state: state;
+      cond: unit Lwt_condition.t;
+      f: Event.t -> unit Lwt.t;
+    }
+
+    let create state _ f = {
+      state; f;
+      repos = Repo.Set.empty;
+      cond = Lwt_condition.create ();
+    }
+
+    let run t =
+      let rec aux () =
+        Lwt_condition.wait t.cond >>= fun () ->
+        let x = List.rev t.state.webhooks in
+        t.state.webhooks <- [];
+        let x = List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x in
+        Lwt_list.iter_s t.f x >>= fun () ->
+        aux ()
+      in
+      aux ()
+
     let watch t r = t.repos <- Repo.Set.add r t.repos; Lwt.return_unit
     let repos t = t.repos
-
-    let pop t =
-      let x = List.rev t.state.webhooks in
-      t.state.webhooks <- [];
-      List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x
+    let signal t = Lwt_condition.broadcast t.cond ()
   end
+
 end
 
 module VG = Sync(API)(DK)

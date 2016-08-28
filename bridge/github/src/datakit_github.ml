@@ -234,9 +234,8 @@ module type API = sig
   val events: token -> Repo.t -> Event.t list result
   module Webhook: sig
     type t
-    val create: token -> Uri.t -> t
-    val pop: t -> Event.t list
-    val listen: t -> unit Lwt.t
+    val create: token -> Uri.t -> (Event.t -> unit Lwt.t) -> t
+    val run: t -> unit Lwt.t
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t
   end
@@ -1264,17 +1263,23 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     abort t >>= fun () ->
     ok t
 
+  type webhook = {
+    w: API.Webhook.t;
+    events: unit -> Event.t list;
+  }
+
   let sync_webhooks t webhook repos ~priv ~pub =
     match webhook with
-    | None   -> ok t
-    | Some w ->
+    | None               -> ok t
+    | Some { w; events } ->
       (* register new webhooks *)
       Lwt_list.iter_p (fun r -> API.Webhook.watch w r) (Repo.Set.elements repos)
       >>= fun () ->
       (* apply the webhook events *)
-      match API.Webhook.pop w with
+      match events () with
       | []     -> ok t
       | events ->
+        let events = List.rev events in
         state ~old:(Some t) ~priv ~pub >>*= fun t ->
         list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
         abort t >>= fun () ->
@@ -1337,15 +1342,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | Some s -> Lwt_switch.is_on s
     | None   -> true
 
-  let create_webhook token = function
-    | None     -> None
-    | Some uri -> Some (API.Webhook.create token uri)
-
   let run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy =
-    let webhook = create_webhook token webhook in
-    let run_webhook () = match webhook with
-      | None   -> let t, _ = Lwt.task () in t
-      | Some w -> API.Webhook.listen w
+    let webhook, run_webhook = match webhook with
+      | None     -> let t, _ = Lwt.task () in None, fun () -> t
+      | Some uri ->
+        let events = ref [] in
+        let enqueue e = events := e :: !events; Lwt.return_unit in
+        let dequeue () = let e = !events in events := []; List.rev e in
+        let w = API.Webhook.create token uri enqueue in
+        let t = { w; events = dequeue } in
+        let run () = API.Webhook.run w in
+        Some t, run
     in
     let sync_once = function
       | Starting -> first_sync ~webhook ~dry_updates ~token ~priv ~pub

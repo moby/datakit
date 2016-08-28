@@ -234,5 +234,5 @@ let events token r =
 
 module Webhook = struct
   include Datakit_github_webhook
-  let pop t = List.map event (pop t)
+  let create t u f = create t u (fun e -> f (event e))
 end

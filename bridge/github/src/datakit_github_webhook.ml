@@ -280,18 +280,20 @@ end
 type s = {
   uri     : Uri.t;
   registry: (string, Webhook.t) Hashtbl.t;
-  events  : Github_t.event Queue.t;
   token   : Github.Token.t;
   mutable repos: Repo.Set.t
 }
 
-type t = { s: s; http: HTTP.t }
+type t = {
+  s: s;
+  f: Github_t.event -> unit Lwt.t;
+  http: HTTP.t;
+}
 
 let empty token uri =
-  let events = Queue.create () in
   let registry = Hashtbl.create 10 in
   let repos = Repo.Set.empty in
-  { uri; registry; events; token; repos }
+  { uri; registry; token; repos }
 
 let notify_query = "notify"
 let path_seg = Re.(rep1 (compl [char '/']))
@@ -301,7 +303,7 @@ let notify_re =
 
 let notification_handler t repo _id _req body =
   Cohttp_lwt_body.to_string body >>= fun body ->
-  Queue.add (Github_j.event_of_string body) t.s.events;
+  Lwt.async (fun () -> t.f (Github_j.event_of_string body));
   let body = Fmt.strf "Got event for %a\n" Repo.pp repo in
   Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
   >|= some
@@ -341,21 +343,13 @@ let service { uri; registry; _ } service_fn =
   in
   service_fn  ~routes ~handler
 
-let create token uri =
+let create token uri f =
   let port = match Uri.port uri with None -> 80 | Some p -> p in
   let http = HTTP.create port in
   let s  = empty token uri in
   let service = service s (HTTP.service "GitHub listener") in
   let http = HTTP.with_service http service in
-  { s; http }
-
-let pop t =
-  let rec aux acc =
-    match Queue.pop t.s.events with
-    | exception Queue.Empty -> List.rev acc
-    | h -> aux (h :: acc)
-  in
-  aux []
+  { s; http; f }
 
 let repos t = t.s.repos
-let listen t = HTTP.listen t.http
+let run t = HTTP.listen t.http

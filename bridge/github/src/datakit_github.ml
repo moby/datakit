@@ -120,6 +120,7 @@ module PR = struct
   let number t = t.number
   let title t = t.title
   let state t = t.state
+  let same x y = repo x = repo y && number x = number y
 
   module Set = Set(struct
       type nonrec t = t
@@ -162,6 +163,7 @@ module Status = struct
   let repo t = t.commit.Commit.repo
   let commit t = t.commit
   let commit_id t = t.commit.Commit.id
+  let same x y = commit x = commit y && context x = context y
 
   module Set = Set(struct
       type nonrec t = t
@@ -184,6 +186,8 @@ module Ref = struct
   let commit_id t = t.head.Commit.id
   let name t = t.name
   let pp ppf t = Fmt.pf ppf "%a[%a]" Commit.pp t.head pp_path t.name
+  let same x y = repo x = repo y && name x = name y
+  let path s = Datakit_path.of_steps_exn s.name
 
   module Set = Set(struct
       type nonrec t = t
@@ -450,6 +454,13 @@ module Snapshot = struct
             | true  -> Status.Set.add s open_status, closed_status
           ) status (Status.Set.empty, Status.Set.empty)
       in
+      let cleanup = {
+        repos   = Repo.Set.empty;
+        refs    = Ref.Set.empty;
+        prs     = closed_prs;
+        status  = closed_status;
+        commits = closed_commits;
+      } in
       Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
       Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
       let repos   = Repo.Set.singleton repo in
@@ -460,31 +471,37 @@ module Snapshot = struct
       let cleanup =
         if PR.Set.is_empty closed_prs && Commit.Set.is_empty closed_commits
         then `Clean
-        else `Closed (closed_prs, closed_commits)
+        else `Prune cleanup
       in
       (t, cleanup)
     in
     (* status cannot be removed, so simply monitor updates in
        [new_status]. *)
-    let result, prs, commits =
-      Repo.Set.fold (fun r (result, prs, commits) ->
+    let result, cleanup =
+      Repo.Set.fold (fun r (result, cleanup) ->
           let (x, c) = aux r in
           let result = union result x in
-          let prs, commits = match c with
-            | `Clean         -> (prs, commits)
-            | `Closed (p, c) ->
-              let prs = PR.Set.union prs p in
-              let commits = Commit.Set.union commits c in
-              (prs, commits)
+          let cleanup = match c with
+            | `Clean   -> cleanup
+            | `Prune p -> union t p
           in
-          result, prs, commits
-        ) t.repos (empty, PR.Set.empty, Commit.Set.empty)
+          result, cleanup
+        ) t.repos (empty, empty)
     in
-    if PR.Set.is_empty prs && Commit.Set.is_empty commits then (
+    if PR.Set.is_empty cleanup.prs && Commit.Set.is_empty cleanup.commits then (
       assert (compare t result = 0);
-      `Clean
+      result, None
     ) else
-      `Prune (result, prs, commits)
+      result, Some cleanup
+
+  let filter repos t =
+    let keep f r = not (Repo.Set.mem (f r) repos) in
+    let repos = Repo.Set.diff t.repos repos in
+    let prs = PR.Set.filter (keep PR.repo) t.prs in
+    let refs = Ref.Set.filter (keep Ref.repo) t.refs in
+    let commits = Commit.Set.filter (keep Commit.repo) t.commits in
+    let status = Status.Set.filter (keep Status.repo) t.status in
+    { repos; prs; refs; commits; status }
 
 end
 
@@ -1059,27 +1076,40 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l ->
         l "new-prs:%a new-refs:%a new-status:%a"
           PR.Set.pp new_prs Ref.Set.pp new_refs Status.Set.pp new_status);
-    let prs =
-      (* as API.prs only return open PRs, we need to manually close
-         the open PR that we already know of *)
-      PR.Set.fold (fun pr acc ->
-        let { PR.head; state; number; _ } = pr in
-        let same pr = PR.commit pr = head && PR.number pr = number in
-        if state = `Open
-        && Repo.Set.mem (PR.repo pr) repos
-        && not (PR.Set.exists same new_prs) then (
-          Log.debug (fun l -> l "closing %a" PR.pp pr);
-          PR.Set.add { pr with PR.state = `Closed } acc
-        ) else
-          PR.Set.add pr acc
-      ) t.Snapshot.prs PR.Set.empty
+    let clean = Snapshot.filter repos t in
+    let prs = PR.Set.union clean.Snapshot.prs new_prs in
+    let to_clean =
+      let prs =
+        PR.Set.filter (fun pr ->
+            not (PR.Set.exists (PR.same pr) new_prs)
+          ) t.Snapshot.prs
+      in
+      let refs =
+        Ref.Set.filter (fun r ->
+            not (Ref.Set.exists (Ref.same r) new_refs)
+          ) t.Snapshot.refs
+      in
+      let status =
+        Status.Set.filter  (fun s ->
+            not (Status.Set.exists (Status.same s) new_status)
+          ) t.Snapshot.status
+      in
+      let commits =
+        Commit.Set.filter (fun c ->
+            not (Commit.Set.exists ((=) c) new_commits)
+          ) t.Snapshot.commits
+      in
+      let repos = Repo.Set.empty in
+      let t = { Snapshot.repos; prs; refs; commits; status } in
+      if Snapshot.(compare empty t = 0) then None else Some t
     in
-    { t with Snapshot.prs }
-    |> PR.Set.fold Snapshot.replace_pr new_prs
-    |> Ref.Set.fold Snapshot.replace_ref new_refs
-    |> Commit.Set.fold Snapshot.replace_commit new_commits
-    |> Status.Set.fold Snapshot.replace_status new_status
-    |> ok
+    Log.debug (fun l ->
+        l "import_repo: cleanup %a" Fmt.(option Snapshot.pp) to_clean);
+    let refs = Ref.Set.union clean.Snapshot.refs new_refs in
+    let commits = Commit.Set.union clean.Snapshot.commits new_commits in
+    let status = Status.Set.union clean.Snapshot.status new_status in
+    let repos = Repo.Set.union clean.Snapshot.repos repos in
+    ok ({ Snapshot.repos; prs; commits; refs; status }, to_clean)
 
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be. *)
@@ -1186,17 +1216,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     DK.Branch.head priv >>*= fun priv_h ->
     match pub_h, priv_h with
     | None, None ->
-        DK.Branch.with_transaction priv (fun tr ->
-            let dir  = Datakit_path.empty in
-            let data = Cstruct.of_string "### DataKit -- GitHub bridge\n" in
-            DK.Transaction.create_or_replace_file tr ~dir "README.md" data
-            >>= function
-            | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
-            | Error e ->
-              DK.Transaction.abort tr >>= fun () ->
-              Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+      DK.Branch.with_transaction priv (fun tr ->
+          let dir  = Datakit_path.empty in
+          let data = Cstruct.of_string "### DataKit -- GitHub bridge\n" in
+          DK.Transaction.create_or_replace_file tr ~dir "README.md" data
+          >>= function
+          | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
+          | Error e ->
+            DK.Transaction.abort tr >>= fun () ->
+            Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
         ) >>*= fun () ->
-        with_head priv (DK.Branch.fast_forward pub)
+      with_head priv (DK.Branch.fast_forward pub)
     | Some pub_c, None  -> DK.Branch.fast_forward priv pub_c
     | None, Some priv_c -> DK.Branch.fast_forward pub priv_c
     | Some _, Some _    -> ok ()
@@ -1209,16 +1239,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     close t.priv.tr >>= fun () ->
     close t.pub.tr
 
-  let maybe_clean tr = function None -> ok () | Some f -> f tr
-
-  let prune t =
-    match Snapshot.prune t with
-    | `Clean -> ok (t, None)
-    | `Prune (t, prs, commits) ->
-      Log.debug (fun l ->
-          l "to-prune: prs=%a commits=%a" PR.Set.pp prs Commit.Set.pp commits);
+  let remove_snapshot = function
+    | None   -> ok None
+    | Some t ->
+      Log.debug (fun l -> l "to-prune: %a" Snapshot.pp t);
       let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
+      let { Snapshot.repos; prs; refs; commits; status } = t in
       let f tr =
+        list_iter_s (fun r ->
+            Conv.safe_remove tr (root r)
+          ) (Repo.Set.elements repos)
+        >>*= fun () ->
         list_iter_s (fun pr ->
             let dir = root (PR.repo pr) / "pr" / string_of_int pr.PR.number in
             Conv.safe_remove tr dir
@@ -1228,18 +1259,37 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             let dir = root (Commit.repo c) / "commit" / c.Commit.id in
             Conv.safe_remove tr dir
           ) (Commit.Set.elements commits)
+        >>*= fun () ->
+        list_iter_s (fun s ->
+            let id = Status.commit_id s in
+            let c  = Status.path s in
+            let dir = root (Status.repo s) / "commit" / id / "status" /@ c in
+            Conv.safe_remove tr dir
+          ) (Status.Set.elements status)
+        >>*= fun () ->
+        list_iter_s (fun r ->
+            let dir = root (Ref.repo r) / "ref" /@ Ref.path r in
+            Conv.safe_remove tr dir
+          ) (Ref.Set.elements refs)
       in
-      ok (t, Some f)
+      ok (Some f)
+
+  let cleanup c tr =
+    remove_snapshot c >>*= function
+    | None   -> ok ()
+    | Some f -> f tr
 
   let sync_repos ~token ~pub ~priv t repos =
-    import_repos ~token t.priv.snapshot repos >>*= fun priv_s ->
-    prune priv_s >>*= fun (priv_s, cleanups) ->
-    maybe_clean t.priv.tr cleanups >>*= fun () ->
+    import_repos ~token t.priv.snapshot repos >>*= fun (priv_s, c1) ->
+    cleanup c1 t.priv.tr >>*= fun () ->
+    let priv_s, c2 = Snapshot.prune priv_s in
+    cleanup c2 t.priv.tr >>*= fun () ->
     Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
     Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
     Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
     DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
-    (if cleanups = None && diff = [] then DK.Transaction.abort t.priv.tr >>= ok
+    (if c1 = None && c2 = None && diff = [] then
+       DK.Transaction.abort t.priv.tr >>= ok
      else
        let message = Fmt.strf "Sync with %a" Repo.Set.pp repos in
        DK.Transaction.commit t.priv.tr ~message)
@@ -1250,15 +1300,6 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     DK.Transaction.abort t.priv.tr >>= fun () ->
     merge t >>*= fun () ->
     state ~old:(Some t) ~pub ~priv >>*= fun t ->
-    prune t.pub.snapshot >>*= fun (_, cleanups) ->
-    begin match cleanups with
-      | None   -> ok t
-      | Some f ->
-        f t.pub.tr >>*= fun () ->
-        DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
-        DK.Transaction.abort t.priv.tr >>= fun () ->
-        state ~old:(Some t) ~pub ~priv
-    end >>*= fun t ->
     Log.debug (fun l -> l "first_sync: after merge %a" pp t);
     abort t >>= fun () ->
     ok t

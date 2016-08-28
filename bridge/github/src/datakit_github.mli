@@ -279,10 +279,9 @@ module Snapshot: sig
   val refs: t -> Ref.Set.t
   (** [refs t] are [t]'s Git references. *)
 
-  val prune: t -> [`Clean | `Prune of t * PR.Set.t * Commit.Set.t]
-  (** [prune t] is either [`Clean] if the snapshot is clean or [`Prune
-      (t, prs, commits)] where [t] is a clean snapshot, [prs] are the pull
-      requests to close and [commits] the commits to close. *)
+  val prune: t -> t * t option
+  (** [prune t] is either a clean snapshot and an optional snapshot
+      representing the the commits and prs entries to remove. *)
 end
 
 module Diff: sig

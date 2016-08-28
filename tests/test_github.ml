@@ -73,6 +73,8 @@ module API = struct
     ctx: Counter.t;
   }
 
+  let state users = { users; webhooks = []; ctx = Counter.zero () }
+
   type token = state
 
   type 'a result = ('a, string) Result.result Lwt.t
@@ -394,13 +396,12 @@ let init status refs events =
       Hashtbl.replace tbl s.Status.commit (s :: v)
     ) status;
   let status = Hashtbl.fold (fun k v acc -> (Commit.id k, v) :: acc) tbl [] in
-  let ctx = Counter.zero () in
   let users = String.Map.singleton user {
       API.repos = String.Map.singleton repo.Repo.repo {
           API.user; repo = repo.Repo.repo; status; refs; prs = []; events
         }
     } in
-  { API.users; ctx; webhooks = [] }
+  API.state users
 
 let root { Repo.user; repo } = Datakit_path.(empty / user / repo)
 
@@ -665,6 +666,59 @@ module Users = struct
 
   let prune t = String.Map.map API.prune_user t
 
+  let fold f (t:t) acc =
+    String.Map.fold (fun _ user acc ->
+        String.Map.fold (fun _ repo acc ->
+            f repo acc
+          ) user.API.repos acc
+      ) t acc
+
+  let repos t =
+    fold (fun { API.user; repo; _ } acc ->
+        Repo.Set.add { Repo.user; repo } acc
+      ) t Repo.Set.empty
+
+  let commits t =
+    fold (fun r acc ->
+        let prs =
+          List.map PR.commit r.API.prs
+          |> Commit.Set.of_list
+        in
+        let status =
+          List.fold_left (fun acc (_, s) ->
+              List.map Status.commit s
+              |> Commit.Set.of_list
+              |> Commit.Set.union acc
+            ) Commit.Set.empty r.API.status
+        in
+        Commit.Set.(union prs (union status acc))
+      ) t Commit.Set.empty
+
+  let prs t =
+    fold (fun r acc ->
+        PR.Set.union acc (PR.Set.of_list r.API.prs)
+      ) t PR.Set.empty
+
+  let status t =
+    fold (fun r acc ->
+        List.fold_left (fun acc (_, s) ->
+            Status.Set.union acc (Status.Set.of_list s)
+          ) acc r.API.status
+      ) t Status.Set.empty
+
+  let refs t =
+    fold (fun r acc ->
+        Ref.Set.union acc (Ref.Set.of_list r.API.refs)
+      ) t Ref.Set.empty
+
+  let diff x y =
+    let repos = Repo.Set.diff (repos x) (repos y) in
+    let commits = Commit.Set.diff (commits x) (commits y) in
+    let prs = PR.Set.diff (prs x) (prs y) in
+    let status = Status.Set.diff (status x) (status y) in
+    let refs = Ref.Set.diff (refs x) (refs y) in
+    Snapshot.create ~repos ~commits ~status ~prs ~refs
+
   let pp_status f = function
     | `Open   -> Fmt.string f "open"
     | `Closed -> Fmt.string f "closed"
@@ -842,7 +896,12 @@ let ensure_in_sync ~msg github pub =
           DataKit:@\n@[%a@]@."
     Users.pp github.API.users
     Users.pp pub_users;
-  Alcotest.check users msg (Users.prune github.API.users) pub_users;
+  let github = Users.prune github.API.users in
+  Alcotest.check snapshot (msg ^ "[github-pub]")
+    Snapshot.empty (Users.diff github pub_users);
+  Alcotest.check snapshot (msg ^ "[pub-github]")
+    Snapshot.empty (Users.diff pub_users github);
+  Alcotest.check users msg github pub_users;
   Lwt.return ()
 
 let test_contexts = [|
@@ -1018,15 +1077,26 @@ let test_random _repo conn =
   DK.branch dk priv >>*= fun priv ->
   let s = VG.empty in
   let users = random_repos ~random ?old:None in
-  let ctx = Counter.zero () in
-  let t = { API.users; ctx; webhooks = [] } in
+  let t = API.state users in
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
   ensure_in_sync ~msg:"init" t pub >>= fun () ->
   let users = random_repos ~random ~old:users in
-  let t = { API.users; ctx; webhooks = [] } in
+  let t = API.state users in
   VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
-  ensure_in_sync ~msg:"update" t pub
-
+  ensure_in_sync ~msg:"update" t pub >>= fun () ->
+  let sync n =
+    let rec aux k old =
+      let s = VG.empty in
+      let users = random_repos ~random ~old in
+      let t = API.state users in
+      VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+      let msg = Fmt.strf "update %d" (n - k + 1) in
+      ensure_in_sync ~msg t pub >>= fun () ->
+      if k > 0 then aux (k-1) users else Lwt.return_unit
+    in
+    aux n users >|= ignore
+  in
+  sync 10
 
 let test_set = [
   "snapshot", `Quick, test_snapshot;

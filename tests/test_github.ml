@@ -8,6 +8,7 @@ open Result
 module Conv = Conv(DK)
 
 module Counter = struct
+
   type t = {
     mutable events    : int;
     mutable prs       : int;
@@ -26,28 +27,24 @@ module Counter = struct
       t.events t.prs t.status t.refs t.set_status t.set_pr
 
   let equal x y = Pervasives.compare x y = 0
+
 end
 
-module API = struct
+module R = struct
 
-  let error_rate = ref None
-
-  let return x = match !error_rate with
-    | None   -> Lwt.return (Ok x)
-    | Some n ->
-      if Random.float 1. > n then Lwt.return (Ok x)
-      else Lwt.return (Error "Randam error")
-
-  type repo = {
+  type t = {
     user  : string;
     repo  : string;
     mutable status: (string * Status.t list) list;
     mutable prs   : PR.t list;
-    mutable events: Event.t list;
     mutable refs  : Ref.t list;
+    mutable events: Event.t list;
   }
 
-  let prune_repo r =
+  let create { Repo.user; repo } =
+    { user; repo; status = []; prs = []; refs = []; events = [] }
+
+  let prune r =
     let prs = List.filter (fun pr -> PR.state pr = `Open) r.prs in
     let commits =
       let prs = Commit.Set.of_list (List.map PR.commit prs) in
@@ -61,33 +58,209 @@ module API = struct
     in
     { r with prs; status }
 
-  type user = {
-    mutable repos : repo String.Map.t;
+  let events t = let x = t.events in t.events <- []; x
+
+  let pp_status f = function
+    | `Open   -> Fmt.string f "open"
+    | `Closed -> Fmt.string f "closed"
+
+  let pp_pr f pr =
+    Fmt.pf f "n=%d;head=%s;title=%S;%a"
+      pr.PR.number (PR.commit_id pr) pr.PR.title pp_status pr.PR.state
+
+  let pp_state f (commit, states) =
+    Fmt.pf f "%s->%a" commit (Fmt.Dump.list Status.pp) states
+
+  let pp f { status; prs; _ } =
+    Fmt.pf f "prs=%a;@,commits=%a"
+      (Fmt.Dump.list pp_pr) prs
+      (Fmt.Dump.list pp_state) status
+
+  let status_equal a b =
+    a.Status.state       = b.Status.state &&
+    a.Status.description = b.Status.description &&
+    a.Status.url         = b.Status.url
+
+  let equal_commit a b =
+    let to_map x =
+      x
+      |> List.map (fun a -> String.concat ~sep:"/" a.Status.context, a)
+      |> String.Map.of_list
+    in
+    let a = to_map a in
+    let b = to_map b in
+    String.Map.equal status_equal a b
+
+  let equal_state a b =
+    let to_map x =
+      x
+      |> List.filter (fun (_, status) -> status <> [])
+      |> String.Map.of_list
+    in
+    let a = to_map a in
+    let b = to_map b in
+    String.Map.equal equal_commit a b
+
+  let equal_pr a b =
+    a.PR.title = b.PR.title &&
+    a.PR.head = b.PR.head
+
+  let equal_prs a b =
+    let to_map x =
+      x
+      |> List.map (fun a -> String.of_int a.PR.number, a)
+      |> String.Map.of_list
+    in
+    let a = to_map a in
+    let b = to_map b in
+    String.Map.equal equal_pr a b
+
+  let equal a b = equal_state a.status b.status && equal_prs a.prs b.prs
+
+end
+
+module User = struct
+
+  type t = {
+    mutable repos : R.t String.Map.t;
   }
 
-  let prune_user u = { repos = String.Map.map prune_repo u.repos }
+  let prune t = { repos = String.Map.map R.prune t.repos }
 
-  type state = {
-    mutable users : user String.Map.t;
-    mutable webhooks: Event.t list;
+  let fold f t acc = String.Map.fold (fun _ repo acc -> f repo acc ) t.repos acc
+
+  let repos t =
+    fold (fun { R.user; repo; _ } acc ->
+        Repo.Set.add { Repo.user; repo } acc
+      ) t Repo.Set.empty
+
+  let commits t =
+    fold (fun r acc ->
+        let prs =
+          List.map PR.commit r.R.prs
+          |> Commit.Set.of_list
+        in
+        let status =
+          List.fold_left (fun acc (_, s) ->
+              List.map Status.commit s
+              |> Commit.Set.of_list
+              |> Commit.Set.union acc
+            ) Commit.Set.empty r.R.status
+        in
+        Commit.Set.(union prs (union status acc))
+      ) t Commit.Set.empty
+
+  let prs t =
+    fold (fun r acc ->
+        PR.Set.union acc (PR.Set.of_list r.R.prs)
+      ) t PR.Set.empty
+
+  let status t =
+    fold (fun r acc ->
+        List.fold_left (fun acc (_, s) ->
+            Status.Set.union acc (Status.Set.of_list s)
+          ) acc r.R.status
+      ) t Status.Set.empty
+
+  let refs t =
+    fold (fun r acc ->
+        Ref.Set.union acc (Ref.Set.of_list r.R.refs)
+      ) t Ref.Set.empty
+
+  let events t = fold (fun r acc -> R.events r @ acc) t []
+
+  let pp f { repos } = String.Map.dump R.pp f repos
+
+  let equal a b = String.Map.equal R.equal a.repos b.repos
+
+end
+
+module Users = struct
+
+  type t = User.t String.Map.t
+
+  let prune (t:t): t = String.Map.map User.prune t
+
+  let fold f t acc = String.Map.fold (fun _ user acc -> f user acc ) t acc
+
+  let repos t =
+    fold (fun u acc -> Repo.Set.union acc (User.repos u)) t Repo.Set.empty
+
+  let commits t =
+    fold (fun u acc -> Commit.Set.union acc (User.commits u)) t Commit.Set.empty
+
+  let prs t =
+    fold (fun u acc -> PR.Set.union acc (User.prs u)) t PR.Set.empty
+
+  let status t =
+    fold (fun u acc -> Status.Set.union acc (User.status u)) t Status.Set.empty
+
+  let refs t =
+    fold (fun u acc -> Ref.Set.union acc (User.refs u)) t Ref.Set.empty
+
+  let diff x y =
+    let repos = Repo.Set.diff (repos x) (repos y) in
+    let commits = Commit.Set.diff (commits x) (commits y) in
+    let prs = PR.Set.diff (prs x) (prs y) in
+    let status = Status.Set.diff (status x) (status y) in
+    let refs = Ref.Set.diff (refs x) (refs y) in
+    Snapshot.create ~repos ~commits ~status ~prs ~refs
+
+  let events_of_diff x y =
+    let d = diff x y in
+    let prs =
+      List.map (fun pr -> Event.PR pr) (PR.Set.elements @@ Snapshot.prs d)
+    in
+    let refs =
+      List.map (fun r -> Event.Ref r) (Ref.Set.elements @@ Snapshot.refs d)
+    in
+    let status =
+      List.map (fun s -> Event.Status s)
+        (Status.Set.elements @@ Snapshot.status d)
+    in
+    prs @ refs @ status
+
+  let pp f users = String.Map.dump User.pp f users
+
+  let equal a b = String.Map.equal User.equal a b
+
+end
+
+module API = struct
+
+  let error_rate = ref None
+
+  let return x = match !error_rate with
+    | None   -> Lwt.return (Ok x)
+    | Some n ->
+      if Random.float 1. > n then Lwt.return (Ok x)
+      else Lwt.return (Error "Randam error")
+
+  type t = {
+    mutable users: User.t String.Map.t;
     ctx: Counter.t;
+    cond: unit Lwt_condition.t; (* for webhooks events *)
   }
-
-  let state users = { users; webhooks = []; ctx = Counter.zero () }
-
-  type token = state
 
   type 'a result = ('a, string) Result.result Lwt.t
+
+  type token = t
+
+  let fold f t acc = String.Map.fold (fun _ repo acc -> f repo acc ) t.users acc
 
   let lookup t { Repo.user; repo }  =
     match String.Map.find user t.users with
     | None -> None
-    | Some user -> String.Map.find repo user.repos
+    | Some user -> String.Map.find repo user.User.repos
 
-  let lookup_exn t repo =
+  let lookup_or_create t repo =
     match lookup t repo with
-    | None -> failwith (Fmt.strf "Unknown user/repo: %a" Repo.pp repo)
     | Some repo -> repo
+    | None      -> R.create repo
+
+  let add_event t e =
+    let r = lookup_or_create t (Event.repo e) in
+    r.R.events <- e :: r.R.events
 
   let user_exists t ~user = return (String.Map.mem user t.users)
   let repo_exists t repo  = return (lookup t repo <> None)
@@ -96,33 +269,33 @@ module API = struct
     match String.Map.find user t.users with
     | None   -> return []
     | Some u ->
-      String.Map.dom u.repos
+      String.Map.dom u.User.repos
       |> String.Set.elements
       |> List.map (fun repo -> { Repo.user; repo })
       |> return
 
   let status t commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;
-    let repo = lookup_exn t (Commit.repo commit) in
-    try return (List.assoc (Commit.id commit) repo.status)
+    let repo = lookup_or_create t (Commit.repo commit) in
+    try return (List.assoc (Commit.id commit) repo.R.status)
     with Not_found -> return []
 
   let set_status_aux t s =
-    let repo = lookup_exn t (Status.repo s) in
+    let repo = lookup_or_create t (Status.repo s) in
     let commit = Status.commit_id s in
     let keep (c, _) = c <> commit in
-    let status = List.filter keep repo.status in
+    let status = List.filter keep repo.R.status in
     let rest =
       try
-        List.find (fun x -> not (keep x)) repo.status
+        List.find (fun x -> not (keep x)) repo.R.status
         |> snd
         |> List.filter (fun y -> y.Status.context <> s.Status.context)
       with Not_found ->
         []
     in
     let status = (commit, s :: rest) :: status in
-    repo.status <- status;
-    t.webhooks <- (Event.Status s) :: t.webhooks
+    repo.R.status <- status;
+    add_event t (Event.Status s)
 
   let set_status t s =
     t.ctx.Counter.set_status <- t.ctx.Counter.set_status + 1;
@@ -130,11 +303,11 @@ module API = struct
     return ()
 
   let set_pr_aux t pr =
-    let repo = lookup_exn t (PR.repo pr) in
+    let repo = lookup_or_create t (PR.repo pr) in
     let num = pr.PR.number in
-    let prs = List.filter (fun pr -> pr.PR.number <> num) repo.prs in
-    repo.prs <- pr :: prs;
-    t.webhooks <- (Event.PR pr) :: t.webhooks
+    let prs = List.filter (fun pr -> pr.PR.number <> num) repo.R.prs in
+    repo.R.prs <- pr :: prs;
+    add_event t (Event.PR pr)
 
   let set_pr t pr =
     t.ctx.Counter.set_pr <- t.ctx.Counter.set_pr + 1;
@@ -142,65 +315,66 @@ module API = struct
     return ()
 
   let set_ref_aux t r =
-    let repo = lookup_exn t (Ref.repo r) in
+    let repo = lookup_or_create t (Ref.repo r) in
     let name = r.Ref.name in
-    let refs = List.filter (fun r -> r.Ref.name <> name) repo.refs in
-    repo.refs <- r :: refs;
-    t.webhooks <- (Event.Ref r) :: t.webhooks
+    let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
+    repo.R.refs <- r :: refs;
+    add_event t (Event.Ref r)
+
+  let prs t repo =
+    t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
+    let repo = lookup_or_create t repo in
+    return repo.R.prs
+
+  let events t repo =
+    t.ctx.Counter.events <- t.ctx.Counter.events + 1;
+    let repo = lookup_or_create t repo in
+    return repo.R.events
+
+  let refs t repo =
+    t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
+    let repo = lookup_or_create t repo in
+    return repo.R.refs
 
   let apply_events t =
     t.users |> String.Map.iter @@ fun _ user ->
-    user.repos |> String.Map.iter @@ fun _ repo ->
-    repo.events |> List.iter @@ function
+    user.User.repos |> String.Map.iter @@ fun _ repo ->
+    repo.R.events |> List.iter @@ function
     | Event.PR pr    -> set_pr_aux t pr
     | Event.Status s -> set_status_aux t s
     | Event.Ref r    -> set_ref_aux t r
     | Event.Other _  -> ()
 
-  let prs t repo =
-    t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
-    let repo = lookup_exn t repo in
-    return repo.prs
-
-  let events t repo =
-    t.ctx.Counter.events <- t.ctx.Counter.events + 1;
-    let repo = lookup_exn t repo in
-    return repo.events
-
-  let refs t repo =
-    t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
-    let repo = lookup_exn t repo in
-    return repo.refs
+  let create ?(events=[]) users =
+    let cond = Lwt_condition.create () in
+    let t = { users; ctx = Counter.zero (); cond } in
+    List.iter (add_event t) events;
+    t
 
   module Webhook = struct
 
     type t = {
-      mutable repos: Repo.Set.t;
-      state: state;
-      cond: unit Lwt_condition.t;
       f: Event.t -> unit Lwt.t;
+      state: token;
+      mutable repos: Repo.Set.t;
     }
 
-    let create state _ f = {
-      state; f;
-      repos = Repo.Set.empty;
-      cond = Lwt_condition.create ();
-    }
+    let create state _ f = { f; state; repos = Repo.Set.empty }
 
     let run t =
       let rec aux () =
-        Lwt_condition.wait t.cond >>= fun () ->
-        let x = List.rev t.state.webhooks in
-        t.state.webhooks <- [];
+        let x = fold (fun u acc -> User.events u @ acc) t.state [] in
         let x = List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x in
+        let x = List.rev x in
         Lwt_list.iter_s t.f x >>= fun () ->
-        aux ()
+        Lwt_condition.wait t.state.cond >>=
+        aux
       in
       aux ()
 
     let watch t r = t.repos <- Repo.Set.add r t.repos; Lwt.return_unit
     let repos t = t.repos
-    let signal t = Lwt_condition.broadcast t.cond ()
+    let signal t = Lwt_condition.signal t.state.cond
   end
 
 end
@@ -397,11 +571,13 @@ let init status refs events =
     ) status;
   let status = Hashtbl.fold (fun k v acc -> (Commit.id k, v) :: acc) tbl [] in
   let users = String.Map.singleton user {
-      API.repos = String.Map.singleton repo.Repo.repo {
-          API.user; repo = repo.Repo.repo; status; refs; prs = []; events
+      User.repos = String.Map.singleton repo.Repo.repo {
+          R.user; repo = repo.Repo.repo; status; refs; prs = []; events;
         }
     } in
-  API.state users
+  let t = API.create users in
+  API.apply_events t;
+  t
 
 let root { Repo.user; repo } = Datakit_path.(empty / user / repo)
 
@@ -479,23 +655,24 @@ open! Counter
 
 let test_events dk =
   let t = init status0 refs0 events0 in
-  API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub  ->
+  let sync s = VG.sync ~policy:`Once ~priv ~pub ~token:t s in
   Alcotest.(check counter) "counter: 0"
     { events = 0; prs = 0; status = 0; refs = 0; set_pr = 0; set_status = 0 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 1"
     { events = 0; prs = 1; status = 1; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
+  sync s >>= fun _s ->
   Alcotest.(check counter) "counter: 2"
     { events = 0; prs = 1; status = 1; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
@@ -514,29 +691,29 @@ let update_status br dir state =
     )
 
 let find_status t repo =
-  let repo = API.lookup_exn t repo in
-  try List.find (fun (c, _) -> c = "foo") repo.API.status |> snd |> List.hd
+  let repo = API.lookup_or_create t repo in
+  try List.find (fun (c, _) -> c = "foo") repo.R.status |> snd |> List.hd
   with Not_found -> Alcotest.fail "foo not found"
 
 let find_pr t repo =
-  let repo = API.lookup_exn t repo in
-  try List.find (fun pr -> pr.PR.number = 2) repo.API.prs
+  let repo = API.lookup_or_create t repo in
+  try List.find (fun pr -> pr.PR.number = 2) repo.R.prs
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
   let t = init status0 refs0 events1 in
-  API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
+  let sync s = VG.sync ~policy:`Once ~priv ~pub ~token:t s in
   Alcotest.(check counter) "counter: 0"
     { events = 0; prs = 0; status = 0; refs = 0; set_pr = 0; set_status = 0 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 1"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 1'"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
@@ -550,11 +727,11 @@ let test_updates dk =
   DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist private commit/foo" true exists;
   update_status pub dir `Pending >>*= fun () ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 2"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 3"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
@@ -575,7 +752,7 @@ let test_updates dk =
       >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     ) >>*= fun () ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  sync s >>= fun _s ->
   Alcotest.(check counter) "counter: 4"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 1; set_status = 1 }
     t.API.ctx;
@@ -585,42 +762,41 @@ let test_updates dk =
 
 let test_startup dk =
   let t = init status0 refs0 events1 in
-  API.apply_events t;
   let s = VG.empty in
   DK.branch dk priv >>*= fun priv ->
   DK.branch dk pub  >>*= fun pub ->
+  let sync s = VG.sync ~policy:`Once ~priv ~pub ~token:t s in
   let dir = root repo / "commit" / "foo" in
 
   (* start from scratch *)
   Alcotest.(check counter) "counter: 1"
     { events = 0; prs = 0; status = 0; refs = 0; set_pr = 0; set_status = 0 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 2"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 0 }
     t.API.ctx;
   update_status pub dir `Pending >>*= fun () ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 3"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
 
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun _s ->
   Alcotest.(check counter) "counter: 3'"
     { events = 0; prs = 1; status = 2; refs = 1; set_pr = 0; set_status = 1 }
     t.API.ctx;
 
   (* stop the app, apply the webhooks and restart *)
   let s = VG.empty in
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 4"
     { events = 0; prs = 2; status = 4; refs = 2; set_pr = 0; set_status = 1 }
     t.API.ctx;
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  sync s >>= fun s ->
+  sync s >>= fun _s ->
   Alcotest.(check counter) "counter: 4'"
     { events = 0; prs = 2; status = 4; refs = 2; set_pr = 0; set_status = 1 }
     t.API.ctx;
@@ -628,24 +804,23 @@ let test_startup dk =
   (* restart with dirty public branch *)
   let s = VG.empty in
   update_status pub dir `Failure >>*= fun () ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 5"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
   let status = find_status t repo in
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
 
-  (* receive new webhooks *)
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  sync s >>= fun s ->
   Alcotest.(check counter) "counter: 6"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
 
   (* changes done in the public branch are never overwritten
      FIXME: we might want to improve/change this in the future. *)
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  sync s >>= fun _s ->
   Alcotest.(check counter) "counter: 7"
     { events = 0; prs = 3; status = 6; refs = 3; set_pr = 0; set_status = 2 }
     t.API.ctx;
@@ -660,125 +835,6 @@ let test_startup dk =
   Alcotest.(check string) "webhook update" "failure\n" (Cstruct.to_string buf);
 
   Lwt.return_unit
-
-module Users = struct
-  type t = API.user String.Map.t
-
-  let prune t = String.Map.map API.prune_user t
-
-  let fold f (t:t) acc =
-    String.Map.fold (fun _ user acc ->
-        String.Map.fold (fun _ repo acc ->
-            f repo acc
-          ) user.API.repos acc
-      ) t acc
-
-  let repos t =
-    fold (fun { API.user; repo; _ } acc ->
-        Repo.Set.add { Repo.user; repo } acc
-      ) t Repo.Set.empty
-
-  let commits t =
-    fold (fun r acc ->
-        let prs =
-          List.map PR.commit r.API.prs
-          |> Commit.Set.of_list
-        in
-        let status =
-          List.fold_left (fun acc (_, s) ->
-              List.map Status.commit s
-              |> Commit.Set.of_list
-              |> Commit.Set.union acc
-            ) Commit.Set.empty r.API.status
-        in
-        Commit.Set.(union prs (union status acc))
-      ) t Commit.Set.empty
-
-  let prs t =
-    fold (fun r acc ->
-        PR.Set.union acc (PR.Set.of_list r.API.prs)
-      ) t PR.Set.empty
-
-  let status t =
-    fold (fun r acc ->
-        List.fold_left (fun acc (_, s) ->
-            Status.Set.union acc (Status.Set.of_list s)
-          ) acc r.API.status
-      ) t Status.Set.empty
-
-  let refs t =
-    fold (fun r acc ->
-        Ref.Set.union acc (Ref.Set.of_list r.API.refs)
-      ) t Ref.Set.empty
-
-  let diff x y =
-    let repos = Repo.Set.diff (repos x) (repos y) in
-    let commits = Commit.Set.diff (commits x) (commits y) in
-    let prs = PR.Set.diff (prs x) (prs y) in
-    let status = Status.Set.diff (status x) (status y) in
-    let refs = Ref.Set.diff (refs x) (refs y) in
-    Snapshot.create ~repos ~commits ~status ~prs ~refs
-
-  let pp_status f = function
-    | `Open   -> Fmt.string f "open"
-    | `Closed -> Fmt.string f "closed"
-
-  let pp_pr f pr =
-    Fmt.pf f "n=%d;head=%s;title=%S;%a"
-      pr.PR.number (PR.commit_id pr) pr.PR.title pp_status pr.PR.state
-
-  let pp_state f (commit, states) =
-    Fmt.pf f "%s->%a" commit (Fmt.Dump.list Status.pp) states
-  let pp_repo f { API.status; prs; _ } =
-    Fmt.pf f "prs=%a;@,commits=%a"
-      (Fmt.Dump.list pp_pr) prs
-      (Fmt.Dump.list pp_state) status
-  let pp_user f { API.repos } = String.Map.dump pp_repo f repos
-  let pp f users = String.Map.dump pp_user f users
-
-  let status_equal a b =
-    a.Status.state       = b.Status.state &&
-    a.Status.description = b.Status.description &&
-    a.Status.url         = b.Status.url
-
-  let equal_commit a b =
-    let to_map x =
-      x
-      |> List.map (fun a -> String.concat ~sep:"/" a.Status.context, a)
-      |> String.Map.of_list
-    in
-    let a = to_map a in
-    let b = to_map b in
-    String.Map.equal status_equal a b
-  let equal_state a b =
-    let to_map x =
-      x
-      |> List.filter (fun (_, status) -> status <> [])
-      |> String.Map.of_list
-    in
-    let a = to_map a in
-    let b = to_map b in
-    String.Map.equal equal_commit a b
-  let equal_pr a b =
-    a.PR.title = b.PR.title &&
-    a.PR.head = b.PR.head
-  let equal_prs a b =
-    let to_map x =
-      x
-      |> List.map (fun a -> String.of_int a.PR.number, a)
-      |> String.Map.of_list
-    in
-    let a = to_map a in
-    let b = to_map b in
-    String.Map.equal equal_pr a b
-  let equal_repo a b =
-    equal_state a.API.status b.API.status &&
-    equal_prs a.API.prs b.API.prs
-  let equal_user a b =
-    String.Map.equal equal_repo a.API.repos b.API.repos
-  let equal a b =
-    String.Map.equal equal_user a b
-end
 
 let users = (module Users : Alcotest.TESTABLE with type t = Users.t)
 
@@ -882,12 +938,12 @@ let state_of_branch b =
           read_commits tree ~user ~repo >>= fun status ->
           read_prs tree ~user ~repo >>= fun prs ->
           read_refs tree ~user ~repo >>= fun refs ->
-          let v = { API.user; repo; status; prs; refs; events = [] } in
+          let v = { R.user; repo; status; prs; refs; events = [] } in
           String.Map.add repo v acc
           |> Lwt.return
         ) String.Map.empty
       >>= fun repos ->
-      Lwt.return (String.Map.add user { API.repos } acc)
+      Lwt.return (String.Map.add user { User.repos } acc)
     ) String.Map.empty
 
 let ensure_in_sync ~msg github pub =
@@ -1033,24 +1089,24 @@ let random_repos ?(old=String.Map.empty) ~random =
   let repo_names = ["a"; "b"] in
   user_names |> List.map (fun user ->
       let old_user =
-        String.Map.find user old |> default { API.repos = String.Map.empty }
+        String.Map.find user old |> default { User.repos = String.Map.empty }
       in
       let repos =
         repo_names |> List.map (fun repo ->
             let r = { Repo.user; repo } in
             let old_prs, old_status, old_refs =
-              match String.Map.find repo old_user.API.repos with
+              match String.Map.find repo old_user.User.repos with
               | None      -> [], [], []
-              | Some repo -> repo.API.prs, repo.API.status, repo.API.refs
+              | Some repo -> repo.R.prs, repo.R.status, repo.R.refs
             in
             let prs, status, refs =
               random_state ~random ~repo:r ~old_prs ~old_status ~old_refs
             in
-            repo, { API.user; repo; status; prs; refs; events = [] }
+            repo, { R.user; repo; status; prs; refs; events = [] }
           )
         |> String.Map.of_list
       in
-      user, { API.repos }
+      user, { User.repos }
     )
   |> String.Map.of_list
 
@@ -1075,21 +1131,23 @@ let test_random _repo conn =
     )
   >>*= fun () ->
   DK.branch dk priv >>*= fun priv ->
+  let sync t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t in
   let s = VG.empty in
   let users = random_repos ~random ?old:None in
-  let t = API.state users in
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  let t = API.create users in
+  sync t s >>= fun _s ->
   ensure_in_sync ~msg:"init" t pub >>= fun () ->
   let users = random_repos ~random ~old:users in
-  let t = API.state users in
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+  let t = API.create users in
+  sync t s >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
   let sync ~fresh n =
     let rec aux k s old =
       let s = if fresh then VG.empty else s in
       let users = random_repos ~random ~old in
-      let t = API.state users in
-      VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+      let events = Users.events_of_diff users old in
+      let t = API.create ~events users in
+      sync t s >>= fun s ->
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
       ensure_in_sync ~msg t pub >>= fun () ->
       if k > 1 then aux (k-1) s users else Lwt.return_unit

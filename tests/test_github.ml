@@ -1082,21 +1082,21 @@ let test_random _repo conn =
   ensure_in_sync ~msg:"init" t pub >>= fun () ->
   let users = random_repos ~random ~old:users in
   let t = API.state users in
-  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
+  VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  let sync n =
-    let rec aux k old =
-      let s = VG.empty in
+  let sync ~fresh n =
+    let rec aux k s old =
+      let s = if fresh then VG.empty else s in
       let users = random_repos ~random ~old in
       let t = API.state users in
-      VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun _s ->
-      let msg = Fmt.strf "update %d" (n - k + 1) in
+      VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+      let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
       ensure_in_sync ~msg t pub >>= fun () ->
-      if k > 0 then aux (k-1) users else Lwt.return_unit
+      if k > 1 then aux (k-1) s users else Lwt.return_unit
     in
-    aux n users >|= ignore
+    aux n s users >|= ignore
   in
-  sync 10
+  sync ~fresh:false 1
 
 let test_set = [
   "snapshot", `Quick, test_snapshot;

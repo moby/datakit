@@ -185,6 +185,20 @@ module Users = struct
   type t = User.t String.Map.t
   let empty = String.Map.empty
 
+  let of_repos repos: t =
+    let users =
+      Repo.Set.fold (fun { Repo.user; _ } acc -> user :: acc) repos []
+      |> List.map (fun u -> u, { User.repos = String.Map.empty })
+      |> String.Map.of_list
+    in
+    Repo.Set.fold (fun ({Repo.user; repo} as r) acc ->
+        let u = String.Map.get user acc in
+        let u =
+          { User.repos = String.Map.add repo (R.create r) u.User.repos }
+        in
+        String.Map.add user u acc
+      ) repos users
+
   let prune (t:t): t = String.Map.map User.prune t
 
   let fold f t acc = String.Map.fold (fun _ user acc -> f user acc ) t acc
@@ -232,7 +246,7 @@ module Users = struct
         (fun pr -> not (PR.Set.exists (PR.same pr) new_prs))
         (Snapshot.prs olds)
       |> PR.Set.elements
-      |> List.map (fun pr -> Event.PR pr)
+      |> List.map (fun pr -> Event.PR { pr with PR.state = `Closed })
     in
     let close_refs =
       Ref.Set.filter
@@ -270,16 +284,16 @@ module API = struct
 
   let lookup t { Repo.user; repo }  =
     match String.Map.find user t.users with
-    | None -> None
+    | None      -> None
     | Some user -> String.Map.find repo user.User.repos
 
-  let lookup_or_create t repo =
+  let lookup_exn t repo =
     match lookup t repo with
     | Some repo -> repo
-    | None      -> R.create repo
+    | None      -> failwith (Fmt.strf "Unknown user/repo: %a" Repo.pp repo)
 
   let add_event t e =
-    let r = lookup_or_create t (Event.repo e) in
+    let r = lookup_exn t (Event.repo e) in
     r.R.events <- e :: r.R.events
 
   let user_exists t ~user = return (String.Map.mem user t.users)
@@ -296,12 +310,12 @@ module API = struct
 
   let status t commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;
-    let repo = lookup_or_create t (Commit.repo commit) in
+    let repo = lookup_exn t (Commit.repo commit) in
     try return (List.assoc (Commit.id commit) repo.R.status)
     with Not_found -> return []
 
   let set_status_aux t s =
-    let repo = lookup_or_create t (Status.repo s) in
+    let repo = lookup_exn t (Status.repo s) in
     let commit = Status.commit_id s in
     let keep (c, _) = c <> commit in
     let status = List.filter keep repo.R.status in
@@ -323,7 +337,7 @@ module API = struct
     return ()
 
   let set_pr_aux t pr =
-    let repo = lookup_or_create t (PR.repo pr) in
+    let repo = lookup_exn t (PR.repo pr) in
     let num = pr.PR.number in
     let prs = List.filter (fun pr -> pr.PR.number <> num) repo.R.prs in
     repo.R.prs <- pr :: prs;
@@ -335,7 +349,7 @@ module API = struct
     return ()
 
   let set_ref_aux t (s, r) =
-    let repo = lookup_or_create t (Ref.repo r) in
+    let repo = lookup_exn t (Ref.repo r) in
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
     match s with
@@ -346,17 +360,17 @@ module API = struct
 
   let prs t repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
-    let repo = lookup_or_create t repo in
+    let repo = lookup_exn t repo in
     return repo.R.prs
 
   let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
-    let repo = lookup_or_create t repo in
+    let repo = lookup_exn t repo in
     return repo.R.events
 
   let refs t repo =
     t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
-    let repo = lookup_or_create t repo in
+    let repo = lookup_exn t repo in
     return repo.R.refs
 
   let apply_events t =
@@ -403,6 +417,11 @@ module API = struct
     let clear t = fold (fun u () -> User.clear u) t.state ()
 
   end
+
+  let all_events t = fold (fun u acc -> User.events u @ acc) t []
+
+  let all_repos t =
+    fold (fun u acc -> Repo.Set.union (User.repos u) acc) t Repo.Set.empty
 
 end
 
@@ -718,12 +737,12 @@ let update_status br dir state =
     )
 
 let find_status t repo =
-  let repo = API.lookup_or_create t repo in
+  let repo = API.lookup_exn t repo in
   try List.find (fun (c, _) -> c = "foo") repo.R.status |> snd |> List.hd
   with Not_found -> Alcotest.fail "foo not found"
 
 let find_pr t repo =
-  let repo = API.lookup_or_create t repo in
+  let repo = API.lookup_exn t repo in
   try List.find (fun pr -> pr.PR.number = 2) repo.R.prs
   with Not_found -> Alcotest.fail "foo not found"
 
@@ -1069,17 +1088,21 @@ let random_prs ~random ~repo ~old_prs =
   let n_prs = Random.State.int random 4 in
   let old_prs = List.rev old_prs in
   let old_prs =
-    List.map (fun pr ->
-        let state =
-          match pr.PR.state with
-          | `Open when Random.State.bool random -> `Closed
-          | s -> s
-        in
-        let head = random_pr_commit ~random ~repo in
-        { pr with PR.state; head }
-      ) old_prs
+    List.fold_left (fun prs pr ->
+        if Random.State.bool random then prs
+        else
+          let state =
+            match pr.PR.state with
+            | `Open when Random.State.bool random -> `Closed
+            | s -> s
+          in
+          let head = random_pr_commit ~random ~repo in
+          { pr with PR.state; head } :: prs
+      ) [] old_prs
   in
-  let next_pr = ref (match old_prs with [] -> 0 | l -> List.length l + 1) in
+  let next_pr =
+    ref (List.fold_left (fun n pr -> max (PR.number pr + 1) n) 0 old_prs)
+  in
   let rec make_prs acc = function
     | 0 -> acc
     | n ->
@@ -1172,7 +1195,7 @@ let test_random_gh ~quick _repo conn =
       if not fresh then s := new_s;
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
       ensure_in_sync ~msg t pub >>= fun () ->
-      if k > 1 then aux (k-1) users else Lwt.return (!s, users)
+      if k > 1 then aux (k-1) users else Lwt.return (!w, t, !s)
     in
     aux n t.API.users
   in
@@ -1187,18 +1210,15 @@ let test_random_gh ~quick _repo conn =
   let w = API.Webhook.v t ~old:w in
   sync w t s >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  nsync ~fresh:false (if quick then 2 else 10) w t s >>= fun (s, users) ->
-  let users = random_repos ~random ~old:users in
-  let t = API.create users in
-  let w = API.Webhook.v t ~old:w in
-  nsync ~fresh:true (if quick then 2 else 30) w t s  >>= fun (s, users) ->
-  let users = random_repos ~random ~old:users in
-  let t = API.create users in
-  let w = API.Webhook.v t ~old:w in
-  nsync ~fresh:false (if quick then 2 else 20) w t s  >>= fun (s, _) ->
-  let t = API.create Users.empty in
+  nsync ~fresh:false (if quick then 2 else 10) w t s >>= fun (w, t, s) ->
+  nsync ~fresh:true (if quick then 2 else 30) w t s  >>= fun (w, t, s) ->
+  nsync ~fresh:false (if quick then 2 else 20) w t s >>= fun (w, t, s) ->
+  let events = Users.diff_events Users.empty t.API.users in
+  let users = Users.of_repos (API.all_repos t) in
+  let t = API.create ~events users in
   let w = API.Webhook.v t ~old:w in
   sync w t s >>= fun _s ->
+  ensure_in_sync ~msg:"empty" t pub >>= fun () ->
   Lwt.return_unit
 
 exception DK_error of DK.error
@@ -1224,8 +1244,11 @@ let test_random_dk ~quick _repo conn =
     )
   >>*= fun () ->
   DK.branch dk priv >>*= fun priv ->
-  let update old =
-    let users = random_repos ~random ~old in
+  let update ?new_state old =
+    let users = match new_state with
+      | None   -> random_repos ~random ~old
+      | Some s -> s
+    in
     let events = Users.diff_events users old in
     DK.Branch.with_transaction pub (fun tr ->
         Lwt_list.iter_s (fun e ->
@@ -1238,45 +1261,39 @@ let test_random_dk ~quick _repo conn =
     | Error e -> Lwt.fail (DK_error e)
     | Ok ()   -> Lwt.return users
   in
-  let sync w t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w in
-  let nsync ~fresh n w t s =
+  let sync t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t in
+  let nsync ~fresh n users s =
     let s = ref (if fresh then VG.empty else s) in
-    let w = ref w in
     let rec aux k old =
       update old >>= fun users ->
       let t = API.create old in
-      w := API.Webhook.v ~old:!w t;
-      VG.sync ~policy:`Once !s ~pub ~priv ~token:t ~webhook:!w >>= fun new_s ->
+      VG.sync ~policy:`Once !s ~pub ~priv ~token:t >>= fun new_s ->
       if not fresh then s := new_s;
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
       ensure_in_sync ~msg t pub >>= fun () ->
       if k > 1 then aux (k-1) users else Lwt.return (!s, users)
     in
-    aux n t.API.users
+    aux n users
   in
   let s = VG.empty in
-  let users = random_repos ~random ?old:None in
-  let t = API.create users in
-  let w = API.Webhook.v t in
-  sync w t s >>= fun _s ->
-  ensure_in_sync ~msg:"init" t pub >>= fun () ->
-  let users = random_repos ~random ~old:users in
-  let t = API.create users in
-  let w = API.Webhook.v t ~old:w in
-  sync w t s >>= fun s ->
-  ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  nsync ~fresh:false (if quick then 2 else 10) w t s >>= fun (s, users) ->
-  let users = random_repos ~random ~old:users in
-  let t = API.create users in
-  let w = API.Webhook.v t ~old:w in
-  nsync ~fresh:true (if quick then 2 else 30) w t s  >>= fun (s, users) ->
-  let users = random_repos ~random ~old:users in
-  let t = API.create users in
-  let w = API.Webhook.v t ~old:w in
-  nsync ~fresh:false (if quick then 2 else 20) w t s  >>= fun (s, _) ->
   let t = API.create Users.empty in
-  let w = API.Webhook.v t ~old:w in
-  sync w t s >>= fun _s ->
+  update Users.empty >>= fun users ->
+  sync t s >>= fun _s ->
+  ensure_in_sync ~msg:"init" t pub >>= fun () ->
+  let t = API.create users in
+  update users >>= fun users ->
+  sync t s >>= fun s ->
+  ensure_in_sync ~msg:"update" t pub >>= fun () ->
+  nsync ~fresh:false (if quick then 2 else 10) users s >>= fun (s, users) ->
+  update users >>= fun users ->
+  nsync ~fresh:true (if quick then 2 else 30) users s  >>= fun (s, users) ->
+  update users >>= fun users ->
+  nsync ~fresh:false (if quick then 2 else 20) users s  >>= fun (s, users) ->
+  update ~new_state:Users.empty users >>= fun _ ->
+  let t = API.create Users.empty in
+  sync t s >>= fun _s ->
+  let empty = API.create Users.empty in
+  ensure_in_sync ~msg:"empty" empty pub >>= fun () ->
   Lwt.return_unit
 
 let runx f () = Test_utils.run f

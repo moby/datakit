@@ -183,6 +183,7 @@ end
 module Users = struct
 
   type t = User.t String.Map.t
+  let empty = String.Map.empty
 
   let prune (t:t): t = String.Map.map User.prune t
 
@@ -1133,7 +1134,7 @@ let random_repos ?(old=String.Map.empty) ~random =
     )
   |> String.Map.of_list
 
-let test_random _repo conn =
+let test_random ~quick _repo conn =
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
@@ -1182,15 +1183,18 @@ let test_random _repo conn =
   let w = API.Webhook.v t ~old:w in
   sync w t s >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  nsync ~fresh:false 3 w t s >>= fun (s, users) ->
+  nsync ~fresh:false (if quick then 2 else 10) w t s >>= fun (s, users) ->
   let users = random_repos ~random ~old:users in
   let t = API.create users in
   let w = API.Webhook.v t ~old:w in
-  nsync ~fresh:true 3 w t s  >>= fun (s, users) ->
+  nsync ~fresh:true (if quick then 2 else 30) w t s  >>= fun (s, users) ->
   let users = random_repos ~random ~old:users in
   let t = API.create users in
   let w = API.Webhook.v t ~old:w in
-  nsync ~fresh:false 2 w t s  >>= fun _ ->
+  nsync ~fresh:false (if quick then 2 else 20) w t s  >>= fun (s, _) ->
+  let t = API.create Users.empty in
+  let w = API.Webhook.v t ~old:w in
+  sync w t s >>= fun _s ->
   Lwt.return_unit
 
 let test_set = [
@@ -1198,5 +1202,6 @@ let test_set = [
   "events"  , `Quick, run test_events;
   "updates" , `Quick, run test_updates;
   "startup" , `Quick, run test_startup;
-  "random"  , `Quick, fun () -> Test_utils.run test_random;
+  "random"  , `Quick, (fun () -> Test_utils.run (test_random ~quick:true));
+  "random-*", `Slow , (fun () -> Test_utils.run (test_random ~quick:false));
 ]

@@ -1076,7 +1076,7 @@ let random_prs ~random ~repo ~old_prs =
         { pr with PR.state; head }
       ) old_prs
   in
-  let next_pr = ref (match old_prs with [] -> 0 | x::_ -> x.PR.number + 1) in
+  let next_pr = ref (match old_prs with [] -> 0 | l -> List.length l + 1) in
   let rec make_prs acc = function
     | 0 -> acc
     | n ->
@@ -1109,6 +1109,7 @@ let random_state ~random ~repo ~old_prs ~old_status ~old_refs =
   prs, status, refs
 
 let random_repos ?(old=String.Map.empty) ~random =
+  String.Map.iter (fun _ repo -> User.clear repo) old;
   let user_names = ["a"; "b"] in
   let repo_names = ["a"; "b"] in
   user_names |> List.map (fun user ->

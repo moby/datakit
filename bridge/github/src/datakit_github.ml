@@ -498,7 +498,7 @@ module Snapshot = struct
           let result = union result x in
           let cleanup = match c with
             | `Clean   -> cleanup
-            | `Prune p -> union t p
+            | `Prune c -> union cleanup c
           in
           result, cleanup
         ) t.repos (empty, empty)

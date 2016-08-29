@@ -389,10 +389,10 @@ module Snapshot = struct
   let pp ppf t =
     if compare t empty = 0 then Fmt.string ppf "empty"
     else
-      Fmt.pf ppf "{@[<2>repos:%a@]@;@[<2>commits:%a@]@;@[<2>status:%a@]@;\
-                  @[<2>prs:%a@]@;@[<2>refs:%a@]}"
-        Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
-        PR.Set.pp t.prs Ref.Set.pp t.refs
+      Fmt.pf ppf "{@[<2>repos:%a@]@;@[<2>prs:%a@]@;@[<2>refs:%a@]@;\
+                  @[<2>commits:%a@]@;@[<2>status:%a@]}"
+        Repo.Set.pp t.repos PR.Set.pp t.prs Ref.Set.pp t.refs
+        Commit.Set.pp t.commits Status.Set.pp t.status
 
   let remove_commit t (r, id) =
     let keep x = r <> Commit.repo x || id <> Commit.id x in

@@ -1134,7 +1134,7 @@ let random_repos ?(old=String.Map.empty) ~random =
     )
   |> String.Map.of_list
 
-let test_random ~quick _repo conn =
+let test_random_gh ~quick _repo conn =
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
@@ -1197,11 +1197,13 @@ let test_random ~quick _repo conn =
   sync w t s >>= fun _s ->
   Lwt.return_unit
 
+let runx f () = Test_utils.run f
+
 let test_set = [
   "snapshot", `Quick, test_snapshot;
   "events"  , `Quick, run test_events;
   "updates" , `Quick, run test_updates;
   "startup" , `Quick, run test_startup;
-  "random"  , `Quick, (fun () -> Test_utils.run (test_random ~quick:true));
-  "random-*", `Slow , (fun () -> Test_utils.run (test_random ~quick:false));
+  "random"  , `Quick, runx (test_random_gh ~quick:true);
+  "random-*", `Slow , runx (test_random_gh ~quick:false);
 ]

@@ -58,6 +58,7 @@ module R = struct
     in
     { r with prs; status }
 
+  let is_empty t = t.status = [] && t.prs = [] && t.refs = []
   let events t = t.events
   let clear t = t.events <- []
 
@@ -131,7 +132,10 @@ module User = struct
     mutable repos : R.t String.Map.t;
   }
 
-  let prune t = { repos = String.Map.map R.prune t.repos }
+  let prune t =
+    let repos = String.Map.map R.prune t.repos in
+    let repos = String.Map.filter (fun _ r -> not (R.is_empty r)) repos in
+    { repos }
 
   let fold f t acc = String.Map.fold (fun _ repo acc -> f repo acc ) t.repos acc
 
@@ -925,6 +929,7 @@ let rec read_state ~user ~repo ~commit tree path context =
     Lwt.return (this_state @ List.concat children)
 
 let read_opt_dir tree path =
+  Fmt.pr "XXX read-opt-dir %a" Datakit_path.pp path;
   DK.Tree.read_dir tree path >|= function
   | Ok items -> items
   | Error (`Msg "No such file or directory") -> []
@@ -983,18 +988,24 @@ let state_of_branch b =
   let tree = DK.Commit.tree head in
   DK.Tree.read_dir tree Datakit_path.empty >>*=
   Lwt_list.fold_left_s (fun acc user ->
-      let path = Datakit_path.of_steps_exn [user] in
-      DK.Tree.read_dir tree path >>*=
-      Lwt_list.fold_left_s (fun acc repo ->
-          read_commits tree ~user ~repo >>= fun status ->
-          read_prs tree ~user ~repo >>= fun prs ->
-          read_refs tree ~user ~repo >>= fun refs ->
-          let v = { R.user; repo; status; prs; refs; events = [] } in
-          String.Map.add repo v acc
-          |> Lwt.return
-        ) String.Map.empty
-      >>= fun repos ->
-      Lwt.return (String.Map.add user { User.repos } acc)
+      DK.Tree.exists_dir tree Datakit_path.(empty / user) >>*= function
+      | false -> Lwt.return acc
+      | true  ->
+        let path = Datakit_path.of_steps_exn [user] in
+        DK.Tree.read_dir tree path >>*=
+        Lwt_list.fold_left_s (fun acc repo ->
+            DK.Tree.exists_dir tree (path / repo) >>*= function
+            | false -> Lwt.return acc
+            | true  ->
+              read_commits tree ~user ~repo >>= fun status ->
+              read_prs tree ~user ~repo >>= fun prs ->
+              read_refs tree ~user ~repo >>= fun refs ->
+              let v = { R.user; repo; status; prs; refs; events = [] } in
+              String.Map.add repo v acc
+              |> Lwt.return
+          ) String.Map.empty
+        >>= fun repos ->
+        Lwt.return (String.Map.add user { User.repos } acc)
     ) String.Map.empty
 
 let ensure_in_sync ~msg github pub =

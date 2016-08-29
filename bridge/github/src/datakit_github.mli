@@ -169,6 +169,9 @@ module Ref: sig
   end
   (** Sets of Git references. *)
 
+  type state = [`Created | `Updated | `Deleted]
+  (** The type for reference state. *)
+
 end
 
 module Event: sig
@@ -177,7 +180,7 @@ module Event: sig
   type t =
     | PR of PR.t
     | Status of Status.t
-    | Ref of Ref.t
+    | Ref of (Ref.state * Ref.t)
     | Other of (Repo.t * string)
 
   val pp: t Fmt.t
@@ -395,7 +398,7 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Git References} *)
 
-  val update_ref: DK.Transaction.t -> Ref.t -> unit result
+  val update_ref: DK.Transaction.t -> Ref.state * Ref.t -> unit result
   (** [update_ref t r] applies the Git reference [r] to the
       transaction [t]. *)
 

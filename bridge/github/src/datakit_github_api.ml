@@ -86,8 +86,16 @@ module Ref = struct
     { head; name = to_list r.git_ref_name }
 
   let of_event repo r =
-    let head = { Commit.repo; id = r.push_event_head } in
-    { head; name = to_list r.push_event_ref }
+    let id = match r.push_event_head, r.push_event_after with
+      | Some _, Some _ | None, None   -> assert false
+      | Some h, None   | None, Some h -> h
+    in
+    let head = { Commit.repo; id } in
+    let t = { head; name = to_list r.push_event_ref } in
+    match r.push_event_deleted, r.push_event_created with
+    | Some true, _ -> `Deleted, t
+    | _, Some true -> `Created, t
+    | _            -> `Updated, t
 
 end
 

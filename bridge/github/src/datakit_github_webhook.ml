@@ -150,7 +150,13 @@ module Webhook = struct
     let `Hex s = Hex.of_cstruct (Nocrypto.Rng.generate 20) in
     prefix ^ ":" ^ s
 
-  let new_hook ?(events=[`Push; `Status; `PullRequest]) url =
+  let default_events = [
+    `Create; `Delete; `Push; (* ref updates *)
+    `Status;                 (* status updates *)
+    `PullRequest;            (* PR updates *)
+  ]
+
+  let new_hook ?(events=default_events) url =
     let secret = new_secret secret_prefix in
     let new_hook_config = `Web {
         web_hook_config_url          =  Uri.to_string url;

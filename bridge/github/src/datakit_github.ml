@@ -198,6 +198,13 @@ module Ref = struct
       let compare = compare
     end)
 
+  type state = [`Created | `Updated | `Deleted]
+
+  let pp_state ppf = function
+    | `Created -> Fmt.string ppf "+"
+    | `Updated -> Fmt.string ppf "*"
+    | `Deleted -> Fmt.string ppf "-"
+
 end
 
 module Event = struct
@@ -205,19 +212,19 @@ module Event = struct
   type t =
     | PR of PR.t
     | Status of Status.t
-    | Ref of Ref.t
+    | Ref of (Ref.state * Ref.t)
     | Other of (Repo.t * string)
 
   let pp ppf = function
     | PR pr    -> Fmt.pf ppf "PR: %a" PR.pp pr
     | Status s -> Fmt.pf ppf "Status: %a" Status.pp s
-    | Ref r    -> Fmt.pf ppf "Ref: %a" Ref.pp r
+    | Ref(s,r) -> Fmt.pf ppf "Ref: %a%a" Ref.pp_state s Ref.pp r
     | Other o  -> Fmt.pf ppf "Other: %s" @@ snd o
 
   let repo = function
     | PR pr    -> PR.repo pr
     | Status s -> Status.repo s
-    | Ref r    -> Ref.repo r
+    | Ref r    -> Ref.repo (snd r)
     | Other o  -> fst o
 
   module Set = Set(struct
@@ -353,10 +360,12 @@ module Snapshot = struct
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "{@[<2>repos:%a@]@;@[<2>commits:%a@]@;@[<2>status:%a@]@;\
-                @[<2>prs:%a@]@;@[<2>refs:%a@]}"
-      Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
-      PR.Set.pp t.prs Ref.Set.pp t.refs
+    if compare t empty = 0 then Fmt.string ppf "empty"
+    else
+      Fmt.pf ppf "{@[<2>repos:%a@]@;@[<2>commits:%a@]@;@[<2>status:%a@]@;\
+                  @[<2>prs:%a@]@;@[<2>refs:%a@]}"
+        Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
+        PR.Set.pp t.prs Ref.Set.pp t.refs
 
   let remove_commit t (r, id) =
     let keep x = r <> Commit.repo x || id <> Commit.id x in
@@ -717,10 +726,10 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       Tree.read_dir t dir >>*=
       list_map_s (fun num -> pr tree repo (int_of_string num))
       >>*= function l ->
-      List.fold_left
-        (fun acc pr -> match pr with None -> acc | Some x -> PR.Set.add x acc)
-        PR.Set.empty l
-      |> ok
+        List.fold_left
+          (fun acc pr -> match pr with None -> acc | Some x -> PR.Set.add x acc)
+          PR.Set.empty l
+        |> ok
 
   let prs ?repos:rs tree =
     Log.debug (fun l -> l "prs");
@@ -760,7 +769,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   let update_status t s =
     let dir = root (Status.repo s) / "commit" / (Status.commit_id s)
-      / "status" /@ Status.path s
+              / "status" /@ Status.path s
     in
     Log.debug (fun l -> l "update_status %s" @@ Datakit_path.to_hum dir);
     DK.Transaction.make_dirs t dir >>*= fun () ->
@@ -851,15 +860,19 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     list_map_s (refs_of_repo tree) (Repo.Set.elements repos) >>*= fun rs ->
     ok (List.fold_left Ref.Set.union Ref.Set.empty rs)
 
-  let update_ref tr r =
-    Log.debug (fun l -> l "update_ref %a" Ref.pp r);
+  let update_ref tr (s, r) =
+    Log.debug (fun l -> l "update_ref %a%a" Ref.pp_state s Ref.pp r);
     let path = Datakit_path.of_steps_exn (Ref.name r) in
     let dir = root (Ref.repo r) / "ref" /@ path in
-    DK.Transaction.make_dirs tr dir >>*= fun () ->
-    let head = Cstruct.of_string (Ref.commit_id r ^ "\n") in
-    DK.Transaction.create_or_replace_file tr ~dir "head" head
+    match s with
+    | `Deleted -> safe_remove tr dir
+    | `Created | `Updated ->
+      DK.Transaction.make_dirs tr dir >>*= fun () ->
+      let head = Cstruct.of_string (Ref.commit_id r ^ "\n") in
+      DK.Transaction.create_or_replace_file tr ~dir "head" head
 
-  let update_refs tr rs = list_iter_s (update_ref tr) (Ref.Set.elements rs)
+  let update_refs tr rs =
+    list_iter_s (fun r -> update_ref tr (`Updated, r)) (Ref.Set.elements rs)
 
   let update_event t = function
     | Event.PR pr    -> update_pr t pr
@@ -1078,29 +1091,29 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       ) Ref.Set.empty new_refs
 
   let to_clean t new_prs new_refs new_status new_commits =
-      let prs =
-        PR.Set.filter (fun pr ->
-            not (PR.Set.exists (PR.same pr) new_prs)
-          ) t.Snapshot.prs
-      in
-      let refs =
-        Ref.Set.filter (fun r ->
-            not (Ref.Set.exists (Ref.same r) new_refs)
-          ) t.Snapshot.refs
-      in
-      let status =
-        Status.Set.filter  (fun s ->
-            not (Status.Set.exists (Status.same s) new_status)
-          ) t.Snapshot.status
-      in
-      let commits =
-        Commit.Set.filter (fun c ->
-            not (Commit.Set.exists ((=) c) new_commits)
-          ) t.Snapshot.commits
-      in
-      let repos = Repo.Set.empty in
-      let t = { Snapshot.repos; prs; refs; commits; status } in
-      if Snapshot.(compare empty t = 0) then None else Some t
+    let prs =
+      PR.Set.filter (fun pr ->
+          not (PR.Set.exists (PR.same pr) new_prs)
+        ) t.Snapshot.prs
+    in
+    let refs =
+      Ref.Set.filter (fun r ->
+          not (Ref.Set.exists (Ref.same r) new_refs)
+        ) t.Snapshot.refs
+    in
+    let status =
+      Status.Set.filter  (fun s ->
+          not (Status.Set.exists (Status.same s) new_status)
+        ) t.Snapshot.status
+    in
+    let commits =
+      Commit.Set.filter (fun c ->
+          not (Commit.Set.exists ((=) c) new_commits)
+        ) t.Snapshot.commits
+    in
+    let repos = Repo.Set.empty in
+    let t = { Snapshot.repos; prs; refs; commits; status } in
+    if Snapshot.(compare empty t = 0) then None else Some t
 
   (* Import http://github.com/usr/repo state. *)
   let import_repos t ~token repos =
@@ -1344,9 +1357,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             | Event.PR pr ->
               if PR.state pr <> `Open then acc
               else Commit.Set.add (PR.commit pr) acc
-            | Event.Ref r -> Commit.Set.add (Ref.commit r) acc
-            | Event.Status _ -> acc
-            | Event.Other _  -> acc
+            | Event.Ref (`Deleted, _) -> acc
+            | Event.Ref (_, r) -> Commit.Set.add (Ref.commit r) acc
+            | Event.Status _  | Event.Other _  -> acc
           ) Commit.Set.empty events
         in
         let commits =
@@ -1356,6 +1369,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         list_iter_s (fun s -> Conv.update_status t.priv.tr s)
           (Status.Set.elements status)
         >>*= fun () ->
+        (* Remove deleted references *)
+        list_iter_s (function
+            | Event.Ref (`Deleted, _ as r) -> Conv.update_ref t.priv.tr r
+            | _ -> ok ()
+          ) events >>*= fun () ->
         let message =
           Fmt.strf "Importing webhooks:\n%a"
             Fmt.(list ~sep:(unit "\n") Event.pp) events

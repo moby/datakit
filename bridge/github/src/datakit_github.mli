@@ -145,6 +145,9 @@ module Ref: sig
   val commit: t -> Commit.t
   (** [commit t] is [t]'s commit. *)
 
+  val commit_id: t -> string
+  (** [commit_id t] is [t]'s commit ID. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
 

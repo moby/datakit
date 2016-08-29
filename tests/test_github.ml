@@ -72,10 +72,15 @@ module R = struct
   let pp_state f (commit, states) =
     Fmt.pf f "%s->%a" commit (Fmt.Dump.list Status.pp) states
 
-  let pp f { status; prs; _ } =
-    Fmt.pf f "prs=%a;@,commits=%a"
+  let pp_refs f r =
+    Fmt.pf f "name=%a;head=%s"
+      Fmt.(Dump.list string) r.Ref.name (Ref.commit_id r)
+
+  let pp f { status; prs; refs; _ } =
+    Fmt.pf f "prs=%a;@,commits=%a;@,refs=%a"
       (Fmt.Dump.list pp_pr) prs
       (Fmt.Dump.list pp_state) status
+      (Fmt.Dump.list pp_refs) refs
 
   let status_equal a b =
     a.Status.state       = b.Status.state &&

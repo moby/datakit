@@ -15,7 +15,7 @@ module Set (E: ELT) = struct
 
   include Set.Make(E)
 
-  let pp ppf t = Fmt.(list ~sep:(unit "@ ") E.pp) ppf (elements t)
+  let pp ppf t = Fmt.(list ~sep:(unit "@;") E.pp) ppf (elements t)
 
   let index t f =
     let tbl = Hashtbl.create (cardinal t) in
@@ -110,13 +110,14 @@ module PR = struct
     | `Open   -> Fmt.string ppf "open"
     | `Closed -> Fmt.string ppf "closed"
 
-  let pp ppf t =
-    Fmt.pf ppf "[%a:%d %a (%S)]"
-      Commit.pp t.head t.number pp_state t.state t.title
-
   let repo t = t.head.Commit.repo
   let commit t = t.head
   let commit_id t = t.head.Commit.id
+
+  let pp ppf t =
+    Fmt.pf ppf "{%a %d[%s] %a %S}"
+      Repo.pp (repo t) t.number (commit_id t) pp_state t.state t.title
+
   let number t = t.number
   let title t = t.title
   let state t = t.state
@@ -142,19 +143,6 @@ module Status = struct
 
   let compare: t -> t -> int = Pervasives.compare
 
-  let pp ppf t =
-    let pp_opt k ppf v = match v with
-      | None   -> ()
-      | Some v -> Fmt.pf ppf " %s=%s," k v
-    in
-
-    Fmt.pf ppf "[%a[%a]%a%a %a]"
-      Commit.pp t.commit
-      pp_path t.context
-      (pp_opt "url") t.url
-      (pp_opt "description") t.description
-      Status_state.pp t.state
-
   let context t = match t.context with
     | [] -> ["default"]
     | l  -> l
@@ -164,6 +152,19 @@ module Status = struct
   let commit t = t.commit
   let commit_id t = t.commit.Commit.id
   let same x y = commit x = commit y && context x = context y
+
+
+  let pp_opt k ppf v = match v with
+    | None   -> ()
+    | Some v -> Fmt.pf ppf " %s=%s" k v
+
+  let pp ppf t =
+    Fmt.pf ppf "{%a %s:%a[%a]%a%a}"
+      Repo.pp (repo t) (commit_id t)
+      pp_path t.context
+      Status_state.pp t.state
+      (pp_opt "url") t.url
+      (pp_opt "descr") t.description
 
   module Set = Set(struct
       type nonrec t = t
@@ -185,9 +186,11 @@ module Ref = struct
   let commit t = t.head
   let commit_id t = t.head.Commit.id
   let name t = t.name
-  let pp ppf t = Fmt.pf ppf "%a[%a]" Commit.pp t.head pp_path t.name
   let same x y = repo x = repo y && name x = name y
   let path s = Datakit_path.of_steps_exn s.name
+
+  let pp ppf t =
+    Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_id t)
 
   module Set = Set(struct
       type nonrec t = t
@@ -350,7 +353,8 @@ module Snapshot = struct
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "@[repos: %a@, commits: %a@, status: %a@, prs: %a@, refs: %a]"
+    Fmt.pf ppf "{@[<2>repos:%a@]@;@[<2>commits:%a@]@;@[<2>status:%a@]@;\
+                @[<2>prs:%a@]@;@[<2>refs:%a@]}"
       Repo.Set.pp t.repos Commit.Set.pp t.commits Status.Set.pp t.status
       PR.Set.pp t.prs Ref.Set.pp t.refs
 
@@ -421,7 +425,7 @@ module Snapshot = struct
       let refs    = find repo refs    |> Ref.Set.of_list in
       let commits = find repo commits |> Commit.Set.of_list in
       Log.debug (fun l ->
-          l "prune %a:@ refs:%a@ prs:%a@ status:%a"
+          l "[prune] %a:@;@[<2>refs:%a@]@;@[<2>prs:%a@]@;@[<2>status:%a@]"
             Repo.pp repo Ref.Set.pp refs PR.Set.pp prs Status.Set.pp status
         );
       let open_prs, closed_prs =
@@ -963,7 +967,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   }
 
   let pp_branch ppf t =
-    Fmt.pf ppf "@[%a: %a@]" DK.Commit.pp t.head Snapshot.pp t.snapshot
+    Fmt.pf ppf "%a=%a" DK.Commit.pp t.head Snapshot.pp t.snapshot
 
   let compare_branch x y = Snapshot.compare x.snapshot y.snapshot
 
@@ -991,7 +995,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | i -> i
 
   let pp ppf t =
-    Fmt.pf ppf "@[[pub: %a@, priv: %a@]@]" pp_branch t.pub pp_branch t.priv
+    Fmt.pf ppf "@[<2>pub:%a@]@;@[<2>priv:%a@]" pp_branch t.pub pp_branch t.priv
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function
@@ -1110,13 +1114,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     status_of_commits token new_commits >>= fun new_status ->
     Log.debug (fun l ->
-        l "new-prs:%a new-refs:%a new-status:%a"
+        l "[import]@;@[<2>new-prs:%a@]@;@[<2>new-refs:%a@]@;@[<2>new-status:%a@]]"
           PR.Set.pp new_prs Ref.Set.pp new_refs Status.Set.pp new_status);
     let clean = Snapshot.filter repos t in
     let prs = PR.Set.union clean.Snapshot.prs new_prs in
     let to_clean = to_clean t new_prs new_refs new_status new_commits in
     Log.debug (fun l ->
-        l "import_repo: cleanup %a" Fmt.(option Snapshot.pp) to_clean);
+        l "[import]@;cleanup:%a" Fmt.(option Snapshot.pp) to_clean);
     let refs = Ref.Set.union clean.Snapshot.refs new_refs in
     let commits = Commit.Set.union clean.Snapshot.commits new_commits in
     let status = Status.Set.union clean.Snapshot.status new_status in
@@ -1138,13 +1142,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           Status.Set.findf same_context old.Snapshot.status
         in
         Log.info
-          (fun l -> l "API.set-status %a (was %a)"
-              Status.pp s Fmt.(option Status.pp) old);
-        if not dry_updates then
+          (fun l ->
+             l "API.set-status %a (was %a)"
+               Status.pp s Fmt.(option ~none:(unit "<empty>") Status.pp) old);
+        if dry_updates then Lwt.return_unit
+        else
           API.set_status token s >|= function
           | Ok ()   -> ()
-          | Error e -> Log.err (fun l -> l "API.set-status %a: %s" Status.pp s e)
-        else  Lwt.return_unit
+          | Error e ->
+            Log.err (fun l -> l "API.set-status %a: %s" Status.pp s e)
       ) (Status.Set.elements status)
     >>= fun () ->
     Lwt_list.iter_p (fun pr ->
@@ -1162,9 +1168,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   (* Merge the private branch back in the public branch. *)
   let merge t =
-    Log.debug (fun l ->
-        l "merge@,@[pub:%a@,priv:%a@]" pp_branch t.pub pp_branch t.priv
-      );
+    Log.debug (fun l -> l "[merge]@;%a" pp t);
     if compare_branch t.pub t.priv = 0 then
       DK.Transaction.abort t.pub.tr >>= ok
     else
@@ -1191,7 +1195,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
                DK.Transaction.create_or_replace_file t.pub.tr ~dir file v
            ) conflicts
          >>*= fun () ->
-         ok @@ Fmt.strf "\n\nconflicts:@,@[%a@]"
+         ok @@ Fmt.strf "\n\nconflicts:@;@[%a@]"
            Fmt.(list ~sep:(unit "\n") Datakit_path.pp) conflicts)
       ) >>*= fun conflict_msg ->
       DK.Transaction.diff t.pub.tr t.pub.head >>*= function
@@ -1254,7 +1258,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let remove_snapshot = function
     | None   -> ok None
     | Some t ->
-      Log.debug (fun l -> l "to-prune: %a" Snapshot.pp t);
+      Log.debug (fun l -> l "to-prune:%a" Snapshot.pp t);
       let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
       let { Snapshot.repos; prs; refs; commits; status } = t in
       let f tr =
@@ -1308,11 +1312,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     >>*= fun () ->
     DK.Transaction.abort t.pub.tr >>= fun () ->
     state ~old:(Some t) ~pub ~priv >>*= fun t ->
-    Log.debug (fun l -> l "first_sync: initial state %a" pp t);
+    Log.debug (fun l -> l "[first_sync]initial:@;%a" pp t);
     DK.Transaction.abort t.priv.tr >>= fun () ->
     merge t >>*= fun () ->
     state ~old:(Some t) ~pub ~priv >>*= fun t ->
-    Log.debug (fun l -> l "first_sync: after merge %a" pp t);
+    Log.debug (fun l -> l "[first]after-merge:@;%a" pp t);
     abort t >>= fun () ->
     ok t
 
@@ -1325,7 +1329,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     match webhook with
     | None   -> ok t
     | Some w ->
-      Log.debug (fun l -> l "sync-webhook repos: %a" Repo.Set.pp repos);
+      Log.debug (fun l -> l "[sync-webhook] repos: %a" Repo.Set.pp repos);
       (* register new webhooks *)
       Lwt_list.iter_p w.watch (Repo.Set.elements repos) >>= fun () ->
       (* apply the webhook events *)
@@ -1333,7 +1337,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       | []     -> ok t
       | events ->
         Log.debug (fun l ->
-            l "sync-webhook events: %a" (Fmt.Dump.list Event.pp) events);
+            l "[sync-webhook] events: %a" (Fmt.Dump.list Event.pp) events);
         list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
         (* Need to resynchronsize build status for new commits *)
         let commits = List.fold_left (fun acc -> function
@@ -1368,7 +1372,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let first_sync ~webhook ~token ~dry_updates ~pub ~priv =
     state ~old:None ~pub ~priv >>*= fun t ->
     Log.debug (fun l ->
-        l "first_sync priv=%a pub=%a"
+        l "[first_sync] priv:%a pub=%a"
           DK.Commit.pp t.priv.head
           DK.Commit.pp t.pub.head
       );
@@ -1392,7 +1396,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   (* The main synchonisation function: it is called on every change in
      the public or private branch. *)
   let sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old t =
-    Log.debug (fun l -> l "sync_once:@,@[old:%a@,new:%a@]" pp old pp t);
+    Log.debug (fun l -> l "[sync_once]@;old:%a@;new:%a" pp old pp t);
     (* Start by calling GitHub API calls that the user requested. *)
     call_github_api ~dry_updates ~token ~old:old.pub.snapshot t.pub.snapshot
     >>*= fun () ->
@@ -1482,7 +1486,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let sync ?webhook ?switch ?(policy=`Repeat)
       ?(dry_updates=false) ~pub ~priv ~token t =
     Log.debug (fun l ->
-        l "sync pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)
+        l "[sync] pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)
       );
     (init_sync ~priv ~pub >>*= fun () ->
      run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy >>*= function

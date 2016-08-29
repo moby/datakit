@@ -1201,13 +1201,94 @@ let test_random_gh ~quick _repo conn =
   sync w t s >>= fun _s ->
   Lwt.return_unit
 
+exception DK_error of DK.error
+
+let test_random_dk ~quick _repo conn =
+  quiet_9p ();
+  quiet_git ();
+  quiet_irmin ();
+  let random = Random.State.make [| 1; 2; 3 |] in
+  let dk = DK.connect conn in
+  DK.branch dk pub  >>*= fun pub ->
+  DK.Branch.with_transaction pub (fun t ->
+      let monitor ~user ~repo =
+        let dir = Datakit_path.of_steps_exn [user; repo] in
+        DK.Transaction.make_dirs t dir >>*= fun () ->
+        DK.Transaction.create_file t ~dir "README" (Cstruct.of_string "Monitor")
+      in
+      monitor ~user:"a" ~repo:"a" >>*= fun () ->
+      monitor ~user:"a" ~repo:"b" >>*= fun () ->
+      monitor ~user:"b" ~repo:"a" >>*= fun () ->
+      monitor ~user:"b" ~repo:"b" >>*= fun () ->
+      DK.Transaction.commit t ~message:"Monitor repos"
+    )
+  >>*= fun () ->
+  DK.branch dk priv >>*= fun priv ->
+  let update old =
+    let users = random_repos ~random ~old in
+    let events = Users.diff_events users old in
+    DK.Branch.with_transaction pub (fun tr ->
+        Lwt_list.iter_s (fun e ->
+            Conv.update_event tr e >>= function
+            | Error e -> Lwt.fail (DK_error e)
+            | Ok ()   -> Lwt.return_unit
+          ) events >>= fun () ->
+        DK.Transaction.commit tr ~message:"User updates"
+      ) >>= function
+    | Error e -> Lwt.fail (DK_error e)
+    | Ok ()   -> Lwt.return users
+  in
+  let sync w t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w in
+  let nsync ~fresh n w t s =
+    let s = ref (if fresh then VG.empty else s) in
+    let w = ref w in
+    let rec aux k old =
+      update old >>= fun users ->
+      let t = API.create old in
+      w := API.Webhook.v ~old:!w t;
+      VG.sync ~policy:`Once !s ~pub ~priv ~token:t ~webhook:!w >>= fun new_s ->
+      if not fresh then s := new_s;
+      let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
+      ensure_in_sync ~msg t pub >>= fun () ->
+      if k > 1 then aux (k-1) users else Lwt.return (!s, users)
+    in
+    aux n t.API.users
+  in
+  let s = VG.empty in
+  let users = random_repos ~random ?old:None in
+  let t = API.create users in
+  let w = API.Webhook.v t in
+  sync w t s >>= fun _s ->
+  ensure_in_sync ~msg:"init" t pub >>= fun () ->
+  let users = random_repos ~random ~old:users in
+  let t = API.create users in
+  let w = API.Webhook.v t ~old:w in
+  sync w t s >>= fun s ->
+  ensure_in_sync ~msg:"update" t pub >>= fun () ->
+  nsync ~fresh:false (if quick then 2 else 10) w t s >>= fun (s, users) ->
+  let users = random_repos ~random ~old:users in
+  let t = API.create users in
+  let w = API.Webhook.v t ~old:w in
+  nsync ~fresh:true (if quick then 2 else 30) w t s  >>= fun (s, users) ->
+  let users = random_repos ~random ~old:users in
+  let t = API.create users in
+  let w = API.Webhook.v t ~old:w in
+  nsync ~fresh:false (if quick then 2 else 20) w t s  >>= fun (s, _) ->
+  let t = API.create Users.empty in
+  let w = API.Webhook.v t ~old:w in
+  sync w t s >>= fun _s ->
+  Lwt.return_unit
+
 let runx f () = Test_utils.run f
 
 let test_set = [
-  "snapshot", `Quick, test_snapshot;
-  "events"  , `Quick, run test_events;
-  "updates" , `Quick, run test_updates;
-  "startup" , `Quick, run test_startup;
-  "random"  , `Quick, runx (test_random_gh ~quick:true);
-  "random-*", `Slow , runx (test_random_gh ~quick:false);
+  "snapshot"  , `Quick, test_snapshot;
+  "events"    , `Quick, run test_events;
+  "updates"   , `Quick, run test_updates;
+  "startup"   , `Quick, run test_startup;
+  "random-gh" , `Quick, runx (test_random_gh ~quick:true);
+  "random-gh*", `Slow , runx (test_random_gh ~quick:false);
+  "random-dk" , `Quick, runx (test_random_dk ~quick:true);
+  "random-dk*", `Slow , runx (test_random_dk ~quick:false);
+
 ]

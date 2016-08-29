@@ -86,6 +86,10 @@ module PR: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for pull-request values. *)
 
+  val same: t -> t -> bool
+  (** [same x y] is true if [x] and [y] have the same repository and
+      number. *)
+
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
@@ -123,6 +127,10 @@ module Status: sig
       API. Otherwise, segments are concatenated using ["/"] as a
       separator. *)
 
+  val same: t -> t -> bool
+  (** [same x y] is true if [x] and [y] have the same commit and
+      context. *)
+
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
@@ -150,6 +158,10 @@ module Ref: sig
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
+
+  val same: t -> t -> bool
+  (** [same x y] is true if [x] and [y] have the same repository and
+      name. *)
 
   module Set: sig
     include Set.S with type elt = t

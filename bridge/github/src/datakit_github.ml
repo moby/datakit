@@ -421,6 +421,13 @@ module Snapshot = struct
     let name = Ref.repo r, r.Ref.name in
     add_ref r (remove_ref t name)
 
+  let replace_event t = function
+    | Event.PR pr             -> replace_pr pr t
+    | Event.Ref (`Deleted, r) -> remove_ref t (Ref.repo r, Ref.name r)
+    | Event.Ref (_, r)        -> replace_ref r t
+    | Event.Status s          -> replace_status s t
+    | Event.Other _           -> t
+
   (* [prune t] is [t] with all the closed PRs pruned. *)
   let prune t =
     let status = Status.Set.index t.status Status.repo in
@@ -433,10 +440,6 @@ module Snapshot = struct
       let prs     = find repo prs     |> PR.Set.of_list in
       let refs    = find repo refs    |> Ref.Set.of_list in
       let commits = find repo commits |> Commit.Set.of_list in
-      Log.debug (fun l ->
-          l "[prune] %a:@;@[<2>refs:%a@]@;@[<2>prs:%a@]@;@[<2>status:%a@]"
-            Repo.pp repo Ref.Set.pp refs PR.Set.pp prs Status.Set.pp status
-        );
       let open_prs, closed_prs =
         PR.Set.fold (fun pr (open_prs, closed_prs) ->
             match pr.PR.state with
@@ -444,8 +447,8 @@ module Snapshot = struct
             | `Closed -> open_prs, PR.Set.add pr closed_prs
           ) prs (PR.Set.empty, PR.Set.empty)
       in
-      Log.debug (fun l -> l "open_prs:%a" PR.Set.pp open_prs);
-      Log.debug (fun l -> l "closed_prs:%a" PR.Set.pp closed_prs);
+      Log.debug (fun l -> l "[prune]+prs:@;%a" PR.Set.pp open_prs);
+      Log.debug (fun l -> l "[prune]-prs:@;%a" PR.Set.pp closed_prs);
       let is_commit_open c =
         PR.Set.exists (fun pr -> PR.commit pr = c) open_prs
         || Ref.Set.exists (fun r -> Ref.commit r = c) refs
@@ -457,8 +460,8 @@ module Snapshot = struct
             | true  -> Commit.Set.add c open_commit, closed_commit
           ) commits (Commit.Set.empty, Commit.Set.empty)
       in
-      Log.debug (fun l -> l "open_commits:%a" Commit.Set.pp open_commits);
-      Log.debug (fun l -> l "closed_commits:%a" Commit.Set.pp closed_commits);
+      Log.debug (fun l -> l "[prune]+commits:@;%a" Commit.Set.pp open_commits);
+      Log.debug (fun l -> l "[prune]-commits:@;%a" Commit.Set.pp closed_commits);
       let is_status_open s =
         Commit.Set.exists (fun c -> s.Status.commit = c ) open_commits
       in
@@ -476,8 +479,8 @@ module Snapshot = struct
         status  = closed_status;
         commits = closed_commits;
       } in
-      Log.debug (fun l -> l "open_status:%a" Status.Set.pp open_status);
-      Log.debug (fun l -> l "closed_status:%a" Status.Set.pp closed_status);
+      Log.debug (fun l -> l "[prune]+status:@;%a" Status.Set.pp open_status);
+      Log.debug (fun l -> l "[prune]-status:@;%a" Status.Set.pp closed_status);
       let repos   = Repo.Set.singleton repo in
       let status  = open_status in
       let prs     = open_prs in
@@ -695,9 +698,11 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     Tree.exists_file t (dir / "state") >>*= fun exists_state ->
     Tree.exists_file t (dir / "title") >>*= fun exists_title ->
     if not exists_head then
-      Log.debug (fun l -> l "error: pr/%d/head does not exist" number);
+      Log.debug (fun l ->
+          l "error: %a/pr/%d/head does not exist" Repo.pp repo number);
     if not exists_state then
-      Log.debug (fun l -> l "error: pr/%d/state does not exist" number);
+      Log.debug (fun l ->
+          l "error: %a/pr/%d/state does not exist" Repo.pp repo number);
     if not exists_head || not exists_state then ok None
     else (
       Tree.read_file t (dir / "head") >>*= fun head ->
@@ -1021,6 +1026,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | [p] -> ok p
     | _   -> error "too many parents!"
 
+  let is_open t =
+    DK.Transaction.closed t.priv.tr = false
+    && DK.Transaction.closed t.pub.tr = false
+
+  let is_closed t =
+    DK.Transaction.closed t.priv.tr && DK.Transaction.closed t.pub.tr
+
   let branch ?old b =
     DK.Branch.transaction b >>*= fun tr ->
     tr_head tr >>*= fun head ->
@@ -1029,7 +1041,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     ok { snapshot; tr; head; name }
 
   let state ~old ~pub ~priv =
-    if old = None then Log.info (fun l -> l "Loading full state");
+    let () = match old with
+      | None   -> Log.info (fun l -> l "Loading full state")
+      | Some o -> assert (is_closed o)
+    in
     let mk b = (b.head, b.snapshot) in
     let pub_o  = match old with None -> None | Some o -> Some (mk o.pub)  in
     let priv_o = match old with None -> None | Some o -> Some (mk o.priv) in
@@ -1180,7 +1195,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   (** Merge *)
 
   (* Merge the private branch back in the public branch. *)
-  let merge t =
+  let merge t ~pub ~priv =
+    state ~old:(Some t) ~pub ~priv >>*= fun t ->
     Log.debug (fun l -> l "[merge]@;%a" pp t);
     if compare_branch t.pub t.priv = 0 then
       DK.Transaction.abort t.pub.tr >>= ok
@@ -1226,13 +1242,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         DK.Transaction.commit t.pub.tr ~message:msg
 
   (* same as [merge], but check some useful invariants too. *)
-  let merge t =
-    assert (DK.Transaction.closed t.priv.tr);
-    assert (not (DK.Transaction.closed t.pub.tr));
-    merge t >>*= fun () ->
-    assert (DK.Transaction.closed t.priv.tr);
-    assert (DK.Transaction.closed t.pub.tr);
-    ok ()
+  let merge t ~pub ~priv =
+    assert (is_closed t);
+    merge t ~pub ~priv >>*= fun () ->
+    assert (is_closed t);
+    state ~old:(Some t) ~priv ~pub
 
   (** Sync *)
 
@@ -1268,10 +1282,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     close t.priv.tr >>= fun () ->
     close t.pub.tr
 
-  let remove_snapshot = function
+  let remove_snapshot msg = function
     | None   -> ok None
     | Some t ->
-      Log.debug (fun l -> l "to-prune:%a" Snapshot.pp t);
+      Log.debug (fun l -> l "[remove_snapshot]%s:@;%a" msg Snapshot.pp t);
       let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
       let { Snapshot.repos; prs; refs; commits; status } = t in
       let f tr =
@@ -1303,16 +1317,16 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       in
       ok (Some f)
 
-  let cleanup c tr =
-    remove_snapshot c >>*= function
+  let cleanup msg c tr =
+    remove_snapshot msg c >>*= function
     | None   -> ok ()
     | Some f -> f tr
 
   let sync_repos ~token ~pub ~priv t repos =
     import_repos ~token t.priv.snapshot repos >>*= fun (priv_s, c1) ->
-    cleanup c1 t.priv.tr >>*= fun () ->
+    cleanup "import" c1 t.priv.tr >>*= fun () ->
     let priv_s, c2 = Snapshot.prune priv_s in
-    cleanup c2 t.priv.tr >>*= fun () ->
+    cleanup "sync" c2 t.priv.tr >>*= fun () ->
     Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
     Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
     Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
@@ -1324,14 +1338,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
        DK.Transaction.commit t.priv.tr ~message)
     >>*= fun () ->
     DK.Transaction.abort t.pub.tr >>= fun () ->
-    state ~old:(Some t) ~pub ~priv >>*= fun t ->
-    Log.debug (fun l -> l "[first_sync]initial:@;%a" pp t);
-    DK.Transaction.abort t.priv.tr >>= fun () ->
-    merge t >>*= fun () ->
-    state ~old:(Some t) ~pub ~priv >>*= fun t ->
-    Log.debug (fun l -> l "[first]after-merge:@;%a" pp t);
-    abort t >>= fun () ->
-    ok t
+    merge t ~pub ~priv
 
   type webhook = {
     watch: Repo.t -> unit Lwt.t;
@@ -1342,7 +1349,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     match webhook with
     | None   -> ok t
     | Some w ->
-      Log.debug (fun l -> l "[sync-webhook] repos: %a" Repo.Set.pp repos);
+      Log.debug (fun l -> l "[sync_webhook] repos: %a" Repo.Set.pp repos);
       (* register new webhooks *)
       Lwt_list.iter_p w.watch (Repo.Set.elements repos) >>= fun () ->
       (* apply the webhook events *)
@@ -1350,8 +1357,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       | []     -> ok t
       | events ->
         Log.debug (fun l ->
-            l "[sync-webhook] events: %a" (Fmt.Dump.list Event.pp) events);
-        list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
+            l "[sync_webhook] events:@;%a" (Fmt.Dump.list Event.pp) events);
+        let priv_s =
+          List.fold_left (Snapshot.replace_event) t.priv.snapshot events
+        in
         (* Need to resynchronsize build status for new commits *)
         let commits = List.fold_left (fun acc -> function
             | Event.PR pr ->
@@ -1362,25 +1371,39 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             | Event.Status _  | Event.Other _  -> acc
           ) Commit.Set.empty events
         in
-        let commits =
-          Commit.Set.diff commits t.priv.snapshot.Snapshot.commits
+        let new_commits = Commit.Set.diff commits priv_s.Snapshot.commits in
+        status_of_commits token commits >>= fun new_status ->
+        let status = Status.Set.union new_status priv_s.Snapshot.status in
+        let commits = Commit.Set.union new_commits priv_s.Snapshot.commits in
+        let priv_s = { priv_s with Snapshot.status; commits } in
+        let events =
+          events
+          @ List.map (fun s -> Event.Status s) @@ Status.Set.elements new_status
         in
-        status_of_commits token commits >>= fun status ->
-        list_iter_s (fun s -> Conv.update_status t.priv.tr s)
-          (Status.Set.elements status)
-        >>*= fun () ->
-        (* Remove deleted references *)
-        list_iter_s (function
-            | Event.Ref (`Deleted, _ as r) -> Conv.update_ref t.priv.tr r
-            | _ -> ok ()
-          ) events >>*= fun () ->
+        list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
+        let _, c = Snapshot.prune priv_s in
+        cleanup "events" c t.priv.tr >>*= fun () ->
         let message =
           Fmt.strf "Importing webhooks:\n%a"
             Fmt.(list ~sep:(unit "\n") Event.pp) events
         in
         DK.Transaction.commit t.priv.tr ~message >>*= fun () ->
-        abort t >>= fun () ->
-        state ~old:(Some t) ~priv ~pub
+        DK.Transaction.abort t.pub.tr >>= fun () ->
+        merge t ~pub ~priv
+
+  let sync ~webhook ~token ~dry_updates ~pub ~priv ?old t repos =
+    assert (is_open t);
+    sync_webhooks t ~token ~webhook ~priv ~pub repos >>*= fun t ->
+    assert (is_open t);
+    sync_repos ~token ~pub ~priv t repos >>*= fun t ->
+    assert (is_open t);
+    let old = match old with
+      | None   -> t.priv.snapshot
+      | Some o -> assert (is_closed o); o.pub.snapshot
+    in
+    call_github_api ~dry_updates ~token ~old t.pub.snapshot >>*= fun () ->
+    abort t >>= fun () ->
+    ok t
 
   (* On startup, build the initial state by looking at the active
      repository in the public and private branch. Import the new
@@ -1398,13 +1421,12 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       let r t = t.snapshot.Snapshot.repos in
       Repo.Set.union (r t.priv) (r t.pub)
     in
-    sync_webhooks t ~token ~webhook ~priv ~pub repos >>*= fun t ->
-    if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
-    else
-      sync_repos ~token ~pub ~priv t repos >>*= fun t ->
-      call_github_api ~token ~dry_updates ~old:t.priv.snapshot t.pub.snapshot
-      >>*= fun () ->
-      ok t
+    begin
+      if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
+      else sync ~webhook ~token ~dry_updates ~pub ~priv t repos
+    end >|*= fun t ->
+    assert (is_closed t);
+    t
 
   let repos old t =
     let old = Snapshot.repos old.snapshot in
@@ -1415,21 +1437,15 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
      the public or private branch. *)
   let sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old t =
     Log.debug (fun l -> l "[sync_once]@;old:%a@;new:%a" pp old pp t);
-    (* Start by calling GitHub API calls that the user requested. *)
-    call_github_api ~dry_updates ~token ~old:old.pub.snapshot t.pub.snapshot
-    >>*= fun () ->
     let repos = Repo.Set.union (repos old.pub t.pub) (repos old.priv t.priv) in
-    sync_webhooks t ~token ~webhook ~priv ~pub repos >>*= fun t ->
-    sync_repos ~token ~pub ~priv t repos
+    sync ~webhook ~token ~dry_updates ~pub ~priv ~old t repos
 
   let sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old =
-    assert (DK.Transaction.closed old.priv.tr);
-    assert (DK.Transaction.closed old.pub.tr);
+    assert (is_closed old);
     state ~old:(Some old) ~pub ~priv >>*= fun t ->
-    sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old t >>*= fun t ->
-    assert (DK.Transaction.closed t.priv.tr);
-    assert (DK.Transaction.closed t.pub.tr);
-    ok t
+    sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old t >|*= fun t ->
+    assert (is_closed t);
+    t
 
   type t = State of state | Starting
 

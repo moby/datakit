@@ -217,8 +217,8 @@ module type API = sig
     type t
     (** The type for the webhook server state. *)
 
-    val create: token -> Uri.t -> (Event.t -> unit Lwt.t) -> t
-    (** [create tok uri f] is the webhook server state configured to
+    val create: token -> Uri.t -> t
+    (** [create tok uri] is the webhook server state configured to
         listen for incoming webhook events to the public address [uri]
         and using the token [tok] to perform GitHub API calls. The
         function [f] will be called everytime a new event is
@@ -233,6 +233,12 @@ module type API = sig
 
     val watch: t -> Repo.t -> unit Lwt.t
     (** [watch t r] makes [t] watch the repo [r]. *)
+
+    val events: t -> Event.t list
+    (** [events t] is the list of events stored in [t]. *)
+
+    val clear: t -> unit
+    (** [clear t] clears the list of events stored in [t]. *)
 
   end
 
@@ -412,7 +418,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   (** Create an empty sync state. *)
 
   val sync:
-    ?webhook:Uri.t  ->
+    ?webhook:API.Webhook.t ->
     ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?dry_updates:bool ->
     pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
     t -> t Lwt.t

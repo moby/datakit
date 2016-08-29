@@ -58,7 +58,8 @@ module R = struct
     in
     { r with prs; status }
 
-  let events t = let x = t.events in t.events <- []; x
+  let events t = t.events
+  let clear t = t.events <- []
 
   let pp_status f = function
     | `Open   -> Fmt.string f "open"
@@ -168,9 +169,8 @@ module User = struct
       ) t Ref.Set.empty
 
   let events t = fold (fun r acc -> R.events r @ acc) t []
-
+  let clear t = fold (fun r () -> R.clear r) t ()
   let pp f { repos } = String.Map.dump R.pp f repos
-
   let equal a b = String.Map.equal R.equal a.repos b.repos
 
 end
@@ -239,7 +239,6 @@ module API = struct
   type t = {
     mutable users: User.t String.Map.t;
     ctx: Counter.t;
-    cond: unit Lwt_condition.t; (* for webhooks events *)
   }
 
   type 'a result = ('a, string) Result.result Lwt.t
@@ -346,35 +345,36 @@ module API = struct
     | Event.Other _  -> ()
 
   let create ?(events=[]) users =
-    let cond = Lwt_condition.create () in
-    let t = { users; ctx = Counter.zero (); cond } in
+    let t = { users; ctx = Counter.zero () } in
     List.iter (add_event t) events;
     t
 
   module Webhook = struct
 
     type t = {
-      f: Event.t -> unit Lwt.t;
       state: token;
       mutable repos: Repo.Set.t;
     }
 
-    let create state _ f = { f; state; repos = Repo.Set.empty }
-
-    let run t =
-      let rec aux () =
-        let x = fold (fun u acc -> User.events u @ acc) t.state [] in
-        let x = List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x in
-        let x = List.rev x in
-        Lwt_list.iter_s t.f x >>= fun () ->
-        Lwt_condition.wait t.state.cond >>=
-        aux
-      in
-      aux ()
-
-    let watch t r = t.repos <- Repo.Set.add r t.repos; Lwt.return_unit
+    let create state _ = { state; repos = Repo.Set.empty }
+    let run _ = let t, _ = Lwt.task () in t
     let repos t = t.repos
-    let signal t = Lwt_condition.signal t.state.cond
+
+    let v ?old state =
+      let repos = match old with None -> Repo.Set.empty | Some t -> t.repos in
+      { state; repos }
+
+    let watch t r =
+      if not (Repo.Set.mem r t.repos) then t.repos <- Repo.Set.add r t.repos;
+      Lwt.return_unit
+
+    let events t =
+      let x = fold (fun u acc -> User.events u @ acc) t.state [] in
+      let x = List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x in
+      List.rev x
+
+    let clear t = fold (fun u () -> User.clear u) t.state ()
+
   end
 
 end
@@ -1131,28 +1131,32 @@ let test_random _repo conn =
     )
   >>*= fun () ->
   DK.branch dk priv >>*= fun priv ->
-  let sync t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t in
+  let sync w t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w in
   let s = VG.empty in
   let users = random_repos ~random ?old:None in
   let t = API.create users in
-  sync t s >>= fun _s ->
+  let w = API.Webhook.v t in
+  sync w t s >>= fun _s ->
   ensure_in_sync ~msg:"init" t pub >>= fun () ->
   let users = random_repos ~random ~old:users in
   let t = API.create users in
-  sync t s >>= fun s ->
+  let w = API.Webhook.v t ~old:w in
+  sync w t s >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
   let sync ~fresh n =
-    let rec aux k s old =
+    let rec aux k (w, s) old =
       let s = if fresh then VG.empty else s in
       let users = random_repos ~random ~old in
       let events = Users.events_of_diff users old in
       let t = API.create ~events users in
-      sync t s >>= fun s ->
+      let w = API.Webhook.v ~old:w t in
+      sync w t s >>= fun s ->
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
       ensure_in_sync ~msg t pub >>= fun () ->
-      if k > 1 then aux (k-1) s users else Lwt.return_unit
+      if k > 1 then aux (k-1) (w, s) users else Lwt.return_unit
     in
-    aux n s users >|= ignore
+    let w = API.Webhook.v t ~old:w in
+    aux n (w, s) users >|= ignore
   in
   sync ~fresh:false 1
 

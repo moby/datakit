@@ -104,6 +104,10 @@ let start () sandbox no_listen listen_urls
     | None   -> failwith "Missing datakit GitHub token"
     | Some t -> t
   in
+  let webhook = match webhook with
+    | None   -> None
+    | Some u -> Some (Datakit_github_api.Webhook.create token u)
+  in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
     Log.app (fun l -> l "Connecting to %s." datakit);

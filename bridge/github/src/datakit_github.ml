@@ -238,10 +238,12 @@ module type API = sig
   val events: token -> Repo.t -> Event.t list result
   module Webhook: sig
     type t
-    val create: token -> Uri.t -> (Event.t -> unit Lwt.t) -> t
+    val create: token -> Uri.t -> t
     val run: t -> unit Lwt.t
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t
+    val events: t -> Event.t list
+    val clear: t -> unit
   end
 end
 
@@ -802,7 +804,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
         |> ok
 
   let statuses_of_commits tree commits =
-    Log.debug (fun l -> l "status_of_commits");
+    Log.debug (fun l -> l "statuses_of_commits");
     list_map_s (fun commit ->
         let dir = root (Commit.repo commit) / "commit" in
         Log.debug (fun l -> l "status_of_commit %a" Commit.pp commit);
@@ -1020,9 +1022,23 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   (** Import from GitHub *)
 
-  (* Import http://github.com/usr/repo state. *)
-  let import_repos t ~token repos =
-    Log.debug (fun l -> l "import_repo %a" Repo.Set.pp repos);
+  let status_of_commits token commits =
+    let api_status token c =
+      Log.info (fun l -> l "API.status %a" Commit.pp c);
+      API.status token c >|= function
+      | Error e   -> Error (c, e)
+      | Ok status -> Ok (Status.Set.of_list status)
+    in
+    Lwt_list.map_p (api_status token) (Commit.Set.elements commits)
+    >|= fun status ->
+    List.fold_left (fun status -> function
+        | Ok s         -> Status.Set.union status s
+        | Error (c, e) ->
+          Log.err (fun l -> l "API.status %a: %s" Commit.pp c e);
+          status
+      ) Status.Set.empty status
+
+  let new_prs token repos =
     let repos_l = Repo.Set.elements repos in
     Lwt_list.map_p (fun r ->
         Log.info (fun l -> l "API.prs %a" Repo.pp r);
@@ -1033,52 +1049,31 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           |> PR.Set.of_list
           |> fun x -> Ok x
       ) repos_l
-    >>= fun new_prs ->
-    let new_prs = List.fold_left (fun new_prs -> function
+    >|= fun new_prs ->
+    List.fold_left (fun new_prs -> function
         | Ok prs       -> PR.Set.union prs new_prs
         | Error (r, e) ->
           Log.err (fun l -> l "API.prs %a: %s" Repo.pp r e);
           new_prs
-      ) PR.Set.empty new_prs in
+      ) PR.Set.empty new_prs
+
+  let new_refs token repos =
+    let repos_l = Repo.Set.elements repos in
     Lwt_list.map_p (fun r ->
         Log.info (fun l -> l "API.refs %a" Repo.pp r);
         API.refs token r >|= function
         | Error e -> Error (r, e)
         | Ok refs -> Ok (Ref.Set.of_list refs)
       ) repos_l
-    >>= fun new_refs ->
-    let new_refs = List.fold_left (fun new_refs -> function
+    >|= fun new_refs ->
+    List.fold_left (fun new_refs -> function
         | Ok refs      -> Ref.Set.union refs new_refs
         | Error (r, e) ->
           Log.err (fun l -> l "API.refs %a: %s" Repo.pp r e);
           new_refs
       ) Ref.Set.empty new_refs
-    in
-    let new_commits =
-      Commit.Set.empty
-      |> PR.Set.fold (fun pr acc -> Commit.Set.add (PR.commit pr) acc) new_prs
-      |> Ref.Set.fold (fun r acc -> Commit.Set.add (Ref.commit r) acc) new_refs
-    in
-    Lwt_list.map_p (fun c ->
-        Log.info (fun l -> l "API.status %a" Commit.pp c);
-        API.status token c >|= function
-        | Error e   -> Error (c, e)
-        | Ok status -> Ok (Status.Set.of_list status)
-      ) (Commit.Set.elements new_commits)
-    >>= fun new_status ->
-    let new_status = List.fold_left (fun new_status -> function
-        | Ok status    -> Status.Set.union status new_status
-        | Error (c, e) ->
-          Log.err (fun l -> l "API.status %a: %s" Commit.pp c e);
-          new_status
-      ) Status.Set.empty new_status
-    in
-    Log.debug (fun l ->
-        l "new-prs:%a new-refs:%a new-status:%a"
-          PR.Set.pp new_prs Ref.Set.pp new_refs Status.Set.pp new_status);
-    let clean = Snapshot.filter repos t in
-    let prs = PR.Set.union clean.Snapshot.prs new_prs in
-    let to_clean =
+
+  let to_clean t new_prs new_refs new_status new_commits =
       let prs =
         PR.Set.filter (fun pr ->
             not (PR.Set.exists (PR.same pr) new_prs)
@@ -1102,7 +1097,24 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       let repos = Repo.Set.empty in
       let t = { Snapshot.repos; prs; refs; commits; status } in
       if Snapshot.(compare empty t = 0) then None else Some t
+
+  (* Import http://github.com/usr/repo state. *)
+  let import_repos t ~token repos =
+    Log.debug (fun l -> l "import_repo %a" Repo.Set.pp repos);
+    new_prs token repos >>= fun new_prs ->
+    new_refs token repos >>= fun new_refs ->
+    let new_commits =
+      Commit.Set.empty
+      |> PR.Set.fold (fun pr acc -> Commit.Set.add (PR.commit pr) acc) new_prs
+      |> Ref.Set.fold (fun r acc -> Commit.Set.add (Ref.commit r) acc) new_refs
     in
+    status_of_commits token new_commits >>= fun new_status ->
+    Log.debug (fun l ->
+        l "new-prs:%a new-refs:%a new-status:%a"
+          PR.Set.pp new_prs Ref.Set.pp new_refs Status.Set.pp new_status);
+    let clean = Snapshot.filter repos t in
+    let prs = PR.Set.union clean.Snapshot.prs new_prs in
+    let to_clean = to_clean t new_prs new_refs new_status new_commits in
     Log.debug (fun l ->
         l "import_repo: cleanup %a" Fmt.(option Snapshot.pp) to_clean);
     let refs = Ref.Set.union clean.Snapshot.refs new_refs in
@@ -1305,26 +1317,48 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     ok t
 
   type webhook = {
-    w: API.Webhook.t;
+    watch: Repo.t -> unit Lwt.t;
     events: unit -> Event.t list;
   }
 
-  let sync_webhooks t webhook repos ~priv ~pub =
+  let sync_webhooks t ~token ~webhook ~priv ~pub repos =
     match webhook with
-    | None               -> ok t
-    | Some { w; events } ->
+    | None   -> ok t
+    | Some w ->
+      Log.debug (fun l -> l "sync-webhook repos: %a" Repo.Set.pp repos);
       (* register new webhooks *)
-      Lwt_list.iter_p (fun r -> API.Webhook.watch w r) (Repo.Set.elements repos)
-      >>= fun () ->
+      Lwt_list.iter_p w.watch (Repo.Set.elements repos) >>= fun () ->
       (* apply the webhook events *)
-      match events () with
+      match w.events () with
       | []     -> ok t
       | events ->
-        let events = List.rev events in
-        state ~old:(Some t) ~priv ~pub >>*= fun t ->
+        Log.debug (fun l ->
+            l "sync-webhook events: %a" (Fmt.Dump.list Event.pp) events);
         list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
+        (* Need to resynchronsize build status for new commits *)
+        let commits = List.fold_left (fun acc -> function
+            | Event.PR pr ->
+              if PR.state pr <> `Open then acc
+              else Commit.Set.add (PR.commit pr) acc
+            | Event.Ref r -> Commit.Set.add (Ref.commit r) acc
+            | Event.Status _ -> acc
+            | Event.Other _  -> acc
+          ) Commit.Set.empty events
+        in
+        let commits =
+          Commit.Set.diff commits t.priv.snapshot.Snapshot.commits
+        in
+        status_of_commits token commits >>= fun status ->
+        list_iter_s (fun s -> Conv.update_status t.priv.tr s)
+          (Status.Set.elements status)
+        >>*= fun () ->
+        let message =
+          Fmt.strf "Importing webhooks:\n%a"
+            Fmt.(list ~sep:(unit "\n") Event.pp) events
+        in
+        DK.Transaction.commit t.priv.tr ~message >>*= fun () ->
         abort t >>= fun () ->
-        ok t
+        state ~old:(Some t) ~priv ~pub
 
   (* On startup, build the initial state by looking at the active
      repository in the public and private branch. Import the new
@@ -1342,7 +1376,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       let r t = t.snapshot.Snapshot.repos in
       Repo.Set.union (r t.priv) (r t.pub)
     in
-    sync_webhooks t webhook repos ~priv ~pub >>*= fun t ->
+    sync_webhooks t ~token ~webhook ~priv ~pub repos >>*= fun t ->
     if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
     else
       sync_repos ~token ~pub ~priv t repos >>*= fun t ->
@@ -1363,10 +1397,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     call_github_api ~dry_updates ~token ~old:old.pub.snapshot t.pub.snapshot
     >>*= fun () ->
     let repos = Repo.Set.union (repos old.pub t.pub) (repos old.priv t.priv) in
-    sync_webhooks t webhook repos ~priv ~pub >>*= fun t ->
+    sync_webhooks t ~token ~webhook ~priv ~pub repos >>*= fun t ->
     sync_repos ~token ~pub ~priv t repos
 
-  let sync_once ~webhook ~dry_updates ~token ~pub ~priv old  =
+  let sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old =
     assert (DK.Transaction.closed old.priv.tr);
     assert (DK.Transaction.closed old.pub.tr);
     state ~old:(Some old) ~pub ~priv >>*= fun t ->
@@ -1383,21 +1417,23 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | Some s -> Lwt_switch.is_on s
     | None   -> true
 
+  let process_webhook = function
+    | None   -> None, fun () -> fst (Lwt.task ())
+    | Some w ->
+      let watch r = API.Webhook.watch w r in
+      let events () =
+        let e = API.Webhook.events w in
+        API.Webhook.clear w;
+        e
+      in
+      let run () = API.Webhook.run w in
+      Some {watch; events}, run
+
   let run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy =
-    let webhook, run_webhook = match webhook with
-      | None     -> let t, _ = Lwt.task () in None, fun () -> t
-      | Some uri ->
-        let events = ref [] in
-        let enqueue e = events := e :: !events; Lwt.return_unit in
-        let dequeue () = let e = !events in events := []; List.rev e in
-        let w = API.Webhook.create token uri enqueue in
-        let t = { w; events = dequeue } in
-        let run () = API.Webhook.run w in
-        Some t, run
-    in
+    let webhook, run_webhook = process_webhook webhook in
     let sync_once = function
       | Starting -> first_sync ~webhook ~dry_updates ~token ~priv ~pub
-      | State t  -> sync_once ~webhook ~dry_updates ~token ~priv ~pub t
+      | State t  -> sync_once ~webhook ~dry_updates ~token ~priv ~pub ~old:t
     in
     match policy with
     | `Once   -> sync_once t >>*= fun t -> ok (`Finish (State t))

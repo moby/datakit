@@ -286,7 +286,7 @@ type s = {
 
 type t = {
   s: s;
-  f: Github_t.event -> unit Lwt.t;
+  mutable events: Github_t.event list;
   http: HTTP.t;
 }
 
@@ -303,7 +303,7 @@ let notify_re =
 
 let notification_handler t repo _id _req body =
   Cohttp_lwt_body.to_string body >>= fun body ->
-  Lwt.async (fun () -> t.f (Github_j.event_of_string body));
+  t.events <- Github_j.event_of_string body :: t.events;
   let body = Fmt.strf "Got event for %a\n" Repo.pp repo in
   Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
   >|= some
@@ -343,13 +343,15 @@ let service { uri; registry; _ } service_fn =
   in
   service_fn  ~routes ~handler
 
-let create token uri f =
+let create token uri =
   let port = match Uri.port uri with None -> 80 | Some p -> p in
   let http = HTTP.create port in
   let s  = empty token uri in
   let service = service s (HTTP.service "GitHub listener") in
   let http = HTTP.with_service http service in
-  { s; http; f }
+  { s; http; events = [] }
 
 let repos t = t.s.repos
 let run t = HTTP.listen t.http
+let events t = List.rev t.events
+let clear t = t.events <- []

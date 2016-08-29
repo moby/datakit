@@ -314,13 +314,6 @@ let list_iter_s f l =
       | Error e, _ | _, Error e -> Error e
     ) (Ok ()) (List.rev l)
 
-let list_map_s f l =
-  Lwt_list.map_s f l >|= fun l ->
-  List.fold_left (fun acc x -> match acc, x with
-      | Ok acc, Ok x            -> Ok (x :: acc)
-      | Error e, _ | _, Error e -> Error e
-    ) (Ok []) (List.rev l)
-
 module Snapshot = struct
 
   type t = {
@@ -617,10 +610,6 @@ end
 
 module Conv (DK: Datakit_S.CLIENT) = struct
 
-  let safe_remove t path =
-    DK.Transaction.exists t path >>*= fun exists ->
-    if not exists then ok () else DK.Transaction.remove t path
-
   type nonrec 'a result = ('a, DK.error) result Lwt.t
 
   (* conversion between GitHub and DataKit states. *)
@@ -632,33 +621,43 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   type tree = E: (module TREE with type t = 'a) * 'a -> tree
 
-  let error fmt = Fmt.kstrf (fun str -> DK.error "conv: %s" str) fmt
+  let safe_remove t path =
+    DK.Transaction.remove t path >>= function
+    | Error _ | Ok () -> ok ()
+
+  let safe_read_dir (E ((module Tree), tree)) dir =
+    Tree.read_dir tree dir >|= function
+    | Error _ -> []
+    | Ok dirs -> dirs
+
+  let safe_read_file (E ((module Tree), tree)) file =
+    Tree.read_file tree file >|= function
+    | Error _ -> None
+    | Ok b    -> Some (String.trim (Cstruct.to_string b))
 
   let walk
       (type elt) (type t) (module Set: SET with type elt = elt and type t = t)
       tree root (file, fn) =
-    let E ((module Tree), t) = tree in
     let rec aux context =
-      let ctx = match Datakit_path.of_steps context with
-        | Ok x    -> ok x
-        | Error e -> error "%s" e
-      in
-      ctx >>*= fun ctx ->
-      let dir = root /@ ctx in
-      Tree.exists_dir t dir >>*= fun exists ->
-      if not exists then ok Set.empty
-      else (
-        Tree.read_dir t dir >>*= fun child ->
-        list_map_s (fun c -> aux (context @ [c])) child >>*= fun child ->
-        let child = List.fold_left Set.union Set.empty child in
-        Tree.exists_file t (dir / file) >>*= fun exists ->
-        if exists then
-          fn context >>*= function
-          | None   -> ok child
-          | Some s -> ok (Set.add s child)
+      match Datakit_path.of_steps context with
+      | Error e ->
+        Log.err (fun l -> l "%s" e);
+        Lwt.return Set.empty
+      | Ok ctx  ->
+        let dir = root /@ ctx in
+        safe_read_dir tree dir >>= fun child ->
+        Lwt_list.fold_left_s (fun acc c ->
+            (* FIXME: not tail recurcsive *)
+            aux (context @ [c]) >|= fun child ->
+            Set.union child acc
+          ) Set.empty child >>= fun child ->
+        safe_read_file tree (dir / file) >>= fun file ->
+        if file <> None then
+          fn context >|= function
+          | None   -> child
+          | Some s -> Set.add s child
         else
-          ok child
-      )
+          Lwt.return child
     in
     aux []
 
@@ -680,24 +679,17 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   (* Repos *)
 
-  let repos (E ((module Tree), tree)) =
+  let repos tree =
     Log.debug (fun l -> l "repos");
     let root = Datakit_path.empty in
-    Tree.exists_dir tree root >>*= fun is_dir ->
-    if not is_dir then ok Repo.Set.empty
-    else
-      Tree.read_dir tree root >>*= fun users ->
-      List.fold_left (fun acc user ->
-          Tree.exists_dir tree (root / user) >>*= fun is_dir ->
-          if not is_dir then acc
-          else
-            Tree.read_dir tree (root / user) >>*= fun repos ->
-            List.fold_left (fun acc repo ->
-                acc >>*= fun acc ->
-                Repo.Set.add { Repo.user; repo } acc
-                |> ok
-              ) acc repos
-        ) (ok Repo.Set.empty) users
+    safe_read_dir tree root >>= fun users ->
+    Lwt_list.fold_left_s (fun acc user ->
+        safe_read_dir tree (root / user) >>= fun repos ->
+        List.fold_left (fun acc repo ->
+            Repo.Set.add { Repo.user; repo } acc
+          ) acc repos
+        |> Lwt.return
+      ) Repo.Set.empty users
 
   (* PRs *)
 
@@ -719,84 +711,80 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   let update_prs tr prs = list_iter_s (update_pr tr) (PR.Set.elements prs)
 
-  let pr (E ((module Tree), t)) repo number =
+  let pr tree repo number =
     let dir = root repo / "pr" / string_of_int number in
     Log.debug (fun l -> l "read_pr %s" @@ Datakit_path.to_hum dir);
-    Tree.exists_file t (dir / "head")  >>*= fun exists_head ->
-    Tree.exists_file t (dir / "state") >>*= fun exists_state ->
-    Tree.exists_file t (dir / "title") >>*= fun exists_title ->
-    if not exists_head then
+    safe_read_file tree (dir / "head")  >>= fun head ->
+    safe_read_file tree (dir / "state") >>= fun state ->
+    safe_read_file tree (dir / "title") >|= fun title ->
+    match head, state with
+    | None, _  ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/head does not exist" Repo.pp repo number);
-    if not exists_state then
+      None
+    | _, None ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/state does not exist" Repo.pp repo number);
-    if not exists_head || not exists_state then ok None
-    else (
-      Tree.read_file t (dir / "head") >>*= fun head ->
-      Tree.read_file t (dir / "state") >>*= fun state ->
-      (if not exists_title then ok (Cstruct.of_string "")
-       else Tree.read_file t (dir / "title"))
-      >>*= fun title ->
-      let parse s = String.trim (Cstruct.to_string s) in
-      let head = { Commit.repo; id = parse head } in
-      let title = parse title in
-      let state = parse state in
-      match PR.state_of_string state with
-      | None       -> error "%s is not a valid PR state" state
-      | Some state ->
-        ok (Some { PR.head; number; state; title })
-    )
+      None
+    | Some id, Some state ->
+      let head = { Commit.repo; id } in
+      let title = match title with None -> "" | Some t -> t in
+      let state = match PR.state_of_string state with
+        | Some s -> s
+        | None    ->
+          Log.err (fun l ->
+              l "%s is not a valid PR state, picking `Closed instead"
+                state);
+          `Closed
+          in
+        Some { PR.head; number; state; title }
 
   let prs_of_repo tree repo =
     Log.debug (fun l -> l "prs_of_repo %a" Repo.pp repo);
-    let E ((module Tree), t) = tree in
     let dir = root repo / "pr"  in
-    Log.debug (fun l -> l "read_prs %s" @@ Datakit_path.to_hum dir);
-    Tree.exists_dir t dir >>*= fun exists ->
-    if not exists then ok PR.Set.empty
-    else
-      Tree.read_dir t dir >>*=
-      list_map_s (fun num -> pr tree repo (int_of_string num))
-      >>*= function l ->
-        List.fold_left
-          (fun acc pr -> match pr with None -> acc | Some x -> PR.Set.add x acc)
-          PR.Set.empty l
-        |> ok
+    safe_read_dir tree dir >>= fun nums ->
+    Lwt_list.fold_left_s (fun acc n ->
+        pr tree repo (int_of_string n) >|= function
+        | None   -> acc
+        | Some p -> PR.Set.add p acc
+      ) PR.Set.empty nums
+
+  let maybe_repos tree = function
+    | None -> repos tree
+    | Some rs -> Lwt.return rs
 
   let prs ?repos:rs tree =
     Log.debug (fun l -> l "prs");
-    (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_s (prs_of_repo tree) (Repo.Set.elements repos)
-    >>*= fun prs ->
-    ok (List.fold_left PR.Set.union PR.Set.empty prs)
+    maybe_repos tree rs >>= fun repos ->
+    Lwt_list.fold_left_s (fun acc r ->
+        prs_of_repo tree r >|= fun prs ->
+        PR.Set.union prs acc
+      ) PR.Set.empty (Repo.Set.elements repos)
 
   (* Commits *)
 
-  let commit (E ((module Tree), t)) repo id =
+  let commit tree repo id =
+    Log.debug (fun l -> l "commit %a:%s" Repo.pp repo id);
     let dir = root repo / "commit" / id in
-    Tree.exists_dir t dir >|*= fun exists ->
-    Log.debug (fun l -> l "commit %a %b" Datakit_path.pp dir exists);
-    if not exists then None
-    else Some { Commit.repo; id }
+    safe_read_dir tree dir >|= function
+    | [] -> None
+    | _  -> Some { Commit.repo; id }
 
   let commits_of_repo tree repo =
     Log.debug (fun l -> l "commits_of_repo %a" Repo.pp repo);
-    let E ((module Tree), t) = tree in
     let dir = root repo / "commit" in
-    Tree.exists_dir t dir >>*= fun exists ->
-    if not exists then ok Commit.Set.empty
-    else
-      Tree.read_dir t dir >|*= fun childs ->
-      List.fold_left (fun s id ->
-          Commit.Set.add { Commit.repo; id } s
-        ) Commit.Set.empty childs
+    safe_read_dir tree dir >|= fun commits ->
+    List.fold_left (fun s id ->
+        Commit.Set.add { Commit.repo; id } s
+      ) Commit.Set.empty commits
 
   let commits ?repos:rs tree =
     Log.debug (fun l -> l "commits");
-    (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_s (commits_of_repo tree) (Repo.Set.elements repos) >>*= fun rs ->
-    ok (List.fold_left Commit.Set.union Commit.Set.empty rs)
+    maybe_repos tree rs >>= fun repos ->
+    Lwt_list.fold_left_s (fun acc r ->
+        commits_of_repo tree r >|= fun commits ->
+        Commit.Set.union commits acc
+      ) Commit.Set.empty (Repo.Set.elements repos)
 
   (* Status *)
 
@@ -821,77 +809,71 @@ module Conv (DK: Datakit_S.CLIENT) = struct
   let update_statuses tr s =
     list_iter_s (update_status tr) (Status.Set.elements s)
 
-  let status (E ((module Tree), t)) commit context =
+  let status tree commit context =
+    Log.debug (fun l -> l "status %a:%a" Commit.pp commit pp_path context);
     let context = Datakit_path.of_steps_exn context in
     let dir =
       root (Commit.repo commit) / "commit" / Commit.id commit / "status"
       /@ context
     in
-    Tree.exists_dir t dir >>*= fun exists_dir ->
-    Log.debug (fun l -> l "status %a %b" Datakit_path.pp dir exists_dir);
-    if not exists_dir then ok None
-    else
-      Tree.read_file t (dir / "state") >>*= fun state ->
-      match Status_state.of_string (String.trim (Cstruct.to_string state)) with
-      | None       -> error "%s: invalid state" @@ Cstruct.to_string state
-      | Some state ->
-        let read file =
-          let some s = match String.trim s with "" -> None | s -> Some s in
-          Tree.exists_file t file >>*= function
-          | false -> ok None
-          | true  ->
-            Tree.read_file t file >>*= fun d ->
-            ok (some @@ Cstruct.to_string d)
-        in
-        read (dir / "description") >>*= fun description ->
-        read (dir / "target_url")  >>*= fun url ->
-        let context = Datakit_path.unwrap context in
-        Some { Status.state; commit; context; description; url }
-        |> ok
+    safe_read_file tree (dir / "state") >>= fun state ->
+    match state with
+    | None     -> Lwt.return_none
+    | Some str ->
+      let state = match Status_state.of_string str with
+        | Some s -> s
+        | None   ->
+          Log.err (fun l -> l "%s: invalid state, using `Failure instead" str);
+          `Failure
+      in
+      safe_read_file tree (dir / "description") >>= fun description ->
+      safe_read_file tree (dir / "target_url")  >|= fun url ->
+      let context = Datakit_path.unwrap context in
+      Some { Status.state; commit; context; description; url }
 
   let statuses_of_commits tree commits =
-    Log.debug (fun l -> l "statuses_of_commits");
-    list_map_s (fun commit ->
+    Log.debug (fun l -> l "statuses_of_commits %a" Commit.Set.pp commits);
+    Lwt_list.fold_left_s (fun acc commit ->
         let dir = root (Commit.repo commit) / "commit" in
-        Log.debug (fun l -> l "status_of_commit %a" Commit.pp commit);
         let dir = dir / Commit.id commit / "status" in
         walk (module Status.Set) tree dir ("state", status tree commit)
-      ) (Commit.Set.elements commits)
-    >>*= fun status ->
-    ok (List.fold_left Status.Set.union Status.Set.empty status)
+        >|= fun status ->
+        Status.Set.union status acc
+      ) Status.Set.empty (Commit.Set.elements commits)
+
+  let maybe_commits tree = function
+    | None   -> commits tree
+    | Some c -> Lwt.return c
 
   let statuses ?commits:cs tree =
     Log.debug (fun l -> l "status");
-    (match cs with None -> commits tree | Some c -> ok c) >>*= fun commits ->
+    maybe_commits tree cs >>= fun commits ->
     statuses_of_commits tree commits
 
   (* Refs *)
 
-  let ref_ (E ((module Tree), t)) repo name =
+  let ref_ tree repo name =
+    Log.debug (fun l -> l "ref_ %a:%a" Repo.pp repo pp_path name);
     let path = Datakit_path.of_steps_exn name in
     let head = root repo / "ref" /@ path / "head" in
-    Tree.exists_file t head >>*= fun exists_head ->
-    Log.debug (fun l -> l "ref %a %b" Datakit_path.pp head exists_head);
-    if not exists_head then ok None
-    else
-      Tree.read_file t head >>*= fun head ->
-      let id = String.trim (Cstruct.to_string head) in
+    safe_read_file tree head >|= function
+    | None    -> None
+    | Some id ->
       let head = { Commit.repo; id } in
-      ok (Some { Ref.head; name })
+      Some { Ref.head; name }
 
   let refs_of_repo tree repo =
     Log.debug (fun l -> l "refs_of_repo %a" Repo.pp repo);
-    let E ((module Tree), t) = tree in
     let dir = root repo / "ref" in
-    Tree.exists_dir t dir >>*= fun exists ->
-    if not exists then ok Ref.Set.empty
-    else walk (module Ref.Set) tree dir ("head", ref_ tree repo)
+    walk (module Ref.Set) tree dir ("head", ref_ tree repo)
 
   let refs ?repos:rs tree =
     Log.debug (fun l -> l "refs");
-    (match rs with None -> repos tree | Some rs -> ok rs) >>*= fun repos ->
-    list_map_s (refs_of_repo tree) (Repo.Set.elements repos) >>*= fun rs ->
-    ok (List.fold_left Ref.Set.union Ref.Set.empty rs)
+    maybe_repos tree rs >>= fun repos ->
+    Lwt_list.fold_left_s (fun acc r ->
+        refs_of_repo tree r >|= fun refs ->
+        Ref.Set.union acc refs
+      ) Ref.Set.empty (Repo.Set.elements repos)
 
   let update_ref tr (s, r) =
     Log.debug (fun l -> l "update_ref %a%a" Ref.pp_state s Ref.pp r);
@@ -917,70 +899,65 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   (* Diffs *)
 
-  let diff (E ((module Tree), _)) c = Tree.diff c
+  let safe_diff (E ((module Tree), _)) c =
+    Tree.diff c >|= function
+    | Error _ -> Diff.Set.empty
+    | Ok d    -> d
 
   let apply_pr_diff t tree (r, id as x)  =
-    pr tree r id >>*= function
-    | None    -> Snapshot.remove_pr t x   |> ok
-    | Some pr -> Snapshot.replace_pr pr t |> ok
+    pr tree r id >|= function
+    | None    -> Snapshot.remove_pr t x
+    | Some pr -> Snapshot.replace_pr pr t
 
   let apply_status_diff t tree (c, context as x) =
-    status tree c context >>*= function
-    | None   -> Snapshot.remove_status t x  |> ok
-    | Some s -> Snapshot.replace_status s t |> ok
+    status tree c context >|= function
+    | None   -> Snapshot.remove_status t x
+    | Some s -> Snapshot.replace_status s t
 
   let apply_ref_diff t tree (r, name as x) =
-    ref_ tree r name >>*= function
-    | None   -> Snapshot.remove_ref t x  |> ok
-    | Some r -> Snapshot.replace_ref r t |> ok
+    ref_ tree r name >|= function
+    | None   -> Snapshot.remove_ref t x
+    | Some r -> Snapshot.replace_ref r t
 
   let apply_commit_diff t tree (r, id as x) =
-    commit tree r id >>*= function
-    | None   -> Snapshot.remove_commit t x  |> ok
-    | Some c -> Snapshot.replace_commit c t |> ok
+    commit tree r id >|= function
+    | None   -> Snapshot.remove_commit t x
+    | Some c -> Snapshot.replace_commit c t
 
   let apply (t:Snapshot.t) (tree, diff) =
     let t = ref t in
-    list_iter_s (fun ({ Diff.repo; id } as d) ->
+    Lwt_list.iter_s (fun ({ Diff.repo; id } as d) ->
         Log.debug (fun l -> l "apply %a" Diff.pp d);
         match id with
         | `PR pr ->
-          apply_pr_diff !t tree (repo, pr) >>*= fun x ->
+          apply_pr_diff !t tree (repo, pr) >|= fun x ->
           t := x;
-          ok ()
         | `Status (id, context) ->
           let commit = { Commit.repo; id } in
-          apply_status_diff !t tree (commit, context) >>*= fun x ->
-          apply_commit_diff x tree (repo, id) >>*= fun x ->
+          apply_status_diff !t tree (commit, context) >>= fun x ->
+          apply_commit_diff x tree (repo, id) >|= fun x ->
           t := x;
-          ok ()
         | `Ref name ->
-          apply_ref_diff !t tree (repo, name) >>*= fun x ->
+          apply_ref_diff !t tree (repo, name) >|= fun x ->
           t := x;
-          ok ()
         | `Unknown ->
           let repos = Repo.Set.add repo !t.Snapshot.repos in
           t := { !t with Snapshot.repos };
-          ok ()
+          Lwt.return_unit
       ) (Diff.Set.elements diff)
-    >>*= fun () ->
-    ok !t
+    >|= fun () ->
+    !t
 
   (* Snapshot *)
 
-  let snapshot_of_tree t =
-    let E ((module Tree), tree) = t in
+  let snapshot_of_tree tree =
     Log.debug (fun l -> l "snapshot_of_tree");
-    let root = Datakit_path.empty in
-    Tree.exists_dir tree root >>*= fun is_dir ->
-    if not is_dir then ok Snapshot.empty
-    else
-      repos t >>*= fun repos ->
-      commits ~repos t >>*= fun commits ->
-      prs ~repos t >>*= fun prs ->
-      statuses ~commits t >>*= fun status ->
-      refs ~repos t >|*= fun refs ->
-      Snapshot.create ~repos ~status ~prs ~refs ~commits
+    repos tree >>= fun repos ->
+    commits ~repos tree >>= fun commits ->
+    prs ~repos tree >>= fun prs ->
+    statuses ~commits tree >>= fun status ->
+    refs ~repos tree >|= fun refs ->
+    Snapshot.create ~repos ~status ~prs ~refs ~commits
 
   (* compute all the active hooks for a given DataKit commit *)
   let snapshot ?old tree =
@@ -991,9 +968,9 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     match old with
     | None        -> snapshot_of_tree tree
     | Some (c, s) ->
-      diff tree c >>*= fun diff ->
-      apply s (tree, diff) >>*= fun s ->
-      ok s
+      safe_diff tree c >>= fun diff ->
+      apply s (tree, diff) >|= fun s ->
+      s
 
 end
 
@@ -1064,7 +1041,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let branch ?old b =
     DK.Branch.transaction b >>*= fun tr ->
     tr_head tr >>*= fun head ->
-    Conv.snapshot ?old (Conv.tree_of_commit head) >>*= fun snapshot ->
+    Conv.snapshot ?old (Conv.tree_of_commit head) >>= fun snapshot ->
     let name = DK.Branch.name b in
     ok { snapshot; tr; head; name }
 
@@ -1441,9 +1418,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let first_sync ~webhook ~token ~dry_updates ~pub ~priv =
     state ~old:None ~pub ~priv >>*= fun t ->
     Log.debug (fun l ->
-        l "[first_sync] priv:%a pub=%a"
-          DK.Commit.pp t.priv.head
-          DK.Commit.pp t.pub.head
+        l "[first_sync]@;@[<2>priv:%a@]@;@[<2>pub=%a@]"
+          pp_branch t.priv
+          pp_branch t.pub
       );
     let repos =
       let r t = t.snapshot.Snapshot.repos in

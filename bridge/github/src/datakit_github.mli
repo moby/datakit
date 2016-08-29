@@ -370,16 +370,16 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Repositories} *)
 
-  val repos: tree -> Repo.Set.t result
+  val repos: tree -> Repo.Set.t Lwt.t
   (** [repos t] is the list of repositories stored in [t]. *)
 
   (** {1 Status} *)
 
-  val status: tree -> Commit.t -> string list -> Status.t option result
+  val status: tree -> Commit.t -> string list -> Status.t option Lwt.t
   (** [status t c s] is the commit's build status [s] for the commit
       [c] in the tree [t]. *)
 
-  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t result
+  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t Lwt.t
   (** [statuses t] is the list of status stored in [t].. *)
 
   val update_status: DK.Transaction.t -> Status.t -> unit result
@@ -388,11 +388,11 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Pull requests} *)
 
-  val pr: tree -> Repo.t -> int -> PR.t option result
+  val pr: tree -> Repo.t -> int -> PR.t option Lwt.t
   (** [pr t r n] is the [n]'th pull-request of the repostiry [r] in
       [t]. *)
 
-  val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t result
+  val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t Lwt.t
   (** [prs t] is the list of pull requests stored in [t]. *)
 
   val update_pr: DK.Transaction.t -> PR.t -> unit result
@@ -413,16 +413,16 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Snapshots and diffs} *)
 
-  val diff: tree -> DK.Commit.t -> Diff.Set.t result
+  val safe_diff: tree -> DK.Commit.t -> Diff.Set.t Lwt.t
   (** [diff tree c] computes the Github diff between the branch [b]
       and the commit [c]. *)
 
-  val snapshot: ?old:(DK.Commit.t * Snapshot.t) -> tree -> Snapshot.t result
+  val snapshot: ?old:(DK.Commit.t * Snapshot.t) -> tree -> Snapshot.t Lwt.t
   (** [snapshot ?old t] is a snapshot of the tree [t]. Note: this is
       expensive, so try to provide a previous (recent) snapshot [prev]
       if possible. *)
 
-  val apply: Snapshot.t -> (tree * Diff.Set.t) -> Snapshot.t result
+  val apply: Snapshot.t -> (tree * Diff.Set.t) -> Snapshot.t Lwt.t
   (** [apply s d] is the snapshot obtained by applying [d] on top of
       [s]. [d] is a pair [tree * diff] where [diff] contains the
       pull-requests and status to consider while [tree] is holding the

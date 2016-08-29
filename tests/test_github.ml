@@ -308,12 +308,6 @@ module API = struct
       |> List.map (fun repo -> { Repo.user; repo })
       |> return
 
-  let status t commit =
-    t.ctx.Counter.status <- t.ctx.Counter.status + 1;
-    let repo = lookup_exn t (Commit.repo commit) in
-    try return (List.assoc (Commit.id commit) repo.R.status)
-    with Not_found -> return []
-
   let set_status_aux t s =
     let repo = lookup_exn t (Status.repo s) in
     let commit = Status.commit_id s in
@@ -358,20 +352,31 @@ module API = struct
       repo.R.refs <- r :: refs;
       add_event t (Event.Ref (s, r))
 
+  let status t commit =
+    t.ctx.Counter.status <- t.ctx.Counter.status + 1;
+    match lookup t (Commit.repo commit) with
+    | None   -> return []
+    | Some r ->
+      try return (List.assoc (Commit.id commit) r.R.status)
+      with Not_found -> return []
+
   let prs t repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
-    let repo = lookup_exn t repo in
-    return repo.R.prs
+    match lookup t repo with
+    | None   -> return []
+    | Some r -> return r.R.prs
 
   let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
-    let repo = lookup_exn t repo in
-    return repo.R.events
+    match lookup t repo with
+    | None   -> return []
+    | Some r -> return r.R.events
 
   let refs t repo =
     t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
-    let repo = lookup_exn t repo in
-    return repo.R.refs
+    match lookup t repo with
+    | None   -> return []
+    | Some r -> return r.R.refs
 
   let apply_events t =
     t.users |> String.Map.iter @@ fun _ user ->
@@ -552,7 +557,7 @@ let test_snapshot () =
                 | Error e -> err e
               ) refs
             >>= fun () ->
-            Conv.snapshot Conv.(tree_of_transaction tr) >>*= fun s ->
+            Conv.snapshot Conv.(tree_of_transaction tr) >>= fun s ->
             DK.Transaction.commit tr ~message:"init" >>*= fun () ->
             ok s)
       in
@@ -566,28 +571,28 @@ let test_snapshot () =
         let commits = Commit.Set.of_list commits0 in
         Snapshot.create ~repos ~commits ~prs ~status ~refs
       in
-      Conv.snapshot Conv.(tree_of_commit head) >>*= fun sh ->
+      Conv.snapshot Conv.(tree_of_commit head) >>= fun sh ->
       Alcotest.(check snapshot) "snap transaction" se s;
       Alcotest.(check snapshot) "snap head" se sh;
 
       update ~prs:[pr2] ~status:[] ~refs:[] >>*= fun s1 ->
       expect_head br >>*= fun head1 ->
       let tree1 = Conv.tree_of_commit head1 in
-      Conv.diff tree1 head >>*= fun diff1 ->
+      Conv.safe_diff tree1 head >>= fun diff1 ->
       Alcotest.(check diffs) "diff1" [d (`PR 1)] (Diff.Set.elements diff1);
-      Conv.snapshot ~old:(head, s) tree1 >>*= fun sd ->
+      Conv.snapshot ~old:(head, s) tree1 >>= fun sd ->
       Alcotest.(check snapshot) "snap diff" s1 sd;
 
       update ~prs:[] ~status:[s5] ~refs:[ref2] >>*= fun s2 ->
       expect_head br >>*= fun head2 ->
       let tree2 = Conv.tree_of_commit head2 in
-      Conv.diff tree2 head1 >>*= fun diff2 ->
+      Conv.safe_diff tree2 head1 >>= fun diff2 ->
       Alcotest.(check diffs) "diff2"
         [d (`Status ("foo", ["foo";"bar";"baz"]));
          d (`Ref ["heads";"master"])]
         (Diff.Set.elements diff2);
-      Conv.snapshot ~old:(head , s ) tree2 >>*= fun sd1 ->
-      Conv.snapshot ~old:(head1, s1) tree2 >>*= fun sd2 ->
+      Conv.snapshot ~old:(head , s ) tree2 >>= fun sd1 ->
+      Conv.snapshot ~old:(head1, s1) tree2 >>= fun sd2 ->
       Alcotest.(check snapshot) "snap diff1" s2 sd1;
       Alcotest.(check snapshot) "snap diff2" s2 sd2;
 
@@ -599,7 +604,7 @@ let test_snapshot () =
         ) >>*= fun () ->
       expect_head br >>*= fun head3 ->
       let tree3 = Conv.tree_of_commit head3 in
-      Conv.diff tree3 head2 >>*= fun diff3 ->
+      Conv.safe_diff tree3 head2 >>= fun diff3 ->
       let d = { Diff.repo = { Repo. user; repo = "toto" }; id = `Unknown } in
       Alcotest.(check diffs) "diff3" [d] (Diff.Set.elements diff3);
 
@@ -1033,6 +1038,9 @@ let test_state = [|
   `Error;
 |]
 
+let test_user = ["a"; "b"]
+let test_repo = ["a"; "b"]
+
 let random_choice ~random options =
   options.(Random.State.int random (Array.length options))
 
@@ -1136,14 +1144,12 @@ let random_state ~random ~repo ~old_prs ~old_status ~old_refs =
 
 let random_repos ?(old=String.Map.empty) ~random =
   String.Map.iter (fun _ repo -> User.clear repo) old;
-  let user_names = ["a"; "b"] in
-  let repo_names = ["a"; "b"] in
-  user_names |> List.map (fun user ->
+  test_user |> List.map (fun user ->
       let old_user =
         String.Map.find user old |> default { User.repos = String.Map.empty }
       in
       let repos =
-        repo_names |> List.map (fun repo ->
+        test_repo |> List.map (fun repo ->
             let r = { Repo.user; repo } in
             let old_prs, old_status, old_refs =
               match String.Map.find repo old_user.User.repos with
@@ -1230,26 +1236,21 @@ let test_random_dk ~quick _repo conn =
   let random = Random.State.make [| 1; 2; 3 |] in
   let dk = DK.connect conn in
   DK.branch dk pub  >>*= fun pub ->
-  DK.Branch.with_transaction pub (fun t ->
-      let monitor ~user ~repo =
-        let dir = Datakit_path.of_steps_exn [user; repo] in
-        DK.Transaction.make_dirs t dir >>*= fun () ->
-        DK.Transaction.create_file t ~dir "README" (Cstruct.of_string "Monitor")
-      in
-      monitor ~user:"a" ~repo:"a" >>*= fun () ->
-      monitor ~user:"a" ~repo:"b" >>*= fun () ->
-      monitor ~user:"b" ~repo:"a" >>*= fun () ->
-      monitor ~user:"b" ~repo:"b" >>*= fun () ->
-      DK.Transaction.commit t ~message:"Monitor repos"
+  DK.branch dk priv >>*= fun priv ->
+  DK.Branch.with_transaction priv (fun t ->
+      let dir = Datakit_path.empty in
+      let empty = Cstruct.of_string "" in
+      DK.Transaction.create_file t ~dir "README"  empty >>*= fun () ->
+      DK.Transaction.commit t ~message:"Init private branch"
     )
   >>*= fun () ->
-  DK.branch dk priv >>*= fun priv ->
   let update ?new_state old =
     let users = match new_state with
       | None   -> random_repos ~random ~old
       | Some s -> s
     in
     let events = Users.diff_events users old in
+    Fmt.pr "XXX events %a\n%!" Fmt.(Dump.list Event.pp) events;
     DK.Branch.with_transaction pub (fun tr ->
         Lwt_list.iter_s (fun e ->
             Conv.update_event tr e >>= function
@@ -1276,7 +1277,14 @@ let test_random_dk ~quick _repo conn =
     aux n users
   in
   let s = VG.empty in
-  let t = API.create Users.empty in
+  let repos =
+    List.fold_left (fun acc user ->
+        List.fold_left (fun acc repo ->
+            Repo.Set.add {Repo.user; repo} acc
+          ) acc test_repo
+      ) Repo.Set.empty test_user
+  in
+  let t = API.create (Users.of_repos repos) in
   update Users.empty >>= fun users ->
   sync t s >>= fun _s ->
   ensure_in_sync ~msg:"init" t pub >>= fun () ->

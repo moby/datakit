@@ -66,14 +66,14 @@ module R = struct
     | `Closed -> Fmt.string f "closed"
 
   let pp_pr f pr =
-    Fmt.pf f "n=%d;head=%s;title=%S;%a"
+    Fmt.pf f "{n=%d;head=%s;title=%S;%a}"
       pr.PR.number (PR.commit_id pr) pr.PR.title pp_status pr.PR.state
 
   let pp_state f (commit, states) =
     Fmt.pf f "%s->%a" commit (Fmt.Dump.list Status.pp) states
 
   let pp_refs f r =
-    Fmt.pf f "name=%a;head=%s"
+    Fmt.pf f "{name=%a;head=%s}"
       Fmt.(Dump.list string) r.Ref.name (Ref.commit_id r)
 
   let pp f { status; prs; refs; _ } =
@@ -211,21 +211,36 @@ module Users = struct
     let refs = Ref.Set.diff (refs x) (refs y) in
     Snapshot.create ~repos ~commits ~status ~prs ~refs
 
-  let events_of_diff x y =
-    let d = diff x y in
-    let prs =
-      List.map (fun pr -> Event.PR pr) (PR.Set.elements @@ Snapshot.prs d)
-    in
+  let pp f users = String.Map.dump User.pp f users
+
+  let diff_events new_t old_t =
+    let news = diff new_t old_t in
+    let olds = diff old_t new_t in
+    let new_prs = Snapshot.prs news in
+    let new_refs = Snapshot.refs news in
+    let new_status = Snapshot.status news in
+    let prs = List.map (fun pr -> Event.PR pr) (PR.Set.elements new_prs) in
     let refs =
-      List.map (fun r -> Event.Ref r) (Ref.Set.elements @@ Snapshot.refs d)
+      List.map (fun r -> Event.Ref (`Updated, r)) (Ref.Set.elements new_refs)
     in
     let status =
-      List.map (fun s -> Event.Status s)
-        (Status.Set.elements @@ Snapshot.status d)
+      List.map (fun s -> Event.Status s) (Status.Set.elements new_status)
     in
-    prs @ refs @ status
-
-  let pp f users = String.Map.dump User.pp f users
+    let close_prs =
+      PR.Set.filter
+        (fun pr -> not (PR.Set.exists (PR.same pr) new_prs))
+        (Snapshot.prs olds)
+      |> PR.Set.elements
+      |> List.map (fun pr -> Event.PR pr)
+    in
+    let close_refs =
+      Ref.Set.filter
+        (fun r -> not (Ref.Set.exists (Ref.same r) new_refs))
+        (Snapshot.refs olds)
+      |> Ref.Set.elements
+      |> List.map (fun r -> Event.Ref (`Deleted, r))
+    in
+    prs @ refs @ status @ close_prs @ close_refs
 
   let equal a b = String.Map.equal User.equal a b
 
@@ -318,12 +333,15 @@ module API = struct
     set_pr_aux t pr;
     return ()
 
-  let set_ref_aux t r =
+  let set_ref_aux t (s, r) =
     let repo = lookup_or_create t (Ref.repo r) in
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
-    repo.R.refs <- r :: refs;
-    add_event t (Event.Ref r)
+    match s with
+    | `Deleted -> ()
+    | `Created | `Updated ->
+      repo.R.refs <- r :: refs;
+      add_event t (Event.Ref (s, r))
 
   let prs t repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
@@ -506,7 +524,7 @@ let test_snapshot () =
               ) status
             >>= fun () ->
             Lwt_list.iter_p (fun r ->
-                Conv.update_ref tr r >>= function
+                Conv.update_ref tr (`Updated, r) >>= function
                 | Ok ()   -> Lwt.return_unit
                 | Error e -> err e
               ) refs
@@ -1137,6 +1155,22 @@ let test_random _repo conn =
   >>*= fun () ->
   DK.branch dk priv >>*= fun priv ->
   let sync w t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w in
+  let nsync ~fresh n w t s =
+    let s = ref (if fresh then VG.empty else s) in
+    let w = ref w in
+    let rec aux k old =
+      let users = random_repos ~random ~old in
+      let events = Users.diff_events users old in
+      let t = API.create ~events users in
+      w := API.Webhook.v ~old:!w t;
+      VG.sync ~policy:`Once !s ~pub ~priv ~token:t ~webhook:!w >>= fun new_s ->
+      if not fresh then s := new_s;
+      let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
+      ensure_in_sync ~msg t pub >>= fun () ->
+      if k > 1 then aux (k-1) users else Lwt.return (!s, users)
+    in
+    aux n t.API.users
+  in
   let s = VG.empty in
   let users = random_repos ~random ?old:None in
   let t = API.create users in
@@ -1148,22 +1182,16 @@ let test_random _repo conn =
   let w = API.Webhook.v t ~old:w in
   sync w t s >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  let sync ~fresh n =
-    let rec aux k (w, s) old =
-      let s = if fresh then VG.empty else s in
-      let users = random_repos ~random ~old in
-      let events = Users.events_of_diff users old in
-      let t = API.create ~events users in
-      let w = API.Webhook.v ~old:w t in
-      sync w t s >>= fun s ->
-      let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
-      ensure_in_sync ~msg t pub >>= fun () ->
-      if k > 1 then aux (k-1) (w, s) users else Lwt.return_unit
-    in
-    let w = API.Webhook.v t ~old:w in
-    aux n (w, s) users >|= ignore
-  in
-  sync ~fresh:false 1
+  nsync ~fresh:false 3 w t s >>= fun (s, users) ->
+  let users = random_repos ~random ~old:users in
+  let t = API.create users in
+  let w = API.Webhook.v t ~old:w in
+  nsync ~fresh:true 3 w t s  >>= fun (s, users) ->
+  let users = random_repos ~random ~old:users in
+  let t = API.create users in
+  let w = API.Webhook.v t ~old:w in
+  nsync ~fresh:false 2 w t s  >>= fun _ ->
+  Lwt.return_unit
 
 let test_set = [
   "snapshot", `Quick, test_snapshot;

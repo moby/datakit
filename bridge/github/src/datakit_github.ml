@@ -42,6 +42,7 @@ let pp_path = Fmt.(list ~sep:(unit "/") string)
 module Repo = struct
   type t = { user: string; repo: string }
   let pp ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
+  let compare = Pervasives.compare
   module Set = Set(struct
       type nonrec t = t
       let pp = pp
@@ -70,6 +71,13 @@ module Status_state = struct
 
 end
 
+let compare_fold fs x y =
+  List.fold_left (fun acc f ->
+      match acc with
+      | 0 -> f x y
+      | i -> i
+    ) 0 (List.rev fs)
+
 module Commit = struct
 
   type t = { repo: Repo.t; id : string }
@@ -77,6 +85,13 @@ module Commit = struct
   let pp ppf t = Fmt.pf ppf "%a:%s" Repo.pp t.repo t.id
   let id t = t.id
   let repo t = t.repo
+  let compare_repo x y = Repo.compare x.repo y.repo
+  let compare_id x y = String.compare x.id y.id
+
+  let compare = compare_fold [
+      compare_repo;
+      compare_id;
+    ]
 
   module Set = Set(struct
       type nonrec t = t
@@ -95,8 +110,6 @@ module PR = struct
     title: string;
   }
 
-  let compare: t -> t -> int = Pervasives.compare
-
   let string_of_state = function
     | `Open   -> "open"
     | `Closed -> "closed"
@@ -113,6 +126,15 @@ module PR = struct
   let repo t = t.head.Commit.repo
   let commit t = t.head
   let commit_id t = t.head.Commit.id
+
+  let compare_repo x y = Repo.compare (repo x) (repo y)
+  let compare_num x y = Pervasives.compare x.number y.number
+
+  let compare = compare_fold [
+      compare_repo;
+      compare_num;
+      Pervasives.compare;
+    ]
 
   let pp ppf t =
     Fmt.pf ppf "{%a %d[%s] %a %S}"
@@ -141,8 +163,6 @@ module Status = struct
     state: Status_state.t;
   }
 
-  let compare: t -> t -> int = Pervasives.compare
-
   let context t = match t.context with
     | [] -> ["default"]
     | l  -> l
@@ -152,7 +172,14 @@ module Status = struct
   let commit t = t.commit
   let commit_id t = t.commit.Commit.id
   let same x y = commit x = commit y && context x = context y
+  let compare_repo x y = Repo.compare (repo x) (repo y)
+  let compare_commit_id x y = Pervasives.compare (commit_id x) (commit_id y)
 
+  let compare = compare_fold [
+      compare_repo;
+      compare_commit_id;
+      Pervasives.compare
+    ]
 
   let pp_opt k ppf v = match v with
     | None   -> ()
@@ -181,13 +208,20 @@ module Ref = struct
     name: string list;
   }
 
-  let compare: t -> t -> int  = Pervasives.compare
   let repo t = t.head.Commit.repo
   let commit t = t.head
   let commit_id t = t.head.Commit.id
   let name t = t.name
   let same x y = repo x = repo y && name x = name y
   let path s = Datakit_path.of_steps_exn s.name
+  let compare_repo x y = Repo.compare (repo x) (repo y)
+  let compare_name x y = Pervasives.compare x.name y.name
+
+  let compare = compare_fold [
+      compare_repo;
+      compare_name;
+      Pervasives.compare;
+    ]
 
   let pp ppf t =
     Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_id t)
@@ -343,13 +377,6 @@ module Snapshot = struct
   let compare_status x y = Status.Set.compare x.status y.status
   let compare_prs x y = PR.Set.compare x.prs y.prs
   let compare_refs x y = Ref.Set.compare x.refs y.refs
-
-  let compare_fold fs x y =
-    List.fold_left (fun acc f ->
-        match acc with
-        | 0 -> f x y
-        | i -> i
-      ) 0 (List.rev fs)
 
   let compare = compare_fold [
       compare_repos;

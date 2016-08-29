@@ -294,6 +294,7 @@ type t = {
   s: s;
   mutable events: Github_t.event list;
   http: HTTP.t;
+  cond: unit Lwt_condition.t;
 }
 
 let empty token uri =
@@ -310,6 +311,7 @@ let notify_re =
 let notification_handler t repo _id _req body =
   Cohttp_lwt_body.to_string body >>= fun body ->
   t.events <- Github_j.event_of_string body :: t.events;
+  Lwt_condition.signal t.cond ();
   let body = Fmt.strf "Got event for %a\n" Repo.pp repo in
   Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
   >|= some
@@ -355,9 +357,11 @@ let create token uri =
   let s  = empty token uri in
   let service = service s (HTTP.service "GitHub listener") in
   let http = HTTP.with_service http service in
-  { s; http; events = [] }
+  let cond = Lwt_condition.create () in
+  { s; http; events = []; cond }
 
 let repos t = t.s.repos
 let run t = HTTP.listen t.http
 let events t = List.rev t.events
 let clear t = t.events <- []
+let wait t = Lwt_condition.wait t.cond

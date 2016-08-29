@@ -380,9 +380,12 @@ module API = struct
       mutable repos: Repo.Set.t;
     }
 
-    let create state _ = { state; repos = Repo.Set.empty }
-    let run _ = let t, _ = Lwt.task () in t
+    let block () = let t, _ = Lwt.task () in t
+
+    let create state _ = { state; repos = Repo.Set.empty  }
     let repos t = t.repos
+    let run _ = block ()
+    let wait _ = block ()
 
     let v ?old state =
       let repos = match old with None -> Repo.Set.empty | Some t -> t.repos in

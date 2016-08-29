@@ -287,6 +287,7 @@ module type API = sig
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t
     val events: t -> Event.t list
+    val wait: t -> unit Lwt.t
     val clear: t -> unit
   end
 end
@@ -1483,7 +1484,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | None   -> true
 
   let process_webhook = function
-    | None   -> None, fun () -> fst (Lwt.task ())
+    | None   -> None, fun _ -> fst (Lwt.task ())
     | Some w ->
       let watch r = API.Webhook.watch w r in
       let events () =
@@ -1491,7 +1492,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         API.Webhook.clear w;
         e
       in
-      let run () = API.Webhook.run w in
+      let rec wait s =
+        API.Webhook.wait w >>= fun () ->
+        s ();
+        wait s
+      in
+      let run s =
+        Lwt.pick [
+          API.Webhook.run w;
+          wait s
+        ]
+      in
       Some {watch; events}, run
 
   let run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy =
@@ -1529,6 +1540,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           >>=
           react
       in
+      let notify () =
+        Log.info (fun l -> l "New webhooks detected");
+        updates := true;
+        Lwt_condition.signal cond ()
+      in
       let watch br =
         let notify _ =
           Log.info (fun l -> l "Change detected in %s" @@ DK.Branch.name br);
@@ -1540,7 +1556,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         | Ok _    -> Lwt.return_unit
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
       in
-      Lwt.choose [ react () ; watch priv; watch pub; run_webhook () ]
+      Lwt.choose [ react () ; watch priv; watch pub; run_webhook notify ]
       >>= fun () ->
       ok (`Finish !t)
 

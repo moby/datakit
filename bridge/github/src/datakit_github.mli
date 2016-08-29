@@ -255,6 +255,9 @@ module type API = sig
     val events: t -> Event.t list
     (** [events t] is the list of events stored in [t]. *)
 
+    val wait: t -> unit Lwt.t
+    (** [wait t] waits for new events to be available. *)
+
     val clear: t -> unit
     (** [clear t] clears the list of events stored in [t]. *)
 

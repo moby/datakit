@@ -1,18 +1,25 @@
 open Result
 
 let level s =
+  (* [empty] should really be per-open-file, but no easy way to do that. *)
+  let empty = ref false in
   let read () =
-    let l = Logs.Src.level s in
-    let data = Fmt.strf "%a@." (Fmt.option Logs.pp_level) l in
-    Vfs.ok (Some (Cstruct.of_string data))
+    if !empty then Vfs.ok (Some (Cstruct.create 0))
+    else (
+      let l = Logs.Src.level s in
+      Vfs.ok (Some (Cstruct.of_string (Logs.level_to_string l ^ "\n")))
+    )
   in
   let write data =
-    let data = String.trim (Cstruct.to_string data) in
-    match Logs.level_of_string data with
-    | Ok l ->
-      Logs.Src.set_level s l;
-      Vfs.ok ()
-    | Error (`Msg msg) -> Vfs.error "%s" msg
+    match String.trim (Cstruct.to_string data) with
+    | "" -> empty := true; Vfs.ok ()
+    | data ->
+      empty := false;
+      match Logs.level_of_string data with
+      | Ok l ->
+        Logs.Src.set_level s l;
+        Vfs.ok ()
+      | Error (`Msg msg) -> Vfs.error "%s" msg
   in
   let chmod _ = Lwt.return Vfs.Error.perm in
   let remove () = Lwt.return Vfs.Error.perm in
@@ -26,13 +33,16 @@ let src s =
   Vfs.Dir.of_list (fun () -> Vfs.ok items)
 
 let srcs =
-  let items =
-    Logs.Src.list ()
-    |> List.map (fun s ->
-        Vfs.Inode.dir (Logs.Src.name s) (src s)
-      )
+  let logs = Hashtbl.create 100 in
+  let get_dir s =
+    let name = Logs.Src.name s in
+    try Hashtbl.find logs name
+    with Not_found ->
+      let dir = Vfs.Inode.dir name (src s) in
+      Hashtbl.add logs name dir;
+      dir
   in
-  Vfs.Dir.of_list (fun () -> Vfs.ok items)
+  Vfs.Dir.of_list (fun () -> Logs.Src.list () |> List.map get_dir |> Vfs.ok)
 
 let fs =
   let dirs = Vfs.ok [

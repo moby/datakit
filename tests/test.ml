@@ -499,6 +499,35 @@ let test_writes () =
     Lwt.return_unit
   end
 
+let test_debug _repo conn =
+  let src = Logs.Src.create "test.debug" ~doc:"Debug test log" in
+  Logs.Src.set_level src None;
+  let read path msg ~expect =
+    Client.read conn path 0L 100l >>*= fun data ->
+    let got = Cstruct.concat data |> Cstruct.to_string in
+    Alcotest.(check string) msg expect got;
+    Lwt.return ()
+  in
+  let write path value =
+    Client.with_fid conn (fun fid ->
+        Client.walk_from_root conn fid path >>*= fun _ ->
+        Client.LowLevel.update conn ~length:0L fid
+      )
+    >>*= fun () ->
+    Client.write conn path 0L (Cstruct.of_string value)
+  in
+  let test_level = ["debug"; "src"; "test.debug"; "level"] in
+  read test_level "Initially quiet" ~expect:"quiet\n" >>= fun () ->
+
+  write test_level "debug\n" >>*= fun () ->
+  read test_level "Now debug" ~expect:"debug\n" >>= fun () ->
+
+  write test_level "info" >>*= fun () ->
+  read test_level "Now info" ~expect:"info\n" >>= fun () ->
+
+  write test_level "quiet" >>*= fun () ->
+  read test_level "None again" ~expect:"quiet\n"
+
 let test_stable_inodes _repo conn =
   let inode x = Int64.to_string Protocol_9p.(x.Types.Stat.qid.Types.Qid.id) in
   make_branch conn "master" >>= fun () ->
@@ -699,6 +728,7 @@ let test_set = [
   "Blobs fast" , `Quick , test_blobs_fast_path;
   "Blobs random", `Quick , test_blobs_random;
   "Streams",    `Quick , test_streams;
+  "Debug",      `Quick , run test_debug;
 ]
 
 let () =

@@ -39,6 +39,9 @@ true: \
 
 <bridge/github/src/datakit_github_api.*>: package(github)
 
+<bridge/github/src/datakit_github_webhook.*>: package(github), package(conduit.lwt)
+<bridge/github/src/datakit_github_webhook.*>: package(nocrypto), package(hex), package(re.str)
+
 ## Binaries
 
 <src/conduit>: include
@@ -59,7 +62,8 @@ true: \
 
 <src/client>: include
 <bridge/github/src>: include
-<bridge/github/main.*>: package(github.unix)
+<bridge/github/main.*>: package(github.unix), package(re.str), package(hex)
+<bridge/github/main.*>: package(nocrypto)
 
 ### because of src/conduit
 

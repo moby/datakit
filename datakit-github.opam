@@ -19,6 +19,7 @@ depends: [
   "cmdliner"
   "lwt"
   "logs" "fmt" "mtime" "asl" "win-eventlog" "hvsock"
+  "hex" "nocrypto" "conduit"
   "datakit-client"
   "github" {>= "1.1.0"}
 ]

@@ -123,6 +123,8 @@ module Event = struct
 
 end
 
+let event = Event.of_gh
+
 open Rresult
 open Lwt.Infix
 

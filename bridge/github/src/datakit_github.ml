@@ -825,6 +825,12 @@ module Conv (DK: Datakit_S.CLIENT) = struct
 
   let update_refs tr rs = list_iter_s (update_ref tr) (Ref.Set.elements rs)
 
+  let update_event t = function
+    | Event.PR pr    -> update_pr t pr
+    | Event.Status s -> update_status t s
+    | Event.Ref r    -> update_ref t r
+    | Event.Other o  -> Log.debug (fun l -> l "ignoring event: %s" o); ok ()
+
   (* Diffs *)
 
   let diff (E ((module Tree), _)) c = Tree.diff c
@@ -906,6 +912,14 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       ok s
 
 end
+
+type webhook = {
+  events: Event.t Queue.t;
+  watch : Repo.t -> unit Lwt.t;
+}
+
+let empty_webhook () =
+  { events = Queue.create (); watch = fun _ -> Lwt.return_unit }
 
 module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
@@ -1181,8 +1195,12 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | Some _, Some _    -> ok ()
 
   let abort t =
-    DK.Transaction.abort t.priv.tr >>= fun () ->
-    DK.Transaction.abort t.pub.tr
+    let close tr =
+      if DK.Transaction.closed tr then Lwt.return_unit
+      else DK.Transaction.abort tr
+    in
+    close t.priv.tr >>= fun () ->
+    close t.pub.tr
 
   let maybe_clean tr = function None -> ok () | Some f -> f tr
 
@@ -1238,12 +1256,32 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     abort t >>= fun () ->
     ok t
 
+  let sync_webhooks t webhook repos ~priv ~pub =
+    (* register new webhooks *)
+    Lwt_list.iter_p (fun r -> webhook.watch r) (Repo.Set.elements repos)
+    >>= fun () ->
+    (* apply the webhook events *)
+    let events =
+      let rec aux acc =
+        match Queue.pop webhook.events with
+        | e -> aux (e :: acc)
+        | exception Queue.Empty -> List.rev acc
+      in
+      aux []
+    in
+    if events = [] then ok t
+    else
+      state ~old:(Some t) ~priv ~pub >>*= fun t ->
+      list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
+      abort t >>= fun () ->
+      ok t
+
   (* On startup, build the initial state by looking at the active
      repository in the public and private branch. Import the new
      repositories in the private branch, then merge it in the public
      branch. Finally call the GitHub API with the diff between the
      public and the private branch. *)
-  let first_sync ~token ~dry_updates ~pub ~priv =
+  let first_sync ~webhook ~token ~dry_updates ~pub ~priv =
     state ~old:None ~pub ~priv >>*= fun t ->
     Log.debug (fun l ->
         l "first_sync priv=%a pub=%a"
@@ -1254,11 +1292,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       let r t = t.snapshot.Snapshot.repos in
       Repo.Set.union (r t.priv) (r t.pub)
     in
+    sync_webhooks t webhook repos ~priv ~pub >>*= fun t ->
     if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
     else
       sync_repos ~token ~pub ~priv t repos >>*= fun t ->
       call_github_api ~token ~dry_updates ~old:t.priv.snapshot t.pub.snapshot
-      >>*= fun () -> ok t
+      >>*= fun () ->
+      ok t
 
   let repos old t =
     let old = Snapshot.repos old.snapshot in
@@ -1267,19 +1307,20 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
 
   (* The main synchonisation function: it is called on every change in
      the public or private branch. *)
-  let sync_once ~dry_updates ~token ~pub ~priv ~old t =
+  let sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old t =
     Log.debug (fun l -> l "sync_once:@,@[old:%a@,new:%a@]" pp old pp t);
     (* Start by calling GitHub API calls that the user requested. *)
     call_github_api ~dry_updates ~token ~old:old.pub.snapshot t.pub.snapshot
     >>*= fun () ->
     let repos = Repo.Set.union (repos old.pub t.pub) (repos old.priv t.priv) in
+    sync_webhooks t webhook repos ~priv ~pub >>*= fun t ->
     sync_repos ~token ~pub ~priv t repos
 
-  let sync_once ~dry_updates ~token ~pub ~priv old  =
+  let sync_once ~webhook ~dry_updates ~token ~pub ~priv old  =
     assert (DK.Transaction.closed old.priv.tr);
     assert (DK.Transaction.closed old.pub.tr);
     state ~old:(Some old) ~pub ~priv >>*= fun t ->
-    sync_once ~dry_updates ~token ~pub ~priv ~old t >>*= fun t ->
+    sync_once ~webhook ~dry_updates ~token ~pub ~priv ~old t >>*= fun t ->
     assert (DK.Transaction.closed t.priv.tr);
     assert (DK.Transaction.closed t.pub.tr);
     ok t
@@ -1292,10 +1333,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | Some s -> Lwt_switch.is_on s
     | None   -> true
 
-  let run ?switch ~dry_updates ~token ~priv ~pub t policy =
+  let run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy =
     let sync_once = function
-      | Starting -> first_sync ~dry_updates ~token ~priv ~pub
-      | State t  -> sync_once ~dry_updates ~token ~priv ~pub t
+      | Starting -> first_sync ~webhook ~dry_updates ~token ~priv ~pub
+      | State t  -> sync_once ~webhook ~dry_updates ~token ~priv ~pub t
     in
     match policy with
     | `Once   -> sync_once t >>*= fun t -> ok (`Finish (State t))
@@ -1340,12 +1381,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       Lwt.join [ react () ; watch priv; watch pub ] >>= fun () ->
       ok (`Finish !t)
 
-  let sync ?switch ?(policy=`Repeat) ?(dry_updates=false) ~pub ~priv ~token t =
+  let sync ?(webhook=empty_webhook ()) ?switch ?(policy=`Repeat)
+      ?(dry_updates=false) ~pub ~priv ~token t =
     Log.debug (fun l ->
         l "sync pub:%s priv:%s" (DK.Branch.name pub) (DK.Branch.name priv)
       );
     (init_sync ~priv ~pub >>*= fun () ->
-     run ?switch ~dry_updates ~token ~priv ~pub t policy >>*= function
+     run ~webhook ?switch ~dry_updates ~token ~priv ~pub t policy >>*= function
      | `Finish l -> ok l
      | _ -> failwith "TODO")
     >>= function

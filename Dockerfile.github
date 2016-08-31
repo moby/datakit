@@ -1,16 +1,5 @@
 FROM ocaml/opam:alpine
 
-# setting-up Go env for datakit-github-webhook
-RUN sudo apk add go
-ENV GOPATH /go/
-COPY bridge/github/webhook /go/src/github.com/docker/datakit/bridge/github/webhook
-COPY api /go/src/github.com/docker/datakit/api
-RUN sudo chown opam.nogroup -R /go/
-WORKDIR /go/src/github.com/docker/datakit/
-RUN go get -d ./bridge/github/webhook/...
-WORKDIR /go/src/github.com/docker/datakit/bridge/github/webhook
-RUN go build
-
 RUN opam update
 RUN sudo apk add ncurses-dev libev-dev
 RUN opam depext ssl lwt react lambda-term && \
@@ -21,8 +10,10 @@ RUN opam depext ssl lwt react lambda-term && \
 
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
+
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
+RUN opam pin add github --dev -n
 RUN opam depext datakit-client datakit-github && \
     opam install github && opam install datakit-client --deps
 
@@ -41,8 +32,7 @@ EXPOSE 5641
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp $(opam config exec -- which datakit-mount)  /usr/bin/ && \
-    sudo cp $(opam config exec -- which datakit-github) /usr/bin/ && \
-    sudo cp webhook /usr/bin/datakit-github-webhook
+    sudo cp $(opam config exec -- which datakit-github) /usr/bin/
 
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 

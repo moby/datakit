@@ -67,7 +67,7 @@ let token () =
 let parse_address address =
   match String.cut ~sep:":" address with
   | Some (proto, address) -> proto, address
-  | _                     -> failwith "Wrong address, use proto:address"
+  | _ -> failwith (address ^ ": wrong address, use proto:address")
 
 let parse_host host =
   match String.cut ~rev:true ~sep:":" host with
@@ -80,19 +80,9 @@ let set_signal_if_supported signal handler =
   with Invalid_argument _ ->
     ()
 
-let exec ~name cmd =
-  Lwt_process.exec cmd >|= function
-  | Unix.WEXITED 0   -> ()
-  | Unix.WEXITED i   ->
-    Logs.err (fun l -> l "%s exited with code %d" name i)
-  | Unix. WSIGNALED i ->
-    Logs.err (fun l -> l "%s killed by signal %d)" name i)
-  | Unix.WSTOPPED i  ->
-    Logs.err (fun l -> l "%s stopped by signal %d" name i)
-
 let start () sandbox no_listen listen_urls
     datakit private_branch public_branch dry_updates
-    no_webhook webhook webhook_secret webhook_port =
+    webhook =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -107,13 +97,27 @@ let start () sandbox no_listen listen_urls
       exit 1
     ));
   Log.app (fun l ->
-      l "Starting %s %s ...\npublic-branch: %s\nprivate-branch: %s"
+      l "Starting %s %s ...\nThe public branch is %s\nThe private branch is %s"
         (Filename.basename Sys.argv.(0)) Version.v public_branch private_branch
     );
   let token = match token () with
     | None   -> failwith "Missing datakit GitHub token"
     | Some t -> t
   in
+  let events = Queue.create () in
+  let watch, start_webhook = match webhook with
+    | None   -> (fun _repo -> Lwt.return_unit), (fun () -> Lwt.return_unit)
+    | Some w ->
+      Log.app (fun l -> l "Listening for webhooks on %s" w);
+      let webhook = Uri.of_string w in
+      let t, th = Datakit_github_webhook.serve webhook (fun e ->
+          let e = Datakit_github_api.event e in
+          Queue.add e events;
+          Lwt.return_unit
+        ) in
+      (Datakit_github_webhook.watch t ~dry_updates token, th)
+  in
+  let webhook = { Datakit_github.events; watch } in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
     Log.app (fun l -> l "Connecting to %s." datakit);
@@ -135,7 +139,9 @@ let start () sandbox no_listen listen_urls
       | Ok priv ->
         DK.branch dk public_branch >>= function
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-        | Ok pub  -> VG.Sync.sync t ~dry_updates ~priv ~pub ~token >|= ignore
+        | Ok pub  ->
+          VG.Sync.sync t ~webhook ~dry_updates ~priv ~pub ~token
+          >|= ignore
   in
   let accept_connections () =
     if no_listen || listen_urls = [] then Lwt.return_unit
@@ -145,22 +151,7 @@ let start () sandbox no_listen listen_urls
       Lwt_list.iter_p
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls
-  in
-  let start_webhook () =
-    if no_webhook then Lwt.return_unit
-    else
-      let secret = match webhook_secret with
-        | None   -> ""
-        | Some s -> Fmt.strf " -s %s" s
-      in
-      let _, address = parse_address datakit in
-      let host, port = parse_host address in
-      let debug = match Logs.level () with Some Logs.Debug -> " -v" | _ -> "" in
-      exec ~name:webhook
-        (Lwt_process.shell @@
-         Fmt.strf "%s%s%s -l :%d -b %s -a [%s]:%s"
-           webhook secret debug webhook_port private_branch host port)
-  in
+    in
   Lwt_main.run @@ Lwt.join [
     connect_to_datakit ();
     accept_connections ();
@@ -230,15 +221,11 @@ let public_branch =
   in
   Arg.(value & opt string "github-metadata" doc)
 
-let no_webhook =
-  let doc = Arg.info ~doc:"Disable webhook handling" ["no-webhook"] in
-  Arg.(value & flag doc)
-
 let webhook =
   let doc =
-    Arg.info ~doc:"Location of the datakit-github-webhook command" ["webhook"]
+    Arg.info ~doc:"Pubic URI of the GitHub webook server" ["webhook"]
   in
-  Arg.(value & opt string "datakit-github-webhook" doc)
+  Arg.(value & opt (some string) None doc)
 
 let webhook_secret =
   let doc = Arg.info ~doc:"Webhook secret" ["s";"webhook-secret"] in
@@ -265,7 +252,7 @@ let term =
   ] in
   Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $
-        no_webhook $ webhook $ webhook_secret $ webhook_port),
+        webhook),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

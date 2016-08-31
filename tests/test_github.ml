@@ -456,7 +456,7 @@ let check name tree =
 
   Lwt.return_unit
 
-open Counter
+open! Counter
 
 let test_events dk =
   let t = init status0 refs0 events0 in

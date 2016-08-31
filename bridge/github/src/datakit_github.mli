@@ -352,6 +352,12 @@ module Conv (DK: Datakit_S.CLIENT): sig
   (** [update_ref t r] applies the Git reference [r] to the
       transaction [t]. *)
 
+  (** {1 Events} *)
+
+  val update_event: DK.Transaction.t -> Event.t -> unit result
+  (** [update_event t e] applies the (webhook) event [e] to the
+      transaction [t]. *)
+
   (** {1 Snapshots and diffs} *)
 
   val diff: tree -> DK.Commit.t -> Diff.Set.t result
@@ -371,6 +377,12 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
 end
 
+type webhook = {
+  events: Event.t Queue.t;
+  watch : Repo.t -> unit Lwt.t;
+}
+(** The type for webhook state. *)
+
 module Sync (API: API) (DK: Datakit_S.CLIENT): sig
 
   type t
@@ -380,6 +392,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   (** Create an empty sync state. *)
 
   val sync:
+    ?webhook:webhook ->
     ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?dry_updates:bool ->
     pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
     t -> t Lwt.t

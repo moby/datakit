@@ -22,8 +22,14 @@ module Repo: sig
   type t = { user: string; repo: string }
   (** The type for Github repositories. *)
 
+  type state = [`Monitored | `Ignored]
+  (** The type for repository state. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)
+
+  val pp_state: state Fmt.t
+  (** [pp_state] is the pretty-printer for repository state. *)
 
   module Set: sig
     include Set.S with type elt = t
@@ -50,6 +56,7 @@ module Commit: sig
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
   end
   (** Sets of commits. *)
 
@@ -93,6 +100,8 @@ module PR: sig
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
+    val commits: t -> Commit.Set.t
   end
   (** Sets of pull requests. *)
 
@@ -134,6 +143,8 @@ module Status: sig
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
+    val commits: t -> Commit.Set.t
   end
   (** Sets of build status. *)
 
@@ -166,6 +177,8 @@ module Ref: sig
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
+    val commits: t -> Commit.Set.t
   end
   (** Sets of Git references. *)
 
@@ -178,6 +191,7 @@ module Event: sig
 
   (** The type for event values. *)
   type t =
+    | Repo of (Repo.state * Repo.t)
     | PR of PR.t
     | Status of Status.t
     | Ref of (Ref.state * Ref.t)
@@ -186,8 +200,14 @@ module Event: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for event values. *)
 
+  val repo': Repo.state -> Repo.t -> t
+  val pr: PR.t -> t
+  val status: Status.t -> t
+  val ref: Ref.state -> Ref.t -> t
+  val other: Repo.t -> string -> t
+
   val repo: t -> Repo.t
-  (** [repo e] is [e]'s repository. *)
+  (** [repo t] is [t]'s repository. *)
 
 end
 
@@ -309,6 +329,7 @@ module Snapshot: sig
   val prune: t -> t * t option
   (** [prune t] is either a clean snapshot and an optional snapshot
       representing the the commits and prs entries to remove. *)
+
 end
 
 module Diff: sig
@@ -317,7 +338,9 @@ module Diff: sig
 
 
   type id = [
+    | `Repo
     | `PR of int
+    | `Commit of string
     | `Status of string * string list
     | `Ref of string list
     | `Unknown
@@ -325,8 +348,8 @@ module Diff: sig
   (** The type for diff identifiers. *)
 
   type t = {
-    repo: Repo.t;
-    id  : id;
+    repo  : Repo.t;
+    id    : id;
   }
   (** The type for filesystem diffs. *)
 
@@ -345,9 +368,6 @@ module Diff: sig
   val changes: Datakit_path.t Datakit_S.diff list -> Set.t
   (** [changes d] is the set of GitHub changes carried over in the
       filesystem changes [d]. *)
-
-  val repos: Datakit_path.t Datakit_S.diff list -> Repo.Set.t
-  (** [repos d] is the set of repositories appearing in [d]. *)
 
 end
 
@@ -372,6 +392,11 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   val repos: tree -> Repo.Set.t Lwt.t
   (** [repos t] is the list of repositories stored in [t]. *)
+
+  val update_repo: DK.Transaction.t -> Repo.state -> Repo.t -> unit result
+  (** [update_repo t s r] applies the repository [r] to the
+      transaction [t]. Depending on the state [s] it can either remove
+      the directory or create a [monitored] file. *)
 
   (** {1 Status} *)
 
@@ -401,9 +426,10 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Git References} *)
 
-  val update_ref: DK.Transaction.t -> Ref.state * Ref.t -> unit result
-  (** [update_ref t r] applies the Git reference [r] to the
-      transaction [t]. *)
+  val update_ref: DK.Transaction.t -> Ref.state -> Ref.t -> unit result
+  (** [update_ref t s r] applies the Git reference [r] to the
+      transaction [t]. Depending on the state [s] it can either remove
+      the directory or create an [head] file. *)
 
   (** {1 Events} *)
 
@@ -417,10 +443,11 @@ module Conv (DK: Datakit_S.CLIENT): sig
   (** [diff tree c] computes the Github diff between the branch [b]
       and the commit [c]. *)
 
-  val snapshot: ?old:(DK.Commit.t * Snapshot.t) -> tree -> Snapshot.t Lwt.t
-  (** [snapshot ?old t] is a snapshot of the tree [t]. Note: this is
-      expensive, so try to provide a previous (recent) snapshot [prev]
-      if possible. *)
+  val snapshot: string -> ?old:(DK.Commit.t * Snapshot.t) -> tree ->
+    Snapshot.t Lwt.t
+  (** [snapshot dbg ?old t] is a snapshot of the tree [t]. Note: this
+      is expensive, so try to provide a previous (recent) snapshot
+      [prev] if possible. *)
 
   val apply: Snapshot.t -> (tree * Diff.Set.t) -> Snapshot.t Lwt.t
   (** [apply s d] is the snapshot obtained by applying [d] on top of

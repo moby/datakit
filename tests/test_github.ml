@@ -312,7 +312,7 @@ module Users = struct
       |> Ref.Set.filter
         (fun r -> keep Ref.repo r && not (Ref.Set.exists (Ref.same r) new_refs))
       |> Ref.Set.elements
-      |> List.map (fun r -> Event.Ref (`Deleted, r))
+      |> List.map (fun r -> Event.Ref (`Removed, r))
     in
     repos @ prs @ refs @ status @ close_prs @ close_refs
 
@@ -416,10 +416,18 @@ module API = struct
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
     match s with
-    | `Deleted -> ()
+    | `Removed -> ()
     | `Created | `Updated ->
       repo.R.refs <- r :: refs;
       add_event t (Event.Ref (s, r))
+
+  let set_ref t r =
+    set_ref_aux t (`Updated, r);
+    return ()
+
+  let remove_ref t repo ~name =
+    set_ref_aux t (`Removed, { Ref.name; head = { Commit.repo; id = "" }});
+    return ()
 
   let status t commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;

@@ -217,7 +217,7 @@ let uri =
 
 let webhook =
   let doc =
-    Arg.info ~doc:"Pubic URI of the GitHub webook server" ["webhook"]
+    Arg.info ~doc:"Public URI of the GitHub webook server" ["webhook"]
   in
   Arg.(value & opt (some uri) None doc)
 

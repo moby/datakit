@@ -262,12 +262,12 @@ module Ref = struct
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
 
-  type state = [`Created | `Updated | `Deleted]
+  type state = [`Created | `Updated | `Removed]
 
   let pp_state ppf = function
     | `Created -> Fmt.string ppf "+"
     | `Updated -> Fmt.string ppf "*"
-    | `Deleted -> Fmt.string ppf "-"
+    | `Removed -> Fmt.string ppf "-"
 
 end
 
@@ -316,6 +316,8 @@ module type API = sig
   val repos: token -> user:string -> Repo.t list result
   val status: token -> Commit.t -> Status.t list result
   val set_status: token -> Status.t -> unit result
+  val set_ref: token -> Ref.t -> unit result
+  val remove_ref: token -> Repo.t -> name:string list -> unit result
   val set_pr: token -> PR.t -> unit result
   val prs: token -> Repo.t -> PR.t list result
   val refs: token -> Repo.t -> Ref.t list result
@@ -480,7 +482,7 @@ module Snapshot = struct
     | Event.Repo (`Ignored,r) -> remove_repo t r
     | Event.Repo (_, r)       -> replace_repo t r
     | Event.PR pr             -> replace_pr t pr
-    | Event.Ref (`Deleted, r) -> remove_ref t (Ref.repo r, Ref.name r)
+    | Event.Ref (`Removed, r) -> remove_ref t (Ref.repo r, Ref.name r)
     | Event.Ref (_, r)        -> replace_ref t r
     | Event.Status s          -> replace_status t s
     | Event.Other _           -> t
@@ -958,7 +960,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "update_ref %a" Datakit_path.pp path);
     let dir = root (Ref.repo r) / "ref" /@ path in
     match s with
-    | `Deleted -> safe_remove tr dir
+    | `Removed -> safe_remove tr dir
     | `Created | `Updated ->
       DK.Transaction.make_dirs tr dir >>*= fun () ->
       let head = Cstruct.of_string (Ref.commit_id r ^ "\n") in
@@ -1245,8 +1247,43 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
      what DataKit think it should be. *)
   let call_github_api ~dry_updates ~token ~old t =
     Log.debug (fun l -> l "call_github_api");
-    let status = Status.Set.diff t.Snapshot.status old.Snapshot.status in
     let prs = PR.Set.diff t.Snapshot.prs old.Snapshot.prs in
+    Lwt_list.iter_p (fun pr ->
+        Log.info (fun l -> l "API.set-pr %a" PR.pp pr);
+        if not dry_updates then
+          API.set_pr token pr >|= function
+          | Ok ()   -> ()
+          | Error e -> Log.err (fun l -> l "API.set-pr %a: %s" PR.pp pr e)
+        else Lwt.return_unit
+      ) (PR.Set.elements prs)
+    >>= fun () ->
+    let refs = Ref.Set.diff t.Snapshot.refs old.Snapshot.refs in
+    Lwt_list.iter_p (fun r ->
+        Log.info (fun l -> l "API.set-ref %a" Ref.pp r);
+        if not dry_updates then
+          API.set_ref token r >|= function
+          | Ok ()   -> ()
+          | Error e -> Log.err (fun l -> l "API.set-ref %a: %s" Ref.pp r e)
+        else Lwt.return_unit
+      ) (Ref.Set.elements refs)
+    >>= fun () ->
+    let old_refs =
+      Ref.Set.diff old.Snapshot.refs t.Snapshot.refs
+      |> Ref.Set.filter (fun r -> not (Ref.Set.exists (Ref.same r) refs))
+    in
+    Lwt_list.iter_p (fun r ->
+        let repo = Ref.repo r in
+        let name = Ref.name r in
+        let pp ppf _ = Fmt.pf ppf "{%a %a}" Repo.pp repo pp_path name in
+        Log.info (fun l -> l "API.rm-ref %a" pp r);
+        if not dry_updates then
+          API.remove_ref token repo ~name >|= function
+          | Ok ()   -> ()
+          | Error e -> Log.err (fun l -> l "API.rm-ref %a: %s" pp r e)
+        else Lwt.return_unit
+      ) (Ref.Set.elements old_refs)
+    >>= fun () ->
+    let status = Status.Set.diff t.Snapshot.status old.Snapshot.status in
     Lwt_list.iter_p (fun s ->
         let old =
           let same_context x =
@@ -1266,15 +1303,6 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           | Error e ->
             Log.err (fun l -> l "API.set-status %a: %s" Status.pp s e)
       ) (Status.Set.elements status)
-    >>= fun () ->
-    Lwt_list.iter_p (fun pr ->
-        Log.info (fun l -> l "API.set-pr %a" PR.pp pr);
-        if not dry_updates then
-          API.set_pr token pr >|= function
-          | Ok ()   -> ()
-          | Error e -> Log.err (fun l -> l "API.set-pr %a: %s" PR.pp pr e)
-        else Lwt.return_unit
-      ) (PR.Set.elements prs)
     >>= fun () ->
     ok ()
 
@@ -1445,7 +1473,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             | Event.PR pr ->
               if PR.state pr <> `Open then acc
               else Commit.Set.add (PR.commit pr) acc
-            | Event.Ref (`Deleted, _) -> acc
+            | Event.Ref (`Removed, _) -> acc
             | Event.Ref (_, r) -> Commit.Set.add (Ref.commit r) acc
             | Event.Repo _ | Event.Status _  | Event.Other _  -> acc
           ) Commit.Set.empty events

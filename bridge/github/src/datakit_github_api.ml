@@ -93,7 +93,7 @@ module Ref = struct
     let head = { Commit.repo; id } in
     let t = { head; name = to_list r.push_event_ref } in
     match r.push_event_deleted, r.push_event_created with
-    | Some true, _ -> `Deleted, t
+    | Some true, _ -> `Removed, t
     | _, Some true -> `Created, t
     | _            -> `Updated, t
 
@@ -204,6 +204,10 @@ let set_pr token pr =
   Github.Pull.update ~token ~user ~repo ~num ~update_pull:new_pr ()
   |> run
   >|= R.map ignore
+
+let not_implemented () = Lwt.fail_with "not implemented"
+let set_ref _ _ = not_implemented ()
+let remove_ref _ _ ~name:_ = not_implemented ()
 
 let prs token r =
   let { Repo.user; repo } = r in

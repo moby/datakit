@@ -158,6 +158,9 @@ module Ref: sig
   }
   (** The type for Git references. *)
 
+  val name: t -> string list
+  (** [name t] is [t]'s name. *)
+
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
@@ -182,7 +185,7 @@ module Ref: sig
   end
   (** Sets of Git references. *)
 
-  type state = [`Created | `Updated | `Deleted]
+  type state = [`Created | `Updated | `Removed]
   (** The type for reference state. *)
 
 end
@@ -236,6 +239,13 @@ module type API = sig
 
   val set_status: token -> Status.t -> unit result
   (** [set_status t s] updates [Status.commit s]'s status with [s]. *)
+
+  val set_ref: token -> Ref.t -> unit result
+  (** [set_ref t r] updates the reference named [Ref.name r] with
+      [r]. *)
+
+  val remove_ref: token -> Repo.t -> name:string list -> unit result
+  (** [remove_ref t n] removes the reference named [n]. *)
 
   val set_pr: token -> PR.t -> unit result
   (** [set_pr t pr] updates the PR number [PR.number pr] with [pr]. *)

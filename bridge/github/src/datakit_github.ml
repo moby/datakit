@@ -17,7 +17,7 @@ module Set (E: ELT) = struct
 
   let pp ppf t = Fmt.(list ~sep:(unit "@;") E.pp) ppf (elements t)
 
-  let map f t = fold (fun x acc -> add (f x) acc) empty t
+  let map f t = fold (fun x acc -> add (f x) acc) t empty
 
   let index t f =
     let tbl = Hashtbl.create (cardinal t) in
@@ -30,12 +30,6 @@ module Set (E: ELT) = struct
         Hashtbl.replace tbl i (x :: v)
       ) t;
     tbl
-
-  exception Found of elt
-
-  let findf f t =
-    try iter (fun e -> if f e then raise (Found e)) t; None
-    with Found e -> Some e
 
 end
 
@@ -427,6 +421,15 @@ module Snapshot = struct
   let remove_repos t repos =
     Repo.Set.fold (fun r acc -> remove_repo acc r) repos t
 
+  let keep_repos t repos =
+    let keep f r = Repo.Set.mem (f r) repos in
+    let repos = Repo.Set.diff t.repos repos in
+    let prs = PR.Set.filter (keep PR.repo) t.prs in
+    let refs = Ref.Set.filter (keep Ref.repo) t.refs in
+    let commits = Commit.Set.filter (keep Commit.repo) t.commits in
+    let status = Status.Set.filter (keep Status.repo) t.status in
+    { repos; prs; refs; commits; status }
+
   let replace_repo t r = { t with repos = Repo.Set.add r t.repos }
 
   let remove_commit t (r, id) =
@@ -567,7 +570,7 @@ module Snapshot = struct
         ) t.repos (empty, empty)
     in
     if PR.Set.is_empty cleanup.prs && Commit.Set.is_empty cleanup.commits then (
-      assert (compare t result = 0);
+      assert (compare (keep_repos t t.repos) (keep_repos result t.repos)  = 0);
       result, None
     ) else
       result, Some cleanup
@@ -747,9 +750,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       let empty = Cstruct.of_string "" in
       DK.Transaction.create_or_replace_file tr ~dir ".monitor" empty
 
-  let update_repos tr repos =
-    list_iter_s (update_repo tr `Monitored) (Repo.Set.elements repos)
-
   (* PRs *)
 
   let update_pr t pr =
@@ -765,8 +765,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
       DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
       DK.Transaction.create_or_replace_file t ~dir "title" title
-
-  let update_prs tr prs = list_iter_s (update_pr tr) (PR.Set.elements prs)
 
   let pr tree repo number =
     let dir = root repo / "pr" / string_of_int number in
@@ -876,9 +874,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
           DK.Transaction.create_or_replace_file t ~dir k v
       ) kvs
 
-  let update_statuses tr s =
-    list_iter_s (update_status tr) (Status.Set.elements s)
-
   let status tree commit context =
     let context = Datakit_path.of_steps_exn context in
     let dir =
@@ -969,9 +964,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       let head = Cstruct.of_string (Ref.commit_id r ^ "\n") in
       DK.Transaction.create_or_replace_file tr ~dir "head" head
 
-  let update_refs tr rs =
-    list_iter_s (fun r -> update_ref tr `Updated r) (Ref.Set.elements rs)
-
   let update_event t = function
     | Event.Repo (s, r) -> update_repo t s r
     | Event.PR pr       -> update_pr t pr
@@ -981,6 +973,19 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       Log.debug (fun l  -> l "ignoring event: %s" @@ snd o);
       ok ()
 
+  (* Snapshot *)
+
+  let snapshot_of_repos tree repos =
+    commits ~repos tree >>= fun commits ->
+    prs ~repos tree >>= fun prs ->
+    statuses ~commits tree >>= fun status ->
+    refs ~repos tree >|= fun refs ->
+    Snapshot.create ~repos ~status ~prs ~refs ~commits
+
+  let snapshot_of_tree tree =
+    repos tree >>= fun repos ->
+    snapshot_of_repos tree repos
+
   (* Diffs *)
 
   let safe_diff (E ((module Tree), _)) c =
@@ -989,9 +994,11 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | Ok d    -> d
 
   let apply_repo_diff t tree r =
-    repo tree r >|= function
-    | None   -> Snapshot.remove_repo t r
-    | Some r -> Snapshot.replace_repo t r
+    repo tree r >>= function
+    | None   -> Snapshot.remove_repo t r |> Lwt.return
+    | Some r ->
+      snapshot_of_repos tree (Repo.Set.singleton r) >|= fun s ->
+      Snapshot.union s t
 
   let apply_commit_diff t tree (r, id as x) =
     commit tree r id >|= function
@@ -1034,17 +1041,6 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       Log.debug (fun l -> l "apply @[<2>(%a)@]@;@[<2>(%a)@]@;@[<2>->(%a)@]"
                     Diff.Set.pp diff Snapshot.pp init Snapshot.pp t);
       t
-
-  (* Snapshot *)
-
-  let snapshot_of_tree tree =
-    repos tree >>= fun repos ->
-    commits ~repos tree >>= fun commits ->
-    prs ~repos tree >>= fun prs ->
-    statuses ~commits tree >>= fun status ->
-    refs ~repos tree >|= fun refs ->
-    Snapshot.create ~repos ~status ~prs ~refs ~commits
-
   (* compute all the active hooks for a given DataKit commit *)
   let snapshot msg ?old tree =
     Log.debug (fun l ->
@@ -1105,7 +1101,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | i -> i
 
   let pp ppf t =
-    Fmt.pf ppf "@[<2>pub:%a@]@;@[<2>priv:%a@]@;@[updates:%a@]"
+    Fmt.pf ppf "@[<2>pub:%a@]@;@[<2>priv:%a@]@;@[<2>updates:%a@]"
       pp_branch t.pub pp_branch t.priv Event.Set.pp t.updates
 
   let with_head branch fn =
@@ -1220,23 +1216,21 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           new_refs
       ) Ref.Set.empty new_refs
 
-  type clean = {
-    clean : Snapshot.t option;
+  type cleanup = {
+    remove: Snapshot.t option;
     update: Snapshot.t option;
   }
 
-  let to_clean t repos new_prs new_refs new_status new_commits =
-    Log.debug (fun l -> l "XXX %a" Repo.Set.pp repos);
-    let mk keep_pr keep_ref keep_status keep_commit =
+  let cleanup t repos new_prs new_refs new_status new_commits =
+    let mk repos keep_pr keep_ref keep_status keep_commit =
       let prs = PR.Set.filter keep_pr t.Snapshot.prs in
       let refs = Ref.Set.filter keep_ref t.Snapshot.refs in
       let status = Status.Set.filter keep_status t.Snapshot.status in
       let commits = Commit.Set.filter keep_commit t.Snapshot.commits in
-      let repos = Repo.Set.empty in
       let t = { Snapshot.repos; prs; refs; commits; status } in
       if Snapshot.(compare empty t = 0) then None else Some t
     in
-    let clean =
+    let remove =
       let keep_pr x =
         Repo.Set.mem (PR.repo x) repos
         && not (PR.Set.exists (PR.same x) new_prs)
@@ -1253,7 +1247,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         Repo.Set.mem (Commit.repo x) repos
         && not (Commit.Set.exists (Commit.same x) new_commits)
       in
-      mk keep_pr keep_ref keep_status keep_commit
+      mk Repo.Set.empty keep_pr keep_ref keep_status keep_commit
     in
     let update =
       let keep_pr x =
@@ -1272,9 +1266,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           (fun y -> Status.same x y && Status.compare x y <> 0) new_status
       in
       let keep_commit _ = false in
-      mk keep_pr keep_ref keep_status keep_commit
+      mk repos keep_pr keep_ref keep_status keep_commit
     in
-    { clean; update }
+    { remove; update }
 
   (* Import http://github.com/usr/repo state. *)
   let import_repos t ~token repos =
@@ -1286,16 +1280,18 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     status_of_commits token new_commits >>= fun new_status ->
     Log.debug (fun l ->
-        l "[import]@;@[<2>new-prs:%a@]@;@[<2>new-refs:%a@]@;@[<2>new-status:%a@]]"
+        l "[import] %a@;@[<2>new-prs:%a@]@;@[<2>new-refs:%a@]@;\
+           @[<2>new-status:%a@]]"
+          Repo.Set.pp repos
           PR.Set.pp new_prs Ref.Set.pp new_refs Status.Set.pp new_status);
-    let to_clean = to_clean t repos new_prs new_refs new_status new_commits in
-    let clean = Snapshot.remove_repos t repos in
-    let prs = PR.Set.union clean.Snapshot.prs new_prs in
+    let cleanup = cleanup t repos new_prs new_refs new_status new_commits in
+    let base = Snapshot.remove_repos t repos in
     let repos = Repo.Set.union t.Snapshot.repos repos in
-    let refs = Ref.Set.union clean.Snapshot.refs new_refs in
-    let commits = Commit.Set.union clean.Snapshot.commits new_commits in
-    let status = Status.Set.union clean.Snapshot.status new_status in
-    ok ({ Snapshot.repos; prs; commits; refs; status }, to_clean)
+    let prs = PR.Set.union base.Snapshot.prs new_prs in
+    let refs = Ref.Set.union base.Snapshot.refs new_refs in
+    let commits = Commit.Set.union base.Snapshot.commits new_commits in
+    let status = Status.Set.union base.Snapshot.status new_status in
+    ok ({ Snapshot.repos; prs; commits; refs; status }, cleanup)
 
   let api_set_pr t ~dry_updates ~token pr =
     let e = Event.PR pr in
@@ -1342,23 +1338,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         | Error x -> Log.err (fun l -> l "API.set-ref %a: %s" Ref.pp r x); e
     )
 
-  let api_set_status t ~dry_updates ~token ~priv s =
+  let api_set_status t ~dry_updates ~token s =
     let e = Event.Status s in
     if Event.Set.mem e t.updates then (
       Log.debug (fun l -> l "[skip] API.set-status %a" Status.pp s);
       Lwt.return e
     ) else (
-      let old =
-        let same_context x =
-          s.Status.context = x.Status.context &&
-          s.Status.commit  = x.Status.commit
-        in
-        Status.Set.findf same_context priv.Snapshot.status
-      in
-      Log.info
-        (fun l ->
-           l "API.set-status %a (was %a)"
-             Status.pp s Fmt.(option ~none:(unit "<empty>") Status.pp) old);
+      Log.info (fun l -> l "API.set-status %a" Status.pp s);
       if dry_updates then Lwt.return e
       else
         API.set_status token s >|= function
@@ -1370,7 +1356,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be. *)
   let call_github_api ~dry_updates ~token t =
-    Log.debug (fun l -> l "call_github_api");
+    Log.debug (fun l -> l "call_github_api@;%a" pp t);
     let priv = t.priv.snapshot and pub = t.pub.snapshot in
     let closed_prs =
       PR.Set.diff priv.Snapshot.prs pub.Snapshot.prs
@@ -1378,6 +1364,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         (fun pr -> not (PR.Set.exists (PR.same pr) pub.Snapshot.prs))
       |> PR.Set.map (fun pr -> { pr with PR.state = `Closed })
     in
+
     let prs =
       PR.Set.diff pub.Snapshot.prs priv.Snapshot.prs
       |> PR.Set.union closed_prs
@@ -1398,7 +1385,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     (* NOTE: ideally we would also remove status, but the GitHub API doesn't
        support removing status so we just ignore *)
     let status = Status.Set.diff pub.Snapshot.status priv.Snapshot.status in
-    Lwt_list.map_p (api_set_status t ~dry_updates ~token ~priv)
+    Lwt_list.map_p (api_set_status t ~dry_updates ~token)
       (Status.Set.elements status)
     >>= fun set_status ->
     let updates =
@@ -1497,11 +1484,11 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let remove_snapshot msg = function
     | None   -> ok None
     | Some t ->
-      Log.debug
-        (fun l -> l "[remove_snapshot] (from %s):@;%a" msg Snapshot.pp t);
-      let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
-      let { Snapshot.prs; refs; commits; status; _ } = t in
       let f tr =
+        Log.debug
+          (fun l -> l "[remove_snapshot] (from %s):@;%a" msg Snapshot.pp t);
+        let root { Repo.user; repo } = Datakit_path.(empty / user / repo) in
+        let { Snapshot.prs; refs; commits; status; _ } = t in
         list_iter_s (fun pr ->
             let dir = root (PR.repo pr) / "pr" / string_of_int pr.PR.number in
             Conv.safe_remove tr dir
@@ -1529,10 +1516,12 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let update_snapshot msg = function
     | None   -> ok None
     | Some t ->
-      Log.debug
-        (fun l -> l "[update_snapshot] (from %s):@;%a" msg Snapshot.pp t);
-      let { Snapshot.prs; refs; status; _ } = t in
       let f tr =
+        Log.debug
+          (fun l -> l "[update_snapshot] (from %s):@;%a" msg Snapshot.pp t);
+        let { Snapshot.repos; prs; refs; status; _ } = t in
+        list_iter_s (Conv.update_repo tr `Monitored) (Repo.Set.elements repos)
+        >>*= fun () ->
         list_iter_s (Conv.update_pr tr) (PR.Set.elements prs)
         >>*= fun () ->
         list_iter_s (Conv.update_ref tr `Updated) (Ref.Set.elements refs)
@@ -1541,9 +1530,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       in
       ok (Some f)
 
-  let cleanup msg { clean; update } tr =
+  let cleanup msg { remove; update } tr =
     let clean () =
-      remove_snapshot msg clean >>*= function
+      remove_snapshot msg remove >>*= function
       | None   -> ok ()
       | Some f -> f tr
     in
@@ -1558,14 +1547,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   let sync_repos ~token ~pub ~priv t repos =
     import_repos ~token t.priv.snapshot repos >>*= fun (priv_s, c) ->
     cleanup "import" c t.priv.tr >>*= fun () ->
-    let priv_s, clean = Snapshot.prune priv_s in
-    cleanup "sync" { clean; update = None } t.priv.tr >>*= fun () ->
-    Conv.update_repos t.priv.tr priv_s.Snapshot.repos >>*= fun () ->
-    Conv.update_prs t.priv.tr priv_s.Snapshot.prs >>*= fun () ->
-    Conv.update_statuses t.priv.tr priv_s.Snapshot.status >>*= fun () ->
-    Conv.update_refs t.priv.tr priv_s.Snapshot.refs >>*= fun () ->
+    let priv_s, remove = Snapshot.prune priv_s in
+    cleanup "sync" { remove; update = Some priv_s } t.priv.tr >>*= fun () ->
     DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
-    (if c.clean = None && c.update = None && clean = None && diff = [] then
+    (if c.remove = None && c.update = None && remove = None && diff = [] then
        DK.Transaction.abort t.priv.tr >>= ok
      else
        let message = Fmt.strf "Sync with %a" Repo.Set.pp repos in
@@ -1614,8 +1599,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           events @ List.map Event.status @@ Status.Set.elements new_status
         in
         list_iter_s (Conv.update_event t.priv.tr) events >>*= fun () ->
-        let _, clean = Snapshot.prune priv_s in
-        cleanup "events" { clean; update = None } t.priv.tr >>*= fun () ->
+        let _, remove = Snapshot.prune priv_s in
+        cleanup "events" { remove; update = None } t.priv.tr >>*= fun () ->
         let message =
           Fmt.strf "Importing webhooks:\n%a"
             Fmt.(list ~sep:(unit "\n") Event.pp) events

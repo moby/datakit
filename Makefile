@@ -18,6 +18,9 @@ client:
 github:
 	ocaml pkg/pkg.ml build -n datakit-github
 
+docs:
+	ocamlbuild -use-ocamlfind doc/api.docdir/index.html
+
 clean:
 	ocaml pkg/pkg.ml clean
 	rm -rf $(APP) $(EXE) _tests

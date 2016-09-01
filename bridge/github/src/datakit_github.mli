@@ -244,7 +244,7 @@ module type API = sig
   (** [set_ref t r] updates the reference named [Ref.name r] with
       [r]. *)
 
-  val remove_ref: token -> Repo.t -> name:string list -> unit result
+  val remove_ref: token -> Repo.t -> string list -> unit result
   (** [remove_ref t n] removes the reference named [n]. *)
 
   val set_pr: token -> PR.t -> unit result

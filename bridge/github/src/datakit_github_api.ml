@@ -207,7 +207,7 @@ let set_pr token pr =
 
 let not_implemented () = Lwt.fail_with "not implemented"
 let set_ref _ _ = not_implemented ()
-let remove_ref _ _ ~name:_ = not_implemented ()
+let remove_ref _ _ _ = not_implemented ()
 
 let prs token r =
   let { Repo.user; repo } = r in

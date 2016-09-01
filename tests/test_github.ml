@@ -5,6 +5,9 @@ open Datakit_github
 open Datakit_path.Infix
 open Result
 
+let src = Logs.Src.create "test" ~doc:"Datakit tests"
+module Log = (val Logs.src_log src)
+
 module Conv = Conv(DK)
 
 module Counter = struct
@@ -137,8 +140,8 @@ module User = struct
     mutable repos : R.t String.Map.t;
   }
 
+  let is_empty t = String.Map.is_empty t.repos
   let empty () = { repos = String.Map.empty }
-
   let mem_repo t r = String.Map.mem r.Repo.repo t.repos
 
   let add_repo t r =
@@ -246,7 +249,10 @@ module Users = struct
     let users = String.Map.remove r.Repo.user t.users in
     t.users <- users
 
-  let prune repos t = { users = String.Map.map (User.prune repos) t.users }
+  let prune repos t =
+    let users = String.Map.map (User.prune repos) t.users in
+    let users = String.Map.filter (fun _ u -> not (User.is_empty u)) users in
+    { users }
 
   let prune_commits t = { users = String.Map.map User.prune_commits t.users }
 
@@ -361,6 +367,7 @@ module API = struct
     | None      -> failwith (Fmt.strf "Unknown user/repo: %a" Repo.pp repo)
 
   let add_event t e =
+    Log.info (fun l -> l "TEST: add_event %a" Event.pp e);
     let r = lookup_exn t (Event.repo e) in
     r.R.events <- e :: r.R.events
 
@@ -477,6 +484,11 @@ module API = struct
     List.iter (add_event t) events;
     t
 
+  let all_events t = fold (fun u acc -> User.events u @ acc) t []
+
+  let all_repos t =
+    fold (fun u acc -> Repo.Set.union (User.repos u) acc) t Repo.Set.empty
+
   module Webhook = struct
 
     type t = {
@@ -491,8 +503,8 @@ module API = struct
     let run _ = block ()
     let wait _ = block ()
 
-    let v ?old state =
-      let repos = match old with None -> Repo.Set.empty | Some t -> t.repos in
+    let v ?repos state =
+      let repos = match repos with None -> all_repos state | Some r -> r in
       { state; repos }
 
     let watch t r =
@@ -507,11 +519,6 @@ module API = struct
     let clear t = iter (fun _ -> User.clear) t.state
 
   end
-
-  let all_events t = fold (fun u acc -> User.events u @ acc) t []
-
-  let all_repos t =
-    fold (fun u acc -> Repo.Set.union (User.repos u) acc) t Repo.Set.empty
 
 end
 
@@ -1114,8 +1121,8 @@ let state_of_branch b =
 
 let ensure_in_sync ~msg github pub =
   state_of_branch pub >>= fun pub_users ->
-  Fmt.pr "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@."
-    Users.pp github.API.users Users.pp pub_users;
+  Log.info (fun l -> l  "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@."
+               Users.pp github.API.users Users.pp pub_users);
   let repos = Users.repos pub_users in
   let github = Users.prune repos github.API.users in
   let pub_users = Users.prune_commits pub_users in
@@ -1246,18 +1253,19 @@ let random_state ~random ~repo ~old_prs ~old_status ~old_refs =
   let prs = random_prs ~random ~repo ~old_prs in
   let refs = random_refs ~random ~repo ~old_refs in
   let commits =
-    Commit.Set.union
-      (Commit.Set.of_list @@ List.map PR.commit prs)
-      (Commit.Set.of_list @@ List.map Ref.commit refs)
+    let (++) = Commit.Set.union in
+    let l f s = Commit.Set.of_list (List.map f s) in
+    l (fun (id, _) -> { Commit.repo; id }) old_status
+    ++ l PR.commit prs ++ l Ref.commit refs
   in
-  let status =
+  let commits =
     Commit.Set.fold (fun c acc ->
         match random_status ~random ~old_status c with
         | [] -> acc
         | s  -> (Commit.id c, s) :: acc
       ) commits []
   in
-  prs, status, refs
+  prs, commits, refs
 
 let random_users ?(old=Users.empty ()) ~random =
   Users.iter (fun _ repo -> User.clear repo) old;
@@ -1292,59 +1300,59 @@ let test_random_gh ~quick _repo conn =
   let random = Random.State.make [| 1; 2; 3 |] in
   let dk = DK.connect conn in
   DK.branch dk pub  >>*= fun pub ->
-  DK.Branch.with_transaction pub (fun t ->
-      let monitor ~user ~repo =
-        Conv.update_repo t `Monitored { Repo.user; repo }
-      in
-      monitor ~user:"a" ~repo:"a" >>*= fun () ->
-      monitor ~user:"a" ~repo:"b" >>*= fun () ->
-      monitor ~user:"b" ~repo:"a" >>*= fun () ->
-      monitor ~user:"b" ~repo:"b" >>*= fun () ->
-      DK.Transaction.commit t ~message:"Monitor repos"
-    )
-  >>*= fun () ->
+  let monitor () =
+    DK.Branch.with_transaction pub (fun t ->
+        let monitor ~user ~repo =
+          let s = if Random.State.bool random then `Monitored else `Ignored in
+          Conv.update_repo t s { Repo.user; repo }
+        in
+        monitor ~user:"a" ~repo:"a" >>*= fun () ->
+        monitor ~user:"a" ~repo:"b" >>*= fun () ->
+        monitor ~user:"b" ~repo:"a" >>*= fun () ->
+        monitor ~user:"b" ~repo:"b" >>*= fun () ->
+        DK.Transaction.commit t ~message:"Monitor repos"
+      )
+  in
   DK.branch dk priv >>*= fun priv ->
-  let sync w t s =
+  let sync (t, s) =
+    let w = API.Webhook.v t in
+    monitor () >>*= fun () ->
     VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >|= fun s ->
     Alcotest.(check int) "API.set-*" 0 (Counter.sets t.API.ctx);
     s
   in
-  let nsync ~fresh n w t s =
-    let s = ref (if fresh then VG.empty else s) in
-    let w = ref w in
-    let rec aux k old =
-      let users = random_users ~random ~old in
-      let events = Users.diff_events users old in
-      let t = API.create ~events users in
-      w := API.Webhook.v ~old:!w t;
-      VG.sync ~policy:`Once !s ~pub ~priv ~token:t ~webhook:!w >>= fun new_s ->
+  let nsync ~fresh n (t, s) =
+    let rec aux k (t, s) =
+      let s = if fresh then VG.empty else s  in
+      let t =
+        let users = random_users ~random ~old:t.API.users in
+        let events = Users.diff_events users t.API.users in
+        API.create ~events users
+      in
+      let w = API.Webhook.v t in
+      monitor () >>*= fun () ->
+      VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >>= fun s ->
       Alcotest.(check int) "API.set-*" 0 (Counter.sets t.API.ctx);
-      if not fresh then s := new_s;
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
       ensure_in_sync ~msg t pub >>= fun () ->
-      if k > 1 then aux (k-1) users else Lwt.return (!w, t, !s)
+      if k > 1 then aux (k-1) (t, s) else Lwt.return (t, s)
     in
-    aux n t.API.users
+    aux n (t, s)
   in
   let s = VG.empty in
-  let users = random_users ~random ?old:None in
-  let t = API.create users in
-  let w = API.Webhook.v t in
-  sync w t s >>= fun _s ->
+  let t = API.create (random_users ~random ?old:None) in
+  sync (t, s) >>= fun _s ->
   ensure_in_sync ~msg:"init" t pub >>= fun () ->
-  let users = random_users ~random ~old:users in
-  let t = API.create users in
-  let w = API.Webhook.v t ~old:w in
-  sync w t s >>= fun s ->
+  let t = API.create (random_users ~random ~old:t.API.users) in
+  sync (t, s) >>= fun s ->
   ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  nsync ~fresh:false (if quick then 2 else 10) w t s >>= fun (w, t, s) ->
-  nsync ~fresh:true (if quick then 2 else 30) w t s  >>= fun (w, t, s) ->
-  nsync ~fresh:false (if quick then 2 else 20) w t s >>= fun (w, t, s) ->
+  nsync ~fresh:false (if quick then 2 else 10) (t, s) >>= fun (t, s) ->
+  nsync ~fresh:true (if quick then 2 else 30)  (t, s) >>= fun (t, s) ->
+  nsync ~fresh:false (if quick then 2 else 20) (t, s) >>= fun (t, s) ->
   let users = Users.of_repos (API.all_repos t) in
   let events = Users.diff_events users t.API.users in
   let t = API.create ~events users in
-  let w = API.Webhook.v t ~old:w in
-  sync w t s >>= fun _s ->
+  sync (t, s) >>= fun _s ->
   ensure_in_sync ~msg:"empty" t pub >>= fun () ->
   Lwt.return_unit
 

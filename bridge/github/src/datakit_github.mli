@@ -15,6 +15,7 @@ module Status_state: sig
   val of_string: string -> t option
   (** [of_string s] is the value v such that [of_string s] is [Some
       v]. *)
+
 end
 
 module Repo: sig
@@ -22,8 +23,14 @@ module Repo: sig
   type t = { user: string; repo: string }
   (** The type for Github repositories. *)
 
+  type state = [`Monitored | `Ignored]
+  (** The type for repository state. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)
+
+  val pp_state: state Fmt.t
+  (** [pp_state] is the pretty-printer for repository state. *)
 
   module Set: sig
     include Set.S with type elt = t
@@ -50,6 +57,7 @@ module Commit: sig
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
   end
   (** Sets of commits. *)
 
@@ -86,9 +94,15 @@ module PR: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for pull-request values. *)
 
+  val same: t -> t -> bool
+  (** [same x y] is true if [x] and [y] have the same repository and
+      number. *)
+
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
+    val commits: t -> Commit.Set.t
   end
   (** Sets of pull requests. *)
 
@@ -123,9 +137,18 @@ module Status: sig
       API. Otherwise, segments are concatenated using ["/"] as a
       separator. *)
 
+  val same: t -> t -> bool
+  (** [same x y] is true if [x] and [y] have the same commit and
+      context. *)
+
+  val compare: t -> t -> int
+  (** [compare] is the comparison function for build status. *)
+
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
+    val commits: t -> Commit.Set.t
   end
   (** Sets of build status. *)
 
@@ -139,20 +162,35 @@ module Ref: sig
   }
   (** The type for Git references. *)
 
+  val name: t -> string list
+  (** [name t] is [t]'s name. *)
+
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
   val commit: t -> Commit.t
   (** [commit t] is [t]'s commit. *)
 
+  val commit_id: t -> string
+  (** [commit_id t] is [t]'s commit ID. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
+
+  val same: t -> t -> bool
+  (** [same x y] is true if [x] and [y] have the same repository and
+      name. *)
 
   module Set: sig
     include Set.S with type elt = t
     val pp: t Fmt.t
+    val repos: t -> Repo.Set.t
+    val commits: t -> Commit.Set.t
   end
   (** Sets of Git references. *)
+
+  type state = [`Created | `Updated | `Removed]
+  (** The type for reference state. *)
 
 end
 
@@ -160,13 +198,23 @@ module Event: sig
 
   (** The type for event values. *)
   type t =
+    | Repo of (Repo.state * Repo.t)
     | PR of PR.t
     | Status of Status.t
-    | Ref of Ref.t
-    | Other of string
+    | Ref of (Ref.state * Ref.t)
+    | Other of (Repo.t * string)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for event values. *)
+
+  val repo': Repo.state -> Repo.t -> t
+  val pr: PR.t -> t
+  val status: Status.t -> t
+  val ref: Ref.state -> Ref.t -> t
+  val other: Repo.t -> string -> t
+
+  val repo: t -> Repo.t
+  (** [repo t] is [t]'s repository. *)
 
 end
 
@@ -196,6 +244,13 @@ module type API = sig
   val set_status: token -> Status.t -> unit result
   (** [set_status t s] updates [Status.commit s]'s status with [s]. *)
 
+  val set_ref: token -> Ref.t -> unit result
+  (** [set_ref t r] updates the reference named [Ref.name r] with
+      [r]. *)
+
+  val remove_ref: token -> Repo.t -> string list -> unit result
+  (** [remove_ref t n] removes the reference named [n]. *)
+
   val set_pr: token -> PR.t -> unit result
   (** [set_pr t pr] updates the PR number [PR.number pr] with [pr]. *)
 
@@ -208,6 +263,39 @@ module type API = sig
   val events: token -> Repo.t -> Event.t list result
   (** [event t r] is the list of events attached to the repository
       [r]. Note: can be slow/costly if multiple pages of events. *)
+
+  module Webhook: sig
+
+    type t
+    (** The type for the webhook server state. *)
+
+    val create: token -> Uri.t -> t
+    (** [create tok uri] is the webhook server state configured to
+        listen for incoming webhook events to the public address [uri]
+        and using the token [tok] to perform GitHub API calls. The
+        function [f] will be called everytime a new event is
+        received. *)
+
+    val run: t -> unit Lwt.t
+    (** [run t] is a blocking lwt thread which runs the webook
+        listener. *)
+
+    val repos: t -> Repo.Set.t
+    (** The list of watched repository. *)
+
+    val watch: t -> Repo.t -> unit Lwt.t
+    (** [watch t r] makes [t] watch the repo [r]. *)
+
+    val events: t -> Event.t list
+    (** [events t] is the list of events stored in [t]. *)
+
+    val wait: t -> unit Lwt.t
+    (** [wait t] waits for new events to be available. *)
+
+    val clear: t -> unit
+    (** [clear t] clears the list of events stored in [t]. *)
+
+  end
 
 end
 
@@ -252,10 +340,10 @@ module Snapshot: sig
   val refs: t -> Ref.Set.t
   (** [refs t] are [t]'s Git references. *)
 
-  val prune: t -> [`Clean | `Prune of t * PR.Set.t * Commit.Set.t]
-  (** [prune t] is either [`Clean] if the snapshot is clean or [`Prune
-      (t, prs, commits)] where [t] is a clean snapshot, [prs] are the pull
-      requests to close and [commits] the commits to close. *)
+  val prune: t -> t * t option
+  (** [prune t] is either a clean snapshot and an optional snapshot
+      representing the the commits and prs entries to remove. *)
+
 end
 
 module Diff: sig
@@ -264,7 +352,9 @@ module Diff: sig
 
 
   type id = [
+    | `Repo
     | `PR of int
+    | `Commit of string
     | `Status of string * string list
     | `Ref of string list
     | `Unknown
@@ -272,8 +362,8 @@ module Diff: sig
   (** The type for diff identifiers. *)
 
   type t = {
-    repo: Repo.t;
-    id  : id;
+    repo  : Repo.t;
+    id    : id;
   }
   (** The type for filesystem diffs. *)
 
@@ -292,9 +382,6 @@ module Diff: sig
   val changes: Datakit_path.t Datakit_S.diff list -> Set.t
   (** [changes d] is the set of GitHub changes carried over in the
       filesystem changes [d]. *)
-
-  val repos: Datakit_path.t Datakit_S.diff list -> Repo.Set.t
-  (** [repos d] is the set of repositories appearing in [d]. *)
 
 end
 
@@ -317,16 +404,21 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Repositories} *)
 
-  val repos: tree -> Repo.Set.t result
+  val repos: tree -> Repo.Set.t Lwt.t
   (** [repos t] is the list of repositories stored in [t]. *)
+
+  val update_repo: DK.Transaction.t -> Repo.state -> Repo.t -> unit result
+  (** [update_repo t s r] applies the repository [r] to the
+      transaction [t]. Depending on the state [s] it can either remove
+      the directory or create a [monitored] file. *)
 
   (** {1 Status} *)
 
-  val status: tree -> Commit.t -> string list -> Status.t option result
+  val status: tree -> Commit.t -> string list -> Status.t option Lwt.t
   (** [status t c s] is the commit's build status [s] for the commit
       [c] in the tree [t]. *)
 
-  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t result
+  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t Lwt.t
   (** [statuses t] is the list of status stored in [t].. *)
 
   val update_status: DK.Transaction.t -> Status.t -> unit result
@@ -335,11 +427,11 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Pull requests} *)
 
-  val pr: tree -> Repo.t -> int -> PR.t option result
+  val pr: tree -> Repo.t -> int -> PR.t option Lwt.t
   (** [pr t r n] is the [n]'th pull-request of the repostiry [r] in
       [t]. *)
 
-  val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t result
+  val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t Lwt.t
   (** [prs t] is the list of pull requests stored in [t]. *)
 
   val update_pr: DK.Transaction.t -> PR.t -> unit result
@@ -348,22 +440,30 @@ module Conv (DK: Datakit_S.CLIENT): sig
 
   (** {1 Git References} *)
 
-  val update_ref: DK.Transaction.t -> Ref.t -> unit result
-  (** [update_ref t r] applies the Git reference [r] to the
+  val update_ref: DK.Transaction.t -> Ref.state -> Ref.t -> unit result
+  (** [update_ref t s r] applies the Git reference [r] to the
+      transaction [t]. Depending on the state [s] it can either remove
+      the directory or create an [head] file. *)
+
+  (** {1 Events} *)
+
+  val update_event: DK.Transaction.t -> Event.t -> unit result
+  (** [update_event t e] applies the (webhook) event [e] to the
       transaction [t]. *)
 
   (** {1 Snapshots and diffs} *)
 
-  val diff: tree -> DK.Commit.t -> Diff.Set.t result
+  val safe_diff: tree -> DK.Commit.t -> Diff.Set.t Lwt.t
   (** [diff tree c] computes the Github diff between the branch [b]
       and the commit [c]. *)
 
-  val snapshot: ?old:(DK.Commit.t * Snapshot.t) -> tree -> Snapshot.t result
-  (** [snapshot ?old t] is a snapshot of the tree [t]. Note: this is
-      expensive, so try to provide a previous (recent) snapshot [prev]
-      if possible. *)
+  val snapshot: string -> ?old:(DK.Commit.t * Snapshot.t) -> tree ->
+    Snapshot.t Lwt.t
+  (** [snapshot dbg ?old t] is a snapshot of the tree [t]. Note: this
+      is expensive, so try to provide a previous (recent) snapshot
+      [prev] if possible. *)
 
-  val apply: Snapshot.t -> (tree * Diff.Set.t) -> Snapshot.t result
+  val apply: Snapshot.t -> (tree * Diff.Set.t) -> Snapshot.t Lwt.t
   (** [apply s d] is the snapshot obtained by applying [d] on top of
       [s]. [d] is a pair [tree * diff] where [diff] contains the
       pull-requests and status to consider while [tree] is holding the
@@ -380,6 +480,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   (** Create an empty sync state. *)
 
   val sync:
+    ?webhook:API.Webhook.t ->
     ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?dry_updates:bool ->
     pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
     t -> t Lwt.t

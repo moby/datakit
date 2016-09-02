@@ -21,11 +21,12 @@ let ok x = Lwt.return (Ok x)
 let ( >>!= ) x f =
   match x with
   | Ok y -> f y
-  | Error vfs_error -> Alcotest.fail (Fmt.to_to_string Vfs.Error.pp vfs_error)
+  | Error vfs_error ->
+    Alcotest.fail ("Vfs.error: " ^ Fmt.to_to_string Vfs.Error.pp vfs_error)
 
 let ( >>*= ) x f = x >>= function
   | Ok y -> f y
-  | Error (`Msg msg) -> Alcotest.fail msg
+  | Error (`Msg msg) -> Alcotest.fail ("Msg: " ^ msg)
 
 let ( >>**= ) x f = x >>= function
   | Ok y -> f y

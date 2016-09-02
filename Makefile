@@ -10,13 +10,13 @@ all: datakit client github
 	@
 
 datakit:
-	ocaml pkg/pkg.ml build --tests $(TESTS)
+	ocaml pkg/pkg.ml build --tests $(TESTS) -q
 
 client:
-	ocaml pkg/pkg.ml build -n datakit-client
+	ocaml pkg/pkg.ml build -n datakit-client -q
 
 github:
-	ocaml pkg/pkg.ml build -n datakit-github
+	ocaml pkg/pkg.ml build -n datakit-github -q
 
 docs:
 	ocamlbuild -use-ocamlfind doc/api.docdir/index.html

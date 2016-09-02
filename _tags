@@ -1,86 +1,67 @@
-true : bin_annot, safe_string, package(bytes)
+true : bin_annot, safe_string
 true: warn_error(+1..49), warn(A-3-4-41-44)
-
-## Libraries
-
-<src/vfs> : include
-<src/ivfs> : include
-<src/fs9p> : include
-
-true: \
-  package(lwt), package(astring), package(logs), package(result), \
-  package(cstruct), package(fmt), package(rresult)
-
-### Client
-
-<src/client/*>: package(protocol-9p), package(uri)
-
-### Server
-
-<src/ivfs/*>: package(irmin), package(tc)
-<src/fs9p/*>: package(protocol-9p.unix)
-
-<src/conduit/*>: \
-  package(threads), thread, \
-  package(conduit.lwt-unix), package(hvsock.lwt), package(hvsock.lwt-unix), \
-  package(named-pipe.lwt), package(uri), package(mirage-flow), \
-  package(protocol-9p.unix)
-
-<src/log/*>: \
-  package(asl), package(win-eventlog), package(cmdliner), \
-  package(mtime.os), package(logs.cli)
-
-<src/irmin-io> : include
-<src/irmin-io/*>: \
-  package(conduit.lwt-unix), package(irmin), package(lwt.unix), \
-  package(uri), package(camlzip), package(git), package(tc)
-
-### Bridges
-
-<bridge/github/src/datakit_github_api.*>: package(github)
-
-## Binaries
-
-<src/conduit>: include
-<src/log>: include
-<src>: include
-
-<src/bin/*> | <bridge/github/main.*>: \
-  package(cmdliner), package(fmt.cli), package(fmt.tty), package(logs.fmt)
+true: package(bytes lwt astring logs result cstruct fmt rresult)
 
 ### datakit
 
-<src/bin/main.*>: \
-  package(git), package(irmin), package(irmin.git), package(irmin.mem), \
-  package(protocol-9p.unix), package(camlzip), \
-  package(irmin-watcher), thread
+<src>: include
+<src/vfs> : include
+
+<src/ivfs> : include
+<src/ivfs/*>: package(irmin tc)
+
+<src/fs9p> : include
+<src/fs9p/*>: package(protocol-9p.unix)
+
+<src/conduit>: include
+<src/conduit/*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
+<src/conduit/*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
+<src/conduit/*>: package(protocol-9p.unix)
+
+<src/log>: include
+<src/log/*>: package(asl win-eventlog cmdliner mtime.os logs.cli)
+
+<src/irmin-io> : include
+<src/irmin-io/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
+
+<bridge/github/src/*>: package(uri)
+<bridge/github/src/datakit_github_*>: package(github)
+<bridge/github/src/datakit_github_webhook.*>: package(nocrypto hex conduit.lwt re.str)
+
+<src/bin/*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
+<src/bin/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
+<src/bin/main.*>: package(protocol-9p.unix camlzip), thread
+
+# datakit-client
+
+<src/client/*>: package(protocol-9p uri)
 
 ### datakit-github-bridge
 
 <src/client>: include
 <bridge/github/src>: include
-<bridge/github/main.*>: package(github.unix)
-
-### because of src/conduit
-
-<src/bin/main.*> | <bridge/github/main.*>: \
-  package(threads), thread, \
-  package(conduit.lwt-unix), package(hvsock.lwt), package(hvsock.lwt-unix), \
-  package(named-pipe.lwt), package(uri), package(mirage-flow), \
-  package(protocol-9p.unix)
-
-### because of src/log
-
-<src/bin/main.*> | <bridge/github/main.*>: \
-  package(asl), package(win-eventlog), package(mtime.os), package(logs.cli), \
-  package(lwt.unix)
+<bridge/github/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
+<bridge/github/main.*>: package(github.unix re.str hex nocrypto)
 
 ### Tests
 
 <src/client>: include
-<tests/*>: \
-  package(alcotest), package(conduit.lwt-unix), \
-  package(str), package(logs.fmt), package(fmt.tty), package(mtime.os), \
-  package(mirage-types.lwt), package(protocol-9p.unix), \
-  package(irmin), package(irmin.mem), package(camlzip), \
-  package(git), package(irmin.git)
+<tests/*>: package(alcotest conduit.lwt-unix str logs.fmt fmt.tty mtime.os)
+<tests/*>: package(mirage-types.lwt protocol-9p.unix irmin irmin.mem camlzip)
+<tests/*>: package(git irmin.git)
+
+### Annoying
+
+# because of src/conduit
+<bridge/github/main.*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
+<bridge/github/main.*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
+<bridge/github/main.*>: package(protocol-9p.unix)
+## because of src/loc
+<bridge/github/main.*>: package(asl win-eventlog cmdliner mtime.os logs.cli)
+
+## because of src/conduit
+<src/bin/main.*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
+<src/bin/main.*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
+<src/bin/main.*>: package(protocol-9p.unix)
+## because of src/loc
+<src/bin/main.*>: package(asl win-eventlog cmdliner mtime.os logs.cli)

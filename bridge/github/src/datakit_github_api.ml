@@ -86,8 +86,16 @@ module Ref = struct
     { head; name = to_list r.git_ref_name }
 
   let of_event repo r =
-    let head = { Commit.repo; id = r.push_event_head } in
-    { head; name = to_list r.push_event_ref }
+    let id = match r.push_event_head, r.push_event_after with
+      | Some _, Some _ | None, None   -> assert false
+      | Some h, None   | None, Some h -> h
+    in
+    let head = { Commit.repo; id } in
+    let t = { head; name = to_list r.push_event_ref } in
+    match r.push_event_deleted, r.push_event_created with
+    | Some true, _ -> `Removed, t
+    | _, Some true -> `Created, t
+    | _            -> `Updated, t
 
 end
 
@@ -100,28 +108,31 @@ module Event = struct
       | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
       | Some (user, repo) -> { Repo.user; repo }
     in
+    let other str = Other (repo, str) in
     match e.event_payload with
     | `Status s       -> Status (Status.of_event repo s)
     | `PullRequest pr -> PR (PR.of_event repo pr)
     | `Push p         -> Ref (Ref.of_event repo p)
-    | `Create _       -> Other "create"
-    | `Delete _       -> Other "delete"
-    | `Download       -> Other "download"
-    | `Follow         -> Other "follow"
-    | `Fork _         -> Other "fork"
-    | `ForkApply      -> Other "fork-apply"
-    | `Gist           -> Other "gist"
-    | `Gollum _       -> Other "gollum"
-    | `IssueComment _ -> Other "issue-comment"
-    | `Issues _       -> Other "issues"
-    | `Member _       -> Other "member"
-    | `Public         -> Other "public"
-    | `Release _      -> Other "release"
-    | `Watch _        -> Other "watch"
-    | `PullRequestReviewComment _ -> Other "pull-request-review-comment"
-    | `CommitComment _            -> Other "commit-comment"
+    | `Create _       -> other "create"
+    | `Delete _       -> other "delete"
+    | `Download       -> other "download"
+    | `Follow         -> other "follow"
+    | `Fork _         -> other "fork"
+    | `ForkApply      -> other "fork-apply"
+    | `Gist           -> other "gist"
+    | `Gollum _       -> other "gollum"
+    | `IssueComment _ -> other "issue-comment"
+    | `Issues _       -> other "issues"
+    | `Member _       -> other "member"
+    | `Public         -> other "public"
+    | `Release _      -> other "release"
+    | `Watch _        -> other "watch"
+    | `PullRequestReviewComment _ -> other "pull-request-review-comment"
+    | `CommitComment _            -> other "commit-comment"
 
 end
+
+let event = Event.of_gh
 
 open Rresult
 open Lwt.Infix
@@ -194,6 +205,10 @@ let set_pr token pr =
   |> run
   >|= R.map ignore
 
+let not_implemented () = Lwt.fail_with "not implemented"
+let set_ref _ _ = not_implemented ()
+let remove_ref _ _ _ = not_implemented ()
+
 let prs token r =
   let { Repo.user; repo } = r in
   Github.Pull.for_repo ~token ~state:`Open ~user ~repo ()
@@ -228,3 +243,8 @@ let events token r =
   Github.Stream.to_list events
   |> Github.Monad.map (List.map Event.of_gh)
   |> run
+
+module Webhook = struct
+  include Datakit_github_webhook
+  let events t = List.map event (events t)
+end

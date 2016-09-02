@@ -516,7 +516,7 @@ module API = struct
 
     let block () = let t, _ = Lwt.task () in t
 
-    let create state _ = { state; repos = Repo.Set.empty  }
+    let create state _ _ = { state; repos = Repo.Set.empty  }
     let repos t = t.repos
     let run _ = block ()
     let wait _ = block ()

@@ -3,7 +3,7 @@
 open Datakit_github
 
 type t
-val create: Github.Token.t -> Uri.t -> t
+val create: Github.Token.t -> Uri.t -> string option -> t
 val run: t -> unit Lwt.t
 val repos: t -> Repo.Set.t
 val watch: t -> Repo.t -> unit Lwt.t

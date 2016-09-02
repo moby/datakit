@@ -82,7 +82,7 @@ let set_signal_if_supported signal handler =
 
 let start () sandbox no_listen listen_urls
     datakit private_branch public_branch dry_updates
-    webhook =
+    webhook webhook_secret =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -109,7 +109,7 @@ let start () sandbox no_listen listen_urls
     | Some u ->
       Log.app (fun l ->
           l "Starting webhook server listening at %s" @@ Uri.to_string u);
-      Some (Datakit_github_api.Webhook.create token u)
+      Some (Datakit_github_api.Webhook.create token u webhook_secret)
   in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in
@@ -228,10 +228,6 @@ let webhook_secret =
   let doc = Arg.info ~doc:"Webhook secret" ["s";"webhook-secret"] in
   Arg.(value & opt (some string) None doc)
 
-let webhook_port =
-  let doc = Arg.info ~doc:"Webhook port" ["p";"webhook-port"] in
-  Arg.(value & opt int 80 doc)
-
 let dry_updates =
   let doc =
     Arg.info ~doc:"Dry API updates: do not call the GitHub API, \
@@ -249,7 +245,7 @@ let term =
   ] in
   Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $
-        webhook),
+        webhook $ webhook_secret),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

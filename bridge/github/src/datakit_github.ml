@@ -323,7 +323,7 @@ module type API = sig
   val events: token -> Repo.t -> Event.t list result
   module Webhook: sig
     type t
-    val create: token -> Uri.t -> t
+    val create: token -> Uri.t -> string option -> t
     val run: t -> unit Lwt.t
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t

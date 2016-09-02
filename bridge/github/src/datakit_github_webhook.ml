@@ -107,23 +107,19 @@ end
 (** Webhooks *)
 module Webhook = struct
 
-  type status = Indicated | Pending | Timeout | Unauthorized | Connected
+  type status = Indicated | Unauthorized | Connected
 
-  type t = {
+  type endpoint = {
     id          : int64;
     url         : Uri.t;
     secret      : Cstruct.t;
     repo        : Repo.t;
     status      : status;
-    update_event: t Lwt_condition.t;
+    update_event: endpoint Lwt_condition.t;
     last_event  : Time.t;
     token       : Github.Token.t;
     handler     : HTTP.response option HTTP.handler;
   }
-
-  let secret_prefix = "datakit"
-
-  let () = Random.self_init ()
 
   let hmac ~secret message =
     Nocrypto.Hash.SHA1.hmac ~key:secret (Cstruct.of_string message)
@@ -146,23 +142,18 @@ module Webhook = struct
       )
     | None -> Lwt.return_false
 
-  let new_secret prefix =
-    let `Hex s = Hex.of_cstruct (Nocrypto.Rng.generate 20) in
-    prefix ^ ":" ^ s
-
   let default_events = [
     `Create; `Delete; `Push; (* ref updates *)
     `Status;                 (* status updates *)
     `PullRequest;            (* PR updates *)
   ]
 
-  let new_hook ?(events=default_events) url =
-    let secret = new_secret secret_prefix in
+  let new_hook ?(events=default_events) url secret =
     let new_hook_config = `Web {
         web_hook_config_url          =  Uri.to_string url;
         web_hook_config_content_type = "json";
         web_hook_config_insecure_ssl = false; (* FIXME: review *)
-        web_hook_config_secret       = Some secret;
+        web_hook_config_secret       = secret;
       }
     in
     { new_hook_name   = "web";
@@ -197,15 +188,6 @@ module Webhook = struct
           );
       }
 
-  let test_endpoint ~token e =
-    let open Github.Monad in
-    let f =
-      Github.Hook.test ~token ~user:e.repo.Repo.user ~repo:e.repo.Repo.repo
-        ~id:e.id ()
-      |> map Github.Response.value
-    in
-    run f
-
   let register registry endpoint =
     let rec handler _id req body =
       verify_event ~secret:endpoint.secret req body >>= fun verified ->
@@ -232,62 +214,35 @@ module Webhook = struct
     in
     Hashtbl.replace registry (Uri.path endpoint.url) {endpoint with handler}
 
-  let check_connectivity registry endpoint timeout_s =
-    Lwt.pick [
-      Lwt_unix.sleep timeout_s
-      >>= begin fun () ->
-        let endpoint = {endpoint with status=Timeout} in
-        Hashtbl.replace registry (Uri.path endpoint.url) endpoint;
-        Lwt_condition.broadcast endpoint.update_event endpoint;
-        Lwt.return ()
-      end;
-      let rec wait endpoint =
-        Lwt_condition.wait endpoint.update_event >>= fun endpoint ->
-        if endpoint.status=Connected then Lwt.return ()
-        else wait endpoint
-      in
-      wait endpoint
-    ]
-
-  let connect ~token registry url ({Repo.user; repo}, _ as x) =
-    let points_to_us h =
-      match web_hook_config h with
-      | None   -> false
-      | Some w -> w.web_hook_config_url = Uri.to_string url
-    in
+  let connect ~token registry url x secret =
     let create =
       let open Github.Monad in
-      Github.Hook.for_repo ~token ~user ~repo ()
-      |> Github.Stream.to_list
-      >>= fun hooks ->
-      List.fold_left (fun m h ->
-          m >>= fun () ->
-          if points_to_us h then
-            Github.Hook.delete ~token ~user ~repo ~id:h.hook_id ()
-            |> map Github.Response.value
-          else return ()
-        ) (return ()) hooks
-      >>= fun () ->
-      let hook = new_hook url in
-      Github.Hook.create ~token ~user ~repo ~hook () >>~ fun hook ->
+      let hook = new_hook url secret in
+      let hook = {
+        Github_t.hook_url = Uri.to_string url;
+        hook_updated_at = "";
+        hook_created_at = "";
+        hook_events = [];
+        hook_active = true;
+        hook_name = hook.Github_t.new_hook_name;
+        hook_config = hook.Github_t.new_hook_config;
+        hook_id = 0L;
+      } in
       endpoint_of_hook ~token ~hook x
       |> return
     in
     Github.Monad.run create >>= fun endpoint ->
-    register registry {endpoint with status=Pending};
-    Lwt.join [
-      check_connectivity registry endpoint 10.;
-      test_endpoint ~token endpoint;
-    ] >|= fun () ->
+    register registry {endpoint with status=Connected};
     Hashtbl.find registry (Uri.path url)
+    |> Lwt.return
 
 end
 
 type s = {
   uri     : Uri.t;
-  registry: (string, Webhook.t) Hashtbl.t;
+  registry: (string, Webhook.endpoint) Hashtbl.t;
   token   : Github.Token.t;
-  mutable repos: Repo.Set.t
+  mutable repos: Repo.Set.t;
 }
 
 type t = {
@@ -295,6 +250,7 @@ type t = {
   mutable events: Github_t.event list;
   http: HTTP.t;
   cond: unit Lwt_condition.t;
+  secret  : string option;
 }
 
 let empty token uri =
@@ -320,21 +276,20 @@ let watch t repo =
   if Repo.Set.mem repo t.s.repos then (
     Log.debug (fun l -> l "Alreday watching %a" Repo.Set.pp t.s.repos);
     Lwt.return_unit
-  ) else
+  ) else (
     let url = Uri.resolve "" t.s.uri (Uri.of_string ("?"^notify_query)) in
     Log.info (fun l ->
         l "Connecting GitHub to callback %s\n%!" (Uri.to_string url));
     let err = github_error_str repo in
     Webhook.connect ~token:t.s.token t.s.registry url
-      (repo, notification_handler t repo)
+      (repo, notification_handler t repo) t.secret
     >|= fun endpoint -> match endpoint.Webhook.status with
     | Webhook.Indicated    -> Log.err (fun l -> l "%s wedged prerequest" err)
-    | Webhook.Pending      -> Log.err (fun l -> l "%s wedged pending" err)
-    | Webhook.Timeout      -> Log.err (fun l -> l "%s handshake timeout" err)
     | Webhook.Unauthorized -> Log.err (fun l -> l "%s authorization failed" err)
     | Webhook.Connected    ->
       Log.info (fun l -> l "%a connected" Repo.pp repo);
-      t.s.repos <- Repo.Set.add repo t.s.repos
+      t.s.repos <- Repo.Set.add repo t.s.repos;
+  )
 
 let service { uri; registry; _ } service_fn =
   let root = Uri.path uri in
@@ -351,14 +306,14 @@ let service { uri; registry; _ } service_fn =
   in
   service_fn  ~routes ~handler
 
-let create token uri =
+let create token uri secret =
   let port = match Uri.port uri with None -> 80 | Some p -> p in
   let http = HTTP.create port in
   let s  = empty token uri in
   let service = service s (HTTP.service "GitHub listener") in
   let http = HTTP.with_service http service in
   let cond = Lwt_condition.create () in
-  { s; http; events = []; cond }
+  { s; http; events = []; cond; secret }
 
 let repos t = t.s.repos
 let run t = HTTP.listen t.http

@@ -269,7 +269,7 @@ module type API = sig
     type t
     (** The type for the webhook server state. *)
 
-    val create: token -> Uri.t -> t
+    val create: token -> Uri.t -> string option -> t
     (** [create tok uri] is the webhook server state configured to
         listen for incoming webhook events to the public address [uri]
         and using the token [tok] to perform GitHub API calls. The

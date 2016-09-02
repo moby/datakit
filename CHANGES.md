@@ -1,3 +1,49 @@
+### 0.5.0 (2016-09-02)
+
+- Split the package in 3: server-side, client-side and GitHub bridge
+  (#232, @samoht)
+- [server] Add `/debug` directory to control log levels (#239, @talex5)
+
+- [github] Lots of stability improvement and bug fixes for the GitHub bridge,
+  including:
+  - Integrate the GH webhooks directly with the bridge process (#243, @samoht)
+  - Track Git References in the GitHub bridge (#234, @samoht)
+  - Be more rebust when GitHub API calls fail (#241, @samoht)
+  - Fuzz testing of GitHub state and user requests (TODO)
+
+- [server] Use platform-specific filesystem notification (fsevents, inotify)
+  instead of polling for branch update notifications (#216, @samoht)
+- [server, client] Expose diffs in the Datakit API (#219, @samoht)
+- [client] Golang bindings: expose Watch outside the package (#208, @djs55)
+- [client] Golang bindings: add SetMultiple method to set more than one field in
+  a transaction (#208, @dave-tucker)
+- [client] Golang bindings: add a function to delete key in a transaction
+  (#208, ebriney)
+- [client] Golang bindings: add a nil-able StringRefField (aka
+  "the billion dollar mistake") (#208, @djs55)
+- [server] Use latest hvsok >= 0.8.1 (#204, @samoht)
+- [server] Support inheriting a listening socket (#199, @djs55)
+- [client, server] Use maximum_write_payload funtion in recent ocaml-9p
+  (#192, @talex5)
+- [server] Allow to auto-push datakit state to GitHub (#189, @samoht)
+- [server] Make `--bare` the default behavior (#185, @samoht)
+- [server] Fix races in stream handling (#170, @talex5)
+- [client] Fix leak warning in Go client (#159, @talex5)
+- [client, server] Support large writes (#151, @talex5)
+- [clent] Add OCaml client bindings (#148, @talex5)
+- [server] Improve speed of appending to large files (#143, @talex5)
+- [client] Add Minimal Go API (#135, @djs55 and @samoht)
+- [client, server] Add a way to trigger remote fetches within the API
+  (#132, @samoht)
+- [server] Generalise the `--eventlog` command-line argument into
+  `--log-destination=(stderr|asl|eventlog)` (#115, @djs55)
+- [client] Improve mount options of datakit-mount (#105, @samoht)
+- [client, server, github] add Dockerfiles (@talex5 and @samoht)
+- [server] add support for Hyper-V socket connections (#94, @djs55)
+- [server] Add support for Windows named pipes (#92, @djs55)
+- [server] Backport mirage/ocaml-git#147: Less unefficient
+  `Git_unix.read_file_with_read` (#88, @chambart)
+
 ### 0.4.0 (2016-04-25)
 
 - Bindings to the Github events API to get notification on new pull requests

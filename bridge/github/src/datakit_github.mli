@@ -15,6 +15,7 @@ module Status_state: sig
   val of_string: string -> t option
   (** [of_string s] is the value v such that [of_string s] is [Some
       v]. *)
+
 end
 
 module Repo: sig
@@ -139,6 +140,9 @@ module Status: sig
   val same: t -> t -> bool
   (** [same x y] is true if [x] and [y] have the same commit and
       context. *)
+
+  val compare: t -> t -> int
+  (** [compare] is the comparison function for build status. *)
 
   module Set: sig
     include Set.S with type elt = t

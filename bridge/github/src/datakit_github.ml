@@ -189,10 +189,12 @@ module Status = struct
   let same x y = commit x = commit y && context x = context y
   let compare_repo x y = Repo.compare (repo x) (repo y)
   let compare_commit_id x y = Pervasives.compare (commit_id x) (commit_id y)
+  let compare_context x y = Pervasives.compare x.context y.context
 
   let compare = compare_fold [
       compare_repo;
       compare_commit_id;
+      compare_context;
       Pervasives.compare
     ]
 
@@ -1092,7 +1094,6 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
   type state = {
     pub    : branch;        (* the public branch, where the user writes stuff *)
     priv   : branch;  (* the private branch, where webhook events are written *)
-    updates: Event.Set.t;                (* list of in-flux update API calls. *)
   }
 
   let _compare x y =
@@ -1101,8 +1102,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | i -> i
 
   let pp ppf t =
-    Fmt.pf ppf "@[<2>pub:%a@]@;@[<2>priv:%a@]@;@[<2>updates:%a@]"
-      pp_branch t.pub pp_branch t.priv Event.Set.pp t.updates
+    Fmt.pf ppf "@[<2>pub:%a@]@;@[<2>priv:%a@]" pp_branch t.pub pp_branch t.priv
 
   let with_head branch fn =
     DK.Branch.head branch >>*= function
@@ -1142,26 +1142,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let priv_o = match old with None -> None | Some o -> Some (mk o.priv) in
     branch (msg ^ "-pub")  ?old:pub_o pub   >>*= fun pub ->
     branch (msg ^ "-priv") ?old:priv_o priv >|*= fun priv ->
-    let updates = match old with
-      | None   -> Event.Set.empty
-      | Some o ->
-        let t = priv.snapshot in
-        let keep = function
-          | Event.PR pr             -> not (PR.Set.mem pr t.Snapshot.prs)
-          | Event.Ref (`Removed, r) -> Ref.Set.mem r t.Snapshot.refs
-          | Event.Ref (_, r)        -> not (Ref.Set.mem r t.Snapshot.refs)
-          | Event.Status s          -> not (Status.Set.mem s t.Snapshot.status)
-          | Event.Repo _
-          | Event.Other _           -> false
-        in
-        Event.Set.filter (fun e ->
-            if keep e then true
-            else (
-              Log.debug (fun l -> l "%a has been delivered!" Event.pp e);
-              false
-            )) o.updates
-    in
-    { pub; priv; updates }
+    { pub; priv }
 
   (** Import from GitHub *)
 
@@ -1293,107 +1274,79 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let status = Status.Set.union base.Snapshot.status new_status in
     ok ({ Snapshot.repos; prs; commits; refs; status }, cleanup)
 
-  let api_set_pr t ~dry_updates ~token pr =
-    let e = Event.PR pr in
-    if Event.Set.mem e t.updates then (
-      Log.debug (fun l -> l "[skip] API.set-pr %a" PR.pp pr);
-      Lwt.return e
-    ) else (
-      Log.info (fun l -> l "API.set-pr %a" PR.pp pr);
-      if dry_updates then Lwt.return e
-      else
-        API.set_pr token pr >|= function
-        | Ok ()   -> e
-        | Error x -> Log.err (fun l -> l "API.set-pr %a: %s" PR.pp pr x); e
-    )
+  let api_set_pr ~dry_updates ~token pr =
+    Log.info (fun l -> l "API.set-pr %a" PR.pp pr);
+    if dry_updates then Lwt.return_unit
+    else
+      API.set_pr token pr >|= function
+      | Ok ()   -> ()
+      | Error e -> Log.err (fun l -> l "API.set-pr %a: %s" PR.pp pr e)
 
-  let api_remove_ref t ~dry_updates ~token r =
-    let e = Event.Ref (`Removed, r) in
+  let api_remove_ref ~dry_updates ~token r =
     let repo = Ref.repo r in
     let name = Ref.name r in
     let pp ppf _ = Fmt.pf ppf "{%a %a}" Repo.pp repo pp_path name in
-    if Event.Set.mem e t.updates then (
-      Log.debug (fun l -> l "[skip] API.remove-ref %a" pp r);
-      Lwt.return e
-    ) else (
-      Log.info (fun l -> l "API.remove-ref %a" pp r);
-      if dry_updates then Lwt.return e
-      else
-        API.remove_ref token repo name >|= function
-        | Ok ()   -> e
-        | Error x -> Log.err (fun l -> l "API.remove-ref %a: %s" pp r x); e
-    )
+    Log.info (fun l -> l "API.remove-ref %a" pp r);
+    if dry_updates then Lwt.return_unit
+    else
+      API.remove_ref token repo name >|= function
+      | Ok ()   -> ()
+      | Error e -> Log.err (fun l -> l "API.remove-ref %a: %s" pp r e)
 
-  let api_set_ref t ~dry_updates ~token r =
-    let e = Event.Ref (`Updated, r) in
-    if Event.Set.mem e t.updates then (
-      Log.debug (fun l -> l "[skip] API.set-ref %a" Ref.pp r);
-      Lwt.return e
-    ) else (
-      Log.info (fun l -> l "API.set-ref %a" Ref.pp r);
-      if dry_updates then Lwt.return e
-      else
-        API.set_ref token r >|= function
-        | Ok ()   -> e
-        | Error x -> Log.err (fun l -> l "API.set-ref %a: %s" Ref.pp r x); e
-    )
+  let api_set_ref ~dry_updates ~token r =
+    Log.info (fun l -> l "API.set-ref %a" Ref.pp r);
+    if dry_updates then Lwt.return_unit
+    else
+      API.set_ref token r >|= function
+      | Ok ()   -> ()
+      | Error e -> Log.err (fun l -> l "API.set-ref %a: %s" Ref.pp r e)
 
-  let api_set_status t ~dry_updates ~token s =
-    let e = Event.Status s in
-    if Event.Set.mem e t.updates then (
-      Log.debug (fun l -> l "[skip] API.set-status %a" Status.pp s);
-      Lwt.return e
-    ) else (
-      Log.info (fun l -> l "API.set-status %a" Status.pp s);
-      if dry_updates then Lwt.return e
-      else
-        API.set_status token s >|= function
-        | Ok ()   -> e
-        | Error x ->
-          Log.err (fun l -> l "API.set-status %a: %s" Status.pp s x); e
-    )
+  let api_set_status ~dry_updates ~token s =
+    Log.info (fun l -> l "API.set-status %a" Status.pp s);
+    if dry_updates then Lwt.return_unit
+    else
+      API.set_status token s >|= function
+      | Ok ()   -> ()
+      | Error e -> Log.err (fun l -> l "API.set-status %a: %s" Status.pp s e)
 
   (* Read DataKit data and call the GitHub API to sync the world with
      what DataKit think it should be. *)
-  let call_github_api ~dry_updates ~token t =
-    Log.debug (fun l -> l "call_github_api@;%a" pp t);
-    let priv = t.priv.snapshot and pub = t.pub.snapshot in
+  let call_github_api ~dry_updates ~token ~old t =
+    let pub = t.pub.snapshot in
+    Log.debug (fun l ->
+        l "call_github_api@;@[<2>old=%a@]@;@[<2>pub=%a@]"
+          Snapshot.pp old Snapshot.pp pub);
     let closed_prs =
-      PR.Set.diff priv.Snapshot.prs pub.Snapshot.prs
+      PR.Set.diff old.Snapshot.prs pub.Snapshot.prs
       |> PR.Set.filter
         (fun pr -> not (PR.Set.exists (PR.same pr) pub.Snapshot.prs))
       |> PR.Set.map (fun pr -> { pr with PR.state = `Closed })
     in
 
     let prs =
-      PR.Set.diff pub.Snapshot.prs priv.Snapshot.prs
+      PR.Set.diff pub.Snapshot.prs old.Snapshot.prs
       |> PR.Set.union closed_prs
     in
-    Lwt_list.map_p (api_set_pr t ~dry_updates ~token) (PR.Set.elements prs)
-    >>= fun set_prs ->
+    Lwt_list.iter_p (api_set_pr ~dry_updates ~token) (PR.Set.elements prs)
+    >>= fun () ->
     let closed_refs =
-      Ref.Set.diff priv.Snapshot.refs pub.Snapshot.refs
+      Ref.Set.diff old.Snapshot.refs pub.Snapshot.refs
       |> Ref.Set.filter
         (fun r -> not (Ref.Set.exists (Ref.same r) pub.Snapshot.refs))
     in
-    Lwt_list.map_p (api_remove_ref t ~dry_updates ~token)
+    Lwt_list.iter_p (api_remove_ref ~dry_updates ~token)
       (Ref.Set.elements closed_refs)
-    >>= fun remove_refs ->
-    let refs = Ref.Set.diff pub.Snapshot.refs priv.Snapshot.refs in
-    Lwt_list.map_p (api_set_ref t ~dry_updates ~token) (Ref.Set.elements refs)
-    >>= fun set_refs ->
+    >>= fun () ->
+    let refs = Ref.Set.diff pub.Snapshot.refs old.Snapshot.refs in
+    Lwt_list.iter_p (api_set_ref ~dry_updates ~token) (Ref.Set.elements refs)
+    >>= fun () ->
     (* NOTE: ideally we would also remove status, but the GitHub API doesn't
        support removing status so we just ignore *)
-    let status = Status.Set.diff pub.Snapshot.status priv.Snapshot.status in
-    Lwt_list.map_p (api_set_status t ~dry_updates ~token)
+    let status = Status.Set.diff pub.Snapshot.status old.Snapshot.status in
+    Lwt_list.iter_p (api_set_status ~dry_updates ~token)
       (Status.Set.elements status)
-    >>= fun set_status ->
-    let updates =
-      let (++) = Event.Set.union in
-      let l = Event.Set.of_list in
-      t.updates ++ l set_prs ++ l remove_refs ++ l set_refs ++ l set_status
-    in
-    ok { t with updates }
+    >>= fun () ->
+    ok t
 
   (** Merge *)
 
@@ -1609,13 +1562,12 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         DK.Transaction.abort t.pub.tr >>= fun () ->
         merge t ~pub ~priv
 
-  let sync ~webhook ~token ~dry_updates ~pub ~priv t repos =
+  let sync ~webhook ~token ~pub ~priv t repos =
     assert (is_open t);
     sync_webhooks t ~token ~webhook ~priv ~pub repos >>*= fun t ->
     assert (is_open t);
     sync_repos ~token ~pub ~priv t repos >>*= fun t ->
     assert (is_open t);
-    call_github_api ~dry_updates ~token t >>*= fun t ->
     abort t >>= fun () ->
     ok t
 
@@ -1637,10 +1589,14 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     in
     begin
       if Repo.Set.is_empty repos then abort t >>= fun () -> ok t
-      else sync ~webhook ~token ~dry_updates ~pub ~priv t repos
-    end >|*= fun t ->
+      else sync ~webhook ~token ~pub ~priv t repos
+    end >>*= fun t ->
     assert (is_closed t);
-    t
+    let old = t in
+    state "api-calls" ~old:(Some t) ~pub ~priv >>*= fun t ->
+    abort t >>= fun () ->
+    call_github_api ~dry_updates ~token ~old:old.priv.snapshot t >>*= fun t ->
+    ok t
 
   let repos old t =
     let old = Snapshot.repos old.snapshot in
@@ -1653,8 +1609,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     assert (is_closed old);
     state "sync-once" ~old:(Some old) ~pub ~priv >>*= fun t ->
     Log.debug (fun l -> l "[sync_once]@;old:%a@;new:%a" pp old pp t);
+    call_github_api ~dry_updates ~token ~old:old.pub.snapshot t >>*= fun t ->
     let repos = Repo.Set.union (repos old.pub t.pub) (repos old.priv t.priv) in
-    sync ~webhook ~token ~dry_updates ~pub ~priv t repos >>*= fun t ->
+    sync ~webhook ~token ~pub ~priv t repos >>*= fun t ->
     assert (is_closed t);
     ok t
 

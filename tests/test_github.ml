@@ -79,6 +79,7 @@ module R = struct
       pr.PR.number (PR.commit_id pr) pr.PR.title pp_status pr.PR.state
 
   let pp_state f (commit, states) =
+    let states = List.sort Status.compare states in
     Fmt.pf f "%s->%a" commit (Fmt.Dump.list Status.pp) states
 
   let pp_refs f r =
@@ -147,6 +148,14 @@ module User = struct
   let add_repo t r =
     let repos = String.Map.add r.Repo.repo (R.create r) t.repos in
     { repos }
+
+  let lookup t r =
+    match String.Map.find r.Repo.repo t.repos with
+    | Some r -> r
+    | None   ->
+      let repo = R.create r in
+      t.repos <-String.Map.add r.Repo.repo repo t.repos;
+      repo
 
   let prune monitored_repos t =
     let repos =
@@ -245,6 +254,17 @@ module Users = struct
     let users = String.Map.add r.Repo.user user t.users in
     t.users <- users
 
+  let lookup t r =
+    let user = match String.Map.find r.Repo.user t.users with
+      | Some user -> user
+      | None      ->
+        let user = User.empty () in
+        let users = String.Map.add r.Repo.user user t.users in
+        t.users <- users;
+        user
+    in
+    User.lookup user r
+
   let remove_repo t r =
     let users = String.Map.remove r.Repo.user t.users in
     t.users <- users
@@ -332,6 +352,7 @@ module Users = struct
   let mem x { users } = String.Map.mem x users
   let find x { users } = String.Map.find x users
   let iter x { users } = String.Map.iter x users
+
 end
 
 module API = struct
@@ -355,24 +376,20 @@ module API = struct
 
   let fold f t acc = Users.fold f t.users acc
   let iter f t = Users.iter f t.users
+  let lookup t r  = Users.lookup t.users r
 
-  let lookup t { Repo.user; repo }  =
-    match Users.find user t.users with
-    | None      -> None
-    | Some user -> String.Map.find repo user.User.repos
-
-  let lookup_exn t repo =
-    match lookup t repo with
-    | Some repo -> repo
-    | None      -> failwith (Fmt.strf "Unknown user/repo: %a" Repo.pp repo)
+ let lookup_opt t { Repo.user; repo }  =
+   match Users.find user t.users with
+   | None      -> None
+   | Some user -> String.Map.find repo user.User.repos
 
   let add_event t e =
     Log.info (fun l -> l "TEST: add_event %a" Event.pp e);
-    let r = lookup_exn t (Event.repo e) in
+    let r = lookup t (Event.repo e) in
     r.R.events <- e :: r.R.events
 
   let user_exists t ~user = return (Users.mem user t.users)
-  let repo_exists t repo  = return (lookup t repo <> None)
+  let repo_exists t repo  = return (lookup_opt t repo <> None)
 
   let repos t ~user =
     match Users.find user t.users with
@@ -390,7 +407,7 @@ module API = struct
     | `Ignored   -> if Users.mem_repo t r then Users.remove_repo t r
 
   let set_status_aux t s =
-    let repo = lookup_exn t (Status.repo s) in
+    let repo = lookup t (Status.repo s) in
     let commit = Status.commit_id s in
     let keep (c, _) = c <> commit in
     let commits = List.filter keep repo.R.commits in
@@ -412,7 +429,7 @@ module API = struct
     return ()
 
   let set_pr_aux t pr =
-    let repo = lookup_exn t (PR.repo pr) in
+    let repo = lookup t (PR.repo pr) in
     let num = pr.PR.number in
     let prs = List.filter (fun pr -> pr.PR.number <> num) repo.R.prs in
     repo.R.prs <- pr :: prs;
@@ -424,14 +441,15 @@ module API = struct
     return ()
 
   let set_ref_aux t (s, r) =
-    let repo = lookup_exn t (Ref.repo r) in
+    let repo = lookup t (Ref.repo r) in
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
-    match s with
-    | `Removed -> ()
-    | `Created | `Updated ->
-      repo.R.refs <- r :: refs;
-      add_event t (Event.Ref (s, r))
+    let () = match s with
+      | `Removed -> repo.R.refs <- refs;
+      | `Created
+      | `Updated -> repo.R.refs <- r :: refs;
+    in
+    add_event t (Event.Ref (s, r))
 
   let set_ref t r =
     t.ctx.Counter.set_ref <- t.ctx.Counter.set_ref + 1;
@@ -445,7 +463,7 @@ module API = struct
 
   let status t commit =
     t.ctx.Counter.status <- t.ctx.Counter.status + 1;
-    match lookup t (Commit.repo commit) with
+    match lookup_opt t (Commit.repo commit) with
     | None   -> return []
     | Some r ->
       try return (List.assoc (Commit.id commit) r.R.commits)
@@ -453,19 +471,19 @@ module API = struct
 
   let prs t repo =
     t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
-    match lookup t repo with
+    match lookup_opt t repo with
     | None   -> return []
     | Some r -> return r.R.prs
 
   let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
-    match lookup t repo with
+    match lookup_opt t repo with
     | None   -> return []
     | Some r -> return r.R.events
 
   let refs t repo =
     t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
-    match lookup t repo with
+    match lookup_opt t repo with
     | None   -> return []
     | Some r -> return r.R.refs
 
@@ -836,12 +854,12 @@ let update_status br dir state =
     )
 
 let find_status t repo =
-  let repo = API.lookup_exn t repo in
+  let repo = API.lookup t repo in
   try List.find (fun (c, _) -> c = "foo") repo.R.commits |> snd |> List.hd
   with Not_found -> Alcotest.fail "foo not found"
 
 let find_pr t repo =
-  let repo = API.lookup_exn t repo in
+  let repo = API.lookup t repo in
   try List.find (fun pr -> pr.PR.number = 2) repo.R.prs
   with Not_found -> Alcotest.fail "foo not found"
 
@@ -1092,6 +1110,10 @@ let safe_exists_file tree path =
   | Ok b    -> b
   | Error _ -> false
 
+let safe_remove t path =
+  DK.Transaction.remove t path >|= function
+  | Error _ | Ok () -> ()
+
 let state_of_branch b =
   expect_head b >>*= fun head ->
   let tree = DK.Commit.tree head in
@@ -1119,13 +1141,25 @@ let state_of_branch b =
   >|= fun users ->
   { Users.users }
 
-let ensure_in_sync ~msg github pub =
+let ensure_pub_in_sync ~msg github pub =
   state_of_branch pub >>= fun pub_users ->
   Log.info (fun l -> l  "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@."
                Users.pp github.API.users Users.pp pub_users);
   let repos = Users.repos pub_users in
   let github = Users.prune repos github.API.users in
   let pub_users = Users.prune_commits pub_users in
+  Alcotest.check snapshot (msg ^ "[github-pub]")
+    Snapshot.empty (Users.diff github pub_users);
+  Alcotest.check snapshot (msg ^ "[pub-github]")
+    Snapshot.empty (Users.diff pub_users github);
+  Alcotest.check users msg github pub_users;
+  Lwt.return ()
+
+let ensure_github_in_sync ~msg github pub_users =
+  Log.info (fun l -> l  "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@."
+               Users.pp github.API.users Users.pp pub_users);
+  let repos = Users.repos github.API.users in
+  let github = Users.prune repos github.API.users in
   Alcotest.check snapshot (msg ^ "[github-pub]")
     Snapshot.empty (Users.diff github pub_users);
   Alcotest.check snapshot (msg ^ "[pub-github]")
@@ -1293,6 +1327,30 @@ let random_users ?(old=Users.empty ()) ~random =
   |> String.Map.of_list
   |> fun users -> { Users.users }
 
+let all_repos =
+  List.fold_left (fun acc user ->
+      List.fold_left (fun acc repo ->
+          Repo.Set.add {Repo.user; repo} acc
+        ) acc test_repo
+    ) Repo.Set.empty test_user
+
+exception DK_error of DK.error
+
+let random_monitor ~random pub =
+  DK.Branch.with_transaction pub (fun t ->
+      let monitor ~user ~repo =
+        let s = if Random.State.bool random then `Monitored else `Ignored in
+        Conv.update_repo t s { Repo.user; repo }
+      in
+      Lwt_list.iter_p (fun { Repo.user; repo } ->
+          monitor ~user ~repo >>= function
+          | Error e -> Lwt.fail (DK_error e)
+          | Ok ()   -> Lwt.return_unit
+        ) (Repo.Set.elements all_repos)
+      >>= fun () ->
+      DK.Transaction.commit t ~message:"Monitor repos"
+    )
+
 let test_random_gh ~quick _repo conn =
   quiet_9p ();
   quiet_git ();
@@ -1300,23 +1358,10 @@ let test_random_gh ~quick _repo conn =
   let random = Random.State.make [| 1; 2; 3 |] in
   let dk = DK.connect conn in
   DK.branch dk pub  >>*= fun pub ->
-  let monitor () =
-    DK.Branch.with_transaction pub (fun t ->
-        let monitor ~user ~repo =
-          let s = if Random.State.bool random then `Monitored else `Ignored in
-          Conv.update_repo t s { Repo.user; repo }
-        in
-        monitor ~user:"a" ~repo:"a" >>*= fun () ->
-        monitor ~user:"a" ~repo:"b" >>*= fun () ->
-        monitor ~user:"b" ~repo:"a" >>*= fun () ->
-        monitor ~user:"b" ~repo:"b" >>*= fun () ->
-        DK.Transaction.commit t ~message:"Monitor repos"
-      )
-  in
   DK.branch dk priv >>*= fun priv ->
   let sync (t, s) =
     let w = API.Webhook.v t in
-    monitor () >>*= fun () ->
+    random_monitor ~random pub >>*= fun () ->
     VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >|= fun s ->
     Alcotest.(check int) "API.set-*" 0 (Counter.sets t.API.ctx);
     s
@@ -1330,22 +1375,21 @@ let test_random_gh ~quick _repo conn =
         API.create ~events users
       in
       let w = API.Webhook.v t in
-      monitor () >>*= fun () ->
+      random_monitor ~random pub >>*= fun () ->
       VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >>= fun s ->
       Alcotest.(check int) "API.set-*" 0 (Counter.sets t.API.ctx);
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
-      ensure_in_sync ~msg t pub >>= fun () ->
+      ensure_pub_in_sync ~msg t pub >>= fun () ->
       if k > 1 then aux (k-1) (t, s) else Lwt.return (t, s)
     in
     aux n (t, s)
   in
-  let s = VG.empty in
   let t = API.create (random_users ~random ?old:None) in
-  sync (t, s) >>= fun _s ->
-  ensure_in_sync ~msg:"init" t pub >>= fun () ->
+  sync (t, VG.empty) >>= fun _ ->
+  ensure_pub_in_sync ~msg:"init" t pub >>= fun () ->
   let t = API.create (random_users ~random ~old:t.API.users) in
-  sync (t, s) >>= fun s ->
-  ensure_in_sync ~msg:"update" t pub >>= fun () ->
+  sync (t, VG.empty) >>= fun s ->
+  ensure_pub_in_sync ~msg:"update" t pub >>= fun () ->
   nsync ~fresh:false (if quick then 2 else 10) (t, s) >>= fun (t, s) ->
   nsync ~fresh:true (if quick then 2 else 30)  (t, s) >>= fun (t, s) ->
   nsync ~fresh:false (if quick then 2 else 20) (t, s) >>= fun (t, s) ->
@@ -1353,10 +1397,8 @@ let test_random_gh ~quick _repo conn =
   let events = Users.diff_events users t.API.users in
   let t = API.create ~events users in
   sync (t, s) >>= fun _s ->
-  ensure_in_sync ~msg:"empty" t pub >>= fun () ->
+  ensure_pub_in_sync ~msg:"empty" t pub >>= fun () ->
   Lwt.return_unit
-
-exception DK_error of DK.error
 
 let test_random_dk ~quick _repo conn =
   quiet_9p ();
@@ -1366,20 +1408,15 @@ let test_random_dk ~quick _repo conn =
   let dk = DK.connect conn in
   DK.branch dk pub  >>*= fun pub ->
   DK.branch dk priv >>*= fun priv ->
-  DK.Branch.with_transaction priv (fun t ->
-      let dir = Datakit_path.empty in
-      let empty = Cstruct.of_string "" in
-      DK.Transaction.create_file t ~dir "README"  empty >>*= fun () ->
-      DK.Transaction.commit t ~message:"Init private branch"
-    )
-  >>*= fun () ->
-  let update ?new_state old =
-    let users = match new_state with
-      | None   -> random_users ~random ~old
-      | Some s -> s
-    in
-    let events = Users.diff_events users old in
+  VG.sync ~policy:`Once VG.empty ~pub ~priv ~token:(API.create (Users.empty ()))
+  >>= fun _ ->
+  let update_pub users =
+    let events = Users.diff_events users (Users.empty ()) in
     DK.Branch.with_transaction pub (fun tr ->
+        Lwt_list.iter_s (fun { Repo.user; repo } ->
+            safe_remove tr Datakit_path.(empty / repo / user)
+          ) (Repo.Set.elements all_repos)
+        >>= fun () ->
         Lwt_list.iter_s (fun e ->
             Conv.update_event tr e >>= function
             | Error e -> Lwt.fail (DK_error e)
@@ -1388,50 +1425,31 @@ let test_random_dk ~quick _repo conn =
         DK.Transaction.commit tr ~message:"User updates"
       ) >>= function
     | Error e -> Lwt.fail (DK_error e)
-    | Ok ()   -> Lwt.return users
+    | Ok ()   -> Lwt.return_unit
   in
-  let sync t s = VG.sync ~policy:`Once s ~pub ~priv ~token:t in
-  let nsync ~fresh n users s =
-    let s = ref (if fresh then VG.empty else s) in
-    let rec aux k old =
-      update old >>= fun users ->
-      let t = API.create old in
-      VG.sync ~policy:`Once !s ~pub ~priv ~token:t >>= fun new_s ->
-      if not fresh then s := new_s;
-      let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
-      ensure_in_sync ~msg t pub >>= fun () ->
-      if k > 1 then aux (k-1) users else Lwt.return (!s, users)
+  let prune = Users.prune all_repos in
+  let sync msg users (s, t) =
+    update_pub users >>= fun () ->
+    random_monitor ~random pub >>*= fun () ->
+    VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+    Log.debug (fun l -> l "API.set-* = %d" (Counter.sets t.API.ctx));
+    ensure_github_in_sync ~msg t (prune users) >|= fun () ->
+    (s, t)
+  in
+  let nsync n users x =
+    let rec aux k users x =
+      let users = random_users ~random ~old:users in
+      let msg = Fmt.strf "update %d" (n - k + 1) in
+      sync msg users x >>= fun x ->
+      if k > 1 then aux (k-1) users x else Lwt.return x
     in
-    aux n users
+    aux n users x
   in
-  let s = VG.empty in
-  let repos =
-    List.fold_left (fun acc user ->
-        List.fold_left (fun acc repo ->
-            Repo.Set.add {Repo.user; repo} acc
-          ) acc test_repo
-      ) Repo.Set.empty test_user
-  in
-  let t = API.create (Users.of_repos repos) in
-  update (Users.empty ()) >>= fun users ->
-  sync t s >>= fun _s ->
-  ensure_in_sync ~msg:"init" t pub >>= fun () ->
-  let t = API.create users in
-  update users >>= fun users ->
-  sync t s >>= fun s ->
-  ensure_in_sync ~msg:"update" t pub >>= fun () ->
-  nsync ~fresh:false (if quick then 2 else 10) users s >>= fun (s, users) ->
-  update users >>= fun users ->
-  nsync ~fresh:true (if quick then 2 else 30) users s  >>= fun (s, users) ->
-  update users >>= fun users ->
-  nsync ~fresh:false (if quick then 2 else 20) users s  >>= fun (s, users) ->
-  let new_state = Users.empty () in
-  update ~new_state users >>= fun _ ->
-  let t = API.create new_state in
-  sync t s >>= fun _s ->
-  let empty = API.create (Users.empty ()) in
-  ensure_in_sync ~msg:"empty" empty pub >>= fun () ->
-  Lwt.return_unit
+  let users = Users.empty () in
+  let x = VG.empty, API.create (Users.empty ()) in
+  sync "init" users x >>= fun s ->
+  nsync (if quick then 3 else 30) (Users.empty ()) s
+  >|= ignore
 
 let runx f () = Test_utils.run f
 
@@ -1444,5 +1462,4 @@ let test_set = [
   "random-gh*", `Slow , runx (test_random_gh ~quick:false);
   "random-dk" , `Quick, runx (test_random_dk ~quick:true);
   "random-dk*", `Slow , runx (test_random_dk ~quick:false);
-
 ]

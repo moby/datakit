@@ -103,13 +103,9 @@ module Event = struct
 
   include Event
 
-  let of_gh e =
-    let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
-      | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
-      | Some (user, repo) -> { Repo.user; repo }
-    in
+  let of_gh_constr repo e =
     let other str = Other (repo, str) in
-    match e.event_payload with
+    match e with
     | `Status s       -> Status (Status.of_event repo s)
     | `PullRequest pr -> PR (PR.of_event repo pr)
     | `Push p         -> Ref (Ref.of_event repo p)
@@ -130,9 +126,17 @@ module Event = struct
     | `PullRequestReviewComment _ -> other "pull-request-review-comment"
     | `CommitComment _            -> other "commit-comment"
 
+
+  let of_gh e =
+    let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
+      | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
+      | Some (user, repo) -> { Repo.user; repo }
+    in
+    of_gh_constr repo e.event_payload
+
 end
 
-let event = Event.of_gh
+let event_constr = Event.of_gh_constr
 
 open Rresult
 open Lwt.Infix
@@ -246,5 +250,5 @@ let events token r =
 
 module Webhook = struct
   include Datakit_github_webhook
-  let events t = List.map event (events t)
+  let events t = List.map (fun (r, e) -> event_constr r e) (events t)
 end

@@ -97,7 +97,7 @@ let start () sandbox no_listen listen_urls
       exit 1
     ));
   Log.app (fun l ->
-      l "Starting %s %s ...\nThe public branch is %s\nThe private branch is %s"
+      l "Starting %s %s ...@.The public branch is %s@.The private branch is %s"
         (Filename.basename Sys.argv.(0)) Version.v public_branch private_branch
     );
   let token = match token () with
@@ -106,7 +106,10 @@ let start () sandbox no_listen listen_urls
   in
   let webhook = match webhook with
     | None   -> None
-    | Some u -> Some (Datakit_github_api.Webhook.create token u)
+    | Some u ->
+      Log.app (fun l ->
+          l "Starting webhook server listening at %s" @@ Uri.to_string u);
+      Some (Datakit_github_api.Webhook.create token u)
   in
   let connect_to_datakit () =
     let proto, address = parse_address datakit in

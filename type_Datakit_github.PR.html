@@ -9,6 +9,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -22,14 +23,19 @@
 <body>
 <code class="code"><span class="keyword">sig</span>
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;{
-&nbsp;&nbsp;&nbsp;&nbsp;user&nbsp;:&nbsp;string;
-&nbsp;&nbsp;&nbsp;&nbsp;repo&nbsp;:&nbsp;string;
+&nbsp;&nbsp;&nbsp;&nbsp;head&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t;
 &nbsp;&nbsp;&nbsp;&nbsp;number&nbsp;:&nbsp;int;
 &nbsp;&nbsp;&nbsp;&nbsp;state&nbsp;:&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Closed</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Open</span>&nbsp;];
-&nbsp;&nbsp;&nbsp;&nbsp;head&nbsp;:&nbsp;string;
 &nbsp;&nbsp;&nbsp;&nbsp;title&nbsp;:&nbsp;string;
 &nbsp;&nbsp;}
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repo&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;commit&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;commit_id&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;number&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;state&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Closed</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Open</span>&nbsp;]
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;title&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="constructor">Fmt</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;same&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool
 &nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Set</span>&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;elt&nbsp;=&nbsp;t
@@ -61,5 +67,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;find&nbsp;:&nbsp;elt&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;elt
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_list&nbsp;:&nbsp;elt&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="constructor">Fmt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repos&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;commits&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.<span class="constructor">Set</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span>
 <span class="keyword">end</span></code></body></html>

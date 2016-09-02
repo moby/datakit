@@ -12,6 +12,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -38,40 +39,58 @@ The type for API tokens.<br>
 </div>
 
 
-<pre><span id="VALuser_exists"><span class="keyword">val</span> user_exists</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -> user:string -> bool Lwt.t</code></pre><div class="info ">
+<pre><span id="TYPEresult"><span class="keyword">type</span> <code class="type">'a</code> result</span> = <code class="type">('a, string) Result.result Lwt.t</code> </pre>
+<div class="info ">
+The type for results.<br>
+</div>
+
+
+<pre><span id="VALuser_exists"><span class="keyword">val</span> user_exists</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -> user:string -> bool <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
 <code class="code">exist_user t ~user</code> is true iff <code class="code">user</code> exists.<br>
 </div>
 
-<pre><span id="VALrepo_exists"><span class="keyword">val</span> repo_exists</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -> user:string -> repo:string -> bool Lwt.t</code></pre><div class="info ">
-<code class="code">exists_repo t ~user ~repo</code> is true iff <code class="code">user/repo</code> exists.<br>
+<pre><span id="VALrepo_exists"><span class="keyword">val</span> repo_exists</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> bool <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">exists_repo t r</code> is true iff the repository <code class="code">r</code> exists.<br>
 </div>
 
-<pre><span id="VALrepos"><span class="keyword">val</span> repos</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -> user:string -> string list Lwt.t</code></pre><div class="info ">
+<pre><span id="VALrepos"><span class="keyword">val</span> repos</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       user:string -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> list <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
 <code class="code">repos t ~user</code> is the list of repositories owned by user
       <code class="code">user</code>.<br>
 </div>
 
-<pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       user:string -><br>       repo:string -> commit:string -> <a href="Datakit_github.Status.html#TYPEt">Datakit_github.Status.t</a> list Lwt.t</code></pre><div class="info ">
-<code class="code">status t ~user ~repo ~commit</code> returns the list of status
-      attached to <code class="code">commit</code>.<br>
+<pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -><br>       <a href="Datakit_github.Status.html#TYPEt">Datakit_github.Status.t</a> list <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">status t c</code> returns the list of status attached to the commit
+      <code class="code">c</code>.<br>
 </div>
 
-<pre><span id="VALset_status"><span class="keyword">val</span> set_status</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -> <a href="Datakit_github.Status.html#TYPEt">Datakit_github.Status.t</a> -> unit Lwt.t</code></pre><div class="info ">
+<pre><span id="VALset_status"><span class="keyword">val</span> set_status</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Status.html#TYPEt">Datakit_github.Status.t</a> -> unit <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
 <code class="code">set_status t s</code> updates <code class="code"><span class="constructor">Status</span>.commit s</code>'s status with <code class="code">s</code>.<br>
 </div>
 
-<pre><span id="VALset_pr"><span class="keyword">val</span> set_pr</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -> <a href="Datakit_github.PR.html#TYPEt">Datakit_github.PR.t</a> -> unit Lwt.t</code></pre><div class="info ">
+<pre><span id="VALset_ref"><span class="keyword">val</span> set_ref</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Ref.html#TYPEt">Datakit_github.Ref.t</a> -> unit <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">set_ref t r</code> updates the reference named <code class="code"><span class="constructor">Ref</span>.name r</code> with
+      <code class="code">r</code>.<br>
+</div>
+
+<pre><span id="VALremove_ref"><span class="keyword">val</span> remove_ref</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> string list -> unit <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">remove_ref t n</code> removes the reference named <code class="code">n</code>.<br>
+</div>
+
+<pre><span id="VALset_pr"><span class="keyword">val</span> set_pr</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.PR.html#TYPEt">Datakit_github.PR.t</a> -> unit <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
 <code class="code">set_pr t pr</code> updates the PR number <code class="code"><span class="constructor">PR</span>.number pr</code> with <code class="code">pr</code>.<br>
 </div>
 
-<pre><span id="VALprs"><span class="keyword">val</span> prs</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       user:string -> repo:string -> <a href="Datakit_github.PR.html#TYPEt">Datakit_github.PR.t</a> list Lwt.t</code></pre><div class="info ">
-<code class="code">pr t ~user ~repo</code> is the list of open pull-requests for the
-      repo <code class="code">user/repo</code>.<br>
+<pre><span id="VALprs"><span class="keyword">val</span> prs</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> <a href="Datakit_github.PR.html#TYPEt">Datakit_github.PR.t</a> list <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">prs t r</code> is the list of open pull-requests for the repo <code class="code">r</code>.<br>
 </div>
 
-<pre><span id="VALevents"><span class="keyword">val</span> events</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       user:string -> repo:string -> <a href="Datakit_github.Event.html#TYPEt">Datakit_github.Event.t</a> list Lwt.t</code></pre><div class="info ">
-<code class="code">event t ~user ~repo</code> is the list of events attached to
-      <code class="code">user/repo</code>. Note: can be slow/costly if multiple pages of
-      events.<br>
+<pre><span id="VALrefs"><span class="keyword">val</span> refs</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> <a href="Datakit_github.Ref.html#TYPEt">Datakit_github.Ref.t</a> list <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">refs t r</code> is the list of references for the the repo <code class="code">r</code>.<br>
 </div>
-</body></html>
+
+<pre><span id="VALevents"><span class="keyword">val</span> events</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -><br>       <a href="Datakit_github.Event.html#TYPEt">Datakit_github.Event.t</a> list <a href="Datakit_github.API.html#TYPEresult">result</a></code></pre><div class="info ">
+<code class="code">event t r</code> is the list of events attached to the repository
+      <code class="code">r</code>. Note: can be slow/costly if multiple pages of events.<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.API.Webhook.html">Webhook</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.API.Webhook.html">..</a> <code class="code"><span class="keyword">end</span></code></pre></body></html>

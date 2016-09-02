@@ -13,6 +13,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -60,7 +61,7 @@ The type for synchronizer state.<br>
 Create an empty sync state.<br>
 </div>
 
-<pre><span id="VALsync"><span class="keyword">val</span> sync</span> : <code class="type">?switch:Lwt_switch.t -><br>       ?policy:[ `Once | `Repeat ] -><br>       ?dry_updates:bool -><br>       pub:DK.Branch.t -><br>       priv:DK.Branch.t -><br>       token:<a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -><br>       <a href="Datakit_github.Sync.html#TYPEt">t</a> -> <a href="Datakit_github.Sync.html#TYPEt">t</a> Lwt.t</code></pre><div class="info ">
+<pre><span id="VALsync"><span class="keyword">val</span> sync</span> : <code class="type">?webhook:<a href="Datakit_github.API.Webhook.html#TYPEt">Datakit_github.API.Webhook.t</a> -><br>       ?switch:Lwt_switch.t -><br>       ?policy:[ `Once | `Repeat ] -><br>       ?dry_updates:bool -><br>       pub:DK.Branch.t -><br>       priv:DK.Branch.t -><br>       token:<a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -><br>       <a href="Datakit_github.Sync.html#TYPEt">t</a> -> <a href="Datakit_github.Sync.html#TYPEt">t</a> Lwt.t</code></pre><div class="info ">
 <code class="code">sync t ~pub ~priv ~token</code> mirror GitHub changes in the DataKit
     public branch <code class="code">pub</code>. It uses the private branch <code class="code">priv</code> to store
     the received webhook event states. It connects to the GitHub API

@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Datakit_github.Repo.html">
+<link rel="previous" href="Datakit_github.Commit.html">
 <link rel="next" href="Datakit_github.Status.html">
 <link rel="Up" href="Datakit_github.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
@@ -14,6 +14,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -25,7 +26,7 @@
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.PR</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Datakit_github.Repo.html" title="Datakit_github.Repo">Previous</a>
+<div class="navbar"><a class="pre" href="Datakit_github.Commit.html" title="Datakit_github.Commit">Previous</a>
 &nbsp;<a class="up" href="Datakit_github.html" title="Datakit_github">Up</a>
 &nbsp;<a class="post" href="Datakit_github.Status.html" title="Datakit_github.Status">Next</a>
 </div>
@@ -38,14 +39,7 @@
 <td align="left" valign="top" >
 <code>&nbsp;&nbsp;</code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.user">user</span>&nbsp;: <code class="type">string</code>;</code></td>
-
-</tr>
-<tr>
-<td align="left" valign="top" >
-<code>&nbsp;&nbsp;</code></td>
-<td align="left" valign="top" >
-<code><span id="TYPEELTt.repo">repo</span>&nbsp;: <code class="type">string</code>;</code></td>
+<code><span id="TYPEELTt.head">head</span>&nbsp;: <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code>;</code></td>
 
 </tr>
 <tr>
@@ -66,13 +60,6 @@
 <td align="left" valign="top" >
 <code>&nbsp;&nbsp;</code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.head">head</span>&nbsp;: <code class="type">string</code>;</code></td>
-
-</tr>
-<tr>
-<td align="left" valign="top" >
-<code>&nbsp;&nbsp;</code></td>
-<td align="left" valign="top" >
 <code><span id="TYPEELTt.title">title</span>&nbsp;: <code class="type">string</code>;</code></td>
 
 </tr></table>
@@ -83,8 +70,37 @@ The type for pull-requests values.<br>
 </div>
 
 
+<pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
+<code class="code">repo t</code> is <code class="code">t</code>'s repostiory.<br>
+</div>
+
+<pre><span id="VALcommit"><span class="keyword">val</span> commit</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code></pre><div class="info ">
+<code class="code">commit t</code> is <code class="code">t</code>'s commit.<br>
+</div>
+
+<pre><span id="VALcommit_id"><span class="keyword">val</span> commit_id</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">commit_id t</code> is the SHA1 of <code class="code">t</code>'s commit.<br>
+</div>
+
+<pre><span id="VALnumber"><span class="keyword">val</span> number</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+<code class="code">number t</code> is <code class="code">t</code>'s number.<br>
+</div>
+
+<pre><span id="VALstate"><span class="keyword">val</span> state</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> [ `Closed | `Open ]</code></pre><div class="info ">
+<code class="code">state t</code> is <code class="code">t</code>'s state.<br>
+</div>
+
+<pre><span id="VALtitle"><span class="keyword">val</span> title</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">title t</code> is <code class="code">t</code>'s title.<br>
+</div>
+
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for pull-request values.<br>
+</div>
+
+<pre><span id="VALsame"><span class="keyword">val</span> same</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.PR.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">same x y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same repository and
+      number.<br>
 </div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.PR.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.PR.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">

@@ -9,6 +9,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -26,44 +27,46 @@
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;tree
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;tree_of_transaction&nbsp;:&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;tree_of_commit&nbsp;:&nbsp;<span class="constructor">DK</span>.<span class="constructor">Commit</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repos&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repos&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;update_repo&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.state&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;status&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;repo:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;commit:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context:string&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;option&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;string&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;option&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;statuses&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?repos:<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?commits:<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;update_status&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pr&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;repo:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;option&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;option&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;prs&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?repos:<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;update_pr&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;diff&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;update_ref&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.state&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;update_event&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Event</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;safe_diff&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Commit</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Diff</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Commit</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Diff</span>.<span class="constructor">Set</span>.t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;snapshot&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;string&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?old:<span class="constructor">DK</span>.<span class="constructor">Commit</span>.t&nbsp;*&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;apply&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.tree&nbsp;*&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Diff</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Conv</span>.result
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">end</span></code></body></html>

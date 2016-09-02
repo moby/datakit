@@ -9,6 +9,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -22,21 +23,55 @@
 <body>
 <code class="code"><span class="keyword">sig</span>
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;token
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;user_exists&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;result&nbsp;=&nbsp;(<span class="keywordsign">'</span>a,&nbsp;string)&nbsp;<span class="constructor">Result</span>.result&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;user_exists&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repo_exists&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;repo:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool&nbsp;<span class="constructor">Lwt</span>.t
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repos&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repos&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;list&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;status&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;repo:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;commit:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;list&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;set_status&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;set_pr&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;set_ref&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;remove_ref&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;set_pr&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;prs&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;repo:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">PR</span>.t&nbsp;list&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;refs&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t&nbsp;list&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;events&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;user:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;repo:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Event</span>.t&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Event</span>.t&nbsp;list&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.result
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Webhook</span>&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Uri</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;run&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;repos&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;watch&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;events&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Event</span>.t&nbsp;list
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;wait&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;clear&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.<span class="constructor">Webhook</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span>
 <span class="keyword">end</span></code></body></html>

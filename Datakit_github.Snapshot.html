@@ -14,6 +14,7 @@
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
 <link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
 <link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
@@ -46,8 +47,8 @@ The type for filesystem snapshots.<br>
 The empty snapshot.<br>
 </div>
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">?repos:Datakit_github.Repo.Set.t -><br>       status:Datakit_github.Status.Set.t -><br>       prs:Datakit_github.PR.Set.t -> unit -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create ?repos ~status ~prs ()</code> is a new snapshot <code class="code">t</code> with
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">repos:Datakit_github.Repo.Set.t -><br>       commits:Datakit_github.Commit.Set.t -><br>       status:Datakit_github.Status.Set.t -><br>       prs:Datakit_github.PR.Set.t -><br>       refs:Datakit_github.Ref.Set.t -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">create ?repos ~status ~prs</code> is a new snapshot <code class="code">t</code> with
       pull-requests <code class="code">prs</code>, build status <code class="code">status</code> and repositories the
       unions of <code class="code">repos</code>, the repositories of <code class="code">status</code> and <code class="code">prs</code>.<br>
 </div>
@@ -68,11 +69,24 @@ The empty snapshot.<br>
 <code class="code">repos t</code> are <code class="code">t</code>'s repository.<br>
 </div>
 
+<pre><span id="VALcommits"><span class="keyword">val</span> commits</span> : <code class="type"><a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> Datakit_github.Commit.Set.t</code></pre><div class="info ">
+<code class="code">commits t</code> are <code class="code">t</code>'s commits.<br>
+</div>
+
 <pre><span id="VALprs"><span class="keyword">val</span> prs</span> : <code class="type"><a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> Datakit_github.PR.Set.t</code></pre><div class="info ">
 <code class="code">prs t</code> are <code class="code">t</code>'s pull-requests.<br>
 </div>
 
 <pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type"><a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> Datakit_github.Status.Set.t</code></pre><div class="info ">
 <code class="code">status t</code> are <code class="code">t</code>'s build status.<br>
+</div>
+
+<pre><span id="VALrefs"><span class="keyword">val</span> refs</span> : <code class="type"><a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> Datakit_github.Ref.Set.t</code></pre><div class="info ">
+<code class="code">refs t</code> are <code class="code">t</code>'s Git references.<br>
+</div>
+
+<pre><span id="VALprune"><span class="keyword">val</span> prune</span> : <code class="type"><a href="Datakit_github.Snapshot.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">t</a> * <a href="Datakit_github.Snapshot.html#TYPEt">t</a> option</code></pre><div class="info ">
+<code class="code">prune t</code> is either a clean snapshot and an optional snapshot
+      representing the the commits and prs entries to remove.<br>
 </div>
 </body></html>

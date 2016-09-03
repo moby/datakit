@@ -184,7 +184,7 @@ let listen_urls =
 let sandbox =
   let doc =
     Arg.info ~doc:
-      "Assume we're running inside an OSX sandbox but not a chroot. \
+      "Assume we are running inside an OSX sandbox but not a chroot. \
        All paths will be manually rewritten to be relative \
        to the current directory." ["sandbox"]
   in
@@ -199,7 +199,7 @@ let datakit =
 let private_branch =
   let doc =
     Arg.info ~doc:"Private DataKit branch where the GitHub events (persistent \
-                   and webhook) is be mirrored."
+                   and webhook) are to be mirrored."
       ["x"; "branch-x"]
   in
   Arg.(value & opt string "github-metadata-x" doc)
@@ -220,7 +220,7 @@ let uri =
 
 let webhook =
   let doc =
-    Arg.info ~doc:"Public URI of the GitHub webook server" ["webhook"]
+    Arg.info ~doc:"Public URI of the GitHub webhook server" ["webhook"]
   in
   Arg.(value & opt (some uri) None doc)
 
@@ -236,8 +236,8 @@ let term =
   let man = [
     `S "DESCRIPTION";
     `P "$(tname) exposes a subset of the GitHub API as a 9p \
-        filesystem. Also connect to a Datakit instance and ensure a \
-        bi-directional mapping between the GitHub API and a Git branch.";
+        filesystem. Also connect to a DataKit instance and ensure a \
+        bidirectional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
         datakit $ private_branch $ public_branch $ dry_updates $

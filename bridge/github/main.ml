@@ -224,14 +224,6 @@ let webhook =
   in
   Arg.(value & opt (some uri) None doc)
 
-let webhook_secret =
-  let doc = Arg.info ~doc:"Webhook secret" ["s";"webhook-secret"] in
-  Arg.(value & opt (some string) None doc)
-
-let webhook_port =
-  let doc = Arg.info ~doc:"Webhook port" ["p";"webhook-port"] in
-  Arg.(value & opt int 80 doc)
-
 let dry_updates =
   let doc =
     Arg.info ~doc:"Dry API updates: do not call the GitHub API, \

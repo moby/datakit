@@ -145,7 +145,7 @@ let start () sandbox no_listen listen_urls
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls
     in
-  Lwt_main.run @@ Lwt.join [
+  Lwt_main.run @@ Lwt.choose [
     connect_to_datakit ();
     accept_connections ();
   ]

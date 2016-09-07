@@ -69,11 +69,6 @@ let parse_address address =
   | Some (proto, address) -> proto, address
   | _ -> failwith (address ^ ": wrong address, use proto:address")
 
-let parse_host host =
-  match String.cut ~rev:true ~sep:":" host with
-  | Some (host, port) -> host, port
-  | _                 -> host, "5640"
-
 let set_signal_if_supported signal handler =
   try
     Sys.set_signal signal handler

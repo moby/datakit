@@ -69,11 +69,6 @@ let parse_address address =
   | Some (proto, address) -> proto, address
   | _ -> failwith (address ^ ": wrong address, use proto:address")
 
-let parse_host host =
-  match String.cut ~rev:true ~sep:":" host with
-  | Some (host, port) -> host, port
-  | _                 -> host, "5640"
-
 let set_signal_if_supported signal handler =
   try
     Sys.set_signal signal handler
@@ -145,7 +140,7 @@ let start () sandbox no_listen listen_urls
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls
     in
-  Lwt_main.run @@ Lwt.join [
+  Lwt_main.run @@ Lwt.choose [
     connect_to_datakit ();
     accept_connections ();
   ]

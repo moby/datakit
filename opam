@@ -38,3 +38,6 @@ depends: [
   "alcotest"   {test}
 ]
 available: [ocaml-version >= "4.02.0"]
+conflicts: [
+  "camlzip" {>= "1.06"}
+]

@@ -19,14 +19,18 @@ let printer fmt x = Format.pp_print_string fmt (match x with
 
 let conv = parser, printer
 
+let pp_time f tm =
+  let open Unix in
+  Fmt.pf f "%04d-%02d-%02d %02d:%02d"
+    (tm.tm_year + 1900) (tm.tm_mon + 1) tm.tm_mday tm.tm_hour tm.tm_min
+
 let reporter () =
   let report src level ~over k msgf =
     let k _ = over (); k () in
     let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
     let with_stamp h _tags k fmt =
-      let dt = Mtime.to_us (Mtime.elapsed ()) in
-      Fmt.kpf k ppf ("\r%0+04.0fus %a %a @[" ^^ fmt ^^ "@]@.")
-        dt
+      Fmt.kpf k ppf ("\r%a %a %a @[" ^^ fmt ^^ "@]@.")
+        pp_time (Unix.localtime (Unix.time ()))
         Fmt.(styled `Magenta string) (Printf.sprintf "%10s" @@ Logs.Src.name src)
         Logs_fmt.pp_header (level, h)
     in

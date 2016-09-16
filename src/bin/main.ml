@@ -147,13 +147,20 @@ let start () url sandbox git auto_push =
           let prefix = if sandbox then "." else "" in
           let path = prefix ^ path in
           let push br =
-            Logs.info (fun l -> l "Pushing %s to %s:%s" path remote br);
-            let cmd =
-              Lwt_process.shell @@
-              Printf.sprintf "cd %S && git push %S %S --force" path remote br
-            in
-            let name = Fmt.strf "auto-push to %s" remote in
-            exec ~name cmd
+            Lwt.catch
+              (fun () ->
+                 Logs.info (fun l -> l "Pushing %s to %s:%s" path remote br);
+                 let cmd =
+                   Lwt_process.shell @@
+                   Printf.sprintf "cd %S && git push %S %S --force" path remote br
+                 in
+                 let name = Fmt.strf "auto-push to %s" remote in
+                 exec ~name cmd
+              )
+              (fun ex ->
+                 Logs.err (fun l -> l "git push failed: %s" (Printexc.to_string ex));
+                 Lwt.return ()
+              )
           in
           Git_fs_store.repo path >>= fun repo ->
           Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)

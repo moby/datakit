@@ -131,19 +131,19 @@ let start () sandbox no_listen listen_urls
           VG.Sync.sync t ?webhook ~dry_updates ~priv ~pub ~token
           >|= ignore
   in
-  let accept_connections () =
-    if no_listen || listen_urls = [] then Lwt.return_unit
+  let accept_9p_connections () =
+    if no_listen || listen_urls = [] then []
     else
       let root = VG.create token in
       let make_root () = Vfs.Dir.of_list (fun () -> Vfs.ok [root]) in
-      Lwt_list.iter_p
+      List.map
         (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
         listen_urls
-    in
-  Lwt_main.run @@ Lwt.choose [
-    connect_to_datakit ();
-    accept_connections ();
-  ]
+  in
+  Lwt_main.run @@ Lwt.choose (
+    connect_to_datakit () :: accept_9p_connections ()
+  );
+  assert false
 
 open Cmdliner
 

@@ -25,8 +25,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 <src/irmin-io/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
 
 <bridge/github/src/*>: package(uri)
-<bridge/github/src/datakit_github_*>: package(github)
-<bridge/github/src/datakit_github_webhook.*>: package(nocrypto hex conduit.lwt re.str)
+<bridge/github/src/datakit_github_*>: package(github github-hooks.unix)
 
 <src/bin/*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
 <src/bin/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
@@ -41,7 +40,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 <src/client>: include
 <bridge/github/src>: include
 <bridge/github/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
-<bridge/github/main.*>: package(github.unix re.str hex nocrypto)
+<bridge/github/main.*>: package(github.unix github-hooks.unix)
 
 ### Tests
 

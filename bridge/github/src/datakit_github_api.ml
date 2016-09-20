@@ -48,19 +48,25 @@ module Status = struct
     | ["default"] -> None
     | l           -> Some (String.concat ~sep:"/" l)
 
+  let of_gh_state = function
+    | `Unknown (s, _) -> failwith ("unknown: " ^ s)
+    | #Status_state.t as s -> s
+
+  let to_gh_state s = (s :> Github_t.status_state)
+
   let of_gh commit s =
     { commit;
       context     = to_list s.status_context;
       url         = s.status_target_url;
       description = s.status_description;
-      state       = s.status_state;
+      state       = of_gh_state s.status_state;
     }
 
   let to_gh s = {
     new_status_context     = of_list s.context;
     new_status_target_url  = s.url;
     new_status_description = s.description;
-    new_status_state       = s.state;
+    new_status_state       = to_gh_state s.state;
   }
 
   let of_event repo s =
@@ -69,7 +75,7 @@ module Status = struct
       context     = to_list s.status_event_context;
       url         = s.status_event_target_url;
       description = s.status_event_description;
-      state       = s.status_event_state;
+      state       = of_gh_state s.status_event_state;
     }
 
 end
@@ -84,6 +90,18 @@ module Ref = struct
   let of_gh repo r =
     let head = { Commit.repo; id = r.git_ref_obj.obj_sha } in
     { head; name = to_list r.git_ref_name }
+
+  let of_event_hook repo r =
+    let id = match r.push_event_hook_head, r.push_event_hook_after with
+      | Some _, Some _ | None, None   -> assert false
+      | Some h, None   | None, Some h -> h
+    in
+    let head = { Commit.repo; id } in
+    let t = { head; name = to_list r.push_event_hook_ref } in
+    match r.push_event_hook_deleted, r.push_event_hook_created with
+    | Some true, _ -> `Removed, t
+    | _, Some true -> `Created, t
+    | _            -> `Updated, t
 
   let of_event repo r =
     let id = match r.push_event_head, r.push_event_after with
@@ -103,7 +121,7 @@ module Event = struct
 
   include Event
 
-  let of_gh_constr repo e =
+  let of_gh_constr repo (e:Github_t.event_constr): t =
     let other str = Other (repo, str) in
     match e with
     | `Status s       -> Status (Status.of_event repo s)
@@ -123,20 +141,46 @@ module Event = struct
     | `Public         -> other "public"
     | `Release _      -> other "release"
     | `Watch _        -> other "watch"
+    | `Repository _   -> other "repository"
+    | `Unknown (s, _) -> other ("unknown " ^ s)
     | `PullRequestReviewComment _ -> other "pull-request-review-comment"
     | `CommitComment _            -> other "commit-comment"
 
+  let of_gh_hook_constr repo (e:Github_t.event_hook_constr): t =
+    let other str = Other (repo, str) in
+    match e with
+    | `Status s       -> Status (Status.of_event repo s)
+    | `PullRequest pr -> PR (PR.of_event repo pr)
+    | `Push p         -> Ref (Ref.of_event_hook repo p)
+    | `Create _       -> other "create"
+    | `Delete _       -> other "delete"
+    | `Download       -> other "download"
+    | `Follow         -> other "follow"
+    | `Fork _         -> other "fork"
+    | `ForkApply      -> other "fork-apply"
+    | `Gist           -> other "gist"
+    | `Gollum _       -> other "gollum"
+    | `IssueComment _ -> other "issue-comment"
+    | `Issues _       -> other "issues"
+    | `Member _       -> other "member"
+    | `Public         -> other "public"
+    | `Release _      -> other "release"
+    | `Watch _        -> other "watch"
+    | `Repository _   -> other "repository"
+    | `Unknown (s, _) -> other ("unknown " ^ s)
+    | `PullRequestReviewComment _ -> other "pull-request-review-comment"
+    | `CommitComment _            -> other "commit-comment"
 
   let of_gh e =
     let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
-      | None -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
+      | None  -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
       | Some (user, repo) -> { Repo.user; repo }
     in
     of_gh_constr repo e.event_payload
 
 end
 
-let event_constr = Event.of_gh_constr
+let event_hook_constr = Event.of_gh_hook_constr
 
 open Rresult
 open Lwt.Infix
@@ -249,6 +293,36 @@ let events token r =
   |> run
 
 module Webhook = struct
-  include Datakit_github_webhook
-  let events t = List.map (fun (r, e) -> event_constr r e) (events t)
+  module Conf = struct
+    let src =
+      Logs.Src.create "dkt-github-hooks" ~doc:"Github to Git bridge webhooks"
+    module Log = (val Logs.src_log src : Logs.LOG)
+    let secret_prefix = "datakit"
+    let tls_config = None
+  end
+
+  module Hook = Github_hooks_unix.Make(Conf)
+
+  include Hook
+
+  let to_repo (user, repo) = { Repo.user; repo }
+  let of_repo { Repo.user; repo } = user, repo
+
+  let events t =
+    List.map (fun (r, e) -> event_hook_constr (to_repo r) e) (events t)
+
+  let repos t =
+    repos t
+    |> Github_hooks.Repo.Set.elements
+    |> List.map to_repo
+    |> Repo.Set.of_list
+
+  let default_events = [
+    `Create; `Delete; `Push; (* ref updates *)
+    `Status;                 (* status updates *)
+    `PullRequest;            (* PR updates *)
+  ]
+
+  let watch t r = watch t ~events:default_events (of_repo r)
+
 end

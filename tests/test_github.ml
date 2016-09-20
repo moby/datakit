@@ -1035,7 +1035,7 @@ let rec read_state ~user ~repo ~commit tree path context =
         let state =
           let status = String.trim (Cstruct.to_string status) in
           match Status_state.of_string status with
-          | None -> failwith (Fmt.strf "Bad state %S" status)
+          | None   -> failwith (Fmt.strf "Bad state %S" status)
           | Some x -> x
         in
         let repo = { Repo.user; repo } in

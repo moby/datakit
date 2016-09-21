@@ -1,9 +1,9 @@
 FROM ocaml/opam:alpine
 
-RUN opam update
+RUN cd /home/opam/opam-repository && git pull && opam update
 RUN sudo apk add ncurses-dev libev-dev
-RUN opam depext ssl lwt react lambda-term && \
-    opam install ssl react lwt base-unix base-threads conf-libev \
+RUN opam depext lwt react lambda-term && \
+    opam install react lwt base-unix base-threads conf-libev \
          lambda-term mirage-types-lwt
 
 # cache opam install of client github dependencies
@@ -12,10 +12,10 @@ COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
 
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
-RUN opam pin add github-hooks https://github.com/samoht/ocaml-github-hooks.git -n
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
+RUN sudo apk update
 RUN opam depext datakit-client datakit-github && \
-    opam install github && opam install datakit-client --deps
+    opam install github.2.0.0 && opam install datakit-client --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit

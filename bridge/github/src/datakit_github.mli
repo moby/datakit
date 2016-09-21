@@ -71,6 +71,7 @@ module PR: sig
     number: int;
     state: [`Open | `Closed];
     title: string;
+    base: string;
   }
 
   val repo: t -> Repo.t

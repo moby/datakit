@@ -117,6 +117,7 @@ module PR = struct
     number: int;
     state: [`Open | `Closed];
     title: string;
+    base: string;
   }
 
   let string_of_state = function
@@ -146,8 +147,8 @@ module PR = struct
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %d[%s] %a %S}"
-      Repo.pp (repo t) t.number (commit_id t) pp_state t.state t.title
+    Fmt.pf ppf "{%a %d[%s] %s %a %S}"
+      Repo.pp (repo t) t.number (commit_id t) t.base pp_state t.state t.title
 
   let number t = t.number
   let title t = t.title
@@ -761,29 +762,36 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | `Closed -> safe_remove t dir
     | `Open   ->
       DK.Transaction.make_dirs t dir >>*= fun () ->
-      let head = Cstruct.of_string (PR.commit_id pr ^ "\n")in
-      let state = Cstruct.of_string (PR.string_of_state pr.PR.state ^ "\n") in
-      let title = Cstruct.of_string (pr.PR.title ^ "\n") in
-      DK.Transaction.create_or_replace_file t ~dir "head" head >>*= fun () ->
-      DK.Transaction.create_or_replace_file t ~dir "state" state >>*= fun () ->
-      DK.Transaction.create_or_replace_file t ~dir "title" title
+      let write k v =
+        let v = Cstruct.of_string (v ^ "\n") in
+        DK.Transaction.create_or_replace_file t ~dir k v
+      in
+      write "head"  (PR.commit_id pr)                >>*= fun () ->
+      write "state" (PR.string_of_state pr.PR.state) >>*= fun () ->
+      write "title" pr.PR.title                      >>*= fun () ->
+      write "base"  pr.PR.base
 
   let pr tree repo number =
     let dir = root repo / "pr" / string_of_int number in
     Log.debug (fun l -> l "pr %a" Datakit_path.pp dir);
     safe_read_file tree (dir / "head")  >>= fun head ->
     safe_read_file tree (dir / "state") >>= fun state ->
-    safe_read_file tree (dir / "title") >|= fun title ->
-    match head, state with
-    | None, _  ->
+    safe_read_file tree (dir / "title") >>= fun title ->
+    safe_read_file tree (dir / "base")  >|= fun base ->
+    match head, state, base with
+    | None, _, _  ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/head does not exist" Repo.pp repo number);
       None
-    | _, None ->
+    | _, None, _ ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/state does not exist" Repo.pp repo number);
       None
-    | Some id, Some state ->
+    | _, _, None ->
+      Log.debug (fun l ->
+          l "error: %a/pr/%d/base does not exist" Repo.pp repo number);
+      None
+    | Some id, Some state, Some base ->
       let head = { Commit.repo; id } in
       let title = match title with None -> "" | Some t -> t in
       let state = match PR.state_of_string state with
@@ -793,8 +801,8 @@ module Conv (DK: Datakit_S.CLIENT) = struct
               l "%s is not a valid PR state, picking `Closed instead"
                 state);
           `Closed
-          in
-        Some { PR.head; number; state; title }
+      in
+      Some { PR.head; number; state; title; base }
 
   let prs_of_repo tree repo =
     let dir = root repo / "pr"  in
@@ -1523,7 +1531,10 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     | Some w ->
       Log.debug (fun l -> l "[sync_webhook] repos: %a" Repo.Set.pp repos);
       (* register new webhooks *)
-      Lwt_list.iter_p w.watch (Repo.Set.elements repos) >>= fun () ->
+      Lwt_list.iter_p (fun r ->
+          Log.info (fun l -> l "API.add-webhook %a" Repo.pp r);
+          w.watch r
+        ) (Repo.Set.elements repos) >>= fun () ->
       (* apply the webhook events *)
       match w.events () with
       | []     -> ok t

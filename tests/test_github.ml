@@ -146,8 +146,10 @@ module User = struct
   let mem_repo t r = String.Map.mem r.Repo.repo t.repos
 
   let add_repo t r =
-    let repos = String.Map.add r.Repo.repo (R.create r) t.repos in
-    { repos }
+    if String.Map.mem r.Repo.repo t.repos then t
+    else
+      let repos = String.Map.add r.Repo.repo (R.create r) t.repos in
+      { repos }
 
   let lookup t r =
     match String.Map.find r.Repo.repo t.repos with
@@ -526,7 +528,10 @@ module API = struct
       { state; repos }
 
     let watch t r =
-      if not (Repo.Set.mem r t.repos) then t.repos <- Repo.Set.add r t.repos;
+      if not (Repo.Set.mem r t.repos) then (
+        Users.add_repo t.state.users r;
+        t.repos <- Repo.Set.add r t.repos;
+      );
       Lwt.return_unit
 
     let events t =
@@ -591,10 +596,16 @@ let s5 = {
   commit = commit_foo;
 }
 
-let pr1 = { PR.number = 1; state = `Open  ; head = commit_foo; title = "" }
-let pr2 = { PR.number = 1; state = `Closed; head = commit_foo; title = "foo" }
-let pr3 = { PR.number = 2; state = `Open  ; head = commit_bar; title = "bar" }
-let pr4 = { PR.number = 2; state = `Open  ; head = commit_bar; title = "toto" }
+let base = "master"
+
+let pr1 =
+  { PR.number = 1; state = `Open  ; head = commit_foo; title = ""; base }
+let pr2 =
+  { PR.number = 1; state = `Closed; head = commit_foo; title = "foo"; base }
+let pr3 =
+  { PR.number = 2; state = `Open  ; head = commit_bar; title = "bar"; base }
+let pr4 =
+  { PR.number = 2; state = `Open  ; head = commit_bar; title = "toto"; base }
 
 let ref1 = { Ref.head = commit_bar; name = ["heads";"master"] }
 let ref2 = { Ref.head = commit_foo; name = ["heads";"master"] }
@@ -803,7 +814,7 @@ let check name tree =
   DK.Tree.read_dir tree pr >>*= fun dirs ->
   check_dirs "pr 1" ["2"] dirs ;
   DK.Tree.read_dir tree (pr / "2") >>*= fun dirs ->
-  check_dirs "pr 2" dirs ["state"; "head"; "title"];
+  check_dirs "pr 2" ["state"; "head"; "title"; "base"] dirs ;
   DK.Tree.read_file tree (pr / "2" / "state") >>*= fun data ->
   check_data "state" "open\n" data;
   DK.Tree.read_file tree (pr / "2" / "head") >>*= fun data ->
@@ -1078,11 +1089,12 @@ let read_prs tree ~user ~repo =
         DK.Tree.read_file tree (path / name) >>*= fun data ->
         Lwt.return (String.trim (Cstruct.to_string data))
       in
-      read "head" >>= fun head ->
+      read "head"  >>= fun head ->
       read "title" >>= fun title ->
+      read "base"  >>= fun base ->
       let repo = { Repo.user; repo } in
       let head = { Commit.repo; id = head } in
-      Lwt.return { PR.head; number; state = `Open; title; }
+            Lwt.return { PR.head; number; state = `Open; title; base}
     )
 
 let read_refs tree ~user ~repo =
@@ -1187,6 +1199,8 @@ let test_descriptions = [|
   None;
 |]
 
+let test_base = [| "master"; "test"; "foo" |]
+
 let test_state = [|
   `Pending;
   `Success;
@@ -1211,6 +1225,8 @@ let random_ref_commit ~random ~repo =
 let random_description ~random = random_choice ~random test_descriptions
 
 let random_state ~random = random_choice ~random test_state
+
+let random_base ~random = random_choice ~random test_base
 
 let random_refs ~random ~repo ~old_refs =
   test_names
@@ -1271,13 +1287,15 @@ let random_prs ~random ~repo ~old_prs =
     | 0 -> acc
     | n ->
       let head = random_pr_commit ~random ~repo in
+      let base = random_base ~random in
       let number = !next_pr in
       incr next_pr;
       let pr = {
         PR.head;
         number;
         state = `Open;
-        title = "PR#" ^ string_of_int number
+        title = "PR#" ^ string_of_int number;
+        base;
       } in
       make_prs (pr :: acc) (n - 1)
   in
@@ -1335,6 +1353,20 @@ let all_repos =
     ) Repo.Set.empty test_user
 
 exception DK_error of DK.error
+
+let monitor repos pub =
+  DK.Branch.with_transaction pub (fun t ->
+      let monitor ~user ~repo =
+        Conv.update_repo t `Monitored { Repo.user; repo }
+      in
+      Lwt_list.iter_p (fun { Repo.user; repo } ->
+          monitor ~user ~repo >>= function
+          | Error e -> Lwt.fail (DK_error e)
+          | Ok ()   -> Lwt.return_unit
+        ) repos
+      >>= fun () ->
+      DK.Transaction.commit t ~message:"Monitor repos"
+    )
 
 let random_monitor ~random pub =
   DK.Branch.with_transaction pub (fun t ->
@@ -1430,8 +1462,9 @@ let test_random_dk ~quick _repo conn =
   let prune = Users.prune all_repos in
   let sync msg users (s, t) =
     update_pub users >>= fun () ->
-    random_monitor ~random pub >>*= fun () ->
-    VG.sync ~policy:`Once s ~pub ~priv ~token:t >>= fun s ->
+    monitor (Repo.Set.elements (Users.repos users)) pub >>*= fun () ->
+    let w = API.Webhook.v t in
+    VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >>= fun s ->
     Log.debug (fun l -> l "API.set-* = %d" (Counter.sets t.API.ctx));
     ensure_github_in_sync ~msg t (prune users) >|= fun () ->
     (s, t)

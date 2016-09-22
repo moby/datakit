@@ -16,12 +16,14 @@ module PR = struct
       number = pr.pull_number;
       state  = pr.pull_state;
       title  = pr.pull_title;
+      base   = pr.pull_base.branch_ref;
     }
 
   let to_gh pr = {
     update_pull_title = Some pr.title;
     update_pull_body  = None;
     update_pull_state = Some pr.state;
+    update_pull_base  = Some pr.base;
   }
 
   let of_event repo pr =
@@ -32,6 +34,7 @@ module PR = struct
       number = pr.pull_request_event_number;
       state  = pr.pull_request_event_pull_request.pull_state;
       title  = pr.pull_request_event_pull_request.pull_title;
+      base   = pr.pull_request_event_pull_request.pull_base.branch_ref;
     }
 
 end
@@ -92,28 +95,19 @@ module Ref = struct
     { head; name = to_list r.git_ref_name }
 
   let of_event_hook repo r =
-    let id = match r.push_event_hook_head, r.push_event_hook_after with
-      | Some _, Some _ | None, None   -> assert false
-      | Some h, None   | None, Some h -> h
-    in
+    let id = r.push_event_hook_after in
     let head = { Commit.repo; id } in
     let t = { head; name = to_list r.push_event_hook_ref } in
     match r.push_event_hook_deleted, r.push_event_hook_created with
-    | Some true, _ -> `Removed, t
-    | _, Some true -> `Created, t
-    | _            -> `Updated, t
+    | true, _ -> `Removed, t
+    | _, true -> `Created, t
+    | _       -> `Updated, t
 
   let of_event repo r =
-    let id = match r.push_event_head, r.push_event_after with
-      | Some _, Some _ | None, None   -> assert false
-      | Some h, None   | None, Some h -> h
-    in
+    let id = r.push_event_head in
     let head = { Commit.repo; id } in
     let t = { head; name = to_list r.push_event_ref } in
-    match r.push_event_deleted, r.push_event_created with
-    | Some true, _ -> `Removed, t
-    | _, Some true -> `Created, t
-    | _            -> `Updated, t
+    `Updated, t
 
 end
 

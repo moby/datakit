@@ -22,5 +22,5 @@ depends: [
   "hex" "nocrypto" "conduit"
   "datakit-client"
   "github-hooks" {>= "0.1.0"}
-  "github" {>= "1.1.0"}
+  "github" {>= "2.0.0"}
 ]

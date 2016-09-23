@@ -1700,7 +1700,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           react
       in
       let notify () =
-        Log.info (fun l -> l "New webhooks detected");
+        Log.debug (fun l -> l "webhook event received!");
         updates := true;
         Lwt_condition.signal cond ()
       in

@@ -25,8 +25,6 @@ let ( / ) dir leaf = dir @ [leaf]
 let ( /@ ) dir user_path = dir @ Datakit_path.unwrap user_path
 let pp_path = Fmt.Dump.list String.dump
 
-let github_path = ["github.com"]
-
 let rec last = function
   | [] -> None
   | [x] -> Some x
@@ -386,11 +384,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
       in
       aux path
 
-    let remove_if_exists t path =
-      exists t path >>*= function
-      | true -> remove t path
-      | false -> ok ()
-
     let create_or_replace t ~dir leaf value =
       let path = dir / leaf in
       exists t path >>*= function
@@ -652,84 +645,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
   end
 
-  module GitHub = struct
-    type t = FS.t
-
-    module Status = struct
-      type t = {
-        fs : FS.t;
-        dir : string list;
-      }
-
-      let string_of_state = function
-        | `Pending -> "pending"
-        | `Success -> "success"
-        | `Failure -> "failure"
-        | `Error -> "error"
-
-      let state_of_string = function
-        | "pending" -> Ok `Pending
-        | "success" -> Ok `Success
-        | "failure" -> Ok `Failure
-        | "error"   -> Ok `Error
-        | s -> Error (`Msg ("Invalid GitHub state: " ^ s))
-
-      let url_of_string s =
-        try Ok (Uri.of_string s)
-        with ex -> Error (`Msg (Printexc.to_string ex))
-
-      let update t leaf fn = function
-        | None -> FS.remove_if_exists t.fs (t.dir / leaf)
-        | Some v -> FS.create_or_replace t.fs ~dir:t.dir leaf (Cstruct.of_string (fn v))
-
-      let set_descr t = update t "descr" (fun x -> x)
-      let set_state t = update t "state" string_of_state
-      let set_url   t = update t "url"   Uri.to_string
-
-      let read_file t leaf f =
-        FS.read_file (FS.read_node t.fs (t.dir / leaf)) >|= function
-        | Error (`Msg "No such file or directory") -> Ok None
-        | Error _ as e -> e
-        | Ok x ->
-          match f (String.trim (Cstruct.to_string x)) with
-          | Ok x -> Ok (Some x)
-          | Error _ as e -> e
-
-      let descr t = read_file t "descr" (fun x -> Ok x)
-      let state t = read_file t "state" state_of_string
-      let url t   = read_file t "url"   url_of_string
-    end
-
-    module PR = struct
-      type t = {
-        fs : FS.t;
-        prs_dir : string list;
-        id : string;
-      }
-
-      let id t = t.id
-
-      let pr_dir t = t.prs_dir @ [t.id]
-
-      let status t path =
-        FS.make_dirs t.fs ~base:(pr_dir t / "status") path >>*= fun () ->
-        ok { Status.fs = t.fs; dir = pr_dir t / "status" /@ path }
-    end
-
-    let pr_path ~user ~project = github_path / user / project / "pr"
-
-    let prs t ~user ~project =
-      let prs_dir = pr_path ~user ~project in
-      FS.read_dir (FS.read_node t prs_dir) >|*=
-      List.map (fun id -> { PR.fs = t; prs_dir; id })
-
-    let pr t ~user ~project id =
-      let prs_dir = pr_path ~user ~project in
-      FS.exists t (prs_dir / id) >>*= function
-      | false -> error "PR %S not found" id
-      | true -> ok { PR.fs = t; prs_dir; id }
-  end
-
   let branch t name =
     Branch.create t name
 
@@ -760,11 +675,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
   let tree t id =
     Tree.of_id t id
-
-  let github t =
-    FS.exists t github_path >|*= function
-    | true -> Some t
-    | false -> None
 
   let connect conn = { FS.conn }
 

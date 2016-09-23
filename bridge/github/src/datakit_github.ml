@@ -778,20 +778,24 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     safe_read_file tree (dir / "state") >>= fun state ->
     safe_read_file tree (dir / "title") >>= fun title ->
     safe_read_file tree (dir / "base")  >|= fun base ->
-    match head, state, base with
-    | None, _, _  ->
+    match head, state with
+    | None, _ ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/head does not exist" Repo.pp repo number);
       None
-    | _, None, _ ->
+    | _, None ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/state does not exist" Repo.pp repo number);
       None
-    | _, _, None ->
-      Log.debug (fun l ->
-          l "error: %a/pr/%d/base does not exist" Repo.pp repo number);
-      None
-    | Some id, Some state, Some base ->
+    | Some id, Some state ->
+      let base = match base with
+        | Some b -> b
+        | None   ->
+          Log.debug (fun l ->
+              l "error: %a/pr/%d/base does not exist, using 'master' instead"
+                Repo.pp repo number);
+          "master"
+      in
       let head = { Commit.repo; id } in
       let title = match title with None -> "" | Some t -> t in
       let state = match PR.state_of_string state with

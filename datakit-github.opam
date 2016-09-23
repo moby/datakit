@@ -21,6 +21,6 @@ depends: [
   "logs" "fmt" "mtime" "asl" "win-eventlog" "hvsock"
   "hex" "nocrypto" "conduit"
   "datakit-client"
-  "github-hooks" {>= "0.1.0"}
+  "github-hooks" {>= "0.1.1"}
   "github" {>= "2.0.0"}
 ]

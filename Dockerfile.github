@@ -14,14 +14,12 @@ RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
 RUN sudo apk update
-RUN opam pin add github https://github.com/dsheets/ocaml-github.git#fix-web-hook-content-type -n
 RUN opam depext datakit-client datakit-github && \
     opam install github && opam install datakit-client --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && git checkout . && scripts/watermark.sh
-RUN opam pin add github-hooks https://github.com/dsheets/ocaml-github-hooks.git#github-web-hook-bug -n
 RUN opam update datakit-client datakit-github && \
     opam install datakit-github --deps
 

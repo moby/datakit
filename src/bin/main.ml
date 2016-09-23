@@ -54,7 +54,7 @@ module Git_fs_store = struct
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
   let listener = lazy (
-    Irmin.Private.Watch.set_listen_dir_hook Irmin_watcher.hook
+    Irmin.Private.Watch.set_listen_dir_hook (Irmin_watcher_polling.hook 1.)
   )
 
   let repo path =
@@ -136,6 +136,7 @@ let start () url sandbox git auto_push =
     match auto_push with
     | None        -> start ()
     | Some remote ->
+      Log.info (fun l -> l "Auto-push to %s enabled" remote);
       let watch () = match git with
         | None      ->
           In_memory_store.repo () >>= fun repo ->
@@ -147,9 +148,9 @@ let start () url sandbox git auto_push =
           let prefix = if sandbox then "." else "" in
           let path = prefix ^ path in
           let push br =
+            Log.info (fun l -> l "Pushing %s to %s:%s" path remote br);
             Lwt.catch
               (fun () ->
-                 Log.info (fun l -> l "Pushing %s to %s:%s" path remote br);
                  let cmd =
                    Lwt_process.shell @@
                    Printf.sprintf "cd %S && git push %S %S --force" path remote br

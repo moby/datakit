@@ -1574,8 +1574,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
         let _, remove = Snapshot.prune priv_s in
         cleanup "events" { remove; update = None } t.priv.tr >>*= fun () ->
         let message =
-          Fmt.strf "Importing webhooks:\n%a"
-            Fmt.(list ~sep:(unit "\n") Event.pp) events
+          Fmt.strf "New webhook events\n\n%a"
+            Fmt.(list ~sep:(unit "\n\n") Event.pp) events
         in
         DK.Transaction.commit t.priv.tr ~message >>*= fun () ->
         DK.Transaction.abort t.pub.tr >>= fun () ->

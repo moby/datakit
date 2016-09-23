@@ -1518,14 +1518,19 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let priv_s, remove = Snapshot.prune priv_s in
     cleanup "sync" { remove; update = Some priv_s } t.priv.tr >>*= fun () ->
     DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
-    (if c.remove = None && c.update = None && remove = None && diff = [] then
-       DK.Transaction.abort t.priv.tr >>= ok
-     else
+    (if diff = [] then DK.Transaction.abort t.priv.tr >>= ok else
        let message = Fmt.strf "Sync with %a" Repo.Set.pp repos in
        DK.Transaction.commit t.priv.tr ~message)
     >>*= fun () ->
     DK.Transaction.abort t.pub.tr >>= fun () ->
-    merge t ~pub ~priv
+    merge t ~pub ~priv >>*= fun t ->
+    let pub_s, remove = Snapshot.prune t.pub.snapshot in
+    cleanup "sync" { remove; update = Some pub_s } t.pub.tr >>*= fun () ->
+    DK.Transaction.diff t.pub.tr t.pub.head >>*= fun diff ->
+    (if diff = [] then ok t else
+       DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
+       DK.Transaction.abort t.priv.tr >>= fun () ->
+       state "end-sync-repos" ~old:(Some t) ~pub ~priv)
 
   type webhook = {
     watch: Repo.t -> unit Lwt.t;

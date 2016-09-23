@@ -668,37 +668,36 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | Error _ -> false
     | Ok b    -> b
 
+  let safe_exists_file (E ((module Tree), tree)) file =
+    Tree.exists_file tree file >|= function
+    | Error _ -> false
+    | Ok b    -> b
+
   let safe_read_file (E ((module Tree), tree)) file =
     Tree.read_file tree file >|= function
     | Error _ -> None
     | Ok b    -> Some (String.trim (Cstruct.to_string b))
 
-
   let walk
       (type elt) (type t) (module Set: SET with type elt = elt and type t = t)
       tree root (file, fn) =
-    let rec aux context =
-      match Datakit_path.of_steps context with
-      | Error e ->
-        Log.err (fun l -> l "%s" e);
-        Lwt.return Set.empty
-      | Ok ctx  ->
-        let dir = root /@ ctx in
-        safe_read_dir tree dir >>= fun child ->
-        Lwt_list.fold_left_s (fun acc c ->
-            (* FIXME: not tail recurcsive *)
-            aux (context @ [c]) >|= fun child ->
-            Set.union child acc
-          ) Set.empty child >>= fun child ->
-        safe_read_file tree (dir / file) >>= fun file ->
-        if file <> None then
-          fn context >|= function
-          | None   -> child
-          | Some s -> Set.add s child
-        else
-          Lwt.return child
+    let rec aux acc = function
+      | [] -> Lwt.return acc
+      | context :: todo ->
+        match Datakit_path.of_steps context with
+        | Error e -> Log.err (fun l -> l "%s" e); aux acc todo
+        | Ok ctx  ->
+          let dir = root /@ ctx in
+          safe_read_dir tree dir >>= fun childs ->
+          let todo = List.map (fun c -> context @ [c]) childs @ todo in
+          safe_exists_file tree (dir / file) >>= function
+          | false -> aux acc todo
+          | true ->
+            fn (Datakit_path.unwrap ctx) >>= function
+            | None   -> aux acc todo
+            | Some e -> aux (Set.add e acc) todo
     in
-    aux []
+    aux Set.empty [ [] ]
 
   let tree_of_commit c =
     let module Tree = struct

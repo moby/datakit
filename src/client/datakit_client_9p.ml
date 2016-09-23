@@ -241,42 +241,47 @@ module Make(P9p : Protocol_9p_client.S) = struct
         P9p.LowLevel.update t.conn ~length:new_length fid
       )
 
-    let read_node t path =
+    let read_node_aux ~link ~file ~dir t path =
       let open Protocol_9p_types in
       with_file_full t path @@ fun _fid { Protocol_9p_response.Walk.wqids } ->
       (* Note: would be more efficient to use [_fid] here... *)
       match last wqids with
-      | Some qid when List.mem Qid.Symlink qid.Qid.flags ->
-        (* Symlink *)
-        read_all t path >>*= fun data ->
-        ok (`Link (Cstruct.to_string data))
-      | Some qid when not (List.mem Qid.Directory qid.Qid.flags) ->
-        (* File *)
-        read_all t path >>*= fun data ->
-        ok (`File data)
-      | _ ->
-        (* Directory *)
-        P9p.readdir t.conn path >>*= fun items ->
-        let items = List.map (fun item -> item.Stat.name) items in
-        ok (`Dir items)
+      | Some qid when List.mem Qid.Symlink qid.Qid.flags -> link t path
+      | Some qid when not (List.mem Qid.Directory qid.Qid.flags) -> file t path
+      | _ -> dir t path
 
-    let read_file read =
-      read >>*= function
-      | `File x -> ok x
-      | `Dir _
-      | `Link _ -> error "Not a file"
+    let read_link_aux t path =
+      read_all t path >>*= fun data ->
+      ok (`Link (Cstruct.to_string data))
 
-    let read_dir read =
-      read >>*= function
-      | `Dir x -> ok x
-      | `File _
-      | `Link _ -> error "Not a directory"
+    let read_file_aux t path =
+      read_all t path >>*= fun data ->
+      ok (`File data)
 
-    let read_link read =
-      read >>*= function
-      | `Link x -> ok x
-      | `Dir _
-      | `File _ -> error "Not a symlink"
+    let read_dir_aux t path =
+      P9p.readdir t.conn path >>*= fun items ->
+      let items =
+        List.map (fun item -> item.Protocol_9p_types.Stat.name) items
+      in
+      ok (`Dir items)
+
+    let read_node =
+      read_node_aux ~link:read_link_aux ~file:read_file_aux ~dir:read_dir_aux
+
+    let read_link t path =
+      let err _ _ = error "not a symlink" in
+      read_node_aux ~link:read_link_aux ~file:err ~dir:err t path
+      >|*= fun (`Link l) -> l
+
+    let read_file t path =
+      let err _ _ = error "not a file" in
+      read_node_aux ~link:err ~file:read_file_aux ~dir:err t path
+      >|*= fun (`File l) -> l
+
+    let read_dir t path =
+      let err _ _ = error "not a dir" in
+      read_node_aux ~link:err ~file:err ~dir:read_dir_aux t path
+      >|*= fun (`Dir l) -> l
 
     let stat t path =
       P9p.stat t.conn path >>= function
@@ -399,9 +404,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let exists t path = FS.exists t.fs (t.path /@ path)
     let exists_dir t path = FS.exists_dir t.fs (t.path /@ path)
     let exists_file t path = FS.exists_file t.fs (t.path /@ path)
-    let read_file t path = FS.read_file (read t path)
-    let read_dir t path = FS.read_dir (read t path)
-    let read_link t path = FS.read_link (read t path)
+    let read_file t path = FS.read_file t.fs (t.path /@ path)
+    let read_dir t path = FS.read_dir t.fs (t.path /@ path)
+    let read_link t path = FS.read_link t.fs (t.path /@ path)
   end
 
   module Commit = struct
@@ -541,9 +546,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let create_or_replace_file t ~dir =
       FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)
 
-    let read_file t path = FS.read_file (read t path)
-    let read_dir t path = FS.read_dir (read t path)
-    let read_link t path = FS.read_link (read t path)
+    let read_file t path = FS.read_file t.fs (t.path / "rw" /@ path)
+    let read_dir t path = FS.read_dir t.fs (t.path / "rw" /@ path)
+    let read_link t path = FS.read_link t.fs (t.path / "rw" /@ path)
 
     let parents t =
       FS.read_all t.fs (t.path / "parents") >|*= fun data ->
@@ -586,7 +591,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       | line ->
         let file f =
           (* TODO: delay loading this? *)
-          FS.read_file (FS.read_node t.fs ["trees"; line]) >>*= fun contents ->
+          FS.read_file t.fs ["trees"; line] >>*= fun contents ->
           ok (Some (f contents)) in
         match String.cut ~sep:"-" line with
         | None -> error "Invalid tree watch line!"

@@ -36,8 +36,6 @@ RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
 
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 
-ENV GITHUB_DEBUG 1
-
 USER root
 ENTRYPOINT ["/usr/bin/datakit-github"]
 CMD ["--listen=tcp://0.0.0.0:5641", "-v", "--datakit=tcp:127.0.0.1:5640"]

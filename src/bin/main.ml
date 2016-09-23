@@ -124,11 +124,11 @@ let exec ~name cmd =
   Lwt_process.exec cmd >|= function
   | Unix.WEXITED 0   -> ()
   | Unix.WEXITED i   ->
-    Logs.err (fun l -> l "%s exited with code %d" name i)
+    Log.err (fun l -> l "%s exited with code %d" name i)
   | Unix. WSIGNALED i ->
-    Logs.err (fun l -> l "%s killed by signal %d)" name i)
+    Log.err (fun l -> l "%s killed by signal %d)" name i)
   | Unix.WSTOPPED i  ->
-    Logs.err (fun l -> l "%s stopped by signal %d" name i)
+    Log.err (fun l -> l "%s stopped by signal %d" name i)
 
 let start () url sandbox git auto_push =
   let start () = start url sandbox git in
@@ -149,7 +149,7 @@ let start () url sandbox git auto_push =
           let push br =
             Lwt.catch
               (fun () ->
-                 Logs.info (fun l -> l "Pushing %s to %s:%s" path remote br);
+                 Log.info (fun l -> l "Pushing %s to %s:%s" path remote br);
                  let cmd =
                    Lwt_process.shell @@
                    Printf.sprintf "cd %S && git push %S %S --force" path remote br
@@ -158,7 +158,7 @@ let start () url sandbox git auto_push =
                  exec ~name cmd
               )
               (fun ex ->
-                 Logs.err (fun l -> l "git push failed: %s" (Printexc.to_string ex));
+                 Log.err (fun l -> l "git push failed: %s" (Printexc.to_string ex));
                  Lwt.return ()
               )
           in

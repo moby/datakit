@@ -54,7 +54,7 @@ module Git_fs_store = struct
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
   let listener = lazy (
-    Irmin.Private.Watch.set_listen_dir_hook Irmin_watcher.hook
+    Irmin.Private.Watch.set_listen_dir_hook (Irmin_watcher_polling.hook 1.)
   )
 
   let repo path =

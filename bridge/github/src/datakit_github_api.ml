@@ -59,10 +59,10 @@ module Status = struct
 
   let of_gh commit s =
     { commit;
-      context     = to_list s.status_context;
-      url         = s.status_target_url;
-      description = s.status_description;
-      state       = of_gh_state s.status_state;
+      context     = to_list s.base_status_context;
+      url         = s.base_status_target_url;
+      description = s.base_status_description;
+      state       = of_gh_state s.base_status_state;
     }
 
   let to_gh s = {
@@ -209,25 +209,17 @@ let repos token ~user =
   @@ List.map (fun r -> { Repo.user; repo = r.repository_name})
   |> run
 
-let list_dedup f l =
-  let tbl = Hashtbl.create (List.length l) in
-  List.fold_left (fun acc s ->
-      let x = f s in
-      try let () = Hashtbl.find tbl x in acc
-      with Not_found -> Hashtbl.add tbl x (); s :: acc
-    ) [] l
-  |> List.rev
-
 let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
 
 let status token commit =
   let user, repo = user_repo commit in
-  let git_ref = Commit.id commit in
-  Github.Status.for_ref ~token ~user ~repo ~git_ref ()
-  |> Github.Stream.to_list
-  |> Github.Monad.map (fun l -> list_dedup (fun s -> s.status_context) l)
-  |> Github.Monad.map (List.map (Status.of_gh commit))
+  let sha = Commit.id commit in
+  Github.Status.get ~token ~user ~repo ~sha ()
+  |> Github.Monad.map Github.Response.value
   |> run
+  >|= R.map (fun r ->
+      List.map (Status.of_gh commit) r.Github_t.combined_status_statuses
+    )
 
 let set_status token status =
   let new_status = Status.to_gh status in

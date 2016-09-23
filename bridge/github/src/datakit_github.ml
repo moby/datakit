@@ -876,8 +876,12 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     in
     Log.debug (fun l -> l "update_status %a" Datakit_path.pp dir);
     DK.Transaction.make_dirs t dir >>*= fun () ->
+    let description = match s.Status.description with
+      | None   -> None
+      | Some d -> Some (String.trim d)
+    in
     let kvs = [
-      "description", s.Status.description;
+      "description", description;
       "state"      , Some (Status_state.to_string s.Status.state);
       "target_url" , s.Status.url;
     ] in

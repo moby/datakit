@@ -668,37 +668,36 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | Error _ -> false
     | Ok b    -> b
 
+  let safe_exists_file (E ((module Tree), tree)) file =
+    Tree.exists_file tree file >|= function
+    | Error _ -> false
+    | Ok b    -> b
+
   let safe_read_file (E ((module Tree), tree)) file =
     Tree.read_file tree file >|= function
     | Error _ -> None
     | Ok b    -> Some (String.trim (Cstruct.to_string b))
 
-
   let walk
       (type elt) (type t) (module Set: SET with type elt = elt and type t = t)
       tree root (file, fn) =
-    let rec aux context =
-      match Datakit_path.of_steps context with
-      | Error e ->
-        Log.err (fun l -> l "%s" e);
-        Lwt.return Set.empty
-      | Ok ctx  ->
-        let dir = root /@ ctx in
-        safe_read_dir tree dir >>= fun child ->
-        Lwt_list.fold_left_s (fun acc c ->
-            (* FIXME: not tail recurcsive *)
-            aux (context @ [c]) >|= fun child ->
-            Set.union child acc
-          ) Set.empty child >>= fun child ->
-        safe_read_file tree (dir / file) >>= fun file ->
-        if file <> None then
-          fn context >|= function
-          | None   -> child
-          | Some s -> Set.add s child
-        else
-          Lwt.return child
+    let rec aux acc = function
+      | [] -> Lwt.return acc
+      | context :: todo ->
+        match Datakit_path.of_steps context with
+        | Error e -> Log.err (fun l -> l "%s" e); aux acc todo
+        | Ok ctx  ->
+          let dir = root /@ ctx in
+          safe_read_dir tree dir >>= fun childs ->
+          let todo = List.map (fun c -> context @ [c]) childs @ todo in
+          safe_exists_file tree (dir / file) >>= function
+          | false -> aux acc todo
+          | true ->
+            fn (Datakit_path.unwrap ctx) >>= function
+            | None   -> aux acc todo
+            | Some e -> aux (Set.add e acc) todo
     in
-    aux []
+    aux Set.empty [ [] ]
 
   let tree_of_commit c =
     let module Tree = struct
@@ -1519,14 +1518,19 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let priv_s, remove = Snapshot.prune priv_s in
     cleanup "sync" { remove; update = Some priv_s } t.priv.tr >>*= fun () ->
     DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
-    (if c.remove = None && c.update = None && remove = None && diff = [] then
-       DK.Transaction.abort t.priv.tr >>= ok
-     else
+    (if diff = [] then DK.Transaction.abort t.priv.tr >>= ok else
        let message = Fmt.strf "Sync with %a" Repo.Set.pp repos in
        DK.Transaction.commit t.priv.tr ~message)
     >>*= fun () ->
     DK.Transaction.abort t.pub.tr >>= fun () ->
-    merge t ~pub ~priv
+    merge t ~pub ~priv >>*= fun t ->
+    let pub_s, remove = Snapshot.prune t.pub.snapshot in
+    cleanup "sync" { remove; update = Some pub_s } t.pub.tr >>*= fun () ->
+    DK.Transaction.diff t.pub.tr t.pub.head >>*= fun diff ->
+    (if diff = [] then ok t else
+       DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
+       DK.Transaction.abort t.priv.tr >>= fun () ->
+       state "end-sync-repos" ~old:(Some t) ~pub ~priv)
 
   type webhook = {
     watch: Repo.t -> unit Lwt.t;

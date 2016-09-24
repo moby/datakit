@@ -25,8 +25,6 @@ let ( / ) dir leaf = dir @ [leaf]
 let ( /@ ) dir user_path = dir @ Datakit_path.unwrap user_path
 let pp_path = Fmt.Dump.list String.dump
 
-let github_path = ["github.com"]
-
 let rec last = function
   | [] -> None
   | [x] -> Some x
@@ -243,42 +241,47 @@ module Make(P9p : Protocol_9p_client.S) = struct
         P9p.LowLevel.update t.conn ~length:new_length fid
       )
 
-    let read_node t path =
+    let read_node_aux ~link ~file ~dir t path =
       let open Protocol_9p_types in
       with_file_full t path @@ fun _fid { Protocol_9p_response.Walk.wqids } ->
       (* Note: would be more efficient to use [_fid] here... *)
       match last wqids with
-      | Some qid when List.mem Qid.Symlink qid.Qid.flags ->
-        (* Symlink *)
-        read_all t path >>*= fun data ->
-        ok (`Link (Cstruct.to_string data))
-      | Some qid when not (List.mem Qid.Directory qid.Qid.flags) ->
-        (* File *)
-        read_all t path >>*= fun data ->
-        ok (`File data)
-      | _ ->
-        (* Directory *)
-        P9p.readdir t.conn path >>*= fun items ->
-        let items = List.map (fun item -> item.Stat.name) items in
-        ok (`Dir items)
+      | Some qid when List.mem Qid.Symlink qid.Qid.flags -> link t path
+      | Some qid when not (List.mem Qid.Directory qid.Qid.flags) -> file t path
+      | _ -> dir t path
 
-    let read_file read =
-      read >>*= function
-      | `File x -> ok x
-      | `Dir _
-      | `Link _ -> error "Not a file"
+    let read_link_aux t path =
+      read_all t path >>*= fun data ->
+      ok (`Link (Cstruct.to_string data))
 
-    let read_dir read =
-      read >>*= function
-      | `Dir x -> ok x
-      | `File _
-      | `Link _ -> error "Not a directory"
+    let read_file_aux t path =
+      read_all t path >>*= fun data ->
+      ok (`File data)
 
-    let read_link read =
-      read >>*= function
-      | `Link x -> ok x
-      | `Dir _
-      | `File _ -> error "Not a symlink"
+    let read_dir_aux t path =
+      P9p.readdir t.conn path >>*= fun items ->
+      let items =
+        List.map (fun item -> item.Protocol_9p_types.Stat.name) items
+      in
+      ok (`Dir items)
+
+    let read_node =
+      read_node_aux ~link:read_link_aux ~file:read_file_aux ~dir:read_dir_aux
+
+    let read_link t path =
+      let err _ _ = error "not a symlink" in
+      read_node_aux ~link:read_link_aux ~file:err ~dir:err t path
+      >|*= fun (`Link l) -> l
+
+    let read_file t path =
+      let err _ _ = error "not a file" in
+      read_node_aux ~link:err ~file:read_file_aux ~dir:err t path
+      >|*= fun (`File l) -> l
+
+    let read_dir t path =
+      let err _ _ = error "not a dir" in
+      read_node_aux ~link:err ~file:err ~dir:read_dir_aux t path
+      >|*= fun (`Dir l) -> l
 
     let stat t path =
       P9p.stat t.conn path >>= function
@@ -386,11 +389,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
       in
       aux path
 
-    let remove_if_exists t path =
-      exists t path >>*= function
-      | true -> remove t path
-      | false -> ok ()
-
     let create_or_replace t ~dir leaf value =
       let path = dir / leaf in
       exists t path >>*= function
@@ -406,9 +404,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let exists t path = FS.exists t.fs (t.path /@ path)
     let exists_dir t path = FS.exists_dir t.fs (t.path /@ path)
     let exists_file t path = FS.exists_file t.fs (t.path /@ path)
-    let read_file t path = FS.read_file (read t path)
-    let read_dir t path = FS.read_dir (read t path)
-    let read_link t path = FS.read_link (read t path)
+    let read_file t path = FS.read_file t.fs (t.path /@ path)
+    let read_dir t path = FS.read_dir t.fs (t.path /@ path)
+    let read_link t path = FS.read_link t.fs (t.path /@ path)
   end
 
   module Commit = struct
@@ -548,9 +546,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let create_or_replace_file t ~dir =
       FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)
 
-    let read_file t path = FS.read_file (read t path)
-    let read_dir t path = FS.read_dir (read t path)
-    let read_link t path = FS.read_link (read t path)
+    let read_file t path = FS.read_file t.fs (t.path / "rw" /@ path)
+    let read_dir t path = FS.read_dir t.fs (t.path / "rw" /@ path)
+    let read_link t path = FS.read_link t.fs (t.path / "rw" /@ path)
 
     let parents t =
       FS.read_all t.fs (t.path / "parents") >|*= fun data ->
@@ -593,7 +591,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       | line ->
         let file f =
           (* TODO: delay loading this? *)
-          FS.read_file (FS.read_node t.fs ["trees"; line]) >>*= fun contents ->
+          FS.read_file t.fs ["trees"; line] >>*= fun contents ->
           ok (Some (f contents)) in
         match String.cut ~sep:"-" line with
         | None -> error "Invalid tree watch line!"
@@ -652,84 +650,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
   end
 
-  module GitHub = struct
-    type t = FS.t
-
-    module Status = struct
-      type t = {
-        fs : FS.t;
-        dir : string list;
-      }
-
-      let string_of_state = function
-        | `Pending -> "pending"
-        | `Success -> "success"
-        | `Failure -> "failure"
-        | `Error -> "error"
-
-      let state_of_string = function
-        | "pending" -> Ok `Pending
-        | "success" -> Ok `Success
-        | "failure" -> Ok `Failure
-        | "error"   -> Ok `Error
-        | s -> Error (`Msg ("Invalid GitHub state: " ^ s))
-
-      let url_of_string s =
-        try Ok (Uri.of_string s)
-        with ex -> Error (`Msg (Printexc.to_string ex))
-
-      let update t leaf fn = function
-        | None -> FS.remove_if_exists t.fs (t.dir / leaf)
-        | Some v -> FS.create_or_replace t.fs ~dir:t.dir leaf (Cstruct.of_string (fn v))
-
-      let set_descr t = update t "descr" (fun x -> x)
-      let set_state t = update t "state" string_of_state
-      let set_url   t = update t "url"   Uri.to_string
-
-      let read_file t leaf f =
-        FS.read_file (FS.read_node t.fs (t.dir / leaf)) >|= function
-        | Error (`Msg "No such file or directory") -> Ok None
-        | Error _ as e -> e
-        | Ok x ->
-          match f (String.trim (Cstruct.to_string x)) with
-          | Ok x -> Ok (Some x)
-          | Error _ as e -> e
-
-      let descr t = read_file t "descr" (fun x -> Ok x)
-      let state t = read_file t "state" state_of_string
-      let url t   = read_file t "url"   url_of_string
-    end
-
-    module PR = struct
-      type t = {
-        fs : FS.t;
-        prs_dir : string list;
-        id : string;
-      }
-
-      let id t = t.id
-
-      let pr_dir t = t.prs_dir @ [t.id]
-
-      let status t path =
-        FS.make_dirs t.fs ~base:(pr_dir t / "status") path >>*= fun () ->
-        ok { Status.fs = t.fs; dir = pr_dir t / "status" /@ path }
-    end
-
-    let pr_path ~user ~project = github_path / user / project / "pr"
-
-    let prs t ~user ~project =
-      let prs_dir = pr_path ~user ~project in
-      FS.read_dir (FS.read_node t prs_dir) >|*=
-      List.map (fun id -> { PR.fs = t; prs_dir; id })
-
-    let pr t ~user ~project id =
-      let prs_dir = pr_path ~user ~project in
-      FS.exists t (prs_dir / id) >>*= function
-      | false -> error "PR %S not found" id
-      | true -> ok { PR.fs = t; prs_dir; id }
-  end
-
   let branch t name =
     Branch.create t name
 
@@ -760,11 +680,6 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
   let tree t id =
     Tree.of_id t id
-
-  let github t =
-    FS.exists t github_path >|*= function
-    | true -> Some t
-    | false -> None
 
   let connect conn = { FS.conn }
 

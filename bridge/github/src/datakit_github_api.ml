@@ -65,10 +65,23 @@ module Status = struct
       state       = of_gh_state s.base_status_state;
     }
 
+  (* To avoid:
+     Github: GitHub API error: 422 Unprocessable Entity (WebDAV) (RFC 4918)
+       -- Validation Failed
+     Resource type: Status
+     Field: description
+     Code: custom
+     Message: description is too long (maximum is 140 characters) *)
+  let to_gh_description = function
+    | None -> None
+    | Some s as x ->
+      if String.length s <= 140 then x
+      else Some (String.with_range s ~len:140)
+
   let to_gh s = {
     new_status_context     = of_list s.context;
     new_status_target_url  = s.url;
-    new_status_description = s.description;
+    new_status_description = to_gh_description s.description;
     new_status_state       = to_gh_state s.state;
   }
 

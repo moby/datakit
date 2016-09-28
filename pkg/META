@@ -18,7 +18,7 @@ package "ivfs" (
  directory = "ivfs"
  description = "Irmin to Datakit's VFS layer"
  version = "%%VERSION%%"
- requires = "irmin datakit.vfs"
+ requires = "fmt astring irmin datakit.vfs"
  archive(byte) = "ivfs.cma"
  archive(native) = "ivfs.cmxa"
  plugin(byte) = "ivfs.cma"

@@ -1,3 +1,14 @@
+### 0.6.0 (unreleased)
+
+- github: fix support for annotated tags (#274, @samoht)
+- github: fix setting build status when description is larger than 140
+  characters (#273, @samoht)
+- github: prune the public branch too (#272, @samoht)
+- client: speed-up 9p walks (#271, @samoht)
+- server: revert back to active polling due to an bug in irmin-watcher's
+  inotify support (#269, @samoht)
+- ...
+
 ### 0.5.0 (2016-09-02)
 
 - Split the package in 3: server-side, client-side and GitHub bridge

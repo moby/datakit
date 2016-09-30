@@ -23,7 +23,7 @@ depends: [
   "git" "mirage-tc" "uri"
   "mirage-types"
   "irmin"       {>= "0.10.1"}
-  "camlzip"
+  "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result" "lwt"
   "conduit" "mirage-flow"
@@ -38,6 +38,3 @@ depends: [
   "alcotest"   {test}
 ]
 available: [ocaml-version >= "4.02.0"]
-conflicts: [
-  "camlzip" {>= "1.06"}
-]

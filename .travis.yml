@@ -7,12 +7,9 @@ env:
   global:
   - EXTRA_DEPS="inotify"
   matrix:
-  - OCAML_VERSION=4.02 PACKAGE "datakit"
-  - OCAML_VERSION=4.03 PACKAGE "datakit"
-  - OCAML_VERSION=4.03 PACKAGE "datakit-client"
-  - OCAML_VERSION=4.02 PACKAGE="datakit-github"
-    PINS="datakit-server:."
-  - OCAML_VERSION=4.03 PACKAGE="datakit-github"
-    PINS="datakit-server:."
+  - OCAML_VERSION=4.02 PACKAGE="datakit-client"
+  - OCAML_VERSION=4.03 PACKAGE="datakit-client"
+  - OCAML_VERSION=4.03 PACKAGE="datakit" PINS="datakit-server:."
+  - OCAML_VERSION=4.03 PACKAGE="datakit-github" PINS="datakit-server:."
 os:
   - linux

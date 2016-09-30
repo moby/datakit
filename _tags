@@ -29,6 +29,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 
 <src/bin/*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
 <src/bin/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
+<src/bin/main.*>: package(irmin.http cohttp.lwt)
 <src/bin/main.*>: package(protocol-9p.unix camlzip), thread
 
 # datakit-client

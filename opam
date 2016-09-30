@@ -29,6 +29,7 @@ depends: [
   "cstruct"     {>= "2.2"}
   "result" "lwt"
   "conduit" "mirage-flow"
+  "cohttp"
   "named-pipe"
   "hvsock"      {>= "0.8.1"}
   "protocol-9p" {>= "0.7.0"}

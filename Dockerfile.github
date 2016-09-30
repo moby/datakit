@@ -8,22 +8,22 @@ RUN opam depext lwt react lambda-term && \
 
 # cache opam install of client github dependencies
 
-COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
-RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
+COPY datakit-server.opam /home/opam/src/datakit/datakit-server.opam
+RUN opam pin add datakit-server.dev /home/opam/src/datakit -n
 
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
 RUN sudo apk update
-RUN opam depext datakit-client datakit-github && \
-    opam install github && opam install datakit-client --deps
+RUN opam depext datakit-server datakit-github && \
+    opam install github && opam install datakit-server --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && git checkout . && scripts/watermark.sh
-RUN opam update datakit-client datakit-github && \
+RUN opam update datakit-server datakit-github && \
     opam install datakit-github --deps
 
-RUN opam info datakit-client --raw
+RUN opam info datakit-server --raw
 RUN opam info datakit-github --raw
 
 RUN opam install datakit-github.dev -vv

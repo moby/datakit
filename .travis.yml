@@ -9,9 +9,10 @@ env:
   matrix:
   - OCAML_VERSION=4.02 PACKAGE "datakit"
   - OCAML_VERSION=4.03 PACKAGE "datakit"
+  - OCAML_VERSION=4.03 PACKAGE "datakit-client"
   - OCAML_VERSION=4.02 PACKAGE="datakit-github"
-    PINS="datakit-client:."
+    PINS="datakit-server:."
   - OCAML_VERSION=4.03 PACKAGE="datakit-github"
-    PINS="datakit-client:."
+    PINS="datakit-server:."
 os:
   - linux

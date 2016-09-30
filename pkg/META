@@ -1,39 +1,14 @@
 description = "A Git-like database with a filesystem interface"
 version = "%%VERSION%%"
-requires = "lwt logs fmt astring rresult cstruct"
-
-package "vfs" (
- directory = "vfs"
- description = "Datakit's VFS description"
- version = "%%VERSION%%"
- requires = "fmt astring lwt cstruct logs result"
- archive(byte) = "vfs.cma"
- archive(native) = "vfs.cmxa"
- plugin(byte) = "vfs.cma"
- plugin(native) = "vfs.cmxs"
- exists_if = "vfs.cma"
-)
 
 package "ivfs" (
  directory = "ivfs"
- description = "Irmin to Datakit's VFS layer"
+ description = "Project Irmin into a Datakit VFS"
  version = "%%VERSION%%"
- requires = "fmt astring irmin datakit.vfs"
- archive(byte) = "ivfs.cma"
- archive(native) = "ivfs.cmxa"
- plugin(byte) = "ivfs.cma"
- plugin(native) = "ivfs.cmxs"
- exists_if = "ivfs.cma"
-)
-
-package "fs9p" (
- directory = "fs9p"
- description = "Datakit's VFS to 9p layer"
- version = "%%VERSION%%"
- requires = "protocol-9p.unix datakit.vfs"
- archive(byte) = "fs9p.cma"
- archive(native) = "fs9p.cmxa"
- plugin(byte) = "fs9p.cma"
- plugin(native) = "fs9p.cmxs"
- exists_if = "fs9p.cma"
+ requires = "fmt astring irmin datakit-server.vfs"
+ archive(byte)   = "datakit-ivfs.cma"
+ archive(native) = "datakit-ivfs.cmxa"
+ plugin(byte)    = "datakit-ivfs.cma"
+ plugin(native)  = "datakit-ivfs.cmxs"
+ exists_if       = "datakit-ivfs.cma"
 )

@@ -18,6 +18,7 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
+  "datakit-server"
   "cmdliner"
   "rresult" "astring" "fmt"
   "git" "mirage-tc" "uri"

@@ -2,6 +2,8 @@
 
 - fix META files (#278, @dsj55)
 - fix CI scripts (#262, @dave-tucker)
+- create a new datakit-server library, to help adding runtime instrospection
+  mechanism to servers without having to depend on irmin (#280)
 
 - github: add documentation (#258, @talex5)
 - github: add API resources capabilities (#279, @samoht)

@@ -76,7 +76,7 @@ let set_signal_if_supported signal handler =
     ()
 
 let start () sandbox no_listen listen_urls
-    datakit private_branch public_branch dry_updates
+    datakit private_branch public_branch cap
     webhook =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
@@ -128,7 +128,7 @@ let start () sandbox no_listen listen_urls
         DK.branch dk public_branch >>= function
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
         | Ok pub  ->
-          VG.Sync.sync t ?webhook ~dry_updates ~priv ~pub ~token
+          VG.Sync.sync t ?webhook ~cap ~priv ~pub ~token
           >|= ignore
   in
   let accept_9p_connections () =
@@ -219,12 +219,17 @@ let webhook =
   in
   Arg.(value & opt (some uri) None doc)
 
-let dry_updates =
+let cap: Datakit_github.Capabilities.t Cmdliner.Arg.converter =
+  Datakit_github.Capabilities.(of_string, pp)
+
+let capabilities =
   let doc =
-    Arg.info ~doc:"Dry API updates: do not call the GitHub API, \
-                   print a line in the logs instead." ["d"; "dry-updates"]
+    Arg.info ~doc:
+      "A comma-separated list of API capabilities, for instance \
+       `*:r,status:rw` to allow the read of all resources but only the write \
+       of build status." ["c"; "capabilities"]
   in
-  Arg.(value & flag doc)
+  Arg.(value & opt cap Datakit_github.Capabilities.all doc)
 
 let term =
   let doc = "Bridge between GiHub API and Datakit." in
@@ -235,7 +240,7 @@ let term =
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
-        datakit $ private_branch $ public_branch $ dry_updates $
+        datakit $ private_branch $ public_branch $ capabilities $
         webhook),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 

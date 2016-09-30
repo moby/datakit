@@ -1,13 +1,25 @@
 ### 0.6.0 (unreleased)
 
+- fix META files (#278, @dsj55)
+- fix CI scripts (#262, @dave-tucker)
+
+- github: add documentation (#258, @talex5)
+- github: add API resources capabilities (#279, @samoht)
 - github: fix support for annotated tags (#274, @samoht)
 - github: fix setting build status when description is larger than 140
   characters (#273, @samoht)
 - github: prune the public branch too (#272, @samoht)
+- github: read combined build status instead of the full build status
+  history (#265)
+- github: use ocaml-github 2.0.0 and ocaml-github-hooks (#264, @samoht)
+- github: fix event loop (#259, #260, @talex5)
+
 - client: speed-up 9p walks (#271, @samoht)
+
 - server: revert back to active polling due to an bug in irmin-watcher's
   inotify support (#269, @samoht)
-- ...
+- server: add more debugging messages for the "GitHub auto-push" feature
+  (#261, @talex5)
 
 ### 0.5.0 (2016-09-02)
 

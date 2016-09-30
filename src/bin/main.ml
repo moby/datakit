@@ -57,14 +57,16 @@ module Git_fs_store = struct
     Irmin.Private.Watch.set_listen_dir_hook (Irmin_watcher_polling.hook 1.)
   )
 
-  let repo path =
+  let repo ~sandbox path =
+    let path = (if sandbox then "." else "") ^ path in
     let config = Irmin_git.config ~root:path ~bare:true () in
     Store.Repo.create config
 
-  let connect path =
+  let connect ~sandbox path =
     Lazy.force listener;
-    Log.debug (fun l -> l "Using Git-format store %S" path);
-    repo path >|= fun repo ->
+    let s = if sandbox then " (sandboxed)" else "" in
+    Log.debug (fun l -> l "Using Git-format store %S%s" path s);
+    repo ~sandbox path >|= fun repo ->
     fun () -> Filesystem.create make_task repo
 end
 
@@ -118,9 +120,9 @@ let http_server uri git =
       In_memory_store.repo () >>= fun repo ->
       In_memory_store.Store.master make_task repo >|= fun t ->
       HTTP.http_spec (t "HTTP server for the in-memory store")
-    | Some path -> (* on-disk store *)
+    | Some (sandbox, path) -> (* on-disk store *)
       let module HTTP = HTTP(Git_fs_store.Store) in
-      Git_fs_store.repo path >>= fun repo ->
+      Git_fs_store.repo ~sandbox path >>= fun repo ->
       Git_fs_store.Store.master make_task repo >|= fun t ->
       HTTP.http_spec (t "HTTP server for the on-disk store")
   end >>= fun spec ->
@@ -150,10 +152,8 @@ let start listen_9p listen_http sandbox git =
   in
   let serve_9p =
     begin match git with
-      | None      -> In_memory_store.connect ()
-      | Some path ->
-        let prefix = if sandbox then "." else "" in
-        Git_fs_store.connect (prefix ^ path)
+      | None                 -> In_memory_store.connect ()
+      | Some (sandbox, path) -> Git_fs_store.connect ~sandbox path
     end >|= fun make_root ->
     List.map (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
       listen_9p
@@ -172,6 +172,7 @@ let exec ~name cmd =
     Log.err (fun l -> l "%s stopped by signal %d" name i)
 
 let start () listen_9p listen_http sandbox git auto_push =
+  let git = match git with None -> None | Some p -> Some (sandbox, p) in
   let start () = start listen_9p listen_http sandbox git in
   Lwt_main.run begin
     match auto_push with
@@ -184,7 +185,7 @@ let start () listen_9p listen_http sandbox git auto_push =
           In_memory_store.Store.Repo.watch_branches repo (fun _ _ ->
               Lwt.fail_with "TOTO"
             )
-        | Some path ->
+        | Some (sandbox, path) ->
           Lazy.force Git_fs_store.listener;
           let prefix = if sandbox then "." else "" in
           let path = prefix ^ path in
@@ -204,7 +205,7 @@ let start () listen_9p listen_http sandbox git auto_push =
                  Lwt.return ()
               )
           in
-          Git_fs_store.repo path >>= fun repo ->
+          Git_fs_store.repo ~sandbox path >>= fun repo ->
           Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)
       in
       watch () >>= fun unwatch ->

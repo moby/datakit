@@ -18,3 +18,15 @@ package "vfs" (
  plugin(native) = "vfs.cmxs"
  exists_if = "vfs.cma"
 )
+
+package "fs9p" (
+ directory = "fs9p"
+ description = "Datakit's VFS to 9p layer"
+ version = "%%VERSION%%"
+ requires = "datakit-client.vfs protocol-9p"
+ archive(byte) = "fs9p.cma"
+ archive(native) = "fs9p.cmxa"
+ plugin(byte) = "fs9p.cma"
+ plugin(native) = "fs9p.cmxs"
+ exists_if = "fs9p.cma"
+)

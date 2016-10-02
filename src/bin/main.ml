@@ -57,14 +57,16 @@ module Git_fs_store = struct
     Irmin.Private.Watch.set_listen_dir_hook (Irmin_watcher_polling.hook 1.)
   )
 
-  let repo path =
+  let repo ~sandbox path =
+    let path = (if sandbox then "." else "") ^ path in
     let config = Irmin_git.config ~root:path ~bare:true () in
     Store.Repo.create config
 
-  let connect path =
+  let connect ~sandbox path =
     Lazy.force listener;
-    Log.debug (fun l -> l "Using Git-format store %S" path);
-    repo path >|= fun repo ->
+    let s = if sandbox then " (sandboxed)" else "" in
+    Log.debug (fun l -> l "Using Git-format store %S%s" path s);
+    repo ~sandbox path >|= fun repo ->
     fun () -> Filesystem.create make_task repo
 end
 
@@ -92,7 +94,41 @@ let set_signal_if_supported signal handler =
   with Invalid_argument _ ->
     ()
 
-let start urls sandbox git =
+module Date = struct
+  let pretty d =
+    let tm = Unix.localtime (Int64.to_float d) in
+    Printf.sprintf "%02d:%02d:%02d"
+      tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec
+end
+
+module HTTP = Irmin_http_server.Make(Cohttp_lwt_unix.Server)(Date)
+
+let http_server uri git =
+  let timeout = 3600 in
+  let uri = match Uri.host uri with
+    | None   -> Uri.with_host uri (Some "localhost")
+    | Some _ -> uri in
+  let port, uri = match Uri.port uri with
+    | None   -> 8080, Uri.with_port uri (Some 8080)
+    | Some p -> p, uri in
+  let mode = `TCP (`Port port) in
+  Logs.info (fun f -> f "daemon: %s" (Uri.to_string uri));
+  Printf.printf "Server starting on port %d.\n%!" port;
+  begin match git with
+    | None -> (* in-memory store *)
+      let module HTTP = HTTP(In_memory_store.Store) in
+      In_memory_store.repo () >>= fun repo ->
+      In_memory_store.Store.master make_task repo >|= fun t ->
+      HTTP.http_spec (t "HTTP server for the in-memory store")
+    | Some (sandbox, path) -> (* on-disk store *)
+      let module HTTP = HTTP(Git_fs_store.Store) in
+      Git_fs_store.repo ~sandbox path >>= fun repo ->
+      Git_fs_store.Store.master make_task repo >|= fun t ->
+      HTTP.http_spec (t "HTTP server for the on-disk store")
+  end >>= fun spec ->
+  Cohttp_lwt_unix.Server.create ~timeout ~mode spec
+
+let start listen_9p listen_http sandbox git =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -110,15 +146,20 @@ let start urls sandbox git =
   Log.app (fun l ->
       l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v
     );
-  begin match git with
-    | None      -> In_memory_store.connect ()
-    | Some path ->
-      let prefix = if sandbox then "." else "" in
-      Git_fs_store.connect (prefix ^ path)
-  end >>= fun make_root ->
-  Lwt_list.iter_p
-    (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
-    urls
+  let serve_http = match listen_http with
+    | None     -> []
+    | Some uri -> [http_server (Uri.of_string uri) git]
+  in
+  let serve_9p =
+    begin match git with
+      | None                 -> In_memory_store.connect ()
+      | Some (sandbox, path) -> Git_fs_store.connect ~sandbox path
+    end >|= fun make_root ->
+    List.map (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
+      listen_9p
+  in
+  serve_9p >>= fun serve_9p ->
+  Lwt.choose (serve_http @ serve_9p)
 
 let exec ~name cmd =
   Lwt_process.exec cmd >|= function
@@ -130,8 +171,9 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Log.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () url sandbox git auto_push =
-  let start () = start url sandbox git in
+let start () listen_9p listen_http sandbox git auto_push =
+  let git = match git with None -> None | Some p -> Some (sandbox, p) in
+  let start () = start listen_9p listen_http sandbox git in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()
@@ -143,7 +185,7 @@ let start () url sandbox git auto_push =
           In_memory_store.Store.Repo.watch_branches repo (fun _ _ ->
               Lwt.fail_with "TOTO"
             )
-        | Some path ->
+        | Some (sandbox, path) ->
           Lazy.force Git_fs_store.listener;
           let prefix = if sandbox then "." else "" in
           let path = prefix ^ path in
@@ -163,7 +205,7 @@ let start () url sandbox git auto_push =
                  Lwt.return ()
               )
           in
-          Git_fs_store.repo path >>= fun repo ->
+          Git_fs_store.repo ~sandbox path >>= fun repo ->
           Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)
       in
       watch () >>= fun unwatch ->
@@ -190,15 +232,25 @@ let git =
   in
   Arg.(value & opt (some string) None doc)
 
-let url =
+let listen_9p =
   let doc =
     Arg.info ~doc:
-      "A comma-separated list of URLs to listen on of the form \
-       file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
-       or hyperv-connect://vmid/serviceid or hyperv-accept://vmid/serviceid"
-      ["url"]
+      "A comma-separated list of URLs to listen on for 9p connections, on \
+       the form file:///var/tmp/foo or tcp://host:port or \
+       \\\\\\\\.\\\\pipe\\\\foo or hyperv-connect://vmid/serviceid or \
+       hyperv-accept://vmid/serviceid"
+      ["url"; "listen-9p"]
   in
   Arg.(value & opt (list string) [ "tcp://127.0.0.1:5640" ] doc)
+
+let listen_http =
+  let doc =
+    Arg.info ~doc:
+      "An URL to listen on for HTTP connection, on of the form \
+       port or host:port"
+      ["listen-http"]
+  in
+  Arg.(value & opt (some string) None doc)
 
 let sandbox =
   let doc =
@@ -222,7 +274,8 @@ let term =
     `S "DESCRIPTION";
     `P "$(tname) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ setup_log $ url $ sandbox $ git $ auto_push),
+  Term.(pure start $ setup_log $ listen_9p $ listen_http
+        $ sandbox $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

@@ -11,7 +11,7 @@ package "vfs" (
  directory = "vfs"
  description = "Datakit's VFS description"
  version = "%%VERSION%%"
- requires = ""
+ requires = "fmt astring lwt cstruct logs result"
  archive(byte) = "vfs.cma"
  archive(native) = "vfs.cmxa"
  plugin(byte) = "vfs.cma"

@@ -9,18 +9,15 @@ dev-repo:     "https://github.com/docker/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
 build: [
-  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" "datakit-github"
+  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" "datakit-server"
 ]
 
 depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
+  "base-bytes"
+  "astring" "logs" "uri" "rresult" "cstruct" "fmt"
   "cmdliner"
-  "lwt"
-  "logs" "fmt" "mtime" "asl" "win-eventlog" "hvsock"
-  "hex" "nocrypto" "conduit"
-  "datakit-server"
-  "github-hooks" {>= "0.1.1"}
-  "github" {>= "2.0.0"}
+  "protocol-9p"
 ]

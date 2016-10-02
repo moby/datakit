@@ -1,14 +1,8 @@
-FROM ocaml/opam:alpine
+FROM docker/datakit:server
 
-RUN sudo apk add ncurses-dev libev-dev
-RUN opam depext lwt && opam install lwt alcotest conf-libev
-
-# cache opam install of dependencies
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext datakit && \
-    opam install lwt inotify && \
-    opam install datakit --deps
+RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
@@ -16,8 +10,8 @@ RUN cd /home/opam/src/datakit && \
     git diff && git status --porcelain && \
     git checkout . && scripts/watermark.sh && \
     git status --porcelain
-RUN opam update datakit
 
+RUN opam update datakit
 RUN opam install datakit.dev -vv
 
 EXPOSE 5640

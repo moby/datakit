@@ -6,6 +6,7 @@ open Topkg
 let metas = [
   Pkg.meta_file ~install:false "pkg/META";
   Pkg.meta_file ~install:false "pkg/META.client";
+  Pkg.meta_file ~install:false "pkg/META.server";
   Pkg.meta_file ~install:false "pkg/META.github";
 ]
 
@@ -15,6 +16,7 @@ let opams =
   [
     Pkg.opam_file "opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-client.opam" ~lint_deps_excluding ~install;
+    Pkg.opam_file "datakit-server.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-github.opam" ~lint_deps_excluding ~install;
   ]
 
@@ -24,9 +26,7 @@ let () =
   | "datakit" -> Ok [
       Pkg.lib   "pkg/META";
       Pkg.lib   "opam";
-      Pkg.mllib "src/fs9p/fs9p.mllib"         ~dst_dir:"fs9p";
-      Pkg.mllib "src/ivfs/ivfs.mllib"         ~dst_dir:"ivfs";
-      Pkg.mllib "src/vfs/vfs.mllib"           ~dst_dir:"vfs";
+      Pkg.mllib "src/ivfs/datakit-ivfs.mllib" ~dst_dir:"ivfs";
       Pkg.bin   "src/bin/main"  ~dst:"datakit";
       Pkg.bin   "src/bin/mount" ~dst:"datakit-mount" ;
       Pkg.test "tests/test" ~args:(Cmd.v "-q");
@@ -37,9 +37,14 @@ let () =
       Pkg.mllib "src/client/datakit-client.mllib";
       Pkg.lib   "src/client/datakit_S.mli";
       Pkg.lib   "src/client/datakit_S.cmi";
-      Pkg.mllib "src/vfs/vfs.mllib" ~dst_dir:"vfs";
       Pkg.bin   "src/bin/mount" ~dst:"datakit-mount" ;
       Pkg.test  "examples/ocaml-client/example" ~run:false ;
+    ]
+  | "datakit-server" -> Ok [
+      Pkg.lib   "pkg/META.server"     ~dst:"META";
+      Pkg.lib   "datakit-server.opam" ~dst:"opam";
+      Pkg.mllib "src/vfs/datakit-vfs.mllib"   ~dst_dir:"vfs";
+      Pkg.mllib "src/fs9p/datakit-fs9p.mllib" ~dst_dir:"fs9p";
     ]
   | "datakit-github" -> Ok [
       Pkg.lib   "pkg/META.github"     ~dst:"META";

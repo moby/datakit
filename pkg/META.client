@@ -11,10 +11,22 @@ package "vfs" (
  directory = "vfs"
  description = "Datakit's VFS description"
  version = "%%VERSION%%"
- requires = ""
+ requires = "fmt astring lwt cstruct logs result"
  archive(byte) = "vfs.cma"
  archive(native) = "vfs.cmxa"
  plugin(byte) = "vfs.cma"
  plugin(native) = "vfs.cmxs"
  exists_if = "vfs.cma"
+)
+
+package "fs9p" (
+ directory = "fs9p"
+ description = "Datakit's VFS to 9p layer"
+ version = "%%VERSION%%"
+ requires = "datakit-client.vfs protocol-9p"
+ archive(byte) = "fs9p.cma"
+ archive(native) = "fs9p.cmxa"
+ plugin(byte) = "fs9p.cma"
+ plugin(native) = "fs9p.cmxs"
+ exists_if = "fs9p.cma"
 )

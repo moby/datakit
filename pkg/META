@@ -30,7 +30,7 @@ package "fs9p" (
  directory = "fs9p"
  description = "Datakit's VFS to 9p layer"
  version = "%%VERSION%%"
- requires = "protocol-9p.unix datakit.vfs"
+ requires = "protocol-9p datakit.vfs"
  archive(byte) = "fs9p.cma"
  archive(native) = "fs9p.cmxa"
  plugin(byte) = "fs9p.cma"

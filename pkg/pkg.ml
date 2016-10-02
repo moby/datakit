@@ -37,6 +37,7 @@ let () =
       Pkg.mllib "src/client/datakit-client.mllib";
       Pkg.lib   "src/client/datakit_S.mli";
       Pkg.lib   "src/client/datakit_S.cmi";
+      Pkg.mllib "src/fs9p/fs9p.mllib" ~dst_dir:"fs9p";
       Pkg.mllib "src/vfs/vfs.mllib" ~dst_dir:"vfs";
       Pkg.bin   "src/bin/mount" ~dst:"datakit-mount" ;
       Pkg.test  "examples/ocaml-client/example" ~run:false ;

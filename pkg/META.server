@@ -1,5 +1,6 @@
 description = "Library to create DataKit servers"
 version = "%%VERSION%%"
+requires = ""
 
 package "vfs" (
  directory = "vfs"
@@ -17,7 +18,7 @@ package "fs9p" (
  directory = "fs9p"
  description = "Expose Datakit VFS as a 9p endpoint"
  version = "%%VERSION%%"
- requires = "protocol-9p.unix io-page.unix datakit-server.vfs"
+ requires = "protocol-9p datakit-server.vfs"
  archive(byte) = "datakit-fs9p.cma"
  archive(native) = "datakit-fs9p.cmxa"
  plugin(byte) = "datakit-fs9p.cma"

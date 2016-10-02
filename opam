@@ -8,9 +8,9 @@ bug-reports:  "https://github.com/docker/datakit/issues"
 dev-repo:     "https://github.com/docker/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
-build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%"]
+build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false"]
 build-test: [
-  ["ocaml" "pkg/pkg.ml" "build" "--tests" "true"]
+  ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true"]
   ["ocaml" "pkg/pkg.ml" "test"]
 ]
 

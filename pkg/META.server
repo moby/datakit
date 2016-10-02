@@ -1,5 +1,6 @@
 description = "Library to create DataKit servers"
 version = "%%VERSION%%"
+requires = ""
 
 package "vfs" (
  directory = "vfs"

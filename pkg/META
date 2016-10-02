@@ -1,5 +1,6 @@
 description = "A Git-like database with a filesystem interface"
 version = "%%VERSION%%"
+requires = ""
 
 package "ivfs" (
  directory = "ivfs"

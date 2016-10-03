@@ -92,8 +92,11 @@ let start () sandbox no_listen listen_urls
       exit 1
     ));
   Log.app (fun l ->
-      l "Starting %s %s ...@.The public branch is %s@.The private branch is %s"
-        (Filename.basename Sys.argv.(0)) Version.v public_branch private_branch
+      l "Starting %s %s (%a)...@.\
+         The public branch is %s@.The private branch is %s"
+        (Filename.basename Sys.argv.(0)) Version.v
+        Datakit_github.Capabilities.pp cap
+        public_branch private_branch
     );
   let token = match token () with
     | None   -> failwith "Missing datakit GitHub token"

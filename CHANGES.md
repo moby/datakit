@@ -1,8 +1,8 @@
-### 0.6.0 (unreleased)
+### 0.6.0 (2016-10-03)
 
 - fix META files (#278, @dsj55)
 - fix CI scripts (#262, @dave-tucker)
-- create a new datakit-server library, to help adding runtime instrospection
+- create a new `datakit-server` library, to help adding runtime instrospection
   mechanism to servers without having to depend on irmin (#280)
 
 - github: add documentation (#258, @talex5)
@@ -22,6 +22,8 @@
   inotify support (#269, @samoht)
 - server: add more debugging messages for the "GitHub auto-push" feature
   (#261, @talex5)
+- server: expose the Irmin "REST" API over HTTP by using the `--listen-http`
+  command-line argument (#281, @samoht)
 
 ### 0.5.0 (2016-09-02)
 

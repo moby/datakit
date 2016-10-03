@@ -51,6 +51,17 @@
       and returns when the connection has beenn closed.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALall">all</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">all</code> is the capability to do everything.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALallow">allow</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">allow t o r</code> is <code class="code">t</code> with the capability to do API calls of type
+      <code class="code">o</code> to the kind of resource <code class="code">r</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Conv.html#VALapply">apply</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
 <td><div class="info">
 <code class="code">apply s d</code> is the snapshot obtained by applying <code class="code">d</code> on top of
@@ -78,6 +89,12 @@
 <td><div class="info">
 <code class="code">changes d</code> is the set of GitHub changes carried over in the
       filesystem changes <code class="code">d</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALcheck">check</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">check t o r</code> is true if <code class="code">t</code> is allowed to to <code class="code">o</code> on the kind of
+      resource <code class="code">r</code>.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALchmod">chmod</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
@@ -281,8 +298,6 @@ Create an open file object.
 </div>
 </td></tr>
 <tr><td align="left"><br>D</td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALdescr">descr</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
-<td></td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALdiff">diff</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">diff t c</code> returns the paths differences between <code class="code">c</code> and <code class="code">t</code>'s
@@ -310,6 +325,12 @@ Create an open file object.
 <td><div class="info">
 <code class="code">dir_only</code> is a directory which contains only
       directories.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALdisallow">disallow</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">disallow t o r</code> is <code class="code">t</code> without the capability to do API calls
+      of type <code class="code">o</code> to the kind of resource <code class="code">r</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#VALdisconnect">disconnect</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
@@ -429,12 +450,6 @@ A directory of debugging tools.
 Look up a sub-directory node.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_S.CLIENT.html#VALgithub">github</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
-<td><div class="info">
-<code class="code">github t</code> is the GitHub API client for <code class="code">t</code>, if <code class="code">t</code> supports
-      <code class="code"><span class="constructor">GitHub</span></code> integration.
-</div>
-</td></tr>
 <tr><td align="left"><br>H</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALhash">hash</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
@@ -456,11 +471,6 @@ Look up a sub-directory node.
 <tr><td><a href="Datakit_github.Commit.html#VALid">id</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
 <td><div class="info">
 <code class="code">id t</code> is <code class="code">t</code>'s SHA1.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.PR.html#VALid">id</a> [<a href="Datakit_S.CLIENT.GitHub.PR.html">Datakit_S.CLIENT.GitHub.PR</a>]</td>
-<td><div class="info">
-<code class="code">id t</code> is the GitHub identifier for the PR.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Commit.html#VALid">id</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
@@ -571,6 +581,11 @@ The <code class="code">mkfile</code> command.
 <code class="code">no_entry</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Noent</span></code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALnone">none</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">none</code> is the capability to do nothing.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.html#VALnot_dir">not_dir</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">not_dir</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Notdir</span></code>.
@@ -638,6 +653,12 @@ Converts a list of the form <code class="code"><span class="string">"a"</span>; 
     the stream <code class="code">s ()</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALof_string">of_string</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">of_string s</code> is <code class="code"><span class="constructor">Some</span> t</code> if there exists <code class="code">t</code> such that <code class="code">s</code> is
+      the string representation of <code class="code">t</code>; and <code class="code"><span class="constructor">None</span></code> otherwise.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Status_state.html#VALof_string">of_string</a> [<a href="Datakit_github.Status_state.html">Datakit_github.Status_state</a>]</td>
 <td><div class="info">
 <code class="code">of_string s</code> is the value v such that <code class="code">of_string s</code> is <code class="code"><span class="constructor">Some</span>
@@ -699,6 +720,11 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <tr><td><a href="Vfs.Error.html#VALperm">perm</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">perm</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Perm</span></code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALpp">pp</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for capabilities.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Diff.Set.html#VALpp">pp</a> [<a href="Datakit_github.Diff.Set.html">Datakit_github.Diff.Set</a>]</td>
@@ -818,11 +844,6 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 </td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALpr">pr</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td></td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.html#VALpr">pr</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
-<td><div class="info">
-<code class="code">pr t ~user ~project id</code> is PR <code class="code">id</code> under "github.com/user/project"
-</div>
-</td></tr>
 <tr><td><a href="Datakit_github.API.html#VALprs">prs</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 <code class="code">prs t r</code> is the list of open pull-requests for the repo <code class="code">r</code>.
@@ -836,11 +857,6 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <tr><td><a href="Datakit_github.Snapshot.html#VALprs">prs</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
 <td><div class="info">
 <code class="code">prs t</code> are <code class="code">t</code>'s pull-requests.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.html#VALprs">prs</a> [<a href="Datakit_S.CLIENT.GitHub.html">Datakit_S.CLIENT.GitHub</a>]</td>
-<td><div class="info">
-<code class="code">prs t ~user ~project</code> is the list of PRs under "github.com/user/project"
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html#VALprune">prune</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
@@ -1085,8 +1101,6 @@ The list of watched repository.
 <code class="code">set_basename t name</code> changes <code class="code">t</code>'s basename to <code class="code">name</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_descr">set_descr</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
-<td></td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALset_executable">set_executable</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">set_executable t path flag</code> marks the file at <code class="code">path</code> as
@@ -1110,15 +1124,11 @@ The list of watched repository.
       <code class="code">r</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_state">set_state</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
-<td></td></tr>
 <tr><td><a href="Datakit_github.API.html#VALset_status">set_status</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 <code class="code">set_status t s</code> updates <code class="code"><span class="constructor">Status</span>.commit s</code>'s status with <code class="code">s</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALset_url">set_url</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
-<td></td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALsize">size</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
 <td><div class="info">
 <code class="code">size t</code> is <code class="code">t</code>'s size.
@@ -1160,8 +1170,6 @@ Convert a branch, which may update while we read it, to a fixed
 <code class="code">state t</code> is <code class="code">t</code>'s state.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALstate">state</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
-<td></td></tr>
 <tr><td><a href="Datakit_github.API.html#VALstatus">status</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 <code class="code">status t c</code> returns the list of status attached to the commit
@@ -1181,8 +1189,6 @@ Convert a branch, which may update while we read it, to a fixed
 </td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALstatus">status</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td></td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.PR.html#VALstatus">status</a> [<a href="Datakit_S.CLIENT.GitHub.PR.html">Datakit_S.CLIENT.GitHub.PR</a>]</td>
-<td></td></tr>
 <tr><td><a href="Vfs.File.html#VALstatus">status</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">status f</code> is the file containing the result of <code class="code">f</code>.
@@ -1196,7 +1202,7 @@ Convert a branch, which may update while we read it, to a fixed
 <tr><td><a href="Datakit_github.Sync.html#VALsync">sync</a> [<a href="Datakit_github.Sync.html">Datakit_github.Sync</a>]</td>
 <td><div class="info">
 <code class="code">sync t ~pub ~priv ~token</code> mirror GitHub changes in the DataKit
-    public branch <code class="code">pub</code>.
+      public branch <code class="code">pub</code>.
 </div>
 </td></tr>
 <tr><td align="left"><br>T</td></tr>
@@ -1314,8 +1320,6 @@ Cast to a list of strings
       <code class="code">t</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_S.CLIENT.GitHub.Status.html#VALurl">url</a> [<a href="Datakit_S.CLIENT.GitHub.Status.html">Datakit_S.CLIENT.GitHub.Status</a>]</td>
-<td></td></tr>
 <tr><td><a href="Datakit_github.API.html#VALuser_exists">user_exists</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 <code class="code">exist_user t ~user</code> is true iff <code class="code">user</code> exists.

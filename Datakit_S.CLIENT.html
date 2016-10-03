@@ -59,7 +59,6 @@ A read-only tree of files, directories and symlinks.
 <pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Commit.html">Commit</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Commit.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Transaction.html">Transaction</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Transaction.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Branch.html">Branch</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.Branch.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
-<pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.GitHub.html">GitHub</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_S.CLIENT.GitHub.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span id="VALbranches"><span class="keyword">val</span> branches</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> string list <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
 <code class="code">branches t</code> is the current set of branches.<br>
 </div>
@@ -85,11 +84,6 @@ A read-only tree of files, directories and symlinks.
 <pre><span id="VALfetch"><span class="keyword">val</span> fetch</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -><br>       url:string -><br>       branch:string -> <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Commit.t</a> <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
 <code class="code">fetch t ~url ~branch</code> fetches the given remote branch and
       returns its head commit.<br>
-</div>
-
-<pre><span id="VALgithub"><span class="keyword">val</span> github</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.GitHub.html#TYPEt">GitHub.t</a> option <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">github t</code> is the GitHub API client for <code class="code">t</code>, if <code class="code">t</code> supports
-      <code class="code"><span class="constructor">GitHub</span></code> integration.<br>
 </div>
 
 <pre><span id="VALdisconnect"><span class="keyword">val</span> disconnect</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">t</a> -> unit Lwt.t</code></pre><div class="info ">

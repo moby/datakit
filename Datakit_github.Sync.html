@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Datakit_github.Conv.html">
+<link rel="previous" href="Datakit_github.Capabilities.html">
 <link rel="Up" href="Datakit_github.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -25,7 +25,7 @@
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.Sync</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Datakit_github.Conv.html" title="Datakit_github.Conv">Previous</a>
+<div class="navbar"><a class="pre" href="Datakit_github.Capabilities.html" title="Datakit_github.Capabilities">Previous</a>
 &nbsp;<a class="up" href="Datakit_github.html" title="Datakit_github">Up</a>
 &nbsp;</div>
 <h1>Functor <a href="type_Datakit_github.Sync.html">Datakit_github.Sync</a></h1>
@@ -61,13 +61,11 @@ The type for synchronizer state.<br>
 Create an empty sync state.<br>
 </div>
 
-<pre><span id="VALsync"><span class="keyword">val</span> sync</span> : <code class="type">?webhook:<a href="Datakit_github.API.Webhook.html#TYPEt">Datakit_github.API.Webhook.t</a> -><br>       ?switch:Lwt_switch.t -><br>       ?policy:[ `Once | `Repeat ] -><br>       ?dry_updates:bool -><br>       pub:DK.Branch.t -><br>       priv:DK.Branch.t -><br>       token:<a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -><br>       <a href="Datakit_github.Sync.html#TYPEt">t</a> -> <a href="Datakit_github.Sync.html#TYPEt">t</a> Lwt.t</code></pre><div class="info ">
+<pre><span id="VALsync"><span class="keyword">val</span> sync</span> : <code class="type">?webhook:<a href="Datakit_github.API.Webhook.html#TYPEt">Datakit_github.API.Webhook.t</a> -><br>       ?switch:Lwt_switch.t -><br>       ?policy:[ `Once | `Repeat ] -><br>       ?cap:<a href="Datakit_github.Capabilities.html#TYPEt">Datakit_github.Capabilities.t</a> -><br>       pub:DK.Branch.t -><br>       priv:DK.Branch.t -><br>       token:<a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -><br>       <a href="Datakit_github.Sync.html#TYPEt">t</a> -> <a href="Datakit_github.Sync.html#TYPEt">t</a> Lwt.t</code></pre><div class="info ">
 <code class="code">sync t ~pub ~priv ~token</code> mirror GitHub changes in the DataKit
-    public branch <code class="code">pub</code>. It uses the private branch <code class="code">priv</code> to store
-    the received webhook event states. It connects to the GitHub API
-    using the token <code class="code">tok</code>. The default <code class="code">policy</code> is <code class="code"><span class="keywordsign">`</span><span class="constructor">Repeat</span></code>. If
-    <code class="code">dry_updates</code> is set (by default it is not), do not do the update
-    API calls but print in the logs (with an <code class="code"><span class="constructor">Logs</span>.<span class="constructor">App</span></code> level) them
-    instead.<br>
+      public branch <code class="code">pub</code>. It uses the private branch <code class="code">priv</code> to store
+      the received webhook event states. It connects to the GitHub API
+      using the token <code class="code">tok</code>. The default <code class="code">policy</code> is <code class="code"><span class="keywordsign">`</span><span class="constructor">Repeat</span></code>. By
+      default <code class="code">cap</code> is <code class="code"><span class="constructor">Cap</span>.all</code>.<br>
 </div>
 </body></html>

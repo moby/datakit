@@ -5,7 +5,7 @@ environment:
   CYG_ROOT: "C:\\cygwin"
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
   TESTS: "false"
-  PINS: "datakit-server:. git.1.9.0"
+  PINS: "datakit-server:."
 
 install:
   - appveyor DownloadFile https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/appveyor-opam.sh

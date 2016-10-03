@@ -1,7 +1,7 @@
 FROM ocaml/opam:alpine
 
 RUN sudo apk add ncurses-dev libev-dev
-RUN opam depext lwt && opam install lwt inotify alcotest conf-libev
+RUN opam depext lwt && opam install lwt inotify alcotest conf-libev lambda-term
 
 # cache opam install of dependencies
 COPY datakit-server.opam /home/opam/src/datakit/datakit-server.opam

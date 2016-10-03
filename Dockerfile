@@ -4,7 +4,7 @@ COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
 RUN opam depext datakit && opam install datakit --deps
 
-COPY . /home/opam/src/datakit
+COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && \
     git diff && git status --porcelain && \
@@ -12,7 +12,7 @@ RUN cd /home/opam/src/datakit && \
     git status --porcelain
 
 RUN opam update datakit
-RUN opam install datakit.dev -vv
+RUN opam install datakit -vv
 
 EXPOSE 5640
 

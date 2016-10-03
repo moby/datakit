@@ -155,8 +155,9 @@ let start listen_9p listen_http sandbox git =
       | None                 -> In_memory_store.connect ()
       | Some (sandbox, path) -> Git_fs_store.connect ~sandbox path
     end >|= fun make_root ->
-    List.map (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
-      listen_9p
+    List.map (fun addr ->
+        Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid addr
+      ) listen_9p
   in
   serve_9p >>= fun serve_9p ->
   Lwt.choose (serve_http @ serve_9p)

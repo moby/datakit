@@ -5,5 +5,6 @@
     connections and serves 9p filesystem described by [make_root
     ()]. *)
 val accept_forever:
+  ?backlog:int ->
   sandbox:bool -> serviceid:string -> make_root:(unit -> Vfs.Dir.t) ->
   string -> unit Lwt.t

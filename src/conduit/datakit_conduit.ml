@@ -51,8 +51,8 @@ module Unix = struct
           Lwt.return ()
         )
 
-  let accept_forever url socket callback =
-    Lwt_unix.listen socket 5;
+  let accept_forever ?(backlog=128) url socket callback =
+    Lwt_unix.listen socket backlog;
     let rec aux () =
       Lwt_unix.accept socket >>= fun (client, _addr) ->
       let _ = (* background thread *)
@@ -101,8 +101,8 @@ module HyperV = struct
           Lwt.return ()
         )
 
-  let accept_forever url socket callback =
-    Flow_lwt_unix_hvsock.Hvsock.listen socket 5;
+  let accept_forever ?(backlog=128) url socket callback =
+    Flow_lwt_unix_hvsock.Hvsock.listen socket backlog;
     let rec aux () =
       Flow_lwt_unix_hvsock.Hvsock.accept socket >>= fun (client, _addr) ->
       let _ = (* background thread *)
@@ -134,7 +134,7 @@ end
 
 module Named_pipe = struct
 
-  let rec accept_forever path callback =
+  let rec accept_forever ?backlog path callback =
     let open Lwt.Infix in
     let p = Named_pipe_lwt.Server.create path in
     Named_pipe_lwt.Server.connect p >>= function
@@ -146,7 +146,7 @@ module Named_pipe = struct
         let fd = Named_pipe_lwt.Server.to_fd p in
         callback fd
       in
-      accept_forever path callback
+      accept_forever ?backlog path callback
 
 end
 
@@ -154,7 +154,7 @@ let default d = function
   | Some x -> x
   | None -> d
 
-let accept_forever ~sandbox ~serviceid ~make_root url =
+let accept_forever ?backlog ~sandbox ~serviceid ~make_root url =
   Lwt.catch
     (fun () ->
        (* Check if it looks like a UNC name before a URI *)
@@ -164,19 +164,24 @@ let accept_forever ~sandbox ~serviceid ~make_root url =
        end else if String.is_prefix ~affix:"fd:" url then begin
          let i = String.with_range ~first:3 url in
          ( match String.to_int i with
-           | None -> Lwt.fail (Failure (Printf.sprintf "Failed to parse command-line argument [%s]" url))
+           | None ->
+             let err =
+               Fmt.strf "Failed to parse command-line argument [%s]" url
+             in
+             Lwt.fail_with err
            | Some x -> Lwt.return x
          ) >>= fun x ->
          Unix.of_fd x >>= fun socket ->
          let socket' = Lwt_unix.of_unix_file_descr socket in
-         Unix.accept_forever (Uri.of_string url) socket' (Unix.handle ~make_root)
+         Unix.accept_forever ?backlog
+           (Uri.of_string url) socket' (Unix.handle ~make_root)
        end else
          let uri = Uri.of_string url in
          match Uri.scheme uri with
          | Some "file" ->
            let prefix = if sandbox then "." else "" in
            Unix.of_path (prefix ^ Uri.path uri) >>= fun socket ->
-           Unix.accept_forever uri socket (Unix.handle ~make_root)
+           Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root)
          | Some "tcp" ->
            begin match Uri.path uri with
              | "" | "/" -> ()
@@ -195,14 +200,14 @@ let accept_forever ~sandbox ~serviceid ~make_root url =
            (* Makes testing easier *)
            Lwt_unix.setsockopt socket Lwt_unix.SO_REUSEADDR true;
            Lwt_unix.bind socket addr;
-           Unix.accept_forever uri socket (Unix.handle ~make_root)
+           Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root)
          | Some "hyperv-connect" ->
            HyperV.connect_forever uri
              (HyperV.of_uri ~serviceid uri) (HyperV.handle ~make_root)
          | Some "hyperv-accept" ->
            let socket = Flow_lwt_unix_hvsock.Hvsock.create () in
            Flow_lwt_unix_hvsock.Hvsock.bind socket (HyperV.of_uri ~serviceid uri);
-           HyperV.accept_forever uri socket (HyperV.handle ~make_root)
+           HyperV.accept_forever ?backlog uri socket (HyperV.handle ~make_root)
          | _ ->
            Printf.fprintf stderr
              "Unknown URL schema. Please use file: or tcp:\n";

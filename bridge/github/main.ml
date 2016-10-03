@@ -111,9 +111,12 @@ let start () sandbox no_listen listen_urls
     Log.app (fun l -> l "Connecting to %s." datakit);
     (Lwt.catch
        (fun () -> Client9p.connect proto address ())
-       (fun _ -> Lwt.fail_with
-           "%s is not a valid connect adress. Use 'tcp:hostname:port' or \
-            'unix:path'."))
+       (fun _ ->
+          let str = Fmt.strf
+              "%s is not a valid connect adress. Use 'tcp:hostname:port' or \
+               'unix:path'." datakit
+          in Lwt.fail_with str
+       ))
     >>= function
     | Error (`Msg e) ->
       Log.err (fun l -> l "cannot connect: %s" e);
@@ -136,9 +139,9 @@ let start () sandbox no_listen listen_urls
     else
       let root = VG.create token in
       let make_root () = Vfs.Dir.of_list (fun () -> Vfs.ok [root]) in
-      List.map
-        (Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid)
-        listen_urls
+      List.map (fun addr ->
+          Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid addr
+        ) listen_urls
   in
   Lwt_main.run @@ Lwt.choose (
     connect_to_datakit () :: accept_9p_connections ()

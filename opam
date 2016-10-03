@@ -32,7 +32,6 @@ depends: [
   "cohttp"
   "named-pipe"
   "hvsock"      {>= "0.8.1"}
-  "protocol-9p" {>= "0.7.0"}
   "logs"        {>= "0.5.0"}
   "win-eventlog"
   "asl"         {>= "0.10"}

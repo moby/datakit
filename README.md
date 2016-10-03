@@ -1,40 +1,21 @@
-## [DataKit](http://github.com/docker/datakit)
-
-[![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
-[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/6qrdgiqbhi4sehmy/branch/master?svg=true)](https://ci.appveyor.com/project/docker/datakit/branch/master)
-[![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
+## DataKit -- Orchestrate applications using a 9P dataflow
 
 *DataKit* is a tool to orchestrate applications using a 9P dataflow. It
 revisits the UNIX pipeline concept, with a modern twist: streams of
 tree-structured data instead of raw text. DataKit allows you to define
 complex build pipelines over version-controlled data, using shell
-scripts interacting with the filesystem. For instance to
-[trigger](https://github.com/docker/datakit/blob/master/ci/ci.sh)
-a build on every change in the `master` branch:
-
-```bash
-# The Git repository to test
-DB=/data
-
-# Load the `map` function.
-# `map fn branch` calls `fn` on the current head of `branch`, and then again
-# each time it changes. `fn` runs in a transaction directory on a new branch.
-# The transaction will be committed when `fn` returns.
-source ci/map.sh
-
-function build {
-  echo 'BUILD FAILED' > msg
-  ((docker build rw && echo PASSED > "$TRANS/msg")  || echo '*** BUILD FAILED ***') 2>&1 | tee "rw/log"
-}
-
-map build master
-```
+scripts interacting with the filesystem.
 
 DataKit is currently used as the coordination
 layer for [HyperKit](http://github.com/docker/hyperkit), the
 hypervisor component of
 [Docker for Mac and Windows](https://blog.docker.com/2016/03/docker-for-mac-windows-beta/).
 
+---
+
+[![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
+[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/6qrdgiqbhi4sehmy/branch/master?svg=true)](https://ci.appveyor.com/project/docker/datakit/branch/master)
+[![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
 ### Quick Start
 

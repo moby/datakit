@@ -1,4 +1,0 @@
-Expose Irmin as a 9p endpoint
-
-Datakit exposes the Irmin API over a filesystem interface so
-you can interact with it using the usual command-line tools.

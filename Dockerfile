@@ -2,6 +2,7 @@ FROM docker/datakit:server
 
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
+RUN opam pin add git --dev -n
 RUN opam depext datakit && opam install datakit --deps
 
 COPY . /home/opam/src/datakit/

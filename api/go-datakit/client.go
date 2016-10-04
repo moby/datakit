@@ -325,31 +325,26 @@ func (f *File) NewIOWriter(ctx context.Context, offset int64) io.Writer {
 }
 
 func (r *ioFileReaderWriter) Read(p []byte) (n int, err error) {
-	if len(p) > r.f.c.session.MaxReadSize() {
-		p = p[:r.f.c.session.MaxReadSize()]
-	}
 	r.f.m.Lock()
 	defer r.f.m.Unlock()
 	n, err = r.f.c.session.Read(r.ctx, r.f.fid, p, r.offset)
 	r.offset += int64(n)
 	// additional error handling for compliying with io.Reader
-	if n < len(p) && err == nil {
-		err = io.EOF
+	if n == 0 && (err == nil || err == io.EOF) {
+		err = io.ErrUnexpectedEOF
+	}
+	if n < len(p) && err == io.EOF {
+		err = io.ErrUnexpectedEOF
 	}
 	return
 }
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
+
 func (w *ioFileReaderWriter) Write(p []byte) (n int, err error) {
 	w.f.m.Lock()
 	defer w.f.m.Unlock()
 	for err == nil {
 		var written int
-		written, err = w.f.c.session.Write(w.ctx, w.f.fid, p[:minInt(len(p), w.f.c.session.MaxWriteSize())], w.offset)
+		written, err = w.f.c.session.Write(w.ctx, w.f.fid, p, w.offset)
 		p = p[written:]
 		w.offset += int64(written)
 		n += written

@@ -75,9 +75,14 @@ let set_signal_if_supported signal handler =
   with Invalid_argument _ ->
     ()
 
+let ( >>~ ) x f =
+  x >>= function
+  | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+  | Ok t    -> f t
+
 let start () sandbox no_listen listen_urls
     datakit private_branch public_branch cap
-    webhook =
+    webhook prune =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -128,12 +133,13 @@ let start () sandbox no_listen listen_urls
       Log.info (fun l -> l "Connected to %s" datakit);
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
-      DK.branch dk private_branch >>= function
-      | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-      | Ok priv ->
-        DK.branch dk public_branch >>= function
-        | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-        | Ok pub  ->
+      match prune with
+      | Some br ->
+        DK.branch dk br >>~ fun br ->
+        VG.Sync.prune br
+      | None ->
+        DK.branch dk private_branch >>~ fun priv ->
+        DK.branch dk public_branch  >>~ fun pub ->
           VG.Sync.sync t ?webhook ~cap ~priv ~pub ~token
           >|= ignore
   in
@@ -148,8 +154,7 @@ let start () sandbox no_listen listen_urls
   in
   Lwt_main.run @@ Lwt.choose (
     connect_to_datakit () :: accept_9p_connections ()
-  );
-  assert false
+  )
 
 open Cmdliner
 
@@ -237,6 +242,10 @@ let capabilities =
   in
   Arg.(value & opt cap Datakit_github.Capabilities.all doc)
 
+let prune =
+  let doc = Arg.info ~doc:"Prune the given branch and exit" ["prune"] in
+  Arg.(value & opt (some string) None doc)
+
 let term =
   let doc = "Bridge between GiHub API and Datakit." in
   let man = [
@@ -247,7 +256,7 @@ let term =
   ] in
   Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
         datakit $ private_branch $ public_branch $ capabilities $
-        webhook),
+        webhook $ prune),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

@@ -1624,6 +1624,18 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     clean () >>*= fun () ->
     update ()
 
+  let prune_branch s =
+    let update, remove = Snapshot.prune s.snapshot in
+    cleanup "prune" { remove; update = Some update } s.tr >>*= fun () ->
+    DK.Transaction.diff s.tr s.head >>*= fun diff ->
+    (if diff = [] then DK.Transaction.abort s.tr
+     else safe_commit s.tr ~message:"Prune") >>= ok
+
+  let prune b =
+    (branch "prune" b >>*= prune_branch) >>= function
+    | Ok ()   -> Lwt.return_unit
+    | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+
   let sync_repos ~cap ~token ~pub ~priv t repos =
     import_repos ~cap ~token t.priv.snapshot repos >>*= fun (priv_s, c) ->
     cleanup "import" c t.priv.tr >>*= fun () ->

@@ -19,7 +19,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 <src/conduit/*>: package(protocol-9p.unix)
 
 <src/log>: include
-<src/log/*>: package(asl win-eventlog cmdliner logs.cli)
+<src/log/*>: package(asl win-eventlog cmdliner logs.cli mtime.os)
 
 <src/irmin-io> : include
 <src/irmin-io/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)

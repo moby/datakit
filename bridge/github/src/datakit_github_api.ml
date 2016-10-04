@@ -103,10 +103,35 @@ module Ref = struct
   let to_list s = match String.cuts ~empty:false ~sep:"/" s with
     | "refs" :: l | l -> l
 
-  let of_gh repo r =
+  let commit_ref_of_tag ~token ~repo:{ Repo.user; repo } r =
+    let open Github.Monad in
+    assert (r.git_ref_obj.obj_ty = `Tag);
+    let sha = r.git_ref_obj.obj_sha in
+    let t =
+      Github.Repo.get_tag ~token ~user ~repo ~sha () >>~ fun t ->
+      (* FIXME: do we care about tags pointing to tags ?*)
+      Github.Monad.return { r with git_ref_obj = t.tag_obj }
+    in
+    Github.Monad.run t
+
+  open Lwt.Infix
+
+  let to_commit_ref ~token ~repo r =
+    match r.Github_t.git_ref_obj.obj_ty with
+    | `Blob
+    | `Tree   -> Lwt.return_none
+    | `Commit -> Lwt.return (Some r)
+    | `Tag    -> commit_ref_of_tag ~token ~repo r >|= fun r -> Some r
+
+  let of_gh_commit_ref ~repo r =
     assert (r.git_ref_obj.obj_ty = `Commit);
     let head = { Commit.repo; id = r.git_ref_obj.obj_sha } in
     { head; name = to_list r.git_ref_name }
+
+  let of_gh ~token ~repo r =
+    to_commit_ref ~token ~repo r >|= function
+    | Some r -> Some (of_gh_commit_ref ~repo r)
+    | None   -> None
 
   let of_event_hook repo r =
     let id = r.push_event_hook_after in
@@ -266,27 +291,15 @@ let prs token r =
 
 let refs token r =
   let { Repo.user; repo } = r in
-  let (>>~) = Github.Monad.(>>~) in
-  let ref_of_tag r =
-    assert (r.git_ref_obj.obj_ty = `Tag);
-    let sha = r.git_ref_obj.obj_sha in
-    Github.Repo.get_tag ~token ~user ~repo ~sha () >>~ fun t ->
-    Github.Monad.return { r with git_ref_obj = t.tag_obj }
-    (* FIXME: do we care about tags pointing to tags ?*)
-  in
   let refs ty =
-    let open Github.Monad in
     Github.Repo.refs ~ty ~token ~user ~repo ()
-    |> Github.Stream.to_list
-    >>= List.fold_left (fun acc r ->
-        match r.Github_t.git_ref_obj.obj_ty with
-        | `Blob
-        | `Tree   -> acc
-        | `Commit -> acc >|= fun acc -> r :: acc
-        | `Tag    -> ref_of_tag r >>= fun r -> acc >|= fun acc -> r :: acc
-      ) (Github.Monad.return [])
-    |> Github.Monad.map @@ List.map (Ref.of_gh r)
-    |> run
+    |>  Github.Stream.to_list
+    |>  Github.Monad.run
+    >>= Lwt_list.fold_left_s (fun acc ref ->
+        Ref.of_gh ~token ~repo:r ref >|= function
+        | None   -> acc
+        | Some r -> r :: acc
+      ) []
   in
   refs "heads" >>= fun heads ->
   refs "tags"  >|= fun tags  ->

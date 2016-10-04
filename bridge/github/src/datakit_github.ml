@@ -1485,6 +1485,13 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     close t.priv.tr >>= fun () ->
     close t.pub.tr
 
+  let safe_commit tr ~message =
+    DK.Transaction.commit tr ~message >>= function
+    | Ok ()   -> Lwt.return_unit
+    | Error e ->
+      Log.info (fun l -> l "Abort: %a" DK.pp_error e);
+      DK.Transaction.abort tr
+
   (* Merge the private branch back in the public branch. *)
   let merge t ~pub ~priv =
     assert (is_closed t);
@@ -1531,8 +1538,8 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
             t.priv.name pp diff conflict_msg
         in
         Log.debug (fun l -> l "merge commit: %s" msg);
-        DK.Transaction.commit t.pub.tr ~message:msg >>*= fun () ->
-        abort t >>= fun () ->
+        safe_commit t.pub.tr ~message:msg >>= fun () ->
+        DK.Transaction.abort t.priv.tr  >>= fun () ->
         state "end-merge" ~old:(Some t) ~priv ~pub
 
   (** Sync *)
@@ -1554,7 +1561,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
           | Error e ->
             DK.Transaction.abort tr >>= fun () ->
-            Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+            Lwt.fail_with @@ Fmt.strf "init_sync: %a" DK.pp_error e
         ) >>*= fun () ->
       with_head priv (DK.Branch.fast_forward pub)
     | Some pub_c, None  -> DK.Branch.fast_forward priv pub_c
@@ -1630,17 +1637,17 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
     let priv_s, remove = Snapshot.prune priv_s in
     cleanup "sync" { remove; update = Some priv_s } t.priv.tr >>*= fun () ->
     DK.Transaction.diff t.priv.tr t.priv.head >>*= fun diff ->
-    (if diff = [] then DK.Transaction.abort t.priv.tr >>= ok else
+    (if diff = [] then DK.Transaction.abort t.priv.tr else
        let message = Fmt.strf "Sync with %a" Repo.Set.pp repos in
-       DK.Transaction.commit t.priv.tr ~message)
-    >>*= fun () ->
+       safe_commit t.priv.tr ~message)
+    >>= fun () ->
     DK.Transaction.abort t.pub.tr >>= fun () ->
     merge t ~pub ~priv >>*= fun t ->
     let pub_s, remove = Snapshot.prune t.pub.snapshot in
     cleanup "sync" { remove; update = Some pub_s } t.pub.tr >>*= fun () ->
     DK.Transaction.diff t.pub.tr t.pub.head >>*= fun diff ->
     (if diff = [] then ok t else
-       DK.Transaction.commit t.pub.tr ~message:"Prune" >>*= fun () ->
+       safe_commit t.pub.tr ~message:"Prune" >>= fun () ->
        DK.Transaction.abort t.priv.tr >>= fun () ->
        state "end-sync-repos" ~old:(Some t) ~pub ~priv)
 
@@ -1694,7 +1701,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
           Fmt.strf "New webhook events\n\n%a"
             Fmt.(list ~sep:(unit "\n\n") Event.pp) events
         in
-        DK.Transaction.commit t.priv.tr ~message >>*= fun () ->
+        safe_commit t.priv.tr ~message >>= fun () ->
         DK.Transaction.abort t.pub.tr >>= fun () ->
         merge t ~pub ~priv
 

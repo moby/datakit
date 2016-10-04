@@ -167,7 +167,8 @@ let setup_log =
       "DATAKIT_VERBOSE"
   in
   Term.(const Datakit_log.setup $ Fmt_cli.style_renderer ()
-        $ Datakit_log.log_destination $ Logs_cli.level ~env ())
+        $ Datakit_log.log_destination $ Logs_cli.level ~env ()
+        $ Datakit_log.log_clock)
 
 let no_listen =
   let doc =

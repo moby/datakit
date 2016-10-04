@@ -518,6 +518,9 @@ module Sync (API: API) (DK: Datakit_S.CLIENT): sig
   val empty: t
   (** Create an empty sync state. *)
 
+  val prune: DK.Branch.t -> unit Lwt.t
+  (** [prune b] prunes the branch [b]. *)
+
   (** [sync t ~pub ~priv ~token] mirror GitHub changes in the DataKit
       public branch [pub]. It uses the private branch [priv] to store
       the received webhook event states. It connects to the GitHub API

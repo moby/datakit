@@ -301,8 +301,7 @@ module FS = struct
     let size = Int32.of_int stats.Unix.st_size in
     { ctime; mtime; dev; inode; uid; gid; mode; size }
 
-  let file_exists f =
-    Lwt.return (Sys.file_exists f)
+  let file_exists f = Lwt_unix.file_exists f
 
   let rm_command =
     if Sys.os_type = "Win32" then

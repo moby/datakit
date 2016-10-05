@@ -23,8 +23,8 @@ dependencies:
   - opam list
   - opam install datakit
   - opam config exec -- make COMMIT
-  - mkdir -p _build/src/bin
-  - opam config exec -- cp /Users/distiller/.opam/4.02.3/bin/datakit _build/src/bin/main.native
+  - mkdir -p _build/src/datakit
+  - opam config exec -- cp /Users/distiller/.opam/4.02.3/bin/datakit _build/src/datakit/main.native
   - opam config exec -- make bundle
 test:
   override:

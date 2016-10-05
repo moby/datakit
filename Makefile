@@ -6,8 +6,11 @@ TESTS = true
 
 .PHONY: all clean test bundle COMMIT exe
 
-all: datakit client server github
-	@
+all:
+	opam pin add datakit-client . -y
+	opam pin add datakit-server . -y
+	opam pin add datakit-github . -y
+	$(MAKE) datakit
 
 datakit:
 	ocaml pkg/pkg.ml build --tests $(TESTS) -q

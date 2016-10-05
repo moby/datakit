@@ -316,3 +316,18 @@ end and Inode: sig
       same inode number, then they are the same file. *)
 
 end
+
+module Logs: sig
+
+  val dir: Dir.t
+  (** [dir] is a projection of [Logs.Src] into the VFS: each entry [s] in
+      [Logs.Src.list ()] has a subdirectory [<fs>/src/<s>] containing
+      two files:
+
+      {ul
+      {- [<fs>/src/<s>/doc] is [Logs.Src.doc s]. The file is read-only. }
+      {- [<fs>/src/<s>/level] is [Logs.Src.level s]. Changing the contents
+         of that file will trigger {!Logs.Src.set_level}. }}
+  *)
+
+end

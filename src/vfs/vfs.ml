@@ -486,3 +486,55 @@ module Inode = struct
   let ino t = t.Dir.ino
   let kind t = t.Dir.kind
 end
+
+module Logs = struct
+
+  let level s =
+    (* [empty] should really be per-open-file, but no easy way to do that. *)
+    let empty = ref false in
+    let read () =
+      if !empty then ok (Some (Cstruct.create 0))
+      else (
+        let l = Logs.Src.level s in
+        ok (Some (Cstruct.of_string (Logs.level_to_string l ^ "\n")))
+      )
+    in
+    let write data =
+      match String.trim (Cstruct.to_string data) with
+      | "" -> empty := true; ok ()
+      | data ->
+        empty := false;
+        match Logs.level_of_string data with
+        | Ok l ->
+          Logs.Src.set_level s l;
+          ok ()
+        | Error (`Msg msg) -> error "%s" msg
+    in
+    let chmod _ = Lwt.return Error.perm in
+    let remove () = Lwt.return Error.perm in
+    File.of_kv ~read ~write ~stat:(File.stat_of ~read) ~remove ~chmod
+
+  let src s =
+    let items = [
+      Inode.file "doc" (File.ro_of_string (Logs.Src.doc s ^ "\n"));
+      Inode.file "level" (level s);
+    ] in
+    Dir.of_list (fun () -> ok items)
+
+  let srcs =
+    let logs = Hashtbl.create 100 in
+    let get_dir s =
+      let name = Logs.Src.name s in
+      try Hashtbl.find logs name
+      with Not_found ->
+        let dir = Inode.dir name (src s) in
+        Hashtbl.add logs name dir;
+        dir
+    in
+    Dir.of_list (fun () -> Logs.Src.list () |> List.map get_dir |> ok)
+
+  let dir =
+    let dirs = ok [ Inode.dir "src" srcs ] in
+    Dir.of_list (fun () -> dirs)
+
+end

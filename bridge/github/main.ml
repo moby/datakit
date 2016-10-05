@@ -146,8 +146,7 @@ let start () sandbox no_listen listen_urls
   let accept_9p_connections () =
     if no_listen || listen_urls = [] then []
     else
-      let root = VG.create token in
-      let make_root () = Vfs.Dir.of_list (fun () -> Vfs.ok [root]) in
+      let make_root = let r = VG.root token in fun () -> r in
       List.map (fun addr ->
           Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid addr
         ) listen_urls

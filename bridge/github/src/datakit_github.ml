@@ -1118,6 +1118,16 @@ module Capabilities = struct
       Fmt.pf ppf "pr:%a,status:%a,ref:%a,webhook:%a"
         X.pp t.pr X.pp t.status X.pp t.ref X.pp t.webhook
 
+  let pp_resource ppf = function
+    | `PR      -> Fmt.string ppf "pr"
+    | `Status  -> Fmt.string ppf "status"
+    | `Ref     -> Fmt.string ppf "ref"
+    | `Webhook -> Fmt.string ppf "webhook"
+
+  let pp_op ppf = function
+    | `Read  -> Fmt.string ppf "read"
+    | `Write -> Fmt.string ppf "write"
+
   let apply f t op = function
     | `PR      -> { t with pr      = f t.pr op }
     | `Status  -> { t with status  = f t.status op }
@@ -1132,11 +1142,20 @@ module Capabilities = struct
   let allow = apply X.allow
   let disallow = apply X.disallow
 
-  let check t op = function
-    | `PR      -> X.check t.pr op
-    | `Status  -> X.check t.status op
-    | `Ref     -> X.check t.ref op
-    | `Webhook -> X.check t.webhook op
+  let x t = function
+    | `PR      -> t.pr
+    | `Status  -> t.status
+    | `Ref     -> t.ref
+    | `Webhook -> t.webhook
+
+  let check t op r =
+    let allowed = X.check (x t r) op in
+    if not allowed then
+      Log.info (fun l ->
+          l "%a: %a is denied (current policy is %a)"
+            pp_resource r pp_op op pp t
+        );
+    allowed
 
   let resource_of_string = function
     | "pr"      -> Some `PR

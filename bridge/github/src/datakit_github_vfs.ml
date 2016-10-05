@@ -271,10 +271,17 @@ module Make (API: API) = struct
       Vfs.ok (Vfs.Inode.dir user dir)
 
   (* /github.com/ *)
-  let create token =
+  let github_com token =
     let ls () = Vfs.ok [] in
     let remove () = Vfs.Dir.err_read_only in
     let lookup name = user_dir ~token ~user:name in
-    Vfs.Inode.dir "github.com" @@ Vfs.Dir.read_only ~ls ~remove ~lookup
+    Vfs.Dir.read_only ~ls ~remove ~lookup
+
+  let root token =
+    let dirs = Vfs.ok [
+        Vfs.Inode.dir "github.com" (github_com token);
+        Vfs.Inode.dir "debug"      Vfs.Logs.dir;
+      ] in
+    Vfs.Dir.of_list (fun () -> dirs)
 
 end

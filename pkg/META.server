@@ -5,7 +5,7 @@ requires = ""
 package "vfs" (
  description = "Datakit VFS"
  version = "%%VERSION%%"
- requires = "datakit-server fmt astring lwt cstruct logs result"
+ requires = "astring cstruct fmt logs lwt result rresult sexplib"
  archive(byte)   = "vfs.cma"
  archive(native) = "vfs.cmxa"
  plugin(byte)    = "vfs.cma"
@@ -16,7 +16,7 @@ package "vfs" (
 package "fs9p" (
  description = "Expose Datakit VFS as a 9p endpoint"
  version = "%%VERSION%%"
- requires = "protocol-9p datakit-server.vfs"
+ requires = "astring cstruct datakit-server.vfs fmt logs protocol-9p result rresult sexplib"
  archive(byte)   = "fs9p.cma"
  archive(native) = "fs9p.cmxa"
  plugin(byte)    = "fs9p.cma"

@@ -6,10 +6,12 @@ dist: trusty
 env:
   global:
   - EXTRA_DEPS="inotify"
+  - PINS="datakit-client:. datakit-server:. datakit-github:. datakit:."
   matrix:
   - OCAML_VERSION=4.02 PACKAGE="datakit-client"
   - OCAML_VERSION=4.03 PACKAGE="datakit-client"
-  - OCAML_VERSION=4.03 PACKAGE="datakit" PINS="datakit-server:."
-  - OCAML_VERSION=4.03 PACKAGE="datakit-github" PINS="datakit-server:."
+  - OCAML_VERSION=4.03 PACKAGE="datakit-server"
+  - OCAML_VERSION=4.03 PACKAGE="datakit-github"
+  - OCAML_VERSION=4.03 PACKAGE="datakit"
 os:
   - linux

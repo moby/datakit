@@ -37,6 +37,9 @@ depends: [
   "asl"         {>= "0.10"}
   "mtime"
   "irmin-watcher" {>= "0.1.3"}
-  "alcotest"   {test}
+  "datakit-client" {test}
+  "datakit-server" {test}
+  "datakit-github" {test}
+  "alcotest"       {test}
 ]
 available: [ocaml-version >= "4.02.0"]

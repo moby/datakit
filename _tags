@@ -2,66 +2,66 @@ true : bin_annot, safe_string
 true: warn_error(+1..49), warn(A-3-4-41-44)
 true: package(bytes lwt astring logs result cstruct fmt rresult)
 
+<src>: include
+
+### datakit-client
+
+<src/datakit-client/*>: package(protocol-9p uri)
+<src/datakit-client/mount.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
+
+### datakit-server
+
+<src/datakit-server/*>: package(protocol-9p.unix)
+
 ### datakit
 
-<src>: include
-<src/vfs> : include
+<src/datakit>: include
+<src/datakit/ivfs*>: package(irmin tc datakit-server.vfs)
 
-<src/ivfs> : include
-<src/ivfs/*>: package(irmin tc)
+#### irmin-io
+<src/datakit/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
 
-<src/fs9p> : include
-<src/fs9p/*>: package(protocol-9p.unix)
+<src/datakit/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
+<src/datakit/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
+<src/datakit/main.*>: package(irmin.http cohttp.lwt)
+<src/datakit/main.*>: package(datakit-server.vfs datakit-server.fs9p)
+<src/datakit/main.*>: package(protocol-9p.unix camlzip), thread
 
-<src/conduit>: include
-<src/conduit/*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
-<src/conduit/*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
-<src/conduit/*>: package(protocol-9p.unix)
+### datakit-conduit
+<src/datakit_conduit.*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
+<src/datakit_conduit.*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
+<src/datakit_conduit.*>: package(protocol-9p.unix datakit-server.fs9p)
 
-<src/log>: include
-<src/log/*>: package(asl win-eventlog cmdliner logs.cli mtime.os)
+### datakit-log
+<src/datakit_log.*>: package(asl win-eventlog cmdliner logs.cli mtime.os)
 
-<src/irmin-io> : include
-<src/irmin-io/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
+### datakit-bridge
 
-<bridge/github/src/*>: package(uri)
-<bridge/github/src/datakit_github_*>: package(github github-hooks.unix)
-
-<src/bin/*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
-<src/bin/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
-<src/bin/main.*>: package(irmin.http cohttp.lwt)
-<src/bin/main.*>: package(protocol-9p.unix camlzip), thread
-
-# datakit-client
-
-<src/client/*>: package(protocol-9p uri)
-
-### datakit-github-bridge
-
-<src/client>: include
-<bridge/github/src>: include
+<bridge/github/*>: package(uri datakit-client datakit-server.vfs)
+<bridge/github/main.*>: package(datakit-server.fs9p)
+<bridge/github/datakit_github_*>: package(github github-hooks.unix)
 <bridge/github/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
 <bridge/github/main.*>: package(github.unix github-hooks.unix)
 
 ### Tests
 
-<src/client>: include
 <tests/*>: package(alcotest conduit.lwt-unix str logs.fmt fmt.tty mtime.os)
 <tests/*>: package(mirage-types.lwt protocol-9p.unix irmin irmin.mem camlzip)
 <tests/*>: package(git irmin.git)
+<tests/*>: package(datakit-client datakit-server.vfs datakit-server.fs9p)
+<tests/*>: package(datakit-github)
 
-### Annoying
+### Painful
 
-# because of src/conduit
+#### because of src/datakit_conduit.ml
+
 <bridge/github/main.*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
 <bridge/github/main.*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
 <bridge/github/main.*>: package(protocol-9p.unix)
-## because of src/loc
-<bridge/github/main.*>: package(asl win-eventlog cmdliner mtime.os logs.cli)
+<src/datakit/main.*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
+<src/datakit/main.*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
+<src/datakit/main.*>: package(protocol-9p.unix datakit-server.fs9p)
 
-## because of src/conduit
-<src/bin/main.*>: thread, package(threads conduit.lwt-unix hvsock.lwt)
-<src/bin/main.*>: package(hvsock.lwt-unix named-pipe.lwt uri mirage-flow)
-<src/bin/main.*>: package(protocol-9p.unix)
-## because of src/loc
-<src/bin/main.*>: package(asl win-eventlog cmdliner mtime.os logs.cli)
+#### because of src/datakit_log.ml
+<bridge/github/main.*>: package(asl win-eventlog cmdliner mtime.os logs.cli)
+<src/datakit/main.*>: package(asl win-eventlog cmdliner mtime.os logs.cli)

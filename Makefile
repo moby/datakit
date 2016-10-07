@@ -6,8 +6,14 @@ TESTS = true
 
 .PHONY: all clean test bundle COMMIT exe
 
-all: datakit client server github
+all: datakit
 	@
+
+depends:
+	opam pin add datakit-client . -y
+	opam pin add datakit-server . -y
+	opam pin add datakit-github . -y
+	opam update -u datakit-client datakit-server datakit-github -y
 
 datakit:
 	ocaml pkg/pkg.ml build --tests $(TESTS) -q
@@ -36,7 +42,7 @@ bundle:
 	ocaml pkg/pkg.ml build --tests false --pinned true
 	mkdir -p $(APP)/Contents/MacOS/
 	mkdir -p $(APP)/Contents/Resources/lib/
-	cp _build/src/bin/main.native $(APP)/Contents/MacOS/com.docker.db
+	cp _build/src/datakit/main.native $(APP)/Contents/MacOS/com.docker.db
 	./scripts/check-dylib.sh
 	dylibbundler -od -b \
 	 -x $(APP)/Contents/MacOS/com.docker.db \
@@ -52,5 +58,5 @@ exe:
 	rm -rf _build/
 	ocaml pkg/pkg.ml build --tests false --pinned true
 	mkdir -p $(EXE)
-	cp _build/src/bin/main.native $(EXE)/datakit.exe
+	cp _build/src/datakit/main.native $(EXE)/datakit.exe
 	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)

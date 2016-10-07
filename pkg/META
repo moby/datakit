@@ -3,13 +3,12 @@ version = "%%VERSION%%"
 requires = ""
 
 package "ivfs" (
- directory = "ivfs"
  description = "Project Irmin into a Datakit VFS"
  version = "%%VERSION%%"
  requires = "fmt astring irmin datakit-server.vfs"
- archive(byte)   = "datakit-ivfs.cma"
- archive(native) = "datakit-ivfs.cmxa"
- plugin(byte)    = "datakit-ivfs.cma"
- plugin(native)  = "datakit-ivfs.cmxs"
- exists_if       = "datakit-ivfs.cma"
+ archive(byte)   = "ivfs.cma"
+ archive(native) = "ivfs.cmxa"
+ plugin(byte)    = "ivfs.cma"
+ plugin(native)  = "ivfs.cmxs"
+ exists_if       = "ivfs.cma"
 )

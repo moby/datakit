@@ -1,6 +1,6 @@
 description = "Use Datakit to interact with the GitHub API"
 version = "%%VERSION%%"
-requires = "datakit-client datakit-server.vfs github"
+requires = "astring cstruct datakit-client datakit-server.vfs fmt github.unix github-hooks.unix logs lwt.unix result rresult uri"
 archive(byte)   = "datakit-github.cma"
 archive(native) = "datakit-github.cmxa"
 plugin(byte)    = "datakit-github.cma"

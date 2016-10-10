@@ -30,6 +30,7 @@ let () =
       Pkg.bin   "src/datakit/main" ~dst:"datakit";
       Pkg.bin   "src/datakit-client/mount" ~dst:"datakit-mount" ;
       Pkg.test  "tests/test" ~args:(Cmd.v "-q");
+      Pkg.test  "examples/ocaml-client/example" ~run:false ;
     ]
   | "datakit-client" -> Ok [
       Pkg.lib   "pkg/META.client"     ~dst:"META";
@@ -38,7 +39,6 @@ let () =
       Pkg.lib   "src/datakit-client/datakit_S.mli";
       Pkg.lib   "src/datakit-client/datakit_S.cmi";
       Pkg.bin   "src/datakit-client/mount" ~dst:"datakit-mount" ;
-      Pkg.test  "examples/ocaml-client/example" ~run:false ;
     ]
   | "datakit-server" -> Ok [
       Pkg.lib   "pkg/META.server"     ~dst:"META";

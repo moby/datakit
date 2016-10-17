@@ -1,6 +1,24 @@
-(** Virtual filesystem for the GitHub API. *)
+(** Main object types used by the GitHub bridge. *)
 
-(** Signature for status states. *)
+(** {1 Printable Sets} *)
+
+(** Pretty-printable {!Set.OrderedType}. *)
+module type ELT = sig
+  include Set.OrderedType
+  val pp: t Fmt.t
+end
+
+(** Pretty-printable {!Set.S}. *)
+module type SET = sig
+  include Set.S
+  val pp: t Fmt.t
+end
+
+module Set (E: ELT): SET with type elt = E.t
+(** [Set] is similar to {!Set.Make} but for pretty-printable sets. *)
+
+(** {1 Data-model} *)
+
 module Status_state: sig
 
   type t = [ `Error | `Pending | `Success | `Failure ]
@@ -29,13 +47,13 @@ module Repo: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)
 
+  val compare: t -> t -> int
+  (** [compare] compares repositories.*)
+
   val pp_state: state Fmt.t
   (** [pp_state] is the pretty-printer for repository state. *)
 
-  module Set: sig
-    include Set.S with type elt = t
-    val pp: t Fmt.t
-  end
+  module Set: SET with type elt = t
   (** Sets of repositories. *)
 
 end
@@ -48,15 +66,20 @@ module Commit: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for commits. *)
 
+  val compare: t -> t -> int
+  (** [compare] compares commits. *)
+
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
   val id: t -> string
   (** [id t] is [t]'s SHA1. *)
 
+  val equal: t -> t -> bool
+  (** [equal] is the equality functions for commits. *)
+
   module Set: sig
-    include Set.S with type elt = t
-    val pp: t Fmt.t
+    include SET with type elt = t
     val repos: t -> Repo.Set.t
   end
   (** Sets of commits. *)
@@ -74,8 +97,23 @@ module PR: sig
     base: string;
   }
 
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for pull-request values. *)
+
+  val compare: t -> t -> int
+  (** [compare] compares pull requests. *)
+
+  type id = Repo.t * int
+  (** The type for commit ids. *)
+
+  val pp_id: id Fmt.t
+  (** [pp_id] is the pretty-printer for PR ids. *)
+
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repostiory. *)
+
+  val id: t -> id
+  (** [id t] is [t]'s ID. *)
 
   val commit: t -> Commit.t
   (** [commit t] is [t]'s commit. *)
@@ -89,21 +127,28 @@ module PR: sig
   val state: t -> [`Open | `Closed]
   (** [state t] is [t]'s state. *)
 
+  val close: t -> t
+  (** [close t] is [t] with [state t] set to [`Closed]. *)
+
+  val state_of_string: string -> [`Open | `Closed] option
+  (** [string_of_state str] is [Some s] if there exists a state [s]
+      such that [state_of_string s] is [str]. Otherwise it is
+      [None]. *)
+
+  val string_of_state: [`Open | `Closed] -> string
+  (** [state_of_string s] is [s]'s string representation. *)
+
   val title: t -> string
   (** [title t] is [t]'s title. *)
 
-  val pp: t Fmt.t
-  (** [pp] is the pretty-printer for pull-request values. *)
-
-  val same: t -> t -> bool
-  (** [same x y] is true if [x] and [y] have the same repository and
-      number. *)
+  val same_id: t -> t -> bool
+  (** [same_id x y] is true if [x] and [y] have the same ID. *)
 
   module Set: sig
-    include Set.S with type elt = t
-    val pp: t Fmt.t
+    include SET with type elt = t
     val repos: t -> Repo.Set.t
     val commits: t -> Commit.Set.t
+    val map: (elt -> elt) -> t -> t
   end
   (** Sets of pull requests. *)
 
@@ -120,6 +165,21 @@ module Status: sig
     state: Status_state.t;
   }
 
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for status values. *)
+
+  type id = Commit.t * string list
+  (** The type for build-status IDs. *)
+
+  val pp_id: id Fmt.t
+  (** [pp_id] is the pretty-printer for build-status IDs. *)
+
+  val id: t -> id
+  (** [id t] is [t]'s ID. *)
+
+  val context: t -> string list
+  (** [context t] is [t]'s context. *)
+
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
@@ -129,25 +189,14 @@ module Status: sig
   val commit_id: t -> string
   (** [commit_id t] is [t]'s commit ID. *)
 
-  val pp: t Fmt.t
-  (** [pp] is the pretty-printer for status values. *)
-
-  val path: t -> Datakit_path.t
-  (** [path t] is path corresponding to [t]'s context. The empty list
-      is rewritten into ["default"] to match the GitHub
-      API. Otherwise, segments are concatenated using ["/"] as a
-      separator. *)
-
-  val same: t -> t -> bool
-  (** [same x y] is true if [x] and [y] have the same commit and
-      context. *)
+  val same_id: t -> t -> bool
+  (** [same_id x y] is true if [x] and [y] have the same ID. *)
 
   val compare: t -> t -> int
   (** [compare] is the comparison function for build status. *)
 
   module Set: sig
-    include Set.S with type elt = t
-    val pp: t Fmt.t
+    include SET with type elt = t
     val repos: t -> Repo.Set.t
     val commits: t -> Commit.Set.t
   end
@@ -163,6 +212,21 @@ module Ref: sig
   }
   (** The type for Git references. *)
 
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for references. *)
+
+  val compare: t -> t -> int
+  (** [compare] compares Git references. *)
+
+  type id = Repo.t * string list
+  (** The type for Git reference IDs. *)
+
+  val pp_id: id Fmt.t
+  (** [pp_id] is the pretty-printer for Git reference IDs. *)
+
+  val id: t -> id
+  (** [id t] is [t]'s ID. *)
+
   val name: t -> string list
   (** [name t] is [t]'s name. *)
 
@@ -175,23 +239,21 @@ module Ref: sig
   val commit_id: t -> string
   (** [commit_id t] is [t]'s commit ID. *)
 
-  val pp: t Fmt.t
-  (** [pp] is the pretty-printer for references. *)
-
-  val same: t -> t -> bool
-  (** [same x y] is true if [x] and [y] have the same repository and
-      name. *)
+  val same_id: t -> t -> bool
+  (** [same_id x y] is true if [x] and [y] have the same ID. *)
 
   module Set: sig
-    include Set.S with type elt = t
-    val pp: t Fmt.t
+    include SET with type elt = t
     val repos: t -> Repo.Set.t
     val commits: t -> Commit.Set.t
   end
   (** Sets of Git references. *)
 
   type state = [`Created | `Updated | `Removed]
-  (** The type for reference state. *)
+  (** The type for reference events' state. *)
+
+  val pp_state: state Fmt.t
+  (** [pp_state] is the pretty-printer for reference events' state.*)
 
 end
 
@@ -208,20 +270,239 @@ module Event: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for event values. *)
 
-  val repo': Repo.state -> Repo.t -> t
-  val pr: PR.t -> t
-  val status: Status.t -> t
-  val ref: Ref.state -> Ref.t -> t
-  val other: Repo.t -> string -> t
+  val of_repo: Repo.state -> Repo.t -> t
+  val of_pr: PR.t -> t
+  val of_status: Status.t -> t
+  val of_ref: Ref.state -> Ref.t -> t
+  val of_other: Repo.t -> string -> t
 
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
 end
 
+module Elt: sig
+
+  type t = [
+    | `Repo of Repo.t
+    | `Commit of Commit.t
+    | `PR of PR.t
+    | `Status of Status.t
+    | `Ref of Ref.t
+  ]
+
+  val pp: t Fmt.t
+  val compare: t -> t -> int
+
+  type id = [
+    | `Repo of Repo.t
+    | `Commit of Commit.t
+    | `PR of PR.id
+    | `Status of Status.id
+    | `Ref of Ref.id
+  ]
+
+  val pp_id: id Fmt.t
+  val compare_id: id -> id -> int
+
+  module Set: SET with type elt = t
+  module IdSet: SET with type elt = id
+
+end
+
+module Snapshot: sig
+
+  (** {1 GitHub snapshot} *)
+
+  type t
+  (** The type for GitHub snapshot. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for snapshots. *)
+
+  val empty: t
+  (** The empty snapshot. *)
+
+  val is_empty: t -> bool
+  (** [is_empty t] is true if [t] is {!empty}. *)
+
+  val create:
+    repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
+    prs:PR.Set.t -> refs:Ref.Set.t -> t
+  (** [create ~repos ~commits ~status ~prs ~refs] is a new snapshot
+      [t] with repositories [reps], commits [commits], pull-requests
+      [prs], build statuses [status] and Git references [refs]. *)
+
+  val compare: t -> t -> int
+  (** [compare] is the comparison function for snapshots. *)
+
+  val union: t -> t -> t
+  (** [union x y] is the union of the snapshots [x] and [y]. *)
+
+  val prune: t -> t
+  (** [prune t] is [t] where all the objects related to closed PRs
+      have been removed. *)
+
+  (** {1 Diffs} *)
+
+  type diff
+  (** The type for snapshot diffs. *)
+
+  val diff: t -> t -> diff
+  (** [diff x y] is the difference between [x] and [y]. *)
+
+  (** {1 Elements} *)
+
+  val elts: t -> Elt.Set.t
+  (** [elts t] is the collection of elements of [t]. *)
+
+  val repos: t -> Repo.Set.t
+  (** [repos t] are [t]'s repository. *)
+
+  val prs: t -> PR.Set.t
+  (** [prs t] are [t]'s pull-requests. *)
+
+  val commits: t -> Commit.Set.t
+  (** [commits t] are [t]'s commits. *)
+
+  val status: t -> Status.Set.t
+  (** [status t] are [t]'s build status. *)
+
+  val refs: t -> Ref.Set.t
+  (** [refs t] are [t]'s Git references. *)
+
+  val with_elt: Elt.t -> t -> t
+  (** [with_elt e t] it [t] with the element [e] added. *)
+
+  val with_elts: Elt.Set.t -> t -> t
+  (** [with_elts] is like {!with_elt} but for a collection of
+      elements. *)
+
+end
+
+module Diff: sig
+
+  (** {1 GitHub Diffs} *)
+
+  type t = Snapshot.diff
+  (** The type for differences between GitHub states. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for diffs. *)
+
+  val compare: t -> t -> int
+  (** [compare_diff] is the comparison function for diffs. *)
+
+  val commit_message: t -> string
+  (** [commit_message d] is the commit message corresponding to the
+      diff [d]. *)
+
+  val empty: t
+  (** [empty] is the empty diff. *)
+
+  val is_empty: t -> bool
+  (** [is_empty d] is true if [d] is empty. *)
+
+  val update: t -> Elt.Set.t
+  (** [update d] are the elements in [d] which needs to be added or
+      updated. *)
+
+  val remove: t -> Elt.IdSet.t
+  (** [remove d] are the elements in [d] which needs to be deleted. *)
+
+  val apply: t -> Snapshot.t -> Snapshot.t
+  (** [snapsho d s] applies [d] on top of the snapshot [s]. *)
+
+  val with_update: Elt.t -> t -> t
+  (** [with_update e d] is [d] augmented with the update of [e]. *)
+
+  val with_remove: Elt.id -> t -> t
+  (** [with_remove e d] is [d] augmented with the removal of [e]. *)
+
+end
+
+
+(** {1 API} *)
+
+
+(** API capabilities, used to restrict the scope of an
+    {!API.token}. *)
+module Capabilities: sig
+
+  type t
+  (** The type for API capabilities. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for capabilities. *)
+
+  val equal: t -> t -> bool
+  (** [equal] equalizes capabilities. *)
+
+  val parse: string -> [ `Error of string | `Ok of t ]
+  (** [parse] is the parses capabilites, such that [parse
+      (Fmt.to_to_string pp x) = `Ok x]. *)
+
+  type op = [`Read | `Write | `Excl]
+  (** The type for API operations.
+      {ul
+      {- [`Read] allows the bridge to read the corresponding kind of
+         GitHub resources}
+      {- [`Write] allows the bridge to update the corresponding kind
+         of resource.}
+      {- [`Excl] means that the bridge has exclusive write access
+         to the corresponding GitHub resource. In particular, this
+         means that when the bridge is disconnect/reconnect it will
+         always try to update GitHub to match with the current state
+         of its local resources and it will revert any changes made
+         by other GitHub users on this kind of resources.}
+      ul}
+  *)
+
+  val pp_op: op Fmt.t
+  (** [pp_op] is the pretty-printer for resource operations. *)
+
+  type resource = [
+    | `Repo of string list
+    | `PR
+    | `Commit
+    | `Status of string list
+    | `Ref
+    | `Webhook
+  ]
+  (** The type for API resources. *)
+
+  val pp_resource: resource Fmt.t
+  (** [pp_resource] is the pretty-printer for resources. *)
+
+  val none: t
+  (** [none] is the capability to do nothing. *)
+
+  val all: t
+  (** [all] is the capability to do everything. *)
+
+  val allow: t -> op -> [`Default | resource] -> t
+  (** [allow t o r] is [t] with the capability to do API calls of type
+      [o] to the kind of resource [r]. *)
+
+  val disallow: t -> op -> [`Default | resource] -> t
+  (** [disallow t o r] is [t] without the capability to do API calls
+      of type [o] to the kind of resource [r]. *)
+
+  val check: t -> op -> resource -> bool
+  (** [check t o r] is true if [t] is allowed to to [o] on the kind of
+      resource [r]. *)
+
+  val filter_diff: t -> op -> Snapshot.diff -> Snapshot.diff
+  (** [filter_diff t op d] filters the diff [d] to only apply the
+      subset of operations [op] over the capabilities defined by
+      [t]. *)
+
+end
+
 (** Signature for the GitHub API. *)
 module type API = sig
 
+  (** {1 API tokens} *)
   type token
   (** The type for API tokens. *)
 
@@ -255,7 +536,7 @@ module type API = sig
   val set_pr: token -> PR.t -> unit result
   (** [set_pr t pr] updates the PR number [PR.number pr] with [pr]. *)
 
-  val prs: token -> Repo.t -> PR.t list result
+   val prs: token -> Repo.t -> PR.t list result
   (** [prs t r] is the list of open pull-requests for the repo [r]. *)
 
   val refs: token -> Repo.t -> Ref.t list result
@@ -300,236 +581,46 @@ module type API = sig
 
 end
 
-module Snapshot: sig
+(** API State: TODO find a better name? *)
+module State (API: API): sig
 
-  (** {1 File-system snapshots} *)
+  (** {1 Token} *)
 
-  type t
-  (** The type for filesystem snapshots. *)
+  type token
+  (** The type for state token. *)
 
-  val empty: t
-  (** The empty snapshot. *)
+  val token: API.token -> Capabilities.t -> token
+  (** [token t c] is the token using the GitHub API token [t] limited
+      by the capabilities [c]. *)
 
-  val create:
-    repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
-    prs:PR.Set.t -> refs:Ref.Set.t -> t
-  (** [create ?repos ~status ~prs] is a new snapshot [t] with
-      pull-requests [prs], build status [status] and repositories the
-      unions of [repos], the repositories of [status] and [prs]. *)
+  val capabilities: token -> Capabilities.t
+  (** [capabilities t] is the token [t]'s capabilities. *)
 
-  val union: t -> t -> t
-  (** [union x y] is the union of the snapshots [x] and [y]. *)
+  val with_capabilities: Capabilities.t -> token -> token
+  (** [with_capabilities c t] is [t] with the capabilities [c]. *)
 
-  val pp: t Fmt.t
-  (** [pp] is the pretty-printer for snapshots. *)
+  (** {1 Synchronisation} *)
 
-  val compare: t -> t -> int
-  (** [compare] is the comparison function for snapshots. *)
+  val import: token -> Snapshot.t -> Repo.Set.t -> Snapshot.t Lwt.t
+  (** [import ~token t r] imports the state of GitHub for the
+      repositories [r] into [t]. API calls use the token [token]. *)
 
-  val repos: t -> Repo.Set.t
-  (** [repos t] are [t]'s repository. *)
+  val apply: token -> Diff.t -> unit Lwt.t
+  (** [apply ~token d] applies the snapshot diff [d] as a series of
+      GitHub API calls, using the token [token]. *)
 
-  val commits: t -> Commit.Set.t
-  (** [commits t] are [t]'s commits. *)
+  (** {1 Webhooks} *)
 
-  val prs: t -> PR.Set.t
-  (** [prs t] are [t]'s pull-requests. *)
+  val add_webhooks:
+    token -> watch:(Repo.t -> unit Lwt.t) -> Repo.Set.t -> unit Lwt.t
+  (** [add_webhooks t rs] adds webhooks for the repositories [rs]. *)
 
-  val status: t -> Status.Set.t
-  (** [status t] are [t]'s build status. *)
-
-  val refs: t -> Ref.Set.t
-  (** [refs t] are [t]'s Git references. *)
-
-  val prune: t -> t * t option
-  (** [prune t] is either a clean snapshot and an optional snapshot
-      representing the the commits and prs entries to remove. *)
-
-end
-
-module Diff: sig
-
-  (** {1 Github diffs} *)
-
-
-  type id = [
-    | `Repo
-    | `PR of int
-    | `Commit of string
-    | `Status of string * string list
-    | `Ref of string list
-    | `Unknown
-  ]
-  (** The type for diff identifiers. *)
-
-  type t = {
-    repo  : Repo.t;
-    id    : id;
-  }
-  (** The type for filesystem diffs. *)
-
-  val pp: t Fmt.t
-  (** [pp] is the pretty-printer for diff values. *)
-
-  val compare: t -> t -> int
-  (** [compare] is the comparison function for diff values. *)
-
-  module Set: sig
-    include Set.S with type elt = t
-    val pp: t Fmt.t
-  end
-  (** Set of changes. *)
-
-  val changes: Datakit_path.t Datakit_S.diff list -> Set.t
-  (** [changes d] is the set of GitHub changes carried over in the
-      filesystem changes [d]. *)
-
-end
-
-(** Conversion between GitHub and DataKit states. *)
-module Conv (DK: Datakit_S.CLIENT): sig
-
-  type nonrec 'a result = ('a, DK.error) Result.result Lwt.t
-  (** The type for conversion results. *)
-
-  (** {1 Trees} *)
-
-  type tree
-  (** The type for readable filesystem trees. *)
-
-  val tree_of_transaction: DK.Transaction.t -> tree
-  (** [tree_of_transaction t] is [t]'s filesystem {!tree}. *)
-
-  val tree_of_commit: DK.Commit.t -> tree
-  (** [tree_of_commit c] is [c]'s filesystem {!tree}. *)
-
-  (** {1 Repositories} *)
-
-  val repos: tree -> Repo.Set.t Lwt.t
-  (** [repos t] is the list of repositories stored in [t]. *)
-
-  val update_repo: DK.Transaction.t -> Repo.state -> Repo.t -> unit result
-  (** [update_repo t s r] applies the repository [r] to the
-      transaction [t]. Depending on the state [s] it can either remove
-      the directory or create a [monitored] file. *)
-
-  (** {1 Status} *)
-
-  val status: tree -> Commit.t -> string list -> Status.t option Lwt.t
-  (** [status t c s] is the commit's build status [s] for the commit
-      [c] in the tree [t]. *)
-
-  val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t Lwt.t
-  (** [statuses t] is the list of status stored in [t].. *)
-
-  val update_status: DK.Transaction.t -> Status.t -> unit result
-  (** [update_status t s] applies the status [s] to the transaction
-      [t]. *)
-
-  (** {1 Pull requests} *)
-
-  val pr: tree -> Repo.t -> int -> PR.t option Lwt.t
-  (** [pr t r n] is the [n]'th pull-request of the repostiry [r] in
-      [t]. *)
-
-  val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t Lwt.t
-  (** [prs t] is the list of pull requests stored in [t]. *)
-
-  val update_pr: DK.Transaction.t -> PR.t -> unit result
-  (** [update_pr t pr] applies the pull-request [pr] to the
-      transaction [t]. *)
-
-  (** {1 Git References} *)
-
-  val update_ref: DK.Transaction.t -> Ref.state -> Ref.t -> unit result
-  (** [update_ref t s r] applies the Git reference [r] to the
-      transaction [t]. Depending on the state [s] it can either remove
-      the directory or create an [head] file. *)
-
-  (** {1 Events} *)
-
-  val update_event: DK.Transaction.t -> Event.t -> unit result
-  (** [update_event t e] applies the (webhook) event [e] to the
-      transaction [t]. *)
-
-  (** {1 Snapshots and diffs} *)
-
-  val safe_diff: tree -> DK.Commit.t -> Diff.Set.t Lwt.t
-  (** [diff tree c] computes the Github diff between the branch [b]
-      and the commit [c]. *)
-
-  val snapshot: string -> ?old:(DK.Commit.t * Snapshot.t) -> tree ->
-    Snapshot.t Lwt.t
-  (** [snapshot dbg ?old t] is a snapshot of the tree [t]. Note: this
-      is expensive, so try to provide a previous (recent) snapshot
-      [prev] if possible. *)
-
-  val apply: Snapshot.t -> (tree * Diff.Set.t) -> Snapshot.t Lwt.t
-  (** [apply s d] is the snapshot obtained by applying [d] on top of
-      [s]. [d] is a pair [tree * diff] where [diff] contains the
-      pull-requests and status to consider while [tree] is holding the
-      respective state of these objects. *)
-
-end
-
-module Capabilities: sig
-
-  type t
-  (** The type for API capabilities. *)
-
-  val pp: t Fmt.t
-  (** [pp] is the pretty-printer for capabilities. *)
-
-  val of_string: string -> [ `Error of string | `Ok of t ]
-  (** [of_string s] is [Some t] if there exists [t] such that [s] is
-      the string representation of [t]; and [None] otherwise. *)
-
-  type op = [`Read | `Write]
-  (** The type for API operations. *)
-
-  type resource = [`PR | `Status | `Ref | `Webhook]
-  (** The type for API resources. *)
-
-  val none: t
-  (** [none] is the capability to do nothing. *)
-
-  val all: t
-  (** [all] is the capability to do everything. *)
-
-  val allow: t -> op -> [`All | resource] -> t
-  (** [allow t o r] is [t] with the capability to do API calls of type
-      [o] to the kind of resource [r]. *)
-
-  val disallow: t -> op -> [`All | resource] -> t
-  (** [disallow t o r] is [t] without the capability to do API calls
-      of type [o] to the kind of resource [r]. *)
-
-  val check: t -> op -> resource -> bool
-  (** [check t o r] is true if [t] is allowed to to [o] on the kind of
-      resource [r]. *)
-
-end
-
-module Sync (API: API) (DK: Datakit_S.CLIENT): sig
-
-  type t
-  (** The type for synchronizer state. *)
-
-  val empty: t
-  (** Create an empty sync state. *)
-
-  val prune: DK.Branch.t -> unit Lwt.t
-  (** [prune b] prunes the branch [b]. *)
-
-  (** [sync t ~pub ~priv ~token] mirror GitHub changes in the DataKit
-      public branch [pub]. It uses the private branch [priv] to store
-      the received webhook event states. It connects to the GitHub API
-      using the token [tok]. The default [policy] is [`Repeat]. By
-      default [cap] is [Cap.all]. *)
-  val sync:
-    ?webhook:API.Webhook.t ->
-    ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?cap:Capabilities.t ->
-    pub:DK.Branch.t -> priv:DK.Branch.t -> token:API.token ->
-    t -> t Lwt.t
+  val import_webhook_events:
+    token -> events:(unit ->  Event.t list) -> Snapshot.t -> Snapshot.t Lwt.t
+  (** [import_webhook_events t ~events s] applies [events ()] on top
+      of [s]. Note: it ensure that all the metadata are correctly
+      updated by inserting (possibly) missing events in the mix. For
+      instance, GitHub never sends {{!Event.Status}status} events, so
+      [import_events] has to reconstruct them. *)
 
 end

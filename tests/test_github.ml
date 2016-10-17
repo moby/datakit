@@ -1,14 +1,16 @@
 open Astring
 open Test_utils
 open Lwt.Infix
-open Datakit_github
+(*open Datakit_github*)
 open Datakit_path.Infix
+open Datakit_github
+
 open Result
 
 let src = Logs.Src.create "test" ~doc:"Datakit tests"
 module Log = (val Logs.src_log src)
 
-module Conv = Conv(DK)
+module Conv = Datakit_github_conv.Make(DK)
 
 module Counter = struct
 
@@ -66,7 +68,6 @@ module R = struct
     in
     { r with prs; commits }
 
-  let is_empty t = t.commits = [] && t.prs = [] && t.refs = []
   let events t = t.events
   let clear t = t.events <- []
 
@@ -87,9 +88,15 @@ module R = struct
       Fmt.(Dump.list string) r.Ref.name (Ref.commit_id r)
 
   let pp f { commits; prs; refs; _ } =
+    let prs = List.sort PR.compare prs in
+    let refs = List.sort Ref.compare refs in
+    let commits =
+      List.map (fun (n, s) -> n, List.sort Status.compare s) commits
+      |> List.sort (fun (x, _) (y, _) -> String.compare x y)
+    in
     Fmt.pf f "prs=%a;@,refs=%a;@,commits=%a"
       (Fmt.Dump.list pp_pr) prs
-      (Fmt.Dump.list pp_refs) refs
+      (Fmt.Dump.list pp_refs) (List.sort Ref.compare refs)
       (Fmt.Dump.list pp_state) commits
 
   let status_equal a b =
@@ -166,20 +173,6 @@ module User = struct
         ) t.repos
     in
     let repos = String.Map.map R.prune repos in
-    { repos }
-
-  let prune_commits t =
-    let repos =
-      String.Map.map (fun r ->
-          let commits =
-            List.fold_left (fun acc (_, s as c) ->
-                if s = [] then acc else c :: acc
-              ) [] r.R.commits
-            |> List.rev
-          in
-          { r with R.commits }
-        ) t.repos
-    in
     { repos }
 
   let fold f t acc = String.Map.fold (fun _ repo acc -> f repo acc ) t.repos acc
@@ -276,8 +269,6 @@ module Users = struct
     let users = String.Map.filter (fun _ u -> not (User.is_empty u)) users in
     { users }
 
-  let prune_commits t = { users = String.Map.map User.prune_commits t.users }
-
   let fold f t acc = String.Map.fold (fun _ user acc -> f user acc ) t.users acc
 
   let repos t =
@@ -315,35 +306,37 @@ module Users = struct
     let new_refs = Snapshot.refs news in
     let new_status = Snapshot.status news in
     let repos =
-      List.map (Event.repo' `Monitored) (Repo.Set.elements new_repos)
-      @ List.map (Event.repo' `Ignored) (Repo.Set.elements old_repos)
+      List.map (Event.of_repo `Monitored) (Repo.Set.elements new_repos)
+      @ List.map (Event.of_repo `Ignored) (Repo.Set.elements old_repos)
     in
     let prs =
       PR.Set.filter (keep PR.repo) new_prs
       |> PR.Set.elements
-      |> List.map Event.pr
+      |> List.map Event.of_pr
     in
     let refs =
       Ref.Set.filter (keep Ref.repo) new_refs
       |> Ref.Set.elements
-      |> List.map (Event.ref `Updated)
+      |> List.map (Event.of_ref `Updated)
     in
     let status =
       Status.Set.filter (keep Status.repo) new_status
       |> Status.Set.elements
-      |> List.map Event.status
+      |> List.map Event.of_status
     in
     let close_prs =
       Snapshot.prs olds
       |> PR.Set.filter
-        (fun pr -> keep PR.repo pr && not (PR.Set.exists (PR.same pr) new_prs))
+        (fun pr ->
+           keep PR.repo pr && not (PR.Set.exists (PR.same_id pr) new_prs))
       |> PR.Set.elements
       |> List.map (fun pr -> Event.PR { pr with PR.state = `Closed })
     in
     let close_refs =
       Snapshot.refs olds
       |> Ref.Set.filter
-        (fun r -> keep Ref.repo r && not (Ref.Set.exists (Ref.same r) new_refs))
+        (fun r ->
+           keep Ref.repo r && not (Ref.Set.exists (Ref.same_id r) new_refs))
       |> Ref.Set.elements
       |> List.map (fun r -> Event.Ref (`Removed, r))
     in
@@ -504,8 +497,6 @@ module API = struct
     List.iter (add_event t) events;
     t
 
-  let all_events t = fold (fun u acc -> User.events u @ acc) t []
-
   let all_repos t =
     fold (fun u acc -> Repo.Set.union (User.repos u) acc) t Repo.Set.empty
 
@@ -545,12 +536,12 @@ module API = struct
 
 end
 
-module VG = Sync(API)(DK)
+module Bridge = Datakit_github_sync.Make(API)(DK)
+module State = Datakit_github.State(API)
 
 let user = "test"
 let repo = "test"
-let pub = "test-pub"
-let priv = "test-priv"
+let branch = "test"
 
 let repo = { Repo.user; repo }
 let commit_bar = { Commit.repo; id = "bar" }
@@ -642,49 +633,445 @@ let snapshot: Snapshot.t Alcotest.testable =
   (module struct include Snapshot let equal x y = Snapshot.compare x y = 0 end)
 
 let diff: Diff.t Alcotest.testable =
-  (module struct include Diff let equal = (=) end)
-
-let diffs = Alcotest.slist diff Diff.compare
-
-let d id = { Diff.repo; id }
+  (module struct include Diff let equal x y = Diff.compare x y = 0 end)
 
 let counter: Counter.t Alcotest.testable = (module Counter)
+let capabilities: Capabilities.t Alcotest.testable = (module Capabilities)
+
+let mk_snapshot ?(repos=[]) ?(commits=[]) ?(status=[]) ?(prs=[]) ?(refs=[]) () =
+  Snapshot.create
+    ~repos:(Repo.Set.of_list repos)
+    ~commits:(Commit.Set.of_list commits)
+    ~status:(Status.Set.of_list status)
+    ~prs:(PR.Set.of_list prs)
+    ~refs:(Ref.Set.of_list refs)
+
+let mk_diff l =
+  let diff acc = function
+    | `Update x -> Diff.with_update x acc
+    | `Remove x -> Diff.with_remove x acc
+  in
+  List.fold_left diff Diff.empty l
+
+module Data = struct
+
+  let contexts = [|
+    ["ci"; "datakit"; "test"];
+    ["ci"; "datakit"; "build"];
+    ["ci"; "circleci"];
+  |]
+
+  let titles = [| "it works!"; "merge me"; "yay!" |]
+  let commits =  [| "123"; "456"; "789"; "0ab"; "abc"; "def" |]
+  let bases = [| "master"; "test"; "foo" |]
+  let pr_states = [| `Closed; `Open  |]
+  let users = [| "a"; "b" |]
+  let repos = [| "a"; "b"; "c" |]
+
+  let names = [|
+    ["heads"; "master"];
+    ["tags" ; "foo"; "bar"];
+    ["heads"; "gh-pages"];
+  |]
+
+  let descriptions = [|
+    Some "Testing...";
+    None;
+  |]
+
+  let build_states = [|
+    `Pending;
+    `Success;
+    `Failure;
+    `Error;
+  |]
+
+  let urls = [|
+    None;
+    Some "http://example.com/"
+  |]
+
+end
+
+module Gen = struct
+
+  let choose ~random options =
+    options.(Random.State.int random (Array.length options))
+
+  let repo ?(x=[]) ~random () =
+    let rec aux () =
+      let user = choose ~random Data.users in
+      let repo = choose ~random Data.repos in
+      let r = { Repo.user; repo } in
+      if List.exists (fun x -> Repo.compare x r = 0) x then aux () else r
+    in
+    aux ()
+
+  let description ~random = choose ~random Data.descriptions
+  let build_state ~random = choose ~random Data.build_states
+  let pr_state ~random = choose ~random Data.pr_states
+  let base ~random = choose ~random Data.bases
+  let title ~random = choose ~random Data.titles
+  let url ~random = choose ~random Data.urls
+  let context ~random = choose ~random Data.contexts
+
+  let commit ?(x=[]) ?repo:r ~random () =
+    let rec aux () =
+      let id = choose ~random Data.commits in
+      let repo = match r with Some r -> r | None -> repo ~random () in
+      let r = { Commit.id; repo } in
+      if List.exists (fun x -> Commit.compare x r = 0) x then aux () else r
+    in
+    aux ()
+
+  let pr ?(x=[]) ?repo ~random () =
+    let rec aux () =
+      let head = commit ?repo ~random () in
+      let title = title ~random in
+      let number = Random.State.int random 10 in
+      let state = pr_state ~random in
+      let base = base ~random in
+      let r = { PR.head; number; title; state; base } in
+      if List.exists (PR.same_id r) x then aux () else r
+    in
+    aux ()
+
+  let ref ?(x=[]) ?repo ~random () =
+    let rec aux () =
+      let head = commit ?repo ~random () in
+      let name = choose ~random Data.names in
+      let r = { Ref.head; name } in
+      if List.exists (Ref.same_id r) x then aux () else r
+    in
+    aux ()
+
+  let status ?(x=[]) ?repo ~random () =
+    let rec aux () =
+      let url = url ~random in
+      let commit = commit ?repo ~random () in
+      let context = context ~random in
+      let description = description ~random in
+      let state = build_state ~random in
+      let r = { Status.commit; url; context; description; state } in
+      if List.exists (Status.same_id r) x then aux () else r
+    in
+    aux ()
+
+  let refs ~random ~repo ~old_refs =
+    Data.names
+    |> Array.to_list
+    |> List.map (fun name ->
+        if Random.State.bool random then (
+          match List.find (fun r -> r.Ref.name = name) old_refs with
+          | exception Not_found -> []
+          | old_ref ->
+            if Random.State.bool random then [] else
+              let head = commit ~random ~repo () in
+              [{ old_ref with Ref.head }]
+        ) else (
+          let head = commit ~random ~repo () in
+          [{ Ref.head; name }]
+        ))
+    |> List.concat
+
+  let statuses ~random ~old_status commit =
+    let old_status = match List.assoc (Commit.id commit) old_status with
+      | exception Not_found -> []
+      | old_status -> old_status
+    in
+    Data.contexts
+    |> Array.to_list
+    |> List.map (fun context ->
+        if Random.State.bool random then (
+          match List.find (fun s -> s.Status.context = context) old_status with
+          | exception Not_found -> []
+          | old_status -> [old_status]    (* GitHub can't delete statuses *)
+        ) else (
+          let state = build_state ~random in
+          let description = description ~random in
+          [{ Status.state; commit; description; url = None; context }]
+        ))
+    |> List.concat
+
+  let prs ~random ~repo ~old_prs =
+    let n_prs = Random.State.int random 4 in
+    let old_prs = List.rev old_prs in
+    let old_prs =
+      List.fold_left (fun prs pr ->
+          let pr = match Random.State.int random 5 with
+            | 0 ->
+              let state = match pr.PR.state with
+                | `Open -> `Closed | `Closed -> `Open
+              in
+              { pr with PR.state }
+            | 1 ->
+              let head = commit ~random ~repo () in
+              { pr with PR.head }
+            | 2 ->
+              let title = title ~random in
+              { pr with PR.title }
+            | 3 ->
+              let base = base ~random in
+              { pr with PR.base }
+            | _ -> pr
+          in
+          pr :: prs
+        ) [] old_prs
+    in
+    let next_pr =
+      Pervasives.ref
+        (List.fold_left (fun n pr -> max (PR.number pr + 1) n) 0 old_prs)
+    in
+    let rec make_prs acc = function
+      | 0 -> acc
+      | n ->
+        let head = commit ~random ~repo () in
+        let base = base ~random in
+        let number = !next_pr in
+        incr next_pr;
+        let pr = {
+          PR.head;
+          number;
+          state = `Open;
+          title = "PR#" ^ string_of_int number;
+          base;
+        } in
+        make_prs (pr :: acc) (n - 1)
+    in
+    make_prs old_prs n_prs |> List.rev
+
+  let state ~random ~repo ~old_prs ~old_status ~old_refs =
+    let prs = prs ~random ~repo ~old_prs in
+    let refs = refs ~random ~repo ~old_refs in
+    let commits =
+      let (++) = Commit.Set.union in
+      let l f s = Commit.Set.of_list (List.map f s) in
+      l (fun (id, _) -> { Commit.repo; id }) old_status
+      ++ l PR.commit prs ++ l Ref.commit refs
+    in
+    let commits =
+      Commit.Set.fold (fun c acc ->
+          match statuses ~random ~old_status c with
+          | [] -> acc
+          | s  -> (Commit.id c, s) :: acc
+        ) commits []
+    in
+    prs, commits, refs
+
+  let users ?(old=Users.empty ()) ~random =
+    Users.iter (fun _ repo -> User.clear repo) old;
+    Data.users |> Array.to_list |> List.map (fun user ->
+        let old_user =
+          Users.find user old |> default { User.repos = String.Map.empty }
+        in
+        let repos =
+          Data.repos |> Array.to_list |> List.map (fun repo ->
+              let r = { Repo.user; repo } in
+              let old_prs, old_status, old_refs =
+                match String.Map.find repo old_user.User.repos with
+                | None      -> [], [], []
+                | Some repo -> repo.R.prs, repo.R.commits, repo.R.refs
+              in
+              let prs, commits, refs =
+                state ~random ~repo:r ~old_prs ~old_status ~old_refs
+              in
+              repo, { R.user; repo; commits; prs; refs; events = [] }
+            )
+          |> String.Map.of_list
+        in
+        user, { User.repos }
+      )
+    |> String.Map.of_list
+    |> fun users -> { Users.users }
+
+  let snapshot ~random =
+    let rec mk acc f = function
+      | 0 -> acc
+      | n -> mk (f acc) f (n-1)
+    in
+    let int n = Random.State.int random n in
+    let repos = mk Repo.Set.empty (Repo.Set.add (repo ~random ())) (int 2) in
+    let commits =
+      mk Commit.Set.empty (Commit.Set.add (commit ~random ())) (int 2)
+    in
+    let prs = mk PR.Set.empty (PR.Set.add (pr ~random ())) (int 4) in
+    let refs = mk Ref.Set.empty (Ref.Set.add (ref ~random ())) (int 3) in
+    let status =
+      mk Status.Set.empty (Status.Set.add (status ~random ())) (int 5)
+    in
+    Snapshot.create ~repos ~commits ~prs ~refs ~status
+
+end
+
+let commit_diff new_commits old_commits =
+  let new_commits = Commit.Set.of_list new_commits in
+  let old_commits = Commit.Set.of_list old_commits in
+  let updates =
+    Commit.Set.diff new_commits old_commits
+    |> Commit.Set.elements
+    |> List.map (fun c -> `Update (`Commit c))
+  in
+  let removes =
+    Commit.Set.diff old_commits new_commits
+    |> Commit.Set.elements
+    |> List.map (fun c -> `Remove (`Commit c))
+  in
+  updates @ removes
+
+let test_basic_snapshot_once random =
+  (* repos *)
+  let r1 = Gen.repo ~random () in
+  let r2 = Gen.repo ~x:[r1] ~random () in
+  let r3 = Gen.repo ~x:[r1;r2] ~random () in
+  let s1 = mk_snapshot ~repos:[r1; r3] () in
+  let s2 = mk_snapshot ~repos:[r2; r3] () in
+  let d = Snapshot.diff s1 s2 in
+  let x = mk_diff [`Update (`Repo r1); `Remove (`Repo r2)] in
+  Alcotest.(check diff) "repos" x d;
+
+  (* prs *)
+  let repo = Gen.repo ~random () in
+  let pr1 = Gen.pr ~random ~repo () in
+  let pr2 = Gen.pr ~x:[pr1] ~random ~repo () in
+  let pr3 = Gen.pr ~x:[pr1; pr2] ~random ~repo () in
+  let s1 = mk_snapshot ~prs:[pr1; pr3] () in
+  let s2 = mk_snapshot ~prs:[pr2; pr3] () in
+  let d = Snapshot.diff s1 s2 in
+  let x =
+    mk_diff ([`Update (`PR pr1); `Remove (`PR (PR.id pr2))]
+             @ commit_diff
+               [PR.commit pr1; PR.commit pr3]
+               [PR.commit pr2; PR.commit pr3])
+  in
+  Alcotest.(check diff) "prs" x d;
+
+  (* refs *)
+  let repo = Gen.repo ~random () in
+  let r1 = Gen.ref ~random ~repo () in
+  let r2 = Gen.ref ~x:[r1] ~random ~repo () in
+  let r3 =
+    let head = Gen.commit ~x:[Ref.commit r2] ~repo ~random () in
+    { r2 with Ref.head }
+  in
+  let s1 = mk_snapshot ~refs:[r2; r1] () in
+  let s2 = mk_snapshot ~refs:[r3; r1] () in
+  let d = Snapshot.diff s1 s2 in
+  let x =
+    mk_diff ([`Update (`Ref r2)]
+             @ commit_diff
+               [Ref.commit r1; Ref.commit r2]
+               [Ref.commit r1; Ref.commit r3])
+  in
+  Alcotest.(check diff) "refs" x d;
+
+  (* status *)
+  let repo = Gen.repo ~random () in
+  let b1 = Gen.status ~random ~repo () in
+  let b2 = Gen.status ~x:[b1] ~random ~repo () in
+  let b3 = Gen.status ~x:[b1;b2] ~random ~repo () in
+  let s1 = mk_snapshot ~status:[b1; b2] () in
+  let s2 = mk_snapshot ~status:[b3] () in
+  let d = Snapshot.diff s1 s2 in
+  let x =
+    mk_diff ([`Update (`Status b2); `Update (`Status b1);
+              `Remove (`Status (Status.id b3))] @
+             commit_diff
+               [Status.commit b1; Status.commit b2]
+               [Status.commit b3])
+  in
+  Alcotest.(check diff) "status" x d;
+
+  (* diff *)
+  let s1 = Gen.snapshot ~random in
+  let s2 = Gen.snapshot ~random in
+  let d = Snapshot.diff s1 s2 in
+  let s3 = Diff.apply d s2 in
+  Alcotest.(check snapshot) "diff/apply" s1 s3
+
+let test_basic_snapshot () =
+  let random = Random.State.make [| 4; 5; 6 |] in
+  for _ = 0 to 100 do
+    test_basic_snapshot_once random
+  done
+
+let cap str = match Capabilities.parse str with
+  | `Ok c    -> c
+  | `Error e -> Alcotest.fail ("capability " ^ str ^ ": " ^ e)
+
+  let test_capabilities () =
+  let caps = [
+    "*:rw";
+    "repo:r,repo[samoht]:w";
+    "*:r,status[foo/bar]:w";
+    "pr:rw,status:w";
+    "*:w,commit:,webhook:r";
+  ] in
+  let to_string = Fmt.to_to_string Capabilities.pp in
+  List.iter (fun str ->
+      let c = cap str in
+      Alcotest.(check string) str str (to_string c)
+    ) caps;
+  let caps = [
+    Capabilities.all;
+    Capabilities.none;
+    Capabilities.(allow all `Read (`Status ["foo";"bar"]));
+    Capabilities.(allow all `Write `Commit);
+  ] in
+  List.iter (fun c ->
+      let str = Fmt.to_to_string Capabilities.pp c in
+      let d = cap str in
+      Alcotest.(check capabilities) str c d
+    ) caps;
+  let checks = [
+    cap "*:rw", `Read , `Status ["foo"], true;
+    cap "*:rw", `Write, `Status ["foo"], true;
+    cap "*:rw", `Excl , `Status ["foo"], false;
+    cap "*:w" , `Read , `PR, false;
+    cap "*:w" , `Write, `PR, true;
+    cap "*:w" , `Excl , `PR, false;
+    cap "*:x" , `Read , `PR, true;
+    cap "*:x" , `Write, `PR, true;
+    cap "*:x" , `Excl , `PR, true;
+    cap "repo[samoht]:w,repo:r", `Read , `Repo ["samoht";"test"], false;
+    cap "repo[samoht]:w,repo:r", `Write, `Repo ["samoht";"test"], true;
+    cap "*:w,pr:r", `Read , `PR, true;
+    cap "*:w,pr:r", `Write, `PR, false;
+    cap "*:w,pr:r", `Excl , `PR, false;
+    cap "*:w,pr:r", `Read , `Commit, false;
+    cap "*:w,pr:r", `Write, `Commit, true;
+    cap "*:w,pr:r", `Excl , `Commit, false;
+    cap "*:r,status[foo]:x,webhook:w", `Excl, `Status ["foo"], true;
+    cap "status[foo/bar]:r", `Read, `Status ["foo";"bar";"0"], true;
+    cap "status[foo]:r,status[foo/bar]:w",
+    `Write, `Status ["foo";"bar";"0"], true;
+  ]
+  in
+  List.iter (fun (c, op, r, b) ->
+      let msg =
+        Fmt.strf "%a - %a - %a"
+          Capabilities.pp c Capabilities.pp_op op Capabilities.pp_resource r
+      in
+      Alcotest.(check bool) msg b Capabilities.(check c op r)
+    ) checks
 
 let test_snapshot () =
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
   Test_utils.run (fun _repo conn ->
-      let dk = DK.connect conn in
-      DK.branch dk "test-snapshot" >>*= fun br ->
+      let dkt = DK.connect conn in
+      DK.branch dkt "test-snapshot" >>*= fun br ->
       let update ~prs ~status ~refs =
-        let err e = Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e in
         DK.Branch.with_transaction br (fun tr ->
-            begin Conv.update_repo tr `Monitored repo >>= function
-              | Ok ()   -> Lwt.return_unit
-              | Error e -> err e
-            end >>= fun () ->
-            Lwt_list.iter_p (fun pr ->
-                Conv.update_pr tr pr >>= function
-                | Ok ()   -> Lwt.return_unit
-                | Error e -> err e
-              ) prs
+            Lwt_list.iter_p (Conv.update_elt tr)
+              (`Repo repo ::
+               (List.map (fun pr -> `PR pr) prs) @
+               (List.map (fun s  -> `Status s) status) @
+               (List.map (fun r  -> `Ref r) refs))
             >>= fun () ->
-            Lwt_list.iter_p (fun s ->
-                Conv.update_status tr s >>= function
-                | Ok ()   -> Lwt.return_unit
-                | Error e -> err e
-              ) status
-            >>= fun () ->
-            Lwt_list.iter_p (fun r ->
-                Conv.update_ref tr `Updated r >>= function
-                | Ok ()   -> Lwt.return_unit
-                | Error e -> err e
-              ) refs
-            >>= fun () ->
-            Conv.snapshot "init" Conv.(tree_of_transaction tr) >>= fun s ->
             DK.Transaction.commit tr ~message:"init" >>*= fun () ->
-            ok s)
+            Conv.of_branch ~debug:"init" br >>= fun (_, s) ->
+            ok (Conv.snapshot s))
       in
       update ~prs:prs0 ~status:status0 ~refs:refs0 >>*= fun s ->
       expect_head br >>*= fun head ->
@@ -696,30 +1083,28 @@ let test_snapshot () =
         let commits = Commit.Set.of_list commits0 in
         Snapshot.create ~repos ~commits ~prs ~status ~refs
       in
-      Conv.snapshot "sh" Conv.(tree_of_commit head) >>= fun sh ->
+      Conv.of_commit ~debug:"sh" head >>= fun sh ->
       Alcotest.(check snapshot) "snap transaction" se s;
-      Alcotest.(check snapshot) "snap head" se sh;
+      Alcotest.(check snapshot) "snap head" se (Conv.snapshot sh);
 
       update ~prs:[pr2] ~status:[] ~refs:[] >>*= fun s1 ->
       expect_head br >>*= fun head1 ->
-      let tree1 = Conv.tree_of_commit head1 in
-      Conv.safe_diff tree1 head >>= fun diff1 ->
-      Alcotest.(check diffs) "diff1" [d (`PR 1)] (Diff.Set.elements diff1);
-      Conv.snapshot "sd" ~old:(head, s) tree1 >>= fun sd ->
-      Alcotest.(check snapshot) "snap diff" s1 sd;
+      Conv.diff head1 head >>= fun diff1 ->
+      Alcotest.(check diff) "diff1" (mk_diff [`Update (`PR pr2)]) diff1;
+      Conv.of_commit ~debug:"sd" ~old:sh head1 >>= fun sd ->
+      Alcotest.(check snapshot) "snap diff" s1 (Conv.snapshot sd);
 
       update ~prs:[] ~status:[s5] ~refs:[ref2] >>*= fun s2 ->
       expect_head br >>*= fun head2 ->
-      let tree2 = Conv.tree_of_commit head2 in
-      Conv.safe_diff tree2 head1 >>= fun diff2 ->
-      Alcotest.(check diffs) "diff2"
-        [d (`Status ("foo", ["foo";"bar";"baz"]));
-         d (`Ref ["heads";"master"])]
-        (Diff.Set.elements diff2);
-      Conv.snapshot "sd1" ~old:(head , s ) tree2 >>= fun sd1 ->
-      Conv.snapshot "ss2" ~old:(head1, s1) tree2 >>= fun sd2 ->
-      Alcotest.(check snapshot) "snap diff1" s2 sd1;
-      Alcotest.(check snapshot) "snap diff2" s2 sd2;
+      Conv.diff head2 head1 >>= fun diff2 ->
+      Alcotest.(check diff) "diff2"
+        (mk_diff [`Update (`Status s5); `Update (`Ref ref2);
+                  `Update (`Commit commit_foo)])
+        diff2;
+      Conv.of_commit ~debug:"sd1" ~old:sh head2 >>= fun sd1 ->
+      Conv.of_commit ~debug:"ss2" ~old:sd head2 >>= fun sd2 ->
+      Alcotest.(check snapshot) "snap diff1" s2 (Conv.snapshot sd1);
+      Alcotest.(check snapshot) "snap diff2" s2 (Conv.snapshot sd2);
 
       DK.Branch.with_transaction br (fun tr ->
           DK.Transaction.make_dirs tr (p "test/toto") >>*= fun () ->
@@ -728,15 +1113,14 @@ let test_snapshot () =
           DK.Transaction.commit tr ~message:"test/foo"
         ) >>*= fun () ->
       expect_head br >>*= fun head3 ->
-      let tree3 = Conv.tree_of_commit head3 in
-      Conv.safe_diff tree3 head2 >>= fun diff3 ->
-      let d = { Diff.repo = { Repo. user; repo = "toto" }; id = `Unknown } in
-      Alcotest.(check diffs) "diff3" [d] (Diff.Set.elements diff3);
+
+      Conv.diff head3 head2 >>= fun diff3 ->
+      Alcotest.(check diff) "diff3" Diff.empty diff3;
 
       Lwt.return_unit
     )
 
-let init status refs events =
+let init_github status refs events =
   let tbl = Hashtbl.create (List.length status) in
   List.iter (fun s ->
       let v =
@@ -761,28 +1145,27 @@ let run_with_test_test f () =
   quiet_git ();
   quiet_irmin ();
   Test_utils.run (fun _repo conn ->
-      let dk = DK.connect conn in
-      DK.branch dk pub  >>*= fun pub ->
-      DK.branch dk priv >>*= fun priv ->
-      let t = init [] [] [] in
-      let s = VG.empty in
-      VG.sync ~policy:`Once s ~priv ~pub ~token:t >>= fun _s ->
-      DK.Branch.with_transaction pub (fun tr ->
-          Conv.update_repo tr `Monitored repo >>*= fun () ->
+      let dkt = DK.connect conn in
+      DK.branch dkt branch >>*= fun br ->
+      let gh = init_github [] [] [] in
+      let b = Bridge.empty in
+      Bridge.sync ~policy:`Once ~token:gh br b >>= fun _s ->
+      DK.Branch.with_transaction br (fun tr ->
+          Conv.update_elt tr (`Repo repo) >>= fun () ->
           DK.Transaction.commit tr ~message:"init"
         )
       >>*= fun () ->
-      f dk
+      f dkt
     )
 
 let check_dirs = Alcotest.(check (slist string String.compare))
 let check_data msg x y = Alcotest.(check string) msg x (Cstruct.to_string y)
 
-let check name tree =
+let check tree =
   (* check test/test/commit *)
   let commit = root repo / "commit" in
   DK.Tree.exists_dir tree commit >>*= fun exists ->
-  Alcotest.(check bool) (name ^ " commit dir exists")  exists true;
+  Alcotest.(check bool) "commit dir exists"  exists true;
   DK.Tree.read_dir tree commit >>*= fun dirs ->
   check_dirs "commits" ["bar"] dirs;
   DK.Tree.read_dir tree (commit / "bar"/ "status" ) >>*= fun dirs ->
@@ -825,39 +1208,39 @@ let check name tree =
 open! Counter
 
 let test_events dk =
-  let t = init status0 refs0 events0 in
-  let s = VG.empty in
-  DK.branch dk priv >>*= fun priv ->
-  DK.branch dk pub  >>*= fun pub  ->
-  let sync s = VG.sync ~policy:`Once ~priv ~pub ~token:t s in
+  let gh = init_github status0 refs0 events0 in
+  let b = Bridge.empty in
+  DK.branch dk branch >>*= fun branch ->
+  let sync b = Bridge.sync ~policy:`Once ~token:gh branch b in
   Alcotest.(check counter) "counter: 0"
     { events = 0; prs = 0; status = 0; refs = 0;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
+    gh.API.ctx;
+  sync b >>= fun b ->
+  sync b >>= fun b ->
+  sync b >>= fun b ->
+  sync b >>= fun b ->
+  sync b >>= fun b ->
+  sync b >>= fun b ->
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 1"
     { events = 0; prs = 1; status = 1; refs = 1;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
-  sync s >>= fun _s ->
+    gh.API.ctx;
+  sync b >>= fun _b ->
   Alcotest.(check counter) "counter: 2"
     { events = 0; prs = 1; status = 1; refs = 1;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
-  expect_head priv >>*= fun head ->
-  check "priv" (DK.Commit.tree head) >>= fun () ->
-  expect_head pub >>*= fun head ->
-  check "pub" (DK.Commit.tree head)
+    gh.API.ctx;
+  expect_head branch >>*= fun head ->
+  check (DK.Commit.tree head)
 
-let update_status br dir state =
+let update_status br commit context state =
   DK.Branch.with_transaction br (fun tr ->
-      let dir = dir / "status" / "foo" / "bar" / "baz" in
+      let dir =
+        root repo / "commit" / commit / "status"
+        /@ Datakit_path.of_steps_exn context
+      in
       DK.Transaction.make_dirs tr dir >>*= fun () ->
       let state = Cstruct.of_string  (Status_state.to_string state ^ "\n") in
       DK.Transaction.create_or_replace_file tr (dir / "state") state >>*= fun () ->
@@ -875,146 +1258,142 @@ let find_pr t repo =
   with Not_found -> Alcotest.fail "foo not found"
 
 let test_updates dk =
-  let t = init status0 refs0 events1 in
-  let s = VG.empty in
-  DK.branch dk priv >>*= fun priv ->
-  DK.branch dk pub  >>*= fun pub ->
-  let sync s = VG.sync ~policy:`Once ~priv ~pub ~token:t s in
+  let gh = init_github status0 refs0 events1 in
+  let b = Bridge.empty in
+  DK.branch dk branch >>*= fun branch ->
+  let sync b = Bridge.sync ~policy:`Once ~token:gh branch b in
   Alcotest.(check counter) "counter: 0"
     { events = 0; prs = 0; status = 0; refs = 0;
       set_pr = 0; set_status = 0; set_ref = 0  }
-    t.API.ctx;
-  sync s >>= fun s ->
+    gh.API.ctx;
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 1"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
-  sync s >>= fun s ->
+    gh.API.ctx;
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 1'"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
+    gh.API.ctx;
 
   (* test status update *)
-  let dir = root repo / "commit" / "foo" in
-  expect_head priv >>*= fun h ->
-  DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
+  let commit_foo = root repo / "commit" / "foo" in
+  expect_head branch >>*= fun h ->
+  DK.Tree.exists_dir (DK.Commit.tree h) commit_foo >>*= fun exists ->
   Alcotest.(check bool) "exist private commit/foo" true exists;
-  expect_head priv >>*= fun h ->
-  DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
-  Alcotest.(check bool) "exist private commit/foo" true exists;
-  update_status pub dir `Pending >>*= fun () ->
-  sync s >>= fun s ->
+  update_status branch "foo" ["foo"; "bar";"baz"] `Pending >>*= fun () ->
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 2"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 1; set_ref = 0 }
-    t.API.ctx;
-  sync s >>= fun s ->
+    gh.API.ctx;
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 3"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 1; set_ref = 0 }
-    t.API.ctx;
-  let status = find_status t repo in
+    gh.API.ctx;
+  let status = find_status gh repo in
   Alcotest.(check status_state) "update status" `Pending status.Status.state;
 
   (* test PR update *)
   let dir = root repo / "pr" / "2" in
-  expect_head priv >>*= fun h ->
+  expect_head branch >>*= fun h ->
   DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist private commit/foo" true exists;
-  expect_head priv >>*= fun h ->
+  expect_head branch >>*= fun h ->
   DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist commit/foo" true exists;
-  DK.Branch.with_transaction pub (fun tr ->
+  DK.Branch.with_transaction branch (fun tr ->
       DK.Transaction.create_or_replace_file tr (dir / "title")
         (Cstruct.of_string "hahaha\n")
       >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     ) >>*= fun () ->
-  sync s >>= fun _s ->
+  sync b >>= fun _b ->
   Alcotest.(check counter) "counter: 4"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 1; set_status = 1; set_ref = 0 }
-    t.API.ctx;
-  let pr = find_pr t repo in
+    gh.API.ctx;
+  let pr = find_pr gh repo in
   Alcotest.(check string) "update pr's title" "hahaha" pr.PR.title;
   Lwt.return_unit
 
 let test_startup dk =
-  let t = init status0 refs0 events1 in
-  let s = VG.empty in
-  DK.branch dk priv >>*= fun priv ->
-  DK.branch dk pub  >>*= fun pub ->
-  let sync s = VG.sync ~policy:`Once ~priv ~pub ~token:t s in
+  let gh = init_github status0 refs0 events1 in
+  let b = Bridge.empty in
+  DK.branch dk branch >>*= fun branch ->
+  let sync ?cap b =
+    let cap = match cap with
+      | None   -> None
+      | Some s -> match Capabilities.parse s with `Ok s -> Some s | _ -> None
+    in
+    Bridge.sync ~policy:`Once ~token:gh ?cap branch b
+  in
   let dir = root repo / "commit" / "foo" in
 
   (* start from scratch *)
   Alcotest.(check counter) "counter: 1"
     { events = 0; prs = 0; status = 0; refs = 0;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
-  sync s >>= fun s ->
+    gh.API.ctx;
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 2"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 0; set_ref = 0 }
-    t.API.ctx;
-  update_status pub dir `Pending >>*= fun () ->
-  sync s >>= fun s ->
+    gh.API.ctx;
+  update_status branch "foo" ["foo"; "bar";"baz"] `Pending >>*= fun () ->
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 3"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 1; set_ref = 0 }
-    t.API.ctx;
+    gh.API.ctx;
 
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun _s ->
+  sync b >>= fun b ->
+  sync b >>= fun b ->
+  sync b >>= fun _b ->
   Alcotest.(check counter) "counter: 3'"
     { events = 0; prs = 1; status = 2; refs = 1;
       set_pr = 0; set_status = 1; set_ref = 0 }
-    t.API.ctx;
+    gh.API.ctx;
 
   (* restart *)
-  let s = VG.empty in
-  sync s >>= fun s ->
+  let b = Bridge.empty in
+  sync b >>= fun b ->
   Alcotest.(check counter) "counter: 4"
     { events = 0; prs = 2; status = 4; refs = 2;
       set_pr = 0; set_status = 1; set_ref = 0 }
-    t.API.ctx;
-  sync s >>= fun s ->
-  sync s >>= fun _s ->
+    gh.API.ctx;
+  sync b >>= fun b ->
+  sync b >>= fun _b ->
   Alcotest.(check counter) "counter: 4'"
     { events = 0; prs = 2; status = 4; refs = 2;
       set_pr = 0; set_status = 1; set_ref = 0 }
-    t.API.ctx;
+    gh.API.ctx;
 
-  (* restart with dirty public branch *)
-  let s = VG.empty in
-  update_status pub dir `Failure >>*= fun () ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
-  sync s >>= fun s ->
+  (* restart with dirty datakit branch + exclusive access  *)
+  let b = Bridge.empty in
+  let cap = "*:r,status[foo/bar/baz]:x" in
+  update_status branch "foo" ["foo"; "bar";"baz"] `Failure >>*= fun () ->
+  sync ~cap b >>= fun b ->
+  sync ~cap b >>= fun b ->
+  sync ~cap b >>= fun b ->
   Alcotest.(check counter) "counter: 5"
     { events = 0; prs = 3; status = 6; refs = 3;
       set_pr = 0; set_status = 2; set_ref = 0 }
-    t.API.ctx;
-  let status = find_status t repo in
+    gh.API.ctx;
+  let status = find_status gh repo in
   Alcotest.(check status_state) "update status" `Failure status.Status.state;
 
-  sync s >>= fun s ->
+  sync b >>= fun b ->
+  sync b >>= fun _b ->
   Alcotest.(check counter) "counter: 6"
     { events = 0; prs = 3; status = 6; refs = 3;
       set_pr = 0; set_status = 2; set_ref = 0 }
-    t.API.ctx;
+    gh.API.ctx;
 
-  (* changes done in the public branch are never overwritten
-     FIXME: we might want to improve/change this in the future. *)
-  sync s >>= fun _s ->
-  Alcotest.(check counter) "counter: 7"
-    { events = 0; prs = 3; status = 6; refs = 3;
-      set_pr = 0; set_status = 2; set_ref = 0 }
-    t.API.ctx;
   let status_dir = dir / "status" / "foo" / "bar" / "baz" in
-  expect_head pub >>*= fun h ->
+  expect_head branch >>*= fun h ->
   let tree = DK.Commit.tree h in
   DK.Tree.exists_dir tree status_dir >>*= fun dir_exists ->
   Alcotest.(check bool) "dir exists" true dir_exists;
@@ -1153,325 +1532,160 @@ let state_of_branch b =
   >|= fun users ->
   { Users.users }
 
-let ensure_pub_in_sync ~msg github pub =
-  state_of_branch pub >>= fun pub_users ->
+let ensure_datakit_in_sync ~msg github datakit =
+  state_of_branch datakit >>= fun dkt_users ->
   Log.info (fun l -> l  "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@."
-               Users.pp github.API.users Users.pp pub_users);
-  let repos = Users.repos pub_users in
+               Users.pp github.API.users Users.pp dkt_users);
+  let repos = Users.repos dkt_users in
   let github = Users.prune repos github.API.users in
-  let pub_users = Users.prune_commits pub_users in
-  Alcotest.check snapshot (msg ^ "[github-pub]")
-    Snapshot.empty (Users.diff github pub_users);
-  Alcotest.check snapshot (msg ^ "[pub-github]")
-    Snapshot.empty (Users.diff pub_users github);
-  Alcotest.check users msg github pub_users;
+  let dkt_users = Users.prune repos dkt_users in
+  Alcotest.check snapshot (msg ^ "[github-datakit]")
+    Snapshot.empty (Users.diff github dkt_users);
+  Alcotest.check snapshot (msg ^ "[datakit-github]")
+    Snapshot.empty (Users.diff dkt_users github);
+  Alcotest.check users msg github dkt_users;
   Lwt.return ()
 
-let ensure_github_in_sync ~msg github pub_users =
+let ensure_github_in_sync ~msg github datakit =
   Log.info (fun l -> l  "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@."
-               Users.pp github.API.users Users.pp pub_users);
+               Users.pp github.API.users Users.pp datakit);
   let repos = Users.repos github.API.users in
   let github = Users.prune repos github.API.users in
-  Alcotest.check snapshot (msg ^ "[github-pub]")
-    Snapshot.empty (Users.diff github pub_users);
-  Alcotest.check snapshot (msg ^ "[pub-github]")
-    Snapshot.empty (Users.diff pub_users github);
-  Alcotest.check users msg github pub_users;
+  Alcotest.check snapshot (msg ^ "[github-datakit]")
+    Snapshot.empty (Users.diff github datakit);
+  Alcotest.check snapshot (msg ^ "[datakit-github]")
+    Snapshot.empty (Users.diff datakit github);
+  Alcotest.check users msg github datakit;
   Lwt.return ()
 
-let test_contexts = [|
-  ["ci"; "datakit"; "test"];
-  ["ci"; "datakit"; "build"];
-  ["ci"; "circleci"];
-|]
-
-let test_pr_commits =  [| "123"; "456"; "789"; "0ab" |]
-let test_ref_commits = [| "123"; "456"; "abc"; "def" |]
-
-let test_names = [|
-  ["heads"; "master"];
-  ["tags" ; "foo"; "bar"];
-  ["heads"; "gh-pages"];
-|]
-
-let test_descriptions = [|
-  Some "Testing...";
-  None;
-|]
-
-let test_base = [| "master"; "test"; "foo" |]
-
-let test_state = [|
-  `Pending;
-  `Success;
-  `Failure;
-  `Error;
-|]
-
-let test_user = ["a"; "b"]
-let test_repo = ["a"; "b"]
-
-let random_choice ~random options =
-  options.(Random.State.int random (Array.length options))
-
-let random_pr_commit ~random ~repo =
-  let id = random_choice ~random test_pr_commits in
-  { Commit.repo; id }
-
-let random_ref_commit ~random ~repo =
-  let id = random_choice ~random test_ref_commits in
-  { Commit.repo; id }
-
-let random_description ~random = random_choice ~random test_descriptions
-
-let random_state ~random = random_choice ~random test_state
-
-let random_base ~random = random_choice ~random test_base
-
-let random_refs ~random ~repo ~old_refs =
-  test_names
-  |> Array.to_list
-  |> List.map (fun name ->
-      if Random.State.bool random then (
-        match List.find (fun r -> r.Ref.name = name) old_refs with
-        | exception Not_found -> []
-        | old_ref ->
-          if Random.State.bool random then [] else
-            let head = random_ref_commit ~random ~repo in
-            [{ old_ref with Ref.head }]
-      ) else (
-        let head = random_ref_commit ~random ~repo in
-        [{ Ref.head; name }]
-      ))
-  |> List.concat
-
-let random_status ~random ~old_status commit =
-  let old_status = match List.assoc (Commit.id commit) old_status with
-    | exception Not_found -> []
-    | old_status -> old_status
-  in
-  test_contexts
-  |> Array.to_list
-  |> List.map (fun context ->
-      if Random.State.bool random then (
-        match List.find (fun s -> s.Status.context = context) old_status with
-        | exception Not_found -> []
-        | old_status -> [old_status]    (* GitHub can't delete statuses *)
-      ) else (
-        let state = random_state ~random in
-        let description = random_description ~random in
-        [{ Status.state; commit; description; url = None; context }]
-      ))
-  |> List.concat
-
-let random_prs ~random ~repo ~old_prs =
-  let n_prs = Random.State.int random 4 in
-  let old_prs = List.rev old_prs in
-  let old_prs =
-    List.fold_left (fun prs pr ->
-        if Random.State.bool random then prs
-        else
-          let state =
-            match pr.PR.state with
-            | `Open when Random.State.bool random -> `Closed
-            | s -> s
-          in
-          let head = random_pr_commit ~random ~repo in
-          { pr with PR.state; head } :: prs
-      ) [] old_prs
-  in
-  let next_pr =
-    ref (List.fold_left (fun n pr -> max (PR.number pr + 1) n) 0 old_prs)
-  in
-  let rec make_prs acc = function
-    | 0 -> acc
-    | n ->
-      let head = random_pr_commit ~random ~repo in
-      let base = random_base ~random in
-      let number = !next_pr in
-      incr next_pr;
-      let pr = {
-        PR.head;
-        number;
-        state = `Open;
-        title = "PR#" ^ string_of_int number;
-        base;
-      } in
-      make_prs (pr :: acc) (n - 1)
-  in
-  make_prs old_prs n_prs |> List.rev
-
-let random_state ~random ~repo ~old_prs ~old_status ~old_refs =
-  let prs = random_prs ~random ~repo ~old_prs in
-  let refs = random_refs ~random ~repo ~old_refs in
-  let commits =
-    let (++) = Commit.Set.union in
-    let l f s = Commit.Set.of_list (List.map f s) in
-    l (fun (id, _) -> { Commit.repo; id }) old_status
-    ++ l PR.commit prs ++ l Ref.commit refs
-  in
-  let commits =
-    Commit.Set.fold (fun c acc ->
-        match random_status ~random ~old_status c with
-        | [] -> acc
-        | s  -> (Commit.id c, s) :: acc
-      ) commits []
-  in
-  prs, commits, refs
-
-let random_users ?(old=Users.empty ()) ~random =
-  Users.iter (fun _ repo -> User.clear repo) old;
-  test_user |> List.map (fun user ->
-      let old_user =
-        Users.find user old |> default { User.repos = String.Map.empty }
-      in
-      let repos =
-        test_repo |> List.map (fun repo ->
-            let r = { Repo.user; repo } in
-            let old_prs, old_status, old_refs =
-              match String.Map.find repo old_user.User.repos with
-              | None      -> [], [], []
-              | Some repo -> repo.R.prs, repo.R.commits, repo.R.refs
-            in
-            let prs, commits, refs =
-              random_state ~random ~repo:r ~old_prs ~old_status ~old_refs
-            in
-            repo, { R.user; repo; commits; prs; refs; events = [] }
-          )
-        |> String.Map.of_list
-      in
-      user, { User.repos }
-    )
-  |> String.Map.of_list
-  |> fun users -> { Users.users }
-
 let all_repos =
-  List.fold_left (fun acc user ->
-      List.fold_left (fun acc repo ->
+  Array.fold_left (fun acc user ->
+      Array.fold_left (fun acc repo ->
           Repo.Set.add {Repo.user; repo} acc
-        ) acc test_repo
-    ) Repo.Set.empty test_user
+        ) acc Data.repos
+    ) Repo.Set.empty Data.users
 
 exception DK_error of DK.error
 
-let monitor repos pub =
-  DK.Branch.with_transaction pub (fun t ->
+let monitor repos branch =
+  DK.Branch.with_transaction branch (fun t ->
       let monitor ~user ~repo =
-        Conv.update_repo t `Monitored { Repo.user; repo }
+        Conv.update_elt t (`Repo { Repo.user; repo })
       in
       Lwt_list.iter_p (fun { Repo.user; repo } ->
-          monitor ~user ~repo >>= function
-          | Error e -> Lwt.fail (DK_error e)
-          | Ok ()   -> Lwt.return_unit
+          monitor ~user ~repo
         ) repos
       >>= fun () ->
       DK.Transaction.commit t ~message:"Monitor repos"
     )
 
-let random_monitor ~random pub =
-  DK.Branch.with_transaction pub (fun t ->
+let random_monitor ~random branch =
+  DK.Branch.with_transaction branch (fun t ->
       let monitor ~user ~repo =
-        let s = if Random.State.bool random then `Monitored else `Ignored in
-        Conv.update_repo t s { Repo.user; repo }
+        let elt = `Repo { Repo.user; repo } in
+        match Random.State.bool random with
+        | true  -> Conv.update_elt t elt
+        | false -> Conv.remove_elt t elt
       in
       Lwt_list.iter_p (fun { Repo.user; repo } ->
-          monitor ~user ~repo >>= function
-          | Error e -> Lwt.fail (DK_error e)
-          | Ok ()   -> Lwt.return_unit
+          monitor ~user ~repo
         ) (Repo.Set.elements all_repos)
       >>= fun () ->
       DK.Transaction.commit t ~message:"Monitor repos"
-    )
+    ) >>= function
+  | Ok ()   -> Lwt.return_unit
+  | Error e -> Lwt.fail_with @@ Fmt.to_to_string DK.pp_error e
 
-let test_random_gh ~quick _repo conn =
+(* Generate a random GitHub state and ensure that Datakit converges:
+   in that test, the source of truth is GitHub *)
+let test_random_github ~quick _repo conn =
+  let cap = cap "*:r" in
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
   let random = Random.State.make [| 1; 2; 3 |] in
-  let dk = DK.connect conn in
-  DK.branch dk pub  >>*= fun pub ->
-  DK.branch dk priv >>*= fun priv ->
-  let sync (t, s) =
-    let w = API.Webhook.v t in
-    random_monitor ~random pub >>*= fun () ->
-    VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >|= fun s ->
-    Alcotest.(check int) "API.set-*" 0 (Counter.sets t.API.ctx);
-    s
+  let dkt = DK.connect conn in
+  DK.branch dkt branch >>*= fun branch ->
+  let sync (gh, b) =
+    let w = API.Webhook.v gh in
+    random_monitor ~random branch >>= fun () ->
+    Bridge.sync ~cap ~policy:`Once ~token:gh ~webhook:w branch b >|= fun b ->
+    Alcotest.(check int) "API.set-*" 0 (Counter.sets gh.API.ctx);
+    b
   in
-  let nsync ~fresh n (t, s) =
-    let rec aux k (t, s) =
-      let s = if fresh then VG.empty else s  in
-      let t =
-        let users = random_users ~random ~old:t.API.users in
-        let events = Users.diff_events users t.API.users in
+  let nsync ~fresh n (gh, b) =
+    let rec aux k (gh, b) =
+      let b = if fresh then Bridge.empty else b in
+      let gh =
+        let users = Gen.users ~random ~old:gh.API.users in
+        let events = Users.diff_events users gh.API.users in
         API.create ~events users
       in
-      let w = API.Webhook.v t in
-      random_monitor ~random pub >>*= fun () ->
-      VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >>= fun s ->
-      Alcotest.(check int) "API.set-*" 0 (Counter.sets t.API.ctx);
+      let w = API.Webhook.v gh in
+      random_monitor ~random branch >>= fun () ->
+      Bridge.sync ~cap ~policy:`Once ~token:gh ~webhook:w branch b >>= fun b ->
+      Alcotest.(check int) "API.set-*" 0 (Counter.sets gh.API.ctx);
       let msg = Fmt.strf "update %d (fresh=%b)" (n - k + 1) fresh in
-      ensure_pub_in_sync ~msg t pub >>= fun () ->
-      if k > 1 then aux (k-1) (t, s) else Lwt.return (t, s)
+      ensure_datakit_in_sync ~msg gh branch >>= fun () ->
+      if k > 1 then aux (k-1) (gh, b) else Lwt.return (gh, b)
     in
-    aux n (t, s)
+    aux n (gh, b)
   in
-  let t = API.create (random_users ~random ?old:None) in
-  sync (t, VG.empty) >>= fun _ ->
-  ensure_pub_in_sync ~msg:"init" t pub >>= fun () ->
-  let t = API.create (random_users ~random ~old:t.API.users) in
-  sync (t, VG.empty) >>= fun s ->
-  ensure_pub_in_sync ~msg:"update" t pub >>= fun () ->
-  nsync ~fresh:false (if quick then 2 else 10) (t, s) >>= fun (t, s) ->
-  nsync ~fresh:true (if quick then 2 else 30)  (t, s) >>= fun (t, s) ->
-  nsync ~fresh:false (if quick then 2 else 20) (t, s) >>= fun (t, s) ->
-  let users = Users.of_repos (API.all_repos t) in
-  let events = Users.diff_events users t.API.users in
-  let t = API.create ~events users in
-  sync (t, s) >>= fun _s ->
-  ensure_pub_in_sync ~msg:"empty" t pub >>= fun () ->
+  let gh = API.create (Gen.users ~random ?old:None) in
+  sync (gh, Bridge.empty) >>= fun _ ->
+  ensure_datakit_in_sync ~msg:"init" gh branch >>= fun () ->
+  let gh = API.create (Gen.users ~random ~old:gh.API.users) in
+  sync (gh, Bridge.empty) >>= fun b ->
+  ensure_datakit_in_sync ~msg:"update" gh branch >>= fun () ->
+  nsync ~fresh:false (if quick then 2 else 10) (gh, b) >>= fun (gh, b) ->
+  nsync ~fresh:true (if quick then 2 else 30)  (gh, b) >>= fun (gh, b) ->
+  nsync ~fresh:false (if quick then 2 else 20) (gh, b) >>= fun (gh, b) ->
+  let users = Users.of_repos (API.all_repos gh) in
+  let events = Users.diff_events users gh.API.users in
+  let gh = API.create ~events users in
+  sync (gh, b) >>= fun _s ->
+  ensure_datakit_in_sync ~msg:"empty" gh branch >>= fun () ->
   Lwt.return_unit
 
-let test_random_dk ~quick _repo conn =
+(* Generate a random datakit state and ensure that GitHub converges:
+   in that test, the source of truth is DataKit. *)
+let test_random_datakit ~quick _repo conn =
+  let cap = cap "*:x" in
   quiet_9p ();
   quiet_git ();
   quiet_irmin ();
   let random = Random.State.make [| 1; 2; 3 |] in
-  let dk = DK.connect conn in
-  DK.branch dk pub  >>*= fun pub ->
-  DK.branch dk priv >>*= fun priv ->
-  VG.sync ~policy:`Once VG.empty ~pub ~priv ~token:(API.create (Users.empty ()))
+  let dkt = DK.connect conn in
+  DK.branch dkt branch  >>*= fun branch ->
+  Bridge.sync
+    ~policy:`Once ~token:(API.create (Users.empty ()))
+    ~cap branch Bridge.empty
   >>= fun _ ->
-  let update_pub users =
+  let update_datakit users =
     let events = Users.diff_events users (Users.empty ()) in
-    DK.Branch.with_transaction pub (fun tr ->
+    DK.Branch.with_transaction branch (fun tr ->
         Lwt_list.iter_s (fun { Repo.user; repo } ->
-            safe_remove tr Datakit_path.(empty / repo / user)
+            safe_remove tr Datakit_path.(empty / user / repo)
           ) (Repo.Set.elements all_repos)
         >>= fun () ->
-        Lwt_list.iter_s (fun e ->
-            Conv.update_event tr e >>= function
-            | Error e -> Lwt.fail (DK_error e)
-            | Ok ()   -> Lwt.return_unit
-          ) events >>= fun () ->
+        Lwt_list.iter_s (Conv.update_event tr) events >>= fun () ->
         DK.Transaction.commit tr ~message:"User updates"
       ) >>= function
     | Error e -> Lwt.fail (DK_error e)
     | Ok ()   -> Lwt.return_unit
   in
   let prune = Users.prune all_repos in
-  let sync msg users (s, t) =
-    update_pub users >>= fun () ->
-    monitor (Repo.Set.elements (Users.repos users)) pub >>*= fun () ->
-    let w = API.Webhook.v t in
-    VG.sync ~policy:`Once s ~pub ~priv ~token:t ~webhook:w >>= fun s ->
-    Log.debug (fun l -> l "API.set-* = %d" (Counter.sets t.API.ctx));
-    ensure_github_in_sync ~msg t (prune users) >|= fun () ->
-    (s, t)
+  let sync msg users (b, gh) =
+    update_datakit users >>= fun () ->
+    monitor (Repo.Set.elements (Users.repos users)) branch >>*= fun () ->
+    Bridge.sync ~cap ~policy:`Once ~token:gh branch b >>= fun b ->
+    Log.debug (fun l -> l "API.set-* = %d" (Counter.sets gh.API.ctx));
+    ensure_github_in_sync ~msg gh (prune users) >|= fun () ->
+    (b, gh)
   in
   let nsync n users x =
     let rec aux k users x =
-      let users = random_users ~random ~old:users in
+      let users = Gen.users ~random ~old:users in
       let msg = Fmt.strf "update %d" (n - k + 1) in
       sync msg users x >>= fun x ->
       if k > 1 then aux (k-1) users x else Lwt.return x
@@ -1479,7 +1693,7 @@ let test_random_dk ~quick _repo conn =
     aux n users x
   in
   let users = Users.empty () in
-  let x = VG.empty, API.create (Users.empty ()) in
+  let x = Bridge.empty, API.create (Users.empty ()) in
   sync "init" users x >>= fun s ->
   nsync (if quick then 3 else 30) (Users.empty ()) s
   >|= ignore
@@ -1487,12 +1701,14 @@ let test_random_dk ~quick _repo conn =
 let runx f () = Test_utils.run f
 
 let test_set = [
-  "snapshot"  , `Quick, test_snapshot;
-  "events"    , `Quick, run_with_test_test test_events;
-  "updates"   , `Quick, run_with_test_test test_updates;
-  "startup"   , `Quick, run_with_test_test test_startup;
-  "random-gh" , `Quick, runx (test_random_gh ~quick:true);
-  "random-gh*", `Slow , runx (test_random_gh ~quick:false);
-  "random-dk" , `Quick, runx (test_random_dk ~quick:true);
-  "random-dk*", `Slow , runx (test_random_dk ~quick:false);
+  "basic-snapshot", `Quick, test_basic_snapshot;
+  "snapshot"      , `Quick, test_snapshot;
+  "capabilities"  , `Quick, test_capabilities;
+  "events" , `Quick, run_with_test_test test_events;
+  "updates", `Quick, run_with_test_test test_updates;
+  "startup", `Quick, run_with_test_test test_startup;
+  "random-github"   , `Quick, runx (test_random_github  ~quick:true);
+  "random-github-*" , `Slow , runx (test_random_github  ~quick:false);
+  "random-datakit"  , `Quick, runx (test_random_datakit ~quick:true);
+  "random-datakit-*", `Slow , runx (test_random_datakit ~quick:false);
 ]

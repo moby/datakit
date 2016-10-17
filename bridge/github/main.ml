@@ -41,7 +41,7 @@ module DK = Datakit_client_9p.Make(Client9p)
 
 module VG = struct
   include Datakit_github_vfs.Make(Datakit_github_api)
-  module Sync = Datakit_github.Sync(Datakit_github_api)(DK)
+  module Sync = Datakit_github_sync.Make(Datakit_github_api)(DK)
 end
 
 (* Hyper-V socket applications use well-known GUIDs. This is ours: *)
@@ -80,9 +80,7 @@ let ( >>~ ) x f =
   | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
   | Ok t    -> f t
 
-let start () sandbox no_listen listen_urls
-    datakit private_branch public_branch cap
-    webhook prune =
+let start () sandbox no_listen listen_urls datakit branch cap webhook =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -98,10 +96,10 @@ let start () sandbox no_listen listen_urls
     ));
   Log.app (fun l ->
       l "Starting %s %s (%a)...@.\
-         The public branch is %s@.The private branch is %s"
+         Datakit/GitHub branch is %s@"
         (Filename.basename Sys.argv.(0)) Version.v
         Datakit_github.Capabilities.pp cap
-        public_branch private_branch
+        branch
     );
   let token = match token () with
     | None   -> failwith "Missing datakit GitHub token"
@@ -133,15 +131,9 @@ let start () sandbox no_listen listen_urls
       Log.info (fun l -> l "Connected to %s" datakit);
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
-      match prune with
-      | Some br ->
-        DK.branch dk br >>~ fun br ->
-        VG.Sync.prune br
-      | None ->
-        DK.branch dk private_branch >>~ fun priv ->
-        DK.branch dk public_branch  >>~ fun pub ->
-          VG.Sync.sync t ?webhook ~cap ~priv ~pub ~token
-          >|= ignore
+      DK.branch dk branch >>~ fun br ->
+      VG.Sync.sync ~token ?webhook ~cap br t
+      >|= ignore
   in
   let accept_9p_connections () =
     if no_listen || listen_urls = [] then []
@@ -202,18 +194,11 @@ let datakit =
   in
   Arg.(value & opt string "tcp:127.0.0.1:5640" doc)
 
-let private_branch =
-  let doc =
-    Arg.info ~doc:"Private DataKit branch where the GitHub events (persistent \
-                   and webhook) are to be mirrored."
-      ["x"; "branch-x"]
-  in
-  Arg.(value & opt string "github-metadata-x" doc)
-
-let public_branch =
+let branch =
   let doc =
     Arg.info
-      ~doc:"Public DataKit branch. Writes to this branch will be translated into \
+      ~doc:"DataKit/GitHub branch. Reflect the GitHub state. \
+            Writes to this branch will be translated into    \
             GitHub API calls."
       ["b"; "branch"]
   in
@@ -231,7 +216,7 @@ let webhook =
   Arg.(value & opt (some uri) None doc)
 
 let cap: Datakit_github.Capabilities.t Cmdliner.Arg.converter =
-  Datakit_github.Capabilities.(of_string, pp)
+  Datakit_github.Capabilities.(parse, pp)
 
 let capabilities =
   let doc =
@@ -242,10 +227,6 @@ let capabilities =
   in
   Arg.(value & opt cap Datakit_github.Capabilities.all doc)
 
-let prune =
-  let doc = Arg.info ~doc:"Prune the given branch and exit" ["prune"] in
-  Arg.(value & opt (some string) None doc)
-
 let term =
   let doc = "Bridge between GiHub API and Datakit." in
   let man = [
@@ -255,8 +236,7 @@ let term =
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
-        datakit $ private_branch $ public_branch $ capabilities $
-        webhook $ prune),
+        datakit $ branch $ capabilities $ webhook),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

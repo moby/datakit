@@ -1,8 +1,9 @@
-(* Implement API with direct GitHub API calls. *)
-
 open Datakit_github
 open Github_t
 open Astring
+
+let src = Logs.Src.create "dkt-github" ~doc:"Github to Git bridge"
+module Log = (val Logs.src_log src : Logs.LOG)
 
 type token = Github.Token.t
 

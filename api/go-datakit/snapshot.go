@@ -66,9 +66,6 @@ func (s *Snapshot) Read(ctx context.Context, path []string) (string, error) {
 	}
 	file, err := s.client.Open(ctx, p9p.OREAD, p...)
 	if err != nil {
-		if err == enoent {
-			return "", nil
-		}
 		return "", err
 	}
 	defer file.Close(ctx)

@@ -4,7 +4,7 @@ EXE=Datakit
 
 TESTS = true
 
-.PHONY: all clean test bundle COMMIT exe
+.PHONY: all clean test bundle COMMIT exe ci
 
 all: datakit
 	@
@@ -26,6 +26,10 @@ server:
 
 github:
 	ocaml pkg/pkg.ml build -n datakit-github -q
+
+ci:
+	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true
+	ocaml pkg/pkg.ml test _build/ci/tests/test_ci.native
 
 clean:
 	ocaml pkg/pkg.ml clean

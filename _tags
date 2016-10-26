@@ -1,5 +1,5 @@
 true : bin_annot, safe_string
-true: warn_error(+1..49), warn(A-3-4-41-44)
+not <ci/**>: warn_error(+1..49), warn(A-3-4-41-44)
 true: package(bytes lwt astring logs result cstruct fmt rresult)
 
 <src>: include

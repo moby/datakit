@@ -568,7 +568,6 @@ let test_rw () =
   let v x = Ivfs_blob.of_string x, `Normal in
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
-  let unit = (module Unit : Alcotest.TESTABLE with type t = unit) in
   Lwt_main.run begin
     Store.Repo.create config >>= fun repo ->
     let rw = RW.of_dir (Tree.Dir.empty repo) in

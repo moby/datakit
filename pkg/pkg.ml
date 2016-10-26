@@ -8,6 +8,7 @@ let metas = [
   Pkg.meta_file ~install:false "pkg/META.client";
   Pkg.meta_file ~install:false "pkg/META.server";
   Pkg.meta_file ~install:false "pkg/META.github";
+  Pkg.meta_file ~install:false "pkg/META.ci";
 ]
 
 let opams =
@@ -18,6 +19,7 @@ let opams =
     Pkg.opam_file "datakit-client.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-server.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-github.opam" ~lint_deps_excluding ~install;
+    Pkg.opam_file "datakit-ci.opam" ~lint_deps_excluding ~install;
   ]
 
 let () =
@@ -51,5 +53,13 @@ let () =
       Pkg.lib   "datakit-github.opam" ~dst:"opam";
       Pkg.mllib "bridge/github/datakit-github.mllib";
       Pkg.bin   "bridge/github/main" ~dst:"datakit-github" ;
+    ]
+  | "datakit-ci" -> Ok [
+      Pkg.lib   "pkg/META.ci"     ~dst:"META";
+      Pkg.lib   "datakit-ci.opam" ~dst:"opam";
+      Pkg.mllib "ci/src/datakit-ci.mllib";
+      Pkg.test  "ci/skeleton/exampleCI" ~run:false ;
+      Pkg.test  "ci/tests/test_ci" ~args:(Cmd.v "-q");
+      
     ]
   | other -> R.error_msgf "unknown package name: %s" other

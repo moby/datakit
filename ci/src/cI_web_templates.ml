@@ -7,16 +7,22 @@ type logs =
   | `Pair of logs * logs
   | `Saved_log of string * string * string ]
 
-let hooks_url = "https://github.com/docker/datakit-test-dump/tree/github-metadata"
+type t = {
+  state_repo : Uri.t;
+}
 
-let log_commit_url commit =
-  Printf.sprintf "https://github.com/docker/datakit-test-dump/commit/%s" commit
+let state_repo_url t fmt =
+  fmt |> Fmt.kstrf @@ fun path ->
+  Fmt.strf "%a/%s" Uri.pp_hum t.state_repo path
 
-let log_branch_history_url branch =
-  Printf.sprintf "https://github.com/docker/datakit-test-dump/commits/%s/log" branch
+let log_commit_url t commit =
+  state_repo_url t "commit/%s" commit
 
-let log_branch_results_url branch =
-  Printf.sprintf "https://github.com/docker/datakit-test-dump/tree/%s" branch
+let log_branch_history_url t branch =
+  state_repo_url t "commits/%s/log" branch
+
+let log_branch_results_url t branch =
+  state_repo_url t "tree/%s" branch
 
 let gh_ref_url r =
   let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
@@ -25,10 +31,10 @@ let gh_ref_url r =
   | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project (String.concat ~sep:"/" id)
   | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user project Datakit_path.pp id
 
-let ref_metadata_url r =
+let ref_metadata_url t r =
   let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
   let id = CI_github_hooks.Ref.name r in
-  Fmt.strf "https://github.com/docker/datakit-test-dump/commits/github-metadata/%s/%s/ref/%a" user project
+  state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user project
     Datakit_path.pp id
 
 let gh_pr_url pr =
@@ -36,19 +42,19 @@ let gh_pr_url pr =
   let id = CI_github_hooks.PR.id pr in
   Printf.sprintf "https://github.com/%s/%s/pull/%d" user project id
 
-let pr_metadata_url pr =
+let pr_metadata_url t pr =
   let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
   let id = CI_github_hooks.PR.id pr in
-  Printf.sprintf "https://github.com/docker/datakit-test-dump/commits/github-metadata/%s/%s/pr/%d" user project id
+  state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user project id
 
-let commit_history_url target =
+let commit_history_url t target =
   let { CI_projectID.user; project }, commit =
     match target with
     | `PR pr -> CI_github_hooks.PR.project pr, CI_github_hooks.PR.head pr
     | `Ref r -> CI_github_hooks.Ref.project r, CI_github_hooks.Ref.head r
   in
   let hash = CI_github_hooks.Commit.hash commit in
-  Printf.sprintf "https://github.com/docker/datakit-test-dump/commits/github-metadata/%s/%s/commit/%s" user project hash
+  state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user project hash
 
 let commit_url ~project commit =
   let { CI_projectID.user; project } = project in
@@ -393,13 +399,7 @@ let prs_page ~ci =
   let sections = List.map pr_table projects in
   let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
-  protected_page title Nav.PRs @@ opt_warning ci @ sections @ [
-      h2 [pcdata "Forgotten PRs"];
-      p [pcdata "If you think your PR should be listed here and it isn't, that probably means the event monitor didn't add it to ";
-         a ~a:[a_href hooks_url] [pcdata "the datakit-test-dump repository"];
-         pcdata ".";
-        ];
-    ]
+  protected_page title Nav.PRs @@ opt_warning ci @ sections
 
 let branches_page ~ci =
   let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
@@ -431,22 +431,22 @@ let log_button_group history log_url anchor_link =
     a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href anchor_link;] [span ~a:[a_class["glyphicon"; "glyphicon-chevron-down"]] []; pcdata "Skip to End"];
   ]
 
-let rec log = function
+let rec log t = function
   | `No_log -> []
   | `Live_log (data, branch) ->
     let link =
       match branch with
       | None -> []
-      | Some branch -> [history_button (log_branch_history_url branch)]
+      | Some branch -> [history_button (log_branch_history_url t branch)]
     in
     [
       p (pcdata "Still running" :: link);
       pre ~a:[a_class ["log"]] [pcdata data]
     ]
   | `Saved_log (data, commit, branch) ->
-    let commit_url = log_commit_url commit in
-    let history = history_button (log_branch_history_url branch) in
-    let log_url = log_branch_results_url branch in
+    let commit_url = log_commit_url t commit in
+    let history = history_button (log_branch_history_url t branch) in
+    let log_url = log_branch_results_url t branch in
     let end_link = log_end_anchor_link branch in
     let end_anchor = log_end_anchor branch in
     [
@@ -465,12 +465,12 @@ let rec log = function
       ];
       end_anchor
     ]
-  | `Pair (a, b) -> log a @ log b
+  | `Pair (a, b) -> log t a @ log t b
 
 let job_id job_name =
   Fmt.strf "job-%s" job_name
 
-let job ~csrf_token ~page_url ~target (job, log_data) =
+let job t ~csrf_token ~page_url ~target (job, log_data) =
   let target = CI_engine.git_target target in
   let state = CI_engine.state job in
   let metadata =
@@ -479,7 +479,7 @@ let job ~csrf_token ~page_url ~target (job, log_data) =
       row "State"        [
         status state;
         pcdata " [ ";
-        a ~a:[a_href (commit_history_url target)] [pcdata "history"];
+        a ~a:[a_href (commit_history_url t target)] [pcdata "history"];
         pcdata " ]"];
       row "Details"      [pcdata state.CI_state.descr];
     ] in
@@ -505,7 +505,7 @@ let job ~csrf_token ~page_url ~target (job, log_data) =
       [metadata] @
       rebuild_buttons @
       [h3 [pcdata "Logs"]; ] @
-      log log_data @
+      log t log_data @
       [metadata];
     )
   ]
@@ -519,7 +519,7 @@ let job_row (job, _log_data) =
     td [pcdata state.CI_state.descr];
   ]
 
-let pr_page ~csrf_token ~target jobs =
+let pr_page t ~csrf_token ~target jobs =
   let pr =
     match CI_engine.git_target target with
     | `PR pr -> pr
@@ -541,17 +541,17 @@ let pr_page ~csrf_token ~target jobs =
       row "PR on GitHub" [
         a ~a:[a_href (gh_pr_url pr)] [pcdata (string_of_int pr_id)];
         pcdata " [ ";
-        a ~a:[a_href (pr_metadata_url pr)] [pcdata "history"];
+        a ~a:[a_href (pr_metadata_url t pr)] [pcdata "history"];
         pcdata " ]";
       ];
       row "Title"        [pcdata (CI_github_hooks.PR.title pr)];
       row "Commit"       [a ~a:[a_href (commit_url ~project commit)] [pcdata commit]];
     ]
     :: state_summary @
-    List.map (job ~csrf_token ~page_url ~target) jobs
+    List.map (job t ~csrf_token ~page_url ~target) jobs
   )
 
-let ref_page ~csrf_token ~target jobs =
+let ref_page t ~csrf_token ~target jobs =
   match CI_engine.git_target target with
   | `PR _ -> assert false
   | `Ref r ->
@@ -576,11 +576,11 @@ let ref_page ~csrf_token ~target jobs =
         row "Branch on GitHub" [
           a ~a:[a_href (gh_ref_url r)] [pcdata title];
           pcdata " [ ";
-          a ~a:[a_href (ref_metadata_url r)] [pcdata "history"];
+          a ~a:[a_href (ref_metadata_url t r)] [pcdata "history"];
           pcdata " ]";
         ];
         row "Commit" [a ~a:[a_href (commit_url ~project commit)] [pcdata commit]];
       ]
       :: state_summary @
-      List.map (job ~csrf_token ~page_url ~target) jobs
+      List.map (job t ~csrf_token ~page_url ~target) jobs
     )

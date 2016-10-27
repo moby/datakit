@@ -1,5 +1,9 @@
 (** Generate HTML for the various pages in the UI. *)
 
+type t = {
+  state_repo : Uri.t;
+}
+
 type logs =
   [ `Live_log of string * string option
   | `No_log
@@ -48,6 +52,7 @@ val tags_page :
   [> `Html ] Tyxml.Html.elt
 
 val pr_page :
+  t ->
   csrf_token:string ->
   target:CI_engine.target ->
   (CI_engine.job * logs) list ->
@@ -55,6 +60,7 @@ val pr_page :
   [> `Html ] Tyxml.Html.elt
 
 val ref_page :
+  t ->
   csrf_token:string ->
   target:CI_engine.target ->
   (CI_engine.job * logs) list ->

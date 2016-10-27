@@ -58,7 +58,7 @@ let () =
       Pkg.lib   "pkg/META.ci"     ~dst:"META";
       Pkg.lib   "datakit-ci.opam" ~dst:"opam";
       Pkg.mllib "ci/src/datakit-ci.mllib";
-      Pkg.test  "ci/skeleton/exampleCI" ~run:false ;
+      Pkg.test  "ci/skeleton/exampleCI" ~run:false;
       Pkg.test  "ci/tests/test_ci" ~args:(Cmd.v "-q");
       
     ]

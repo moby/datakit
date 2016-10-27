@@ -43,7 +43,7 @@ See below for information on writing configuration files.
 
 Then run your new image:
 
-    docker run --name=my-ci -p 8443:8443 my-ci --metadata-store tcp:127.0.0.1:5640
+    docker run --name=my-ci -p 8443:8443 my-ci --metadata-store tcp:127.0.0.1:5640 --state-repo https://github.com/foo/bar
 
 The arguments are:
 
@@ -51,6 +51,7 @@ The arguments are:
 - `-p PORT:8443` tells Docker to expose port 8443 (the https web UI) on host port `PORT`.
 - `my-ci` is the image you just built.
 - `--metadata-store tcp:HOST:PORT` is the address of your running DataKit server.
+- `--state-repo URL` is used to add links from the web UI to Git browser for the metadata store's data.
 
 On the first run, you will be prompted to choose a password for the "admin" user.
 

@@ -5,11 +5,14 @@ open CI_utils
 module Wm = CI_web_utils.Wm
 module Rd = Webmachine.Rd
 
+type config = CI_web_templates.t
+
 type t = {
   ci : CI_engine.t;
   logs : CI_live_log.manager;
   server : CI_web_utils.server;
   dashboards : CI_target.ID_Set.t CI_projectID.Map.t;
+  config : CI_web_templates.t;
 }
 
 class virtual http_page t = object(self)
@@ -124,7 +127,7 @@ class pr_page t = object(self)
         >>= fun jobs ->
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.pr_page ~csrf_token ~target jobs) rd
+        Wm.continue (CI_web_templates.pr_page t.config ~csrf_token ~target jobs) rd
 end
 
 class ref_page t = object(self)
@@ -150,7 +153,7 @@ class ref_page t = object(self)
         >>= fun jobs ->
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.ref_page ~csrf_token ~target jobs) rd
+        Wm.continue (CI_web_templates.ref_page t.config ~csrf_token ~target jobs) rd
 end
 
 let rebuild ~ci ~uri ~project ~target ~job ~redirect rd =
@@ -215,9 +218,9 @@ let mime_type uri =
   | "png"   -> Some "image/png"
   | _       -> None
 
-let serve ~logs ~mode ~ci ~auth ~dashboards =
+let serve ~config ~logs ~mode ~ci ~auth ~dashboards =
   let server = CI_web_utils.server ~auth in
-  let t = { logs; ci; server; dashboards } in
+  let t = { logs; ci; server; dashboards; config } in
   let routes = [
     (* Auth *)
     ("/auth/login",     fun () -> new CI_web_utils.login_page t.server);
@@ -239,3 +242,23 @@ let serve ~logs ~mode ~ci ~auth ~dashboards =
     (":dir/:name",      fun () -> new CI_web_utils.static_crunch ~mime_type CI_static.read);
   ] in
   CI_web_utils.serve ~mode ~routes
+
+open Cmdliner
+
+let make_config state_repo =
+  { CI_web_templates.state_repo }
+
+let uri =
+  let parse s =
+    try `Ok (Uri.of_string s)
+    with ex -> `Error (Printexc.to_string ex) in
+  (parse, Uri.pp_hum)
+
+let state_repo =
+  let doc =
+    Arg.info ~doc:"GitHub repository mirroring the state repository"
+      ~docv:"URL" ["state-repo"]
+  in
+  Arg.(required (opt (some uri) None doc))
+
+let opts = Term.(pure make_config $ state_repo)

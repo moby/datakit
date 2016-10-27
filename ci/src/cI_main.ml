@@ -16,7 +16,7 @@ let connect protocol address =
          protocol address (Printexc.to_string ex)
     )
 
-let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards projects =
+let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config projects =
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
   CI_web_utils.Auth.create (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
@@ -46,12 +46,12 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards projects =
   in
   Lwt.pick [
     main_thread;
-    CI_web.serve ~logs ~auth ~mode ~ci ~dashboards;
+    CI_web.serve ~config:web_config ~logs ~auth ~mode ~ci ~dashboards;
   ]
 
-let start () pr_store web_ui secrets_dir projects canaries dashboards =
+let start () pr_store web_ui secrets_dir projects canaries dashboards web_config =
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
-  Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards projects)
+  Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config projects)
 
 (* Command-line parsing *)
 
@@ -107,6 +107,7 @@ let run projects =
                    $ projects
                    $ canaries
                    $ dashboards
+                   $ CI_web.opts
                   ) in
   match Term.eval (spec, Term.info "DataKitCI") with
   | `Error _ -> exit 1

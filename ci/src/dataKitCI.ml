@@ -14,6 +14,11 @@ module Cache = CI_cache
 module type BUILDER = CI_s.BUILDER
 module DK = Utils.DK
 
+module Web = struct
+  type config = CI_web_templates.t
+  let config = CI_web_templates.config
+end
+
 module Private = struct
   module Client9p = Utils.Client9p
   type engine = CI_engine.t

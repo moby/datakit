@@ -8,12 +8,21 @@ type logs =
   | `Saved_log of string * string * string ]
 
 type t = {
-  state_repo : Uri.t;
+  name : string;
+  state_repo : Uri.t option;
 }
+
+let err_no_state_repo = "no-state-repo"
+
+let error_link id = "/error/" ^ id
+
+let config ?(name="datakit-ci") ?state_repo () = { name; state_repo }
 
 let state_repo_url t fmt =
   fmt |> Fmt.kstrf @@ fun path ->
-  Fmt.strf "%a/%s" Uri.pp_hum t.state_repo path
+  match t.state_repo with
+  | Some base -> Fmt.strf "%a/%s" Uri.pp_hum base path
+  | None -> error_link err_no_state_repo
 
 let log_commit_url t commit =
   state_repo_url t "commit/%s" commit
@@ -197,11 +206,11 @@ let build_navbar active =
     item Tags "/tag";
   ]
 
-let page t active children ~user =
+let page page_title active children t ~user =
   let navbar = build_navbar active in
   let user = user |> CI_utils.default "not logged in" in
   html
-    (head (title (pcdata t)) [
+    (head (title (pcdata page_title)) [
         meta ~a:[a_charset "utf-8"] ();
         meta ~a:[a_http_equiv "X-UA-Compatible"; a_content "IE=edge"] ();
         meta ~a:[a_name "viewport"; a_content "width=device-width, initial-scale=1"] ();
@@ -221,7 +230,7 @@ let page t active children ~user =
                 span ~a:[a_class["icon-bar"]] [];
 
               ];
-              a ~a:[a_class["navbar-brand"]; a_href "/"] [pcdata "datakit-ci"];
+              a ~a:[a_class["navbar-brand"]; a_href "/"] [pcdata t.name];
             ];
             div ~a:[a_id "navbar"; a_class["collapse"; "navbar-collapse"]] [
               ul ~a:[a_class ["nav"; "navbar-nav"]] navbar;
@@ -338,7 +347,7 @@ let resource_pools ~csrf_token =
     items
   )
 
-let login_page ~csrf_token ~user =
+let login_page ~csrf_token t ~user =
   let query = [
     "CSRFToken", [csrf_token];
   ] in
@@ -350,17 +359,17 @@ let login_page ~csrf_token ~user =
       input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name] ()
     ]
   in
-  page "Login" Nav.Home ~user @@ [
-      h2 [pcdata "Login"];
-      form ~a:[a_class ["login-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
-        field "Username" `Text "user";
-        field "Password" `Password "password";
-        div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
-      ]
+  page "Login" Nav.Home ~user [
+    h2 [pcdata "Login"];
+    form ~a:[a_class ["login-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
+      field "Username" `Text "user";
+      field "Password" `Password "password";
+      div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
     ]
+  ] t
 
-let protected_page title tab body ~user =
-  page title tab body ~user:(Some user)
+let protected_page title tab body t ~user =
+  page title tab body t ~user:(Some user)
 
 let user_page ~csrf_token =
   let query = [
@@ -519,7 +528,7 @@ let job_row (job, _log_data) =
     td [pcdata state.CI_state.descr];
   ]
 
-let pr_page t ~csrf_token ~target jobs =
+let pr_page ~csrf_token ~target jobs t =
   let pr =
     match CI_engine.git_target target with
     | `PR pr -> pr
@@ -549,9 +558,9 @@ let pr_page t ~csrf_token ~target jobs =
     ]
     :: state_summary @
     List.map (job t ~csrf_token ~page_url ~target) jobs
-  )
+  ) t
 
-let ref_page t ~csrf_token ~target jobs =
+let ref_page ~csrf_token ~target jobs t =
   match CI_engine.git_target target with
   | `PR _ -> assert false
   | `Ref r ->
@@ -583,4 +592,20 @@ let ref_page t ~csrf_token ~target jobs =
       ]
       :: state_summary @
       List.map (job t ~csrf_token ~page_url ~target) jobs
-    )
+    ) t
+
+let error_page id =
+  protected_page "Error" Nav.Home (
+    if id = err_no_state_repo then
+      [
+        p [pcdata "No web mirror of the state repository has been configured, so can't link to it."];
+        p [pcdata "Configure DataKit to push to a GitHub repository and then pass the repository's URL using ";
+           code [pcdata "Web.config ~state_repo"];
+           pcdata "."
+          ];
+      ]
+    else
+      [
+        p [pcdata (Printf.sprintf "Unknown error code %S" id)]
+      ]
+  )

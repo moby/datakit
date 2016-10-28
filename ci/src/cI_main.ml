@@ -49,7 +49,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config p
     CI_web.serve ~config:web_config ~logs ~auth ~mode ~ci ~dashboards;
   ]
 
-let start () pr_store web_ui secrets_dir projects canaries dashboards web_config =
+let start ~web_config () pr_store web_ui secrets_dir projects canaries dashboards =
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
   Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config projects)
 
@@ -98,8 +98,8 @@ let dashboards =
   in
   Arg.(value (opt_all CI_target.Full.arg [] doc))
 
-let run projects =
-  let spec = Term.(const start
+let run ~web_config projects =
+  let spec = Term.(const (start ~web_config)
                    $ CI_log_reporter.setup_log
                    $ pr_store
                    $ web_ui
@@ -107,7 +107,6 @@ let run projects =
                    $ projects
                    $ canaries
                    $ dashboards
-                   $ CI_web.opts
                   ) in
   match Term.eval (spec, Term.info "DataKitCI") with
   | `Error _ -> exit 1

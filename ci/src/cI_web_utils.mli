@@ -19,7 +19,8 @@ end
 
 type server
 
-val server : auth:Auth.t -> server
+val server : auth:Auth.t -> web_config:CI_web_templates.t -> server
+val web_config : server -> CI_web_templates.t
 
 module Session_data : sig
   type t

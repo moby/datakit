@@ -10,4 +10,3 @@ true: package(asetmap)
 <src/cI_web_utils.*>: package(ppx_sexp_conv)
 
 <src>: include
-<skeleton>: include

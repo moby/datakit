@@ -18,6 +18,12 @@ let my_projects = [
 let projects =
   Cmdliner.Term.pure my_projects
 
+let web_config =
+  Web.config
+    ~name:"example-ci"
+    ?state_repo:None
+    ()
+
 (* The main entry-point *)
 let () =
-  DataKitCI.Main.run projects
+  DataKitCI.Main.run ~web_config projects

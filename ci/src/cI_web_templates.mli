@@ -1,7 +1,8 @@
 (** Generate HTML for the various pages in the UI. *)
 
-type t = {
-  state_repo : Uri.t;
+type t = private {
+  name : string;
+  state_repo : Uri.t option;
 }
 
 type logs =
@@ -9,6 +10,12 @@ type logs =
   | `No_log
   | `Pair of logs * logs
   | `Saved_log of string * string * string ]
+
+val config : ?name:string -> ?state_repo:Uri.t -> unit -> t
+(** [config ~name ~state_repo ()] is a web configuration.
+    If [name] is given, it is used as the main heading, and also as the name of the session cookie
+    (useful if you run multiple CIs on the same host, on different ports).
+    If [state_repo] is given, it is used to construct links to the state repository on GitHub. *)
 
 val pr_url : CI_projectID.t -> int -> string
 (** [pr_url project pr] is a link to the page for [pr]. *)
@@ -21,11 +28,13 @@ val unescape_ref : string -> Datakit_path.t
 
 val login_page :
   csrf_token:string ->
+  t ->
   user:string option ->
   [> `Html ] Tyxml.Html.elt
 
 val user_page :
   csrf_token:string ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt
 
@@ -33,36 +42,46 @@ val main_page :
   csrf_token:string ->
   ci:CI_engine.t ->
   dashboards:CI_target.ID_Set.t CI_projectID.Map.t ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt
 
 val prs_page :
   ci:CI_engine.t ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt
 
 val branches_page :
   ci:CI_engine.t ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt
 
 val tags_page :
   ci:CI_engine.t ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt
 
 val pr_page :
-  t ->
   csrf_token:string ->
   target:CI_engine.target ->
   (CI_engine.job * logs) list ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt
 
 val ref_page :
-  t ->
   csrf_token:string ->
   target:CI_engine.target ->
   (CI_engine.job * logs) list ->
+  t ->
+  user:string ->
+  [> `Html ] Tyxml.Html.elt
+
+val error_page :
+  string ->
+  t ->
   user:string ->
   [> `Html ] Tyxml.Html.elt

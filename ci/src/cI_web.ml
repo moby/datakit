@@ -5,20 +5,17 @@ open CI_utils
 module Wm = CI_web_utils.Wm
 module Rd = Webmachine.Rd
 
-type config = CI_web_templates.t
-
 type t = {
   ci : CI_engine.t;
   logs : CI_live_log.manager;
   server : CI_web_utils.server;
   dashboards : CI_target.ID_Set.t CI_projectID.Map.t;
-  config : CI_web_templates.t;
 }
 
 class virtual http_page t = object(self)
   inherit CI_web_utils.protected_page t.server
 
-  method virtual private render : (user:string -> [ `Html ] Tyxml.Html.elt, Cohttp_lwt_body.t) Wm.op
+  method virtual private render : (CI_web_templates.t -> user:string -> [ `Html ] Tyxml.Html.elt, Cohttp_lwt_body.t) Wm.op
 
   method content_types_provided rd =
     Wm.continue [
@@ -36,7 +33,7 @@ class virtual http_page t = object(self)
       match self#authenticated_user with
       | None -> assert false
       | Some user ->
-      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user) in
+      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user (CI_web_utils.web_config t.server)) in
       Wm.continue (`String body) rd
 end
 
@@ -54,6 +51,13 @@ class main t = object(self)
     self#session rd >>= fun session_data ->
     let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
     Wm.continue (CI_web_templates.main_page ~csrf_token ~ci:t.ci ~dashboards:t.dashboards) rd
+end
+
+class error t = object
+  inherit http_page t
+  method private render rd =
+    let id = Rd.lookup_path_info_exn "id" rd in
+    Wm.continue (CI_web_templates.error_page id) rd
 end
 
 class pr_list t = object
@@ -127,7 +131,7 @@ class pr_page t = object(self)
         >>= fun jobs ->
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.pr_page t.config ~csrf_token ~target jobs) rd
+        Wm.continue (CI_web_templates.pr_page ~csrf_token ~target jobs) rd
 end
 
 class ref_page t = object(self)
@@ -153,7 +157,7 @@ class ref_page t = object(self)
         >>= fun jobs ->
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.ref_page t.config ~csrf_token ~target jobs) rd
+        Wm.continue (CI_web_templates.ref_page ~csrf_token ~target jobs) rd
 end
 
 let rebuild ~ci ~uri ~project ~target ~job ~redirect rd =
@@ -219,8 +223,8 @@ let mime_type uri =
   | _       -> None
 
 let serve ~config ~logs ~mode ~ci ~auth ~dashboards =
-  let server = CI_web_utils.server ~auth in
-  let t = { logs; ci; server; dashboards; config } in
+  let server = CI_web_utils.server ~auth ~web_config:config in
+  let t = { logs; ci; server; dashboards } in
   let routes = [
     (* Auth *)
     ("/auth/login",     fun () -> new CI_web_utils.login_page t.server);
@@ -238,27 +242,9 @@ let serve ~config ~logs ~mode ~ci ~auth ~dashboards =
     ("ref/:user/:project/:id/:job/rebuild",     fun () -> new ref_rebuild t);
     (* Logs *)
     ("cancel/:branch",                          fun () -> new cancel t);
+    (* Errors *)
+    ("error/:id",       fun () -> new error t);
     (* Static resources *)
     (":dir/:name",      fun () -> new CI_web_utils.static_crunch ~mime_type CI_static.read);
   ] in
   CI_web_utils.serve ~mode ~routes
-
-open Cmdliner
-
-let make_config state_repo =
-  { CI_web_templates.state_repo }
-
-let uri =
-  let parse s =
-    try `Ok (Uri.of_string s)
-    with ex -> `Error (Printexc.to_string ex) in
-  (parse, Uri.pp_hum)
-
-let state_repo =
-  let doc =
-    Arg.info ~doc:"GitHub repository mirroring the state repository"
-      ~docv:"URL" ["state-repo"]
-  in
-  Arg.(required (opt (some uri) None doc))
-
-let opts = Term.(pure make_config $ state_repo)

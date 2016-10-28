@@ -211,9 +211,19 @@ module Term : sig
       It is pending until a successful URL is available. *)
 end
 
+module Web : sig
+  type config
+
+  val config : ?name:string -> ?state_repo:Uri.t -> unit -> config
+  (** [config ~name ~state_repo ()] is a web configuration.
+      If [name] is given, it is used as the main heading, and also as the name of the session cookie
+      (useful if you run multiple CIs on the same host, on different ports).
+      If [state_repo] is given, it is used to construct links to the state repository on GitHub. *)
+end
+
 module Main : sig
-  val run : (string * (string * string Term.t) list) list Cmdliner.Term.t -> unit
-  (** [run projects] runs DataKitCI, monitoring [projects].
+  val run : web_config:Web.config -> (string * (string * string Term.t) list) list Cmdliner.Term.t -> unit
+  (** [run ~web_config projects] runs DataKitCI, monitoring [projects].
       Each item in the list is a GitHub project and the test to apply to PRs within it. *)
 
   val logs : Live_log.manager

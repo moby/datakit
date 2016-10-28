@@ -1,0 +1,40 @@
+opam-version: "1.2"
+maintainer:   "datakit@docker.com"
+authors:      ["Thomas Leonard" "Anil Madhaveppy"
+               "Dave Tucker" "Thomas Gazagnaire" ]
+license:      "Apache"
+homepage:     "https://github.com/docker/datakit-ci"
+bug-reports:  "https://github.com/docker/datakit-ci/issues"
+dev-repo:     "https://github.com/docker/datakit-ci.git"
+doc:          "https://docker.github.io/datakit-ci/"
+
+build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false" "-n" "datakit-ci"]
+build-test: [
+  ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true" "-n" "datakit-ci"]
+  ["ocaml" "pkg/pkg.ml" "test" "-n" "datakit-ci"]
+]
+
+depends: [
+  "ocamlfind" {build}
+  "multipart-form-data"
+  "datakit-client"
+  "protocol-9p"
+  "astring"
+  "cmdliner"
+  "fmt"
+  "logs"
+  "tyxml"
+  "tls"
+  "channel"
+  "conduit"
+  "io-page"
+  "dockerfile"
+  "pbkdf"
+  "webmachine"
+  "session"
+  "ppx_sexp_conv" {build}
+  "crunch" {build}
+  "datakit" {test}
+  "irmin-unix" {test}
+  "alcotest" {test}
+]

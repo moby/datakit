@@ -1,0 +1,59 @@
+body {
+  padding-top: 50px;
+}
+.content {
+  padding: 40px 15px;
+}
+
+button span {
+  padding-right: 4px;
+}
+
+span.glyphicon {
+  padding-right: 2px;
+}
+
+.log {
+  background: #000;
+  color: #fff;
+}
+
+.dashboard {
+  margin-bottom: 20px;
+}
+
+.dashboard #title {
+  margin-bottom: 40px;
+}
+
+.dashboard #status {
+  margin-top: 0px;
+  margin-bottom: 40px;
+}
+
+.dashboard #icon {
+  margin-bottom: 0px;
+}
+
+.dashboard-pending {
+  background: #f0ad4e
+}
+
+.dashboard-success {
+  background: #5cb85c;
+  color: #fff
+}
+
+.dashboard-error {
+  background: #d9534f
+}
+
+.dashboard-failure {
+  background: #d9534f;
+  color: #fff
+}
+
+form.cancel {
+  display: inline;
+  padding-right: 1em;
+}

@@ -1,0 +1,13 @@
+true: warn(A-4), strict_sequence, safe_string, annot, bin_annot
+true: package(datakit-client, protocol-9p.unix)
+true: package(astring, cmdliner, fmt.tty, logs.fmt, fmt.cli, logs.cli)
+true: package(cohttp.lwt)
+true: package(tyxml, webmachine, session.webmachine, multipart-form-data)
+true: package(tls, channel, conduit.lwt-unix, io-page.unix)
+true: package(pbkdf, sexplib)
+true: package(asetmap)
+
+<src/cI_web_utils.*>: package(ppx_sexp_conv)
+
+<src>: include
+<skeleton>: include

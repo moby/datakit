@@ -12,6 +12,7 @@ env:
   - OCAML_VERSION=4.03 PACKAGE="datakit-client"
   - OCAML_VERSION=4.03 PACKAGE="datakit-server"
   - OCAML_VERSION=4.03 PACKAGE="datakit-github"
+  - OCAML_VERSION=4.03 PACKAGE="datakit-ci" PINS="multipart-form-data:https://github.com/cryptosense/multipart-form-data.git datakit-client:. datakit-server:. datakit-github:. datakit:."
   - OCAML_VERSION=4.03 PACKAGE="datakit"
 os:
   - linux

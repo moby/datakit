@@ -6,7 +6,8 @@ let my_test =
 
 (* A list of GitHub projects to monitor. *)
 let projects = [
-  Config.project ~id:"me/my-project"         (* The project at https://github.com/me/my-project: *)
+  Config.project ~id:"me/my-project"    (* The project is at https://github.com/me/my-project *)
+    ~dashboards:["master"]              (* Key branches to display in the dashboard overview *)
     [
       (* The tests to apply to the open PRs in this project. *)
       "my-test", my_test;

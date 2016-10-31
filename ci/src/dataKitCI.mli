@@ -226,9 +226,14 @@ module Config : sig
   type project
   type test = string Term.t
 
-  val project : id:string -> (string * test) list -> project
+  val project :
+    id:string ->
+    ?dashboards:string list ->
+    (string * test) list ->
+    project
   (** [project ~id tests] is the configuration for a single GitHub project.
-      [tests] is a list tests to apply to branches, tags and open PRs within the project. *)
+      [tests] is a list tests to apply to branches, tags and open PRs within the project.
+      [dashboards] (default [["master"]]) is a list of branches to display in the main dashboard area. *)
 
   val ci :
     web_config:Web.config ->

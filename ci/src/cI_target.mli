@@ -1,3 +1,5 @@
+open Asetmap
+
 module ID : sig
   type t = [ `PR of int | `Ref of Datakit_path.t ]
   val pp : t Fmt.t

@@ -4,19 +4,14 @@ open DataKitCI
 let my_test =
   Term.return "Success!"
 
-(* The configuration for a project that has a single test called "my-test". *)
-let my_project = [
-  "my-test", my_test;
+(* A list of GitHub projects to monitor. *)
+let projects = [
+  Config.project ~id:"me/my-project"         (* The project at https://github.com/me/my-project: *)
+    [
+      (* The tests to apply to the open PRs in this project. *)
+      "my-test", my_test;
+    ];
 ]
-
-(* A list of GitHub projects to monitor and the tests to apply to the open PRs in each one. *)
-let my_projects = [
-  "me/my-project", my_project;
-]
-
-(* Parsing of command-line options (none in this example). *)
-let projects =
-  Cmdliner.Term.pure my_projects
 
 let web_config =
   Web.config
@@ -26,4 +21,4 @@ let web_config =
 
 (* The main entry-point *)
 let () =
-  DataKitCI.Main.run ~web_config projects
+  DataKitCI.Main.run (Cmdliner.Term.pure (Config.ci ~web_config ~projects))

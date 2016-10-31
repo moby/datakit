@@ -178,7 +178,7 @@ let with_ci ?(project=ProjectID.v ~user:"user" ~project:"project") conn workflow
   let web_ui = Uri.of_string "https://localhost/" in
   let dk = Private.connect conn in
   let ci = Private.test_engine ~web_ui (fun () -> Lwt.return dk)
-      (ProjectID.Map.singleton project (fun () -> String.Map.singleton "test" (workflow check_build)))
+      (ProjectID.Map.singleton project (String.Map.singleton "test" (workflow check_build)))
   in
   Utils.with_switch @@ fun switch ->
   Lwt.async (fun () -> Private.listen ci ~switch);

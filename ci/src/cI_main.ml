@@ -21,9 +21,6 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config p
   CI_web_utils.Auth.create (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
   let connect_dk () = connect proto addr >|*= DK.connect in
-  let projects = projects
-    |> List.map (fun (name, terms) -> (CI_projectID.of_string_exn name, fun () -> String.Map.of_list terms))
-    |> CI_projectID.Map.of_list in
   let canaries =
     match canaries with
     | [] -> None
@@ -49,7 +46,8 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config p
     CI_web.serve ~config:web_config ~logs ~auth ~mode ~ci ~dashboards;
   ]
 
-let start ~web_config () pr_store web_ui secrets_dir projects canaries dashboards =
+let start () pr_store web_ui secrets_dir config canaries dashboards =
+  let { CI_config.web_config; projects } = config in
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
   Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config projects)
 
@@ -98,13 +96,13 @@ let dashboards =
   in
   Arg.(value (opt_all CI_target.Full.arg [] doc))
 
-let run ~web_config projects =
-  let spec = Term.(const (start ~web_config)
+let run config =
+  let spec = Term.(const start
                    $ CI_log_reporter.setup_log
                    $ pr_store
                    $ web_ui
                    $ secrets_dir
-                   $ projects
+                   $ config
                    $ canaries
                    $ dashboards
                   ) in

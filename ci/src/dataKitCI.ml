@@ -31,3 +31,11 @@ module Private = struct
   let cancel = CI_live_log.cancel
   let read_log = CI_cache.read_log
 end
+
+module Config = struct
+  type t = CI_config.t
+  type project = CI_projectID.t * CI_config.project
+  type test = CI_config.test
+  let project = CI_config.project
+  let ci = CI_config.ci
+end

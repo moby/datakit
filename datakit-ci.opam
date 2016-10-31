@@ -32,6 +32,7 @@ depends: [
   "pbkdf"
   "webmachine"
   "session"
+  "asetmap"
   "ppx_sexp_conv" {build}
   "crunch" {build}
   "datakit" {test}

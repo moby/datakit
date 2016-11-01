@@ -3,6 +3,19 @@
 #require "topkg"
 open Topkg
 
+let build =
+  let build_with_visible_warnings c os =
+    let ocamlbuild = Conf.tool "ocamlbuild" os in
+    let build_dir = Conf.build_dir c in
+    let debug = Cmd.(on (Conf.debug c) (v "-tag" % "debug")) in
+    let profile = Cmd.(on (Conf.profile c) (v "-tag" % "profile")) in
+    Cmd.(ocamlbuild % "-use-ocamlfind" %% debug %% profile % "-build-dir" % build_dir)
+  in
+  let cmd c os files =
+    OS.Cmd.run @@ Cmd.(build_with_visible_warnings c os %% of_list files)
+  in
+  Pkg.build ~cmd ()
+
 let metas = [
   Pkg.meta_file ~install:false "pkg/META";
   Pkg.meta_file ~install:false "pkg/META.client";
@@ -23,7 +36,7 @@ let opams =
   ]
 
 let () =
-  Pkg.describe ~opams ~metas "datakit" @@ fun c ->
+  Pkg.describe ~opams ~metas ~build "datakit" @@ fun c ->
   match Conf.pkg_name c with
   | "datakit" -> Ok [
       Pkg.lib   "pkg/META";
@@ -32,7 +45,7 @@ let () =
       Pkg.bin   "src/datakit/main" ~dst:"datakit";
       Pkg.bin   "src/datakit-client/mount" ~dst:"datakit-mount" ;
       Pkg.test  "tests/test" ~args:(Cmd.v "-q");
-      Pkg.test  "examples/ocaml-client/example" ~run:false ;
+      Pkg.test  "examples/ocaml-client/example" ~run:false;
     ]
   | "datakit-client" -> Ok [
       Pkg.lib   "pkg/META.client"     ~dst:"META";
@@ -58,8 +71,7 @@ let () =
       Pkg.lib   "pkg/META.ci"     ~dst:"META";
       Pkg.lib   "datakit-ci.opam" ~dst:"opam";
       Pkg.mllib "ci/src/datakit-ci.mllib";
-      Pkg.test  "ci/skeleton/exampleCI" ~run:false;
       Pkg.test  "ci/tests/test_ci" ~args:(Cmd.v "-q");
-      
+      Pkg.test  "ci/tests/exampleCI" ~run:false;
     ]
   | other -> R.error_msgf "unknown package name: %s" other

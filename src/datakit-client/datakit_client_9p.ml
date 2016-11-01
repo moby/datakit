@@ -454,16 +454,24 @@ module Make(P9p : Protocol_9p_client.S) = struct
       if t.closed then raise (Invalid_argument "Transaction is closed");
       t.path / "rw" /@ path
 
-    let create_file t ~dir leaf ?(executable=false) data =
+    let split_for_create path =
+      match Datakit_path.pop path with
+      | Some x -> ok x
+      | None -> error "Can't create '/'!"
+
+    let create_file t path ?(executable=false) data =
+      split_for_create path >>*= fun (dir, leaf) ->
       FS.create_file t.fs ~executable ~dir:(rw_path t dir) leaf data
 
-    let create_symlink t ~dir leaf target =
+    let create_symlink t path target =
+      split_for_create path >>*= fun (dir, leaf) ->
       FS.create_symlink t.fs ~dir:(rw_path t dir) leaf target
 
     let make_dirs t path =
       FS.make_dirs t.fs ~base:(t.path / "rw") path
 
-    let create_dir t ~dir leaf =
+    let create_dir t path =
+      split_for_create path >>*= fun (dir, leaf) ->
       FS.create_dir t.fs ~dir:(rw_path t dir) leaf
 
     let set_parents t parents =
@@ -472,7 +480,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
       |> Cstruct.concat
       |> FS.replace_file t.fs t.path "parents"
 
-    let replace_file t ~dir leaf data =
+    let replace_file t path data =
+      split_for_create path >>*= fun (dir, leaf) ->
       FS.replace_file t.fs (rw_path t dir) leaf data
 
     let remove t path =
@@ -543,8 +552,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let exists_file t path = FS.exists_file t.fs (t.path / "rw" /@ path)
     let exists_dir t path = FS.exists_dir t.fs (t.path / "rw" /@ path)
 
-    let create_or_replace_file t ~dir =
-      FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir)
+    let create_or_replace_file t path content =
+      split_for_create path >>*= fun (dir, leaf) ->
+      FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir) leaf content
 
     let read_file t path = FS.read_file t.fs (t.path / "rw" /@ path)
     let read_dir t path = FS.read_dir t.fs (t.path / "rw" /@ path)

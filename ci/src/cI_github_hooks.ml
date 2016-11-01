@@ -127,7 +127,7 @@ let set_state t ci ~status ~descr ?target_url commit =
       let dir = CI_projectID.path snapshot.project_id /@ commits_dir / commit.Commit.hash / "status" /@ ci in
       DK.Transaction.make_dirs t dir >>*= fun () ->
       let update leaf data =
-        DK.Transaction.create_or_replace_file t ~dir leaf (Cstruct.of_string (data ^ "\n"))
+        DK.Transaction.create_or_replace_file t (dir / leaf) (Cstruct.of_string (data ^ "\n"))
         >>*= Lwt.return in
       update "state" (Fmt.to_to_string CI_state.pp_status status) >>= fun () ->
       update "description" descr >>= fun () ->

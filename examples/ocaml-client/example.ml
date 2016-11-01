@@ -29,7 +29,7 @@ let main () =
   DK.branch dk "test" >>*= fun test_branch ->
   DK.Branch.with_transaction test_branch (fun t ->
       let contents = Cstruct.of_string "This is a test" in
-      DK.Transaction.create_file t ~dir:root "README" contents >>*= fun () ->
+      DK.Transaction.create_file t (p "README") contents >>*= fun () ->
       DK.Transaction.commit t ~message:"My first commit"
     )
   >>*= fun () ->

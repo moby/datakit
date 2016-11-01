@@ -2,6 +2,8 @@ open DataKitCI
 open! Astring
 open Utils
 
+let ( / ) = Datakit_path.Infix.( / )
+
 let src = Logs.Src.create "datakit-ci.tests" ~doc:"CI Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -202,7 +204,7 @@ module Builder = struct
     Live_log.log log "Time=%d" t.time;
     t.time <- t.time + 1;
     let data = Cstruct.of_string key in
-    DK.Transaction.create_or_replace_file trans ~dir:Cache.Path.value "x" data >>*= fun () ->
+    DK.Transaction.create_or_replace_file trans (Cache.Path.value / "x") data >>*= fun () ->
     Lwt.return @@ Ok (int_of_string key)
 
   let load _t tr _key =

@@ -211,10 +211,39 @@ module Term : sig
       It is pending until a successful URL is available. *)
 end
 
+module Web : sig
+  type config
+
+  val config : ?name:string -> ?state_repo:Uri.t -> unit -> config
+  (** [config ~name ~state_repo ()] is a web configuration.
+      If [name] is given, it is used as the main heading, and also as the name of the session cookie
+      (useful if you run multiple CIs on the same host, on different ports).
+      If [state_repo] is given, it is used to construct links to the state repository on GitHub. *)
+end
+
+module Config : sig
+  type t
+  type project
+  type test = string Term.t
+
+  val project :
+    id:string ->
+    ?dashboards:string list ->
+    (string * test) list ->
+    project
+  (** [project ~id tests] is the configuration for a single GitHub project.
+      [tests] is a list tests to apply to branches, tags and open PRs within the project.
+      [dashboards] (default [["master"]]) is a list of branches to display in the main dashboard area. *)
+
+  val ci :
+    web_config:Web.config ->
+    projects:project list ->
+    t
+end
+
 module Main : sig
-  val run : (string * (string * string Term.t) list) list Cmdliner.Term.t -> unit
-  (** [run projects] runs DataKitCI, monitoring [projects].
-      Each item in the list is a GitHub project and the test to apply to PRs within it. *)
+  val run : Config.t Cmdliner.Term.t -> unit
+  (** [run config] runs DataKitCI. *)
 
   val logs : Live_log.manager
   (** The singleton log manager. *)
@@ -321,10 +350,6 @@ end
 module Cache : sig
   (** A cache for values computed (slowly) by terms. *)
 
-  module Name : sig
-    val value : string
-  end
-
   module Path : sig
     val value : Datakit_path.t    (* Store build results in this directory *)
   end
@@ -364,7 +389,7 @@ module Private : sig
   val connect: Client9p.t -> DK.t
 
   val test_engine : web_ui:Uri.t -> (unit -> DK.t Lwt.t) ->
-    (unit -> (string Term.t String.Map.t)) ProjectID.Map.t ->
+    (string Term.t String.Map.t) ProjectID.Map.t ->
     engine
 
   val listen : ?switch:Lwt_switch.t -> engine -> [`Abort] Lwt.t

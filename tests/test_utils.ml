@@ -12,6 +12,8 @@ let p = function
   | "" -> Datakit_path.empty
   | path -> Datakit_path.of_string_exn path
 
+let ( / ) = Datakit_path.Infix.( / )
+
 let v = Cstruct.of_string
 
 let ( ++ ) = Int64.add
@@ -424,8 +426,7 @@ let populate_client branch files =
           | Some (parent, name) ->
             ensure_dir parent >>= fun () ->
             Hashtbl.add dirs d ();
-            DK.Transaction.create_dir t ~dir:(Datakit_path.of_steps_exn parent)
-              name
+            DK.Transaction.create_dir t (Datakit_path.of_steps_exn parent / name)
             >>*= Lwt.return
         ) in
       files |> Lwt_list.iter_s (fun (path, value) ->
@@ -436,7 +437,7 @@ let populate_client branch files =
           | Some (dir, name) ->
             ensure_dir dir >>= fun () ->
             let dir = Datakit_path.of_steps_exn dir in
-            DK.Transaction.create_file t ~dir name (Cstruct.of_string value)
+            DK.Transaction.create_file t (dir / name) (Cstruct.of_string value)
             >>*= Lwt.return
         ) >>= fun () ->
       DK.Transaction.commit t ~message:"init"

@@ -47,7 +47,7 @@ let job_name j = j.name
 let project target = target.project_id
 
 type project = {
-  make_terms : unit -> string CI_term.t String.Map.t;
+  terms : string CI_term.t String.Map.t;
   canaries : CI_target.ID_Set.t option;
   mutable open_prs : target IntMap.t;
   mutable refs : target Datakit_path.Map.t;
@@ -86,13 +86,13 @@ let create ~web_ui ?canaries connect_dk projects =
       )
   end;
   let projects =
-    projects |> CI_projectID.Map.mapi (fun id make_terms ->
+    projects |> CI_projectID.Map.mapi (fun id terms ->
         let canaries =
           match canaries with
           | None -> None
           | Some canaries -> Some (CI_projectID.Map.find id canaries |> default CI_target.ID_Set.empty)
         in
-        {make_terms; open_prs = IntMap.empty; refs = Datakit_path.Map.empty; canaries}
+        {terms; open_prs = IntMap.empty; refs = Datakit_path.Map.empty; canaries}
       )
   in
   {
@@ -242,8 +242,7 @@ let listen ?switch t =
           head = `PR pr;
           jobs = [];
         } in
-        let terms = project.make_terms () in
-        String.Map.bindings terms
+        String.Map.bindings project.terms
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:open_pr name term)
         >>= fun jobs ->
         open_pr.jobs <- jobs;
@@ -266,8 +265,7 @@ let listen ?switch t =
           head = `Ref r;
           jobs = [];
         } in
-        let terms = project.make_terms () in
-        String.Map.bindings terms
+        String.Map.bindings project.terms
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:target name term)
         >>= fun jobs ->
         target.jobs <- jobs;

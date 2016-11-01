@@ -104,27 +104,25 @@ module type CLIENT = sig
 
     (** {2 Writing} *)
 
-    val create_dir: t -> dir:Datakit_path.t -> string -> unit or_error Lwt.t
-    (** [create_dir t ~dir name] creates the directory [dir/name]. *)
+    val create_dir: t -> Datakit_path.t -> unit or_error Lwt.t
+    (** [create_dir t path] creates the directory [path]. *)
 
-    val create_file: t -> dir:Datakit_path.t -> string -> ?executable:bool ->
+    val create_file: t -> Datakit_path.t -> ?executable:bool ->
       Cstruct.t -> unit or_error Lwt.t
-    (** [create_file t ~dir name ?executable content] creates the file
-        [dir/name]. *)
+    (** [create_file t path ?executable content] creates the file
+        [path]. *)
 
-    val create_symlink: t -> dir:Datakit_path.t -> string -> string ->
+    val create_symlink: t -> Datakit_path.t -> string ->
       unit or_error Lwt.t
-    (** [create_symlink t ~dir name target] creates the symlink
-        [dir/name]. *)
+    (** [create_symlink t path target] creates the symlink [path]. *)
 
-    val replace_file: t -> dir:Datakit_path.t -> string -> Cstruct.t ->
-      unit or_error Lwt.t
-    (** [replace_file t ~dir name new_content] changes the content of
-        the existing file [dir/name]. *)
+    val replace_file: t -> Datakit_path.t -> Cstruct.t -> unit or_error Lwt.t
+    (** [replace_file t path new_content] changes the content of
+        the existing file [path]. *)
 
-    val create_or_replace_file: t -> dir:Datakit_path.t -> string -> Cstruct.t ->
+    val create_or_replace_file: t -> Datakit_path.t -> Cstruct.t ->
       unit or_error Lwt.t
-    (** [create_or_replace_file t ~dir leaf content] uses either [create_file]
+    (** [create_or_replace_file t path content] uses either [create_file]
         or [replace_file] as appropriate to set the contents. *)
 
     val set_executable: t -> Datakit_path.t -> bool -> unit or_error Lwt.t

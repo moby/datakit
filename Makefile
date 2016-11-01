@@ -13,7 +13,8 @@ depends:
 	opam pin add datakit-client . -y
 	opam pin add datakit-server . -y
 	opam pin add datakit-github . -y
-	opam update -u datakit-client datakit-server datakit-github -y
+	opam pin add datakit-ci . -y
+	opam update -u datakit-client datakit-server datakit-github datakit-ci -y
 
 datakit:
 	ocaml pkg/pkg.ml build --tests $(TESTS) -q
@@ -34,6 +35,8 @@ ci:
 clean:
 	ocaml pkg/pkg.ml clean
 	rm -rf $(APP) $(EXE) _tests
+	rm -f examples/ocaml-client/*.native
+	rm -f ci/skeleton/exampleCI.native
 	rm -f com.docker.db
 
 test:

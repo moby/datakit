@@ -14,7 +14,7 @@ val create :
   web_ui:Uri.t ->
   ?canaries:CI_target.ID_Set.t CI_projectID.Map.t ->
   (unit -> DK.t Lwt.t) ->
-  (unit -> (string CI_term.t String.Map.t)) CI_projectID.Map.t ->
+  (string CI_term.t String.Map.t) CI_projectID.Map.t ->
   t
 (** [create ~web_ui connect projects] is a new DataKit CI that calls [connect] to connect to the database.
     Once [listen] has been called, it will handle CI for [projects].

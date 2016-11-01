@@ -1,4 +1,5 @@
 open Astring
+open Asetmap
 
 module ID = struct
   type t = [ `PR of int | `Ref of Datakit_path.t ]
@@ -14,9 +15,7 @@ module ID = struct
     | _ -> compare a b
 end
 
-module ID_Set = struct
-  include Set.Make(ID)
-end
+module ID_Set = Set.Make(ID)
 
 module Full = struct
   type t = CI_projectID.t * ID.t

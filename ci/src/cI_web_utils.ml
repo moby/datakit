@@ -1,4 +1,4 @@
-open Astring
+open! Astring
 open Sexplib.Std
 open Lwt.Infix
 
@@ -102,11 +102,17 @@ end
 type server = {
   auth : Auth.t;
   session_backend : Session.Backend.t;
+  web_config : CI_web_templates.t;
 }
 
-let server ~auth =
+let cookie_key t =
+  "__ci_session:" ^ t.web_config.CI_web_templates.name
+
+let server ~auth ~web_config =
   let session_backend = Session.create () in
-  { auth; session_backend }
+  { auth; session_backend; web_config }
+
+let web_config t = t.web_config
 
 class static ~valid ~mime_type dir =
   object(self)
@@ -162,8 +168,6 @@ class static_crunch ~mime_type read =
         Wm.respond 404 rd
   end
 
-let cookie_key = "__ci_session"
-
 module Session_data = struct
   type t = {
     csrf_token : string;
@@ -179,7 +183,7 @@ end
 class virtual resource_with_session t =
   object(self)
     inherit [Cohttp_lwt_body.t] Wm.resource
-    inherit [Cohttp_lwt_body.t] Session.manager ~cookie_key t.session_backend
+    inherit [Cohttp_lwt_body.t] Session.manager ~cookie_key:(cookie_key t) t.session_backend
 
     method private session rd =
       self#session_of_rd rd >>= function
@@ -270,7 +274,7 @@ class login_page t = object(self)
 
   method private to_html rd =
     self#session rd >>= fun {Session_data.username; csrf_token; _} ->
-    let html = CI_web_templates.login_page ~csrf_token ~user:username in
+    let html = CI_web_templates.login_page ~csrf_token ~user:username t.web_config in
     let body = Fmt.to_to_string (Tyxml.Html.pp ()) html in
     Wm.continue (`String body) rd
 

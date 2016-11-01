@@ -16,24 +16,19 @@ let connect protocol address =
          protocol address (Printexc.to_string ex)
     )
 
-let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config projects =
+let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config =
+  let { CI_config.web_config; projects } = config in
+  let dashboards = CI_projectID.Map.map (fun p -> p.CI_config.dashboards) projects in
+  let projects = CI_projectID.Map.map (fun p -> p.CI_config.tests) projects in
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
   CI_web_utils.Auth.create (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
   let connect_dk () = connect proto addr >|*= DK.connect in
-  let projects = projects
-    |> List.map (fun (name, terms) -> (CI_projectID.of_string_exn name, fun () -> String.Map.of_list terms))
-    |> CI_projectID.Map.of_list in
   let canaries =
     match canaries with
     | [] -> None
     | canaries -> Some (CI_target.Full.map_of_list canaries)
   in
-  let dashboards = CI_target.Full.map_of_list dashboards in
-  dashboards |> CI_projectID.Map.iter (fun id _ ->
-      if not (CI_projectID.Map.mem id projects) then
-        Log.warn (fun f -> f "Dashboard ref %a not in list of monitored projects" CI_projectID.pp id)
-    );
   let ci = CI_engine.create ~web_ui ?canaries connect_dk projects in
   let main_thread = CI_engine.listen ci >|= fun `Abort -> assert false in
   let mode =
@@ -49,9 +44,9 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config p
     CI_web.serve ~config:web_config ~logs ~auth ~mode ~ci ~dashboards;
   ]
 
-let start () pr_store web_ui secrets_dir projects canaries dashboards web_config =
+let start () pr_store web_ui secrets_dir config canaries =
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
-  Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~dashboards ~web_config projects)
+  Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config)
 
 (* Command-line parsing *)
 
@@ -91,23 +86,14 @@ let canaries =
   in
   Arg.(value (opt_all CI_target.Full.arg [] doc))
 
-let dashboards =
-  let doc =
-    Arg.info ~doc:"Add these refs (e.g user/project/heads/master) to the dashboard"
-      ~docv:"TARGET" ["dashboard"]
-  in
-  Arg.(value (opt_all CI_target.Full.arg [] doc))
-
-let run projects =
+let run config =
   let spec = Term.(const start
                    $ CI_log_reporter.setup_log
                    $ pr_store
                    $ web_ui
                    $ secrets_dir
-                   $ projects
+                   $ config
                    $ canaries
-                   $ dashboards
-                   $ CI_web.opts
                   ) in
   match Term.eval (spec, Term.info "DataKitCI") with
   | `Error _ -> exit 1

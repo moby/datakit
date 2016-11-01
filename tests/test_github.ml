@@ -723,7 +723,7 @@ let test_snapshot () =
 
       DK.Branch.with_transaction br (fun tr ->
           DK.Transaction.make_dirs tr (p "test/toto") >>*= fun () ->
-          DK.Transaction.create_or_replace_file tr ~dir:(p "test/toto") "FOO"
+          DK.Transaction.create_or_replace_file tr (p "test/toto/FOO")
             (v "") >>*= fun () ->
           DK.Transaction.commit tr ~message:"test/foo"
         ) >>*= fun () ->
@@ -860,7 +860,7 @@ let update_status br dir state =
       let dir = dir / "status" / "foo" / "bar" / "baz" in
       DK.Transaction.make_dirs tr dir >>*= fun () ->
       let state = Cstruct.of_string  (Status_state.to_string state ^ "\n") in
-      DK.Transaction.create_or_replace_file tr ~dir "state" state >>*= fun () ->
+      DK.Transaction.create_or_replace_file tr (dir / "state") state >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     )
 
@@ -926,8 +926,8 @@ let test_updates dk =
   DK.Tree.exists_dir (DK.Commit.tree h) dir >>*= fun exists ->
   Alcotest.(check bool) "exist commit/foo" true exists;
   DK.Branch.with_transaction pub (fun tr ->
-      DK.Transaction.create_or_replace_file tr ~dir
-        "title" (Cstruct.of_string "hahaha\n")
+      DK.Transaction.create_or_replace_file tr (dir / "title")
+        (Cstruct.of_string "hahaha\n")
       >>*= fun () ->
       DK.Transaction.commit tr ~message:"Test"
     ) >>*= fun () ->

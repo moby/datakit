@@ -117,6 +117,24 @@ let status state =
   in
   span ~a:[a_class ["label"; colour;]] [span ~a:[a_class ["glyphicon"; icon]] []; pcdata status]
 
+let status_list jobs =
+  table ~a:[a_class ["ci-status-list"]] [
+    tr (
+      jobs |> List.map (fun job ->
+          let state = CI_engine.state job in
+          let cl, icon, status =
+            match state.CI_state.status with
+            | `Pending -> "label-warning", "glyphicon-hourglass", "pending"
+            | `Success -> "label-success", "glyphicon-ok","success"
+            | `Error -> "label-danger", "glyphicon-warning-sign", "error"
+            | `Failure -> "label-danger", "glyphicon-remove", "failure"
+          in
+          let tooltip = Printf.sprintf "%s : %s" (CI_engine.job_name job) status in
+          td ~a:[a_class [cl]; a_title tooltip] [span ~a:[a_class ["glyphicon"; icon]] []]
+        )
+    )
+  ]
+
 let summarise jobs =
   let states = List.map (fun j -> CI_engine.job_name j, CI_engine.state j) jobs in
   let combine status states =
@@ -161,20 +179,22 @@ let dashboard_widget id ref =
   ]
 
 let ref_job ~project id ref =
-  let state = CI_engine.jobs ref |> summarise in
+  let jobs = CI_engine.jobs ref in
+  let summary = summarise jobs in
   tr [
     td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Datakit_path.pp id)]];
-    td [status state];
-    td [pcdata state.CI_state.descr];
+    td [status_list jobs];
+    td [pcdata summary.CI_state.descr];
   ]
 
 let pr_job ~project id open_pr =
-  let state = CI_engine.jobs open_pr |> summarise in
+  let jobs = CI_engine.jobs open_pr in
+  let summary = summarise jobs in
   tr [
     td [a ~a:[a_href (pr_url project id)] [pcdata (string_of_int id)]];
     td [pcdata (CI_engine.title open_pr)];
-    td [status state];
-    td [pcdata state.CI_state.descr];
+    td [status_list jobs];
+    td [pcdata summary.CI_state.descr];
   ]
 
 let heading x = th [pcdata x]

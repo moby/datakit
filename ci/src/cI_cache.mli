@@ -2,10 +2,6 @@
 
 open CI_utils
 
-module Name : sig
-  val value : string
-end
-
 module Path : sig
   val value : Datakit_path.t    (* Store build results in this directory *)
 end

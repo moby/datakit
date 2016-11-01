@@ -750,7 +750,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | `Monitored ->
       DK.Transaction.make_dirs tr dir >>*= fun () ->
       let empty = Cstruct.of_string "" in
-      DK.Transaction.create_or_replace_file tr ~dir ".monitor" empty
+      DK.Transaction.create_or_replace_file tr (dir / ".monitor") empty
 
   (* PRs *)
 
@@ -763,7 +763,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
       DK.Transaction.make_dirs t dir >>*= fun () ->
       let write k v =
         let v = Cstruct.of_string (v ^ "\n") in
-        DK.Transaction.create_or_replace_file t ~dir k v
+        DK.Transaction.create_or_replace_file t (dir / k) v
       in
       write "head"  (PR.commit_id pr)                >>*= fun () ->
       write "state" (PR.string_of_state pr.PR.state) >>*= fun () ->
@@ -888,7 +888,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
         | None   -> safe_remove t (dir / k)
         | Some v ->
           let v = Cstruct.of_string (v ^ "\n") in
-          DK.Transaction.create_or_replace_file t ~dir k v
+          DK.Transaction.create_or_replace_file t (dir / k) v
       ) kvs
 
   let status tree commit context =
@@ -979,7 +979,7 @@ module Conv (DK: Datakit_S.CLIENT) = struct
     | `Created | `Updated ->
       DK.Transaction.make_dirs tr dir >>*= fun () ->
       let head = Cstruct.of_string (Ref.commit_id r ^ "\n") in
-      DK.Transaction.create_or_replace_file tr ~dir "head" head
+      DK.Transaction.create_or_replace_file tr (dir / "head") head
 
   let update_event t = function
     | Event.Repo (s, r) -> update_repo t s r
@@ -1539,7 +1539,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
              | Error _ , Error _ -> DK.Transaction.remove t.pub.tr dir
              | Ok v    ,  _
              | Error _ , Ok v    ->
-               DK.Transaction.create_or_replace_file t.pub.tr ~dir file v
+               DK.Transaction.create_or_replace_file t.pub.tr (dir / file) v
            ) conflicts
          >>*= fun () ->
          ok @@ Fmt.strf "\n\nconflicts:@;@[%a@]"
@@ -1575,7 +1575,7 @@ module Sync (API: API) (DK: Datakit_S.CLIENT) = struct
       DK.Branch.with_transaction priv (fun tr ->
           let dir  = Datakit_path.empty in
           let data = Cstruct.of_string "### DataKit -- GitHub bridge\n" in
-          DK.Transaction.create_or_replace_file tr ~dir "README.md" data
+          DK.Transaction.create_or_replace_file tr (dir / "README.md") data
           >>= function
           | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
           | Error e ->

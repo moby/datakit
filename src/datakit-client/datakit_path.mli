@@ -24,6 +24,10 @@ val of_string_exn : string -> t
 val unwrap : t -> string list
 (** Cast to a list of strings *)
 
+val pop : t -> (t * string) option
+(** [pop (dir / leaf)] is [Some (dir, leaf)].
+    [pop empty] is [None]. *)
+
 val pp : t Fmt.t
 (** [pp] is a formatter for human-readable paths. *)
 

@@ -1,24 +1,18 @@
 open CI_utils
 open Lwt.Infix
 
-module Name = struct
+module Path = struct
   (* Each entry in the cache has a branch in the database:
      - /log contains the build log
      - /failure (if present) indicates that the build failed and contains the error
      - /value may contain extra artifacts/data (depending on the builder)
      - /rebuild-requested (if present) indicates that the current results are not acceptable
    *)
-  let log = "log"
-  let failure = "failure"
-  let rebuild = "rebuild-requested"
-  let value = "value"
-end
-
-module Path = struct
-  let log     = Datakit_path.of_string_exn Name.log
-  let failure = Datakit_path.of_string_exn Name.failure
-  let rebuild = Datakit_path.of_string_exn Name.rebuild
-  let value   = Datakit_path.of_string_exn Name.value
+  let v = Datakit_path.of_string_exn
+  let log     = v "log"
+  let failure = v "failure"
+  let rebuild = v "rebuild-requested"
+  let value   = v "value"
 end
 
 let read_log dk { CI_result.Step_log.commit; branch } =
@@ -99,8 +93,7 @@ module Make(B : CI_s.BUILDER) = struct
     let branch = B.branch builder key in
     DK.branch dk branch >>*= fun branch ->
     DK.Branch.with_transaction branch (fun t ->
-        let dir = Datakit_path.empty in
-        DK.Transaction.create_or_replace_file t ~dir Name.rebuild (Cstruct.create 0) >>*= fun () ->
+        DK.Transaction.create_or_replace_file t Path.rebuild (Cstruct.create 0) >>*= fun () ->
         DK.Transaction.commit t ~message:"Marked for rebuild"
       )
     >>*= Lwt.return
@@ -158,22 +151,21 @@ module Make(B : CI_s.BUILDER) = struct
               (* Note: we don't hold the lock here. But that's OK; no-one else can change the entry while it's pending. *)
               DK.branch dk branch_name >>*= fun branch ->
               DK.Branch.with_transaction branch (fun trans ->
-                  let dir = Datakit_path.empty in
                   ensure_removed trans Path.rebuild >>= fun () ->
                   ensure_removed trans Path.value >>= fun () ->
-                  DK.Transaction.create_dir trans ~dir Name.value >>*= fun () ->
+                  DK.Transaction.create_dir trans Path.value >>*= fun () ->
                   ensure_removed trans Path.failure >>= fun () ->
                   let return x = Lwt.return (Ok x) in
                   catch (fun () -> B.generate t.builder ~switch ~log trans ctx k) >>= function
                   | Ok x ->
                     CI_live_log.log log "Success";
-                    DK.Transaction.create_or_replace_file trans ~dir Name.log (Cstruct.of_string (CI_live_log.contents log)) >>*= fun () ->
+                    DK.Transaction.create_or_replace_file trans Path.log (Cstruct.of_string (CI_live_log.contents log)) >>*= fun () ->
                     DK.Transaction.commit trans ~message:"Cached successful result" >>*= fun () ->
                     return (Ok x)
                   | Error (`Failure msg) ->
                     CI_live_log.log log "Failed: %s" msg;
-                    DK.Transaction.create_or_replace_file trans ~dir Name.log (Cstruct.of_string (CI_live_log.contents log)) >>*= fun () ->
-                    DK.Transaction.create_file trans ~dir Name.failure (Cstruct.of_string msg) >>*= fun () ->
+                    DK.Transaction.create_or_replace_file trans Path.log (Cstruct.of_string (CI_live_log.contents log)) >>*= fun () ->
+                    DK.Transaction.create_file trans Path.failure (Cstruct.of_string msg) >>*= fun () ->
                     DK.Transaction.commit trans ~message:("Cached failure: " ^ msg) >>*= fun () ->
                     return (Error (`Failure msg))
                 )

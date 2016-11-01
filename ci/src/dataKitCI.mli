@@ -350,10 +350,6 @@ end
 module Cache : sig
   (** A cache for values computed (slowly) by terms. *)
 
-  module Name : sig
-    val value : string
-  end
-
   module Path : sig
     val value : Datakit_path.t    (* Store build results in this directory *)
   end

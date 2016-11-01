@@ -40,6 +40,15 @@ let to_hum = Fmt.to_to_string pp
 
 let compare = compare
 
+let pop = function
+  | [] -> None
+  | x::xs ->
+    let rec aux dir this = function
+      | [] -> Some (List.rev dir, this)
+      | x::xs -> aux (this :: dir) x xs
+    in
+    aux [] x xs
+
 module Set = Set.Make(struct type t = string list let compare = compare end)
 module Map = Map.Make(struct type t = string list let compare = compare end)
 

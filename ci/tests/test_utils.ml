@@ -3,6 +3,8 @@ open Lwt.Infix
 open! Astring
 open DataKitCI
 
+let ( / ) = Datakit_path.Infix.( / )
+
 (* Chain operations together, returning early if we get an error *)
 let ( >>*= ) x f =
   x >>= function
@@ -85,7 +87,7 @@ let update branch values ~message =
             | None -> Datakit_path.empty, path
             | Some (dir, leaf) -> Datakit_path.of_string_exn dir, leaf in
           DK.Transaction.make_dirs t dir >>*= fun () ->
-          DK.Transaction.create_or_replace_file t ~dir leaf (Cstruct.of_string value) >>*= Lwt.return
+          DK.Transaction.create_or_replace_file t (dir / leaf) (Cstruct.of_string value) >>*= Lwt.return
         )
       >>= fun () ->
       DK.Transaction.commit t ~message

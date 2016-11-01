@@ -9,10 +9,6 @@ dev-repo:     "https://github.com/docker/datakit-ci.git"
 doc:          "https://docker.github.io/datakit-ci/"
 
 build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false" "-n" "datakit-ci"]
-build-test: [
-  ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true" "-n" "datakit-ci"]
-  ["ocaml" "pkg/pkg.ml" "test" "-n" "datakit-ci"]
-]
 
 depends: [
   "ocamlfind" {build}

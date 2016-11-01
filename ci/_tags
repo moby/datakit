@@ -1,4 +1,5 @@
-true: warn(A-4), strict_sequence, safe_string, annot, bin_annot
+not <src/cI_static.*>: warn(A-4-58)
+true: strict_sequence, safe_string, annot, bin_annot
 true: package(datakit-client, protocol-9p.unix)
 true: package(astring, cmdliner, fmt.tty, logs.fmt, fmt.cli, logs.cli)
 true: package(cohttp.lwt)

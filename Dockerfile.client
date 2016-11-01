@@ -1,6 +1,5 @@
 FROM ocaml/opam:alpine
 
-RUN sudo apk add ncurses-dev libev-dev
 RUN opam depext lwt && opam install lwt alcotest conf-libev
 
 # cache opam install of dependencies

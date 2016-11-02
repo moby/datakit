@@ -1,7 +1,7 @@
 FROM ocaml/opam:alpine-3.4_ocaml-4.03.0
-RUN sudo apk add ncurses-dev tzdata
+RUN sudo apk add tzdata
 
-RUN opam depext -ui cohttp yojson ssl tyxml fmt rresult logs lwt react camlp4 \
+RUN opam depext -ui cohttp yojson ssl tyxml fmt rresult logs lwt conf-libev react camlp4 \
     tls pbkdf ppx_sexp_conv webmachine session asetmap
 
 RUN opam pin add multipart-form-data https://github.com/cryptosense/multipart-form-data.git

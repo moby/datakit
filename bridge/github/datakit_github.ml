@@ -228,14 +228,16 @@ module Status = struct
      Field: description
      Code: custom
      Message: description is too long (maximum is 140 characters) *)
-  let trim_description = function
-    | None -> None
-    | Some s as x ->
-      if String.length s <= 140 then x
-      else Some (String.with_range s ~len:140)
+  let truncate_and_trim = function
+    | None   -> None
+    | Some s ->
+      let s =
+        if String.length s <= 140 then s else String.with_range s ~len:140
+      in
+      Some (String.trim s)
 
   let create ?description ?url commit context state =
-    { description = trim_description description;
+    { description = truncate_and_trim description;
       url; commit; context; state }
 
   let compare = compare_fold [

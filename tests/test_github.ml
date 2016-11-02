@@ -100,14 +100,14 @@ module R = struct
       (Fmt.Dump.list pp_state) commits
 
   let status_equal a b =
-    a.Status.state       = b.Status.state &&
-    a.Status.description = b.Status.description &&
-    a.Status.url         = b.Status.url
+    Status.state a       = Status.state b &&
+    Status.description a = Status.description b &&
+    Status.url a         = Status.url b
 
   let equal_commit a b =
     let to_map x =
       x
-      |> List.map (fun a -> String.concat ~sep:"/" a.Status.context, a)
+      |> List.map (fun a -> String.concat ~sep:"/" @@ Status.context a, a)
       |> String.Map.of_list
     in
     let a = to_map a in
@@ -410,7 +410,7 @@ module API = struct
       try
         List.find (fun x -> not (keep x)) repo.R.commits
         |> snd
-        |> List.filter (fun y -> y.Status.context <> s.Status.context)
+        |> List.filter (fun y -> Status.context y <> Status.context s)
       with Not_found ->
         []
     in
@@ -551,45 +551,21 @@ let repo = { Repo.user; repo }
 let commit_bar = { Commit.repo; id = "bar" }
 let commit_foo = { Commit.repo; id = "foo" }
 
-let s1 = {
-  Status.context = ["foo"; "bar"; "baz"];
-  url            = None;
-  description    = Some "foo";
-  state          = `Pending;
-  commit = commit_bar;
-}
+let s1 =
+  Status.create ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
 
-let s2 = {
-  Status.context = ["foo"; "bar"; "toto"];
-  url            = Some "toto";
-  description    = None;
-  state          = `Failure;
-  commit = commit_bar;
-}
+let s2 =
+  Status.create ~url:"toto" commit_bar ["foo"; "bar"; "toto"] `Failure
 
-let s3 = {
-  Status.context = ["foo"; "bar"; "baz"];
-  url            = Some "titi";
-  description    = Some "foo";
-  state          = `Success;
-  commit = commit_foo;
-}
+let s3 =
+  Status.create ~url:"titi" ~description:"foo"
+    commit_foo ["foo"; "bar"; "baz"] `Success
 
-let s4 = {
-  Status.context = ["foo"];
-  url            = None;
-  description    = None;
-  state          = `Pending;
-  commit = commit_bar;
-}
+let s4 =
+  Status.create commit_bar ["foo"] `Pending
 
-let s5 = {
-  Status.context = ["foo"; "bar"; "baz"];
-  url            = Some "titi";
-  description    = None;
-  state          = `Failure;
-  commit = commit_foo;
-}
+let s5 =
+  Status.create ~url:"titi" commit_foo ["foo"; "bar"; "baz"] `Failure
 
 let base = "master"
 
@@ -756,7 +732,7 @@ module Gen = struct
       let context = context ~random in
       let description = description ~random in
       let state = build_state ~random in
-      let r = { Status.commit; url; context; description; state } in
+      let r = Status.create ?description ?url commit context state in
       if List.exists (Status.same_id r) x then aux () else r
     in
     aux ()
@@ -787,13 +763,13 @@ module Gen = struct
     |> Array.to_list
     |> List.map (fun context ->
         if Random.State.bool random then (
-          match List.find (fun s -> s.Status.context = context) old_status with
+          match List.find (fun s -> Status.context s = context) old_status with
           | exception Not_found -> []
           | old_status -> [old_status]    (* GitHub can't delete statuses *)
         ) else (
           let state = build_state ~random in
           let description = description ~random in
-          [{ Status.state; commit; description; url = None; context }]
+          [Status.create ?description commit context state]
         ))
     |> List.concat
 
@@ -1128,10 +1104,10 @@ let init_github status refs events =
   let tbl = Hashtbl.create (List.length status) in
   List.iter (fun s ->
       let v =
-        try Hashtbl.find tbl s.Status.commit
+        try Hashtbl.find tbl (Status.commit s)
         with Not_found -> []
       in
-      Hashtbl.replace tbl s.Status.commit (s :: v)
+      Hashtbl.replace tbl (Status.commit s) (s :: v)
     ) status;
   let commits = Hashtbl.fold (fun k v acc -> (Commit.id k, v) :: acc) tbl [] in
   let users = String.Map.singleton user {
@@ -1298,7 +1274,7 @@ let test_updates dk =
       set_pr = 0; set_status = 1; set_ref = 0 }
     gh.API.ctx;
   let status = find_status gh repo in
-  Alcotest.(check status_state) "update status" `Pending status.Status.state;
+  Alcotest.(check status_state) "update status" `Pending (Status.state status);
 
   (* test PR update *)
   let dir = root repo / "pr" / "2" in
@@ -1387,7 +1363,7 @@ let test_startup dk =
       set_pr = 0; set_status = 2; set_ref = 0 }
     gh.API.ctx;
   let status = find_status gh repo in
-  Alcotest.(check status_state) "update status" `Failure status.Status.state;
+  Alcotest.(check status_state) "update status" `Failure (Status.state status);
 
   sync b >>= fun b ->
   sync b >>= fun _b ->
@@ -1425,7 +1401,7 @@ let rec read_state ~user ~repo ~commit tree path context =
       | Error _ -> Lwt.return []
       | Ok status ->
         opt_read_file tree (path / "description") >>= fun description ->
-        opt_read_file tree (path / "target_url") >>= fun url ->
+        opt_read_file tree (path / "target_url") >|= fun url ->
         let state =
           let status = String.trim (Cstruct.to_string status) in
           match Status_state.of_string status with
@@ -1434,7 +1410,7 @@ let rec read_state ~user ~repo ~commit tree path context =
         in
         let repo = { Repo.user; repo } in
         let commit = { Commit.repo; id = commit } in
-        Lwt.return [{ Status.commit; state; context; description; url }]
+         [ Status.create ?description ?url commit context state]
     end
     >>= fun this_state ->
     items |> Lwt_list.map_s (function

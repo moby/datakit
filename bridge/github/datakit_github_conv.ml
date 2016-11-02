@@ -277,14 +277,14 @@ module Make (DK: Datakit_S.CLIENT) = struct
     in
     Log.debug (fun l -> l "update_status %a" Datakit_path.pp dir);
     lift_errors "update_status" (DK.Transaction.make_dirs t dir) >>= fun () ->
-    let description = match s.Status.description with
+    let description = match Status.description s with
       | None   -> None
       | Some d -> Some (String.trim d)
     in
     let kvs = [
       "description", description;
-      "state"      , Some (Status_state.to_string s.Status.state);
-      "target_url" , s.Status.url;
+      "state"      , Some (Status_state.to_string @@ Status.state s);
+      "target_url" , Status.url s;
     ] in
     Lwt_list.iter_s (fun (k, v) -> match v with
         | None   -> safe_remove t (dir / k)
@@ -317,7 +317,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       safe_read_file tree (dir / "description") >>= fun description ->
       safe_read_file tree (dir / "target_url")  >|= fun url ->
       let context = Datakit_path.unwrap context in
-      Some { Status.state; commit; context; description; url }
+      Some (Status.create ?description ?url commit context state)
 
   let statuses_of_commits tree commits =
     Lwt_list.fold_left_s (fun acc commit ->

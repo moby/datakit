@@ -212,17 +212,37 @@ module Status = struct
   let id t = t.commit, t.context
   let repo t = t.commit.Commit.repo
   let commit t = t.commit
+  let description t = t.description
+  let state t = t.state
+  let url t = t.url
   let commit_id t = t.commit.Commit.id
   let same_id x y = commit x = commit y && context x = context y
   let compare_repo x y = Repo.compare (repo x) (repo y)
   let compare_commit_id x y = Pervasives.compare (commit_id x) (commit_id y)
   let compare_context x y = Pervasives.compare x.context y.context
 
+  (* To avoid:
+     Github: GitHub API error: 422 Unprocessable Entity (WebDAV) (RFC 4918)
+       -- Validation Failed
+     Resource type: Status
+     Field: description
+     Code: custom
+     Message: description is too long (maximum is 140 characters) *)
+  let trim_description = function
+    | None -> None
+    | Some s as x ->
+      if String.length s <= 140 then x
+      else Some (String.with_range s ~len:140)
+
+  let create ?description ?url commit context state =
+    { description = trim_description description;
+      url; commit; context; state }
+
   let compare = compare_fold [
       compare_repo;
       compare_commit_id;
       compare_context;
-      Pervasives.compare
+      Pervasives.compare;
     ]
 
   let pp_opt k ppf v = match v with

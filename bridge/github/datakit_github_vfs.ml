@@ -38,13 +38,16 @@ module Make (API: API) = struct
     Logs.debug (fun l -> l "commit_status_file %a" Status.pp s);
     let current_descr = ref None in
     let current_url = ref None in
-    let current_state = ref s.Status.state in
-    let init = Status_state.to_string s.Status.state ^ "\n" in
+    let current_state = ref (Status.state s) in
+    let init = Status_state.to_string (Status.state s) ^ "\n" in
     let set_status () =
       let state = !current_state in
       let description = !current_descr in
       let url = !current_url in
-      let new_status = { s with Status.description; url; state } in
+      let new_status =
+        Status.create ?description ?url
+          (Status.commit s) (Status.context s) state
+      in
       API.set_status t.token new_status;
     in
     let state = Vfs.File.command ~init (fun str ->
@@ -155,13 +158,7 @@ module Make (API: API) = struct
     in
     let mkdir name =
       Log.debug (fun l -> l "mkdir %s" name);
-      let new_status = {
-        commit;
-        Status.context = [name];
-        url = None;
-        description = None;
-        state = `Pending;
-      } in
+      let new_status = Status.create commit [name] `Pending in
       API.set_status t.token new_status >>= function
       | Error e -> Vfs.error "set-status %s" e
       | Ok ()   ->

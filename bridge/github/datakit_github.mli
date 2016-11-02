@@ -156,14 +156,12 @@ end
 
 module Status: sig
 
+  type t
   (** The type for status values. *)
-  type t = {
-    commit: Commit.t;
-    context: string list;
-    url: string option;
-    description: string option;
-    state: Status_state.t;
-  }
+
+  val create: ?description:string -> ?url:string ->
+    Commit.t -> string list -> Status_state.t -> t
+  (** [create] is a new status. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for status values. *)
@@ -179,6 +177,15 @@ module Status: sig
 
   val context: t -> string list
   (** [context t] is [t]'s context. *)
+
+  val state: t -> Status_state.t
+  (** [state t] is [t]'s state. *)
+
+  val description: t -> string option
+  (** [description t] is [t]'s description. *)
+
+  val url: t -> string option
+  (** [url t] is [t]'s target URL. *)
 
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)

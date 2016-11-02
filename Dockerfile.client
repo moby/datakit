@@ -1,6 +1,6 @@
 FROM ocaml/opam:alpine
 
-RUN opam depext lwt && opam install lwt alcotest conf-libev
+RUN opam depext -ui lwt alcotest conf-libev
 
 # cache opam install of dependencies
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam

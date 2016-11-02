@@ -1,6 +1,6 @@
 FROM ocaml/opam:alpine
 
-RUN opam depext lwt && opam install lwt inotify alcotest conf-libev lambda-term
+RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term
 
 # cache opam install of dependencies
 COPY datakit-server.opam /home/opam/src/datakit/datakit-server.opam

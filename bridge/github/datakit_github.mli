@@ -249,11 +249,11 @@ module Ref: sig
   end
   (** Sets of Git references. *)
 
-  type state = [`Created | `Updated | `Removed]
+  type event = [`Created of t | `Updated of t | `Removed of id]
   (** The type for reference events' state. *)
 
-  val pp_state: state Fmt.t
-  (** [pp_state] is the pretty-printer for reference events' state.*)
+  val pp_event: event Fmt.t
+  (** [pp_event] is the pretty-printer for reference events' state.*)
 
 end
 
@@ -264,7 +264,7 @@ module Event: sig
     | Repo of (Repo.state * Repo.t)
     | PR of PR.t
     | Status of Status.t
-    | Ref of (Ref.state * Ref.t)
+    | Ref of Ref.event
     | Other of (Repo.t * string)
 
   val pp: t Fmt.t
@@ -273,7 +273,7 @@ module Event: sig
   val of_repo: Repo.state -> Repo.t -> t
   val of_pr: PR.t -> t
   val of_status: Status.t -> t
-  val of_ref: Ref.state -> Ref.t -> t
+  val of_ref: Ref.event -> t
   val of_other: Repo.t -> string -> t
 
   val repo: t -> Repo.t

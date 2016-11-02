@@ -317,7 +317,7 @@ module Users = struct
     let refs =
       Ref.Set.filter (keep Ref.repo) new_refs
       |> Ref.Set.elements
-      |> List.map (Event.of_ref `Updated)
+      |> List.map (fun e -> Event.of_ref (`Updated e))
     in
     let status =
       Status.Set.filter (keep Status.repo) new_status
@@ -338,7 +338,7 @@ module Users = struct
         (fun r ->
            keep Ref.repo r && not (Ref.Set.exists (Ref.same_id r) new_refs))
       |> Ref.Set.elements
-      |> List.map (fun r -> Event.Ref (`Removed, r))
+      |> List.map (fun r -> Event.Ref (`Removed (Ref.id r)))
     in
     repos @ prs @ refs @ status @ close_prs @ close_refs
 
@@ -435,25 +435,27 @@ module API = struct
     set_pr_aux t pr;
     return ()
 
-  let set_ref_aux t (s, r) =
+  let set_ref_aux t r =
     let repo = lookup t (Ref.repo r) in
     let name = r.Ref.name in
     let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
-    let () = match s with
-      | `Removed -> repo.R.refs <- refs;
-      | `Created
-      | `Updated -> repo.R.refs <- r :: refs;
-    in
-    add_event t (Event.Ref (s, r))
+    repo.R.refs <- r :: refs;
+    add_event t (Event.Ref (`Updated r))
 
   let set_ref t r =
     t.ctx.Counter.set_ref <- t.ctx.Counter.set_ref + 1;
-    set_ref_aux t (`Updated, r);
+    set_ref_aux t r;
     return ()
 
-  let remove_ref t repo name =
+  let remove_ref_aux t (r, name as ref_) =
+    let repo = lookup t r in
+    let refs = List.filter (fun r -> r.Ref.name <> name) repo.R.refs in
+    repo.R.refs <- refs;
+    add_event t (Event.Ref (`Removed ref_))
+
+    let remove_ref t repo name =
     t.ctx.Counter.set_ref <- t.ctx.Counter.set_ref + 1;
-    set_ref_aux t (`Removed, { Ref.name; head = { Commit.repo; id = "" }});
+    remove_ref_aux t (repo, name);
     return ()
 
   let status t commit =
@@ -489,7 +491,9 @@ module API = struct
     | Event.Repo r   -> set_repo_aux t r
     | Event.PR pr    -> set_pr_aux t pr
     | Event.Status s -> set_status_aux t s
-    | Event.Ref r    -> set_ref_aux t r
+    | Event.Ref (`Removed r) -> remove_ref_aux t r
+    | Event.Ref (`Updated r
+                |`Created r) -> set_ref_aux t r
     | Event.Other _  -> ()
 
   let create ?(events=[]) users =

@@ -380,5 +380,5 @@ event.
 ## Licensing
 
 DataKit is licensed under the Apache License, Version 2.0. See
-[LICENSE](https://github.com/docker/datakit/blob/master/LICENSE) for the full
+[LICENSE](https://github.com/docker/datakit/blob/master/LICENSE.md) for the full
 license text.

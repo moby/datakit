@@ -135,19 +135,21 @@ module Ref = struct
     | None   -> None
 
   let of_event_hook repo r =
-    let id = r.push_event_hook_after in
-    let head = { Commit.repo; id } in
-    let t = { head; name = to_list r.push_event_hook_ref } in
-    match r.push_event_hook_deleted, r.push_event_hook_created with
-    | true, _ -> `Removed, t
-    | _, true -> `Created, t
-    | _       -> `Updated, t
+    let name = to_list r.push_event_hook_ref in
+    match r.push_event_hook_head_commit with
+    | Some c ->
+      let id = c.push_event_hook_commit_id in
+      let head = { Commit.repo; id } in
+      let t = { head; name } in
+      if r.push_event_hook_created then `Created t else `Updated t
+    | None ->
+      `Removed (repo, name)
 
   let of_event repo r =
     let id = r.push_event_head in
     let head = { Commit.repo; id } in
     let t = { head; name = to_list r.push_event_ref } in
-    `Updated, t
+    `Updated t
 
 end
 

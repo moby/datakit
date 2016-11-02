@@ -316,12 +316,12 @@ module Ref = struct
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
 
-  type state = [`Created | `Updated | `Removed]
+  type event = [`Created of t | `Updated of t  | `Removed of id]
 
-  let pp_state ppf = function
-    | `Created -> Fmt.string ppf "+"
-    | `Updated -> Fmt.string ppf "*"
-    | `Removed -> Fmt.string ppf "-"
+  let pp_event ppf = function
+    | `Created t  -> Fmt.pf ppf "+%a" pp t
+    | `Updated t  -> Fmt.pf ppf "*%a" pp t
+    | `Removed id -> Fmt.pf ppf "-%a" pp_id id
 
 end
 
@@ -331,27 +331,30 @@ module Event = struct
     | Repo of (Repo.state * Repo.t)
     | PR of PR.t
     | Status of Status.t
-    | Ref of (Ref.state * Ref.t)
+    | Ref of Ref.event
     | Other of (Repo.t * string)
 
   let of_repo s r = Repo (s, r)
   let of_pr x = PR x
   let of_status x = Status x
-  let of_ref x y = Ref (x, y)
+  let of_ref x = Ref x
   let of_other x y = Other (x, y)
 
   let pp ppf = function
     | Repo(s,r) -> Fmt.pf ppf "Repo: %a%a" Repo.pp_state s Repo.pp r
     | PR pr     -> Fmt.pf ppf "PR: %a" PR.pp pr
     | Status s  -> Fmt.pf ppf "Status: %a" Status.pp s
-    | Ref(s,r)  -> Fmt.pf ppf "Ref: %a%a" Ref.pp_state s Ref.pp r
+    | Ref r     -> Fmt.pf ppf "Ref: %a" Ref.pp_event r
     | Other o   -> Fmt.pf ppf "Other: %s" @@ snd o
 
   let repo = function
     | Repo r   -> snd r
     | PR pr    -> PR.repo pr
     | Status s -> Status.repo s
-    | Ref r    -> Ref.repo (snd r)
+    | Ref (`Removed r) -> fst r
+    | Ref (`Created r
+          |`Updated r) -> Ref.repo r
+
     | Other o  -> fst o
 
   module Set = Set(struct
@@ -651,8 +654,9 @@ module Snapshot = struct
     | Event.Repo (`Ignored,r) -> without_repo r
     | Event.Repo (_, r)       -> with_repo r
     | Event.PR pr             -> with_pr pr
-    | Event.Ref (`Removed, r) -> without_ref (Ref.repo r, Ref.name r)
-    | Event.Ref (_, r)        -> with_ref r
+    | Event.Ref (`Removed  r) -> without_ref r
+    | Event.Ref (`Created r
+                |`Updated r)  -> with_ref r
     | Event.Status s          -> with_status s
     | Event.Other _           -> fun t -> t
 
@@ -1228,8 +1232,9 @@ module State (API: API) = struct
           | Event.PR pr ->
             if PR.state pr <> `Open then acc
             else Commit.Set.add (PR.commit pr) acc
-          | Event.Ref (`Removed, _) -> acc
-          | Event.Ref (_, r) -> Commit.Set.add (Ref.commit r) acc
+          | Event.Ref (`Removed _) -> acc
+          | Event.Ref (`Created r
+                      |`Updated r) -> Commit.Set.add (Ref.commit r) acc
           | Event.Repo _  | Event.Status _  | Event.Other _  -> acc
         ) Commit.Set.empty events
       in

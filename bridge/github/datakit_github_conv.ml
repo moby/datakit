@@ -394,8 +394,9 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | Event.Repo (s, r) -> update_repo_aux t s r
     | Event.PR pr       -> update_pr t pr
     | Event.Status s    -> update_status t s
-    | Event.Ref (`Removed, r) -> remove_ref t (Ref.id r)
-    | Event.Ref (_, r)        -> update_ref t r
+    | Event.Ref (`Removed r) -> remove_ref t r
+    | Event.Ref (`Created r
+                |`Updated r) -> update_ref t r
     | Event.Other o     ->
       Log.debug (fun l  -> l "ignoring event: %s" @@ snd o);
       Lwt.return_unit

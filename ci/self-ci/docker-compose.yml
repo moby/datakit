@@ -1,0 +1,28 @@
+version: '2'
+services:
+  ci:
+    build: .
+    command: --metadata-store tcp:datakit:5640 --web-ui=https://datakit.ci:8446/
+    ports:
+     - "8446:8443"
+    volumes:
+     - ./data/ci/repos:/data/repos
+     - ./data/ci/secrets:/secrets
+     - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+     - datakit
+  datakit:
+    image: docker/datakit
+    user: "root"
+    volumes:
+      - ./data/datakit/data:/data
+    command: --git /data --listen-9p tcp://0.0.0.0:5640
+  bridge:
+    image: docker/datakit:github
+    command: --datakit tcp:datakit:5640 --no-listen -v -c "*:r,status:rw,webhook:rw" --webhook http://datakit.ci:81
+    ports:
+     - "81:81"
+    volumes:
+      - ./data/bridge/_github:/root/.github
+    depends_on:
+     - datakit

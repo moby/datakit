@@ -40,6 +40,6 @@ depends: [
   "datakit-client" {test}
   "datakit-server"
   "datakit-github" {test}
-  "alcotest"       {test}
+  "alcotest"       {test & >= "0.7.0"}
 ]
 available: [ocaml-version >= "4.02.0"]

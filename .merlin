@@ -3,8 +3,9 @@ PKG alcotest rresult github astring fmt irmin logs mtime.os
 PKG camlzip irmin.mem irmin-watcher
 PKG conduit.lwt-unix hvsock named-pipe
 PKG asl win-eventlog github-hooks
+PKG datakit-client datakit-server.vfs datakit-github
 
 S src/**
 S tests/
-S bridge/github/**
+S bridge/github/*
 B _build/**

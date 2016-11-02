@@ -23,6 +23,9 @@ let (>|@=) x f =
   | Ok x    -> Ok (f x)
   | Error e -> Vfs.Error.other "%s" e
 
+let path s = Datakit_path.of_steps_exn s
+let status_path s = path (Status.context s)
+
 module Make (API: API) = struct
 
   type t = {
@@ -133,7 +136,7 @@ module Make (API: API) = struct
       | Ok s    -> f s
     in
     let ls () = with_status (fun s ->
-        List.map (fun s -> Datakit_path.unwrap (Status.path s), s) s
+        List.map (fun s -> Datakit_path.unwrap (status_path s), s) s
         |> sort_by_hd
         |> List.map (fun (name, childs) -> Vfs.Inode.dir name @@ inodes childs)
         |> Vfs.ok)
@@ -141,7 +144,7 @@ module Make (API: API) = struct
     let lookup name =
       Log.debug (fun l -> l "lookup %s" name);
       try with_status (fun s ->
-          List.map (fun s -> Datakit_path.unwrap (Status.path s), s) s
+          List.map (fun s -> Datakit_path.unwrap (status_path s), s) s
           |> sort_by_hd
           |> List.assoc name
           |> inodes

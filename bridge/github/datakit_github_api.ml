@@ -59,12 +59,11 @@ module Status = struct
   let to_gh_state s = (s :> Github_t.status_state)
 
   let of_gh commit s =
-    { commit;
-      context     = to_list s.base_status_context;
-      url         = s.base_status_target_url;
-      description = s.base_status_description;
-      state       = of_gh_state s.base_status_state;
-    }
+    let description = s.base_status_description in
+    let url = s.base_status_target_url in
+    let context = to_list s.base_status_context in
+    let state = of_gh_state s.base_status_state in
+    Status.create ?description ?url commit context state
 
   (* To avoid:
      Github: GitHub API error: 422 Unprocessable Entity (WebDAV) (RFC 4918)
@@ -73,27 +72,26 @@ module Status = struct
      Field: description
      Code: custom
      Message: description is too long (maximum is 140 characters) *)
-  let to_gh_description = function
-    | None -> None
-    | Some s as x ->
-      if String.length s <= 140 then x
-      else Some (String.with_range s ~len:140)
+  let assert_short_description = function
+    | None   -> ()
+    | Some s -> assert (String.length s <= 140)
 
-  let to_gh s = {
-    new_status_context     = of_list s.context;
-    new_status_target_url  = s.url;
-    new_status_description = to_gh_description s.description;
-    new_status_state       = to_gh_state s.state;
-  }
+  let to_gh s =
+    assert_short_description (Status.description s);
+    {
+      new_status_context     = of_list (Status.context s);
+      new_status_target_url  = Status.url s;
+      new_status_description = Status.description s;
+      new_status_state       = to_gh_state (Status.state s);
+    }
 
   let of_event repo s =
     let commit = { Commit.repo; id = s.status_event_sha } in
-    { commit;
-      context     = to_list s.status_event_context;
-      url         = s.status_event_target_url;
-      description = s.status_event_description;
-      state       = of_gh_state s.status_event_state;
-    }
+    let description = s.status_event_description in
+    let url = s.status_event_target_url in
+    let context = to_list s.status_event_context in
+    let state = of_gh_state s.status_event_state in
+    Status.create ?description ?url commit context state
 
 end
 

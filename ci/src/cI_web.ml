@@ -15,7 +15,7 @@ type t = {
 class virtual http_page t = object(self)
   inherit CI_web_utils.protected_page t.server
 
-  method virtual private render : (CI_web_templates.t -> user:string -> [ `Html ] Tyxml.Html.elt, Cohttp_lwt_body.t) Wm.op
+  method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt_body.t) Wm.op
 
   method content_types_provided rd =
     Wm.continue [
@@ -30,15 +30,16 @@ class virtual http_page t = object(self)
     match resp with
     | Wm.Error _ as e -> Lwt.return (e, rd)
     | Wm.Ok html ->
-      match self#authenticated_user with
-      | None -> assert false
-      | Some user ->
+      let user = self#authenticated_user in
       let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user (CI_web_utils.web_config t.server)) in
       Wm.continue (`String body) rd
 end
 
 class user_page t = object(self)
   inherit http_page t
+
+  method private required_roles = [`LoggedIn]
+
   method private render rd =
     self#session rd >>= fun session_data ->
     let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
@@ -47,6 +48,9 @@ end
 
 class main t = object(self)
   inherit http_page t
+
+  method private required_roles = [`Reader]
+
   method private render rd =
     self#session rd >>= fun session_data ->
     let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
@@ -55,6 +59,9 @@ end
 
 class error t = object
   inherit http_page t
+
+  method private required_roles = []
+
   method private render rd =
     let id = Rd.lookup_path_info_exn "id" rd in
     Wm.continue (CI_web_templates.error_page id) rd
@@ -62,16 +69,25 @@ end
 
 class pr_list t = object
   inherit http_page t
+
+  method private required_roles = [`Reader]
+
   method private render rd = Wm.continue (CI_web_templates.prs_page ~ci:t.ci) rd
 end
 
 class branch_list t = object
   inherit http_page t
+
+  method private required_roles = [`Reader]
+
   method private render rd = Wm.continue (CI_web_templates.branches_page ~ci:t.ci) rd
 end
 
 class tag_list t = object
   inherit http_page t
+
+  method private required_roles = [`Reader]
+
   method private render rd = Wm.continue (CI_web_templates.tags_page ~ci:t.ci) rd
 end
 
@@ -110,6 +126,9 @@ let read_log ci state =
 
 class pr_page t = object(self)
   inherit http_page t
+
+  method private required_roles = [`Reader]
+
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
     let project = Rd.lookup_path_info_exn "project" rd in
@@ -136,6 +155,9 @@ end
 
 class ref_page t = object(self)
   inherit http_page t
+
+  method private required_roles = [`Reader]
+
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
     let project = Rd.lookup_path_info_exn "project" rd in
@@ -172,6 +194,9 @@ let rebuild ~ci ~uri ~project ~target ~job ~redirect rd =
 
 class pr_rebuild t = object
   inherit CI_web_utils.post_page t.server
+
+  method private required_roles = [`Builder]
+
   method! private process_post rd =
     let user = Rd.lookup_path_info_exn "user" rd in
     let project = Rd.lookup_path_info_exn "project" rd in
@@ -185,6 +210,9 @@ end
 
 class ref_rebuild t = object
   inherit CI_web_utils.post_page t.server
+
+  method private required_roles = [`Builder]
+
   method! private process_post rd =
     let user = Rd.lookup_path_info_exn "user" rd in
     let project = Rd.lookup_path_info_exn "project" rd in
@@ -198,6 +226,9 @@ end
 
 class cancel t = object
   inherit CI_web_utils.post_page t.server
+
+  method private required_roles = [`Builder]
+
   method! private process_post rd =
     let branch = Rd.lookup_path_info_exn "branch" rd in
     match CI_live_log.lookup ~branch t.logs with
@@ -222,10 +253,16 @@ let mime_type uri =
   | "png"   -> Some "image/png"
   | _       -> None
 
-let serve ~config ~logs ~mode ~ci ~auth ~dashboards =
-  let server = CI_web_utils.server ~auth ~web_config:config in
+let routes ~config ~logs ~ci ~auth ~dashboards =
+  let has_role r ~user =
+    match user, r with
+    | None, `Reader -> config.CI_web_templates.public
+    | None, _ -> false
+    | Some _, (`Reader | `LoggedIn | `Builder) -> true
+  in
+  let server = CI_web_utils.server ~auth ~web_config:config ~has_role in
   let t = { logs; ci; server; dashboards } in
-  let routes = [
+  [
     (* Auth *)
     ("/auth/login",     fun () -> new CI_web_utils.login_page t.server);
     ("/auth/logout",    fun () -> new CI_web_utils.logout_page t.server);
@@ -246,5 +283,4 @@ let serve ~config ~logs ~mode ~ci ~auth ~dashboards =
     ("error/:id",       fun () -> new error t);
     (* Static resources *)
     (":dir/:name",      fun () -> new CI_web_utils.static_crunch ~mime_type CI_static.read);
-  ] in
-  CI_web_utils.serve ~mode ~routes
+  ]

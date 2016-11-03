@@ -214,11 +214,17 @@ end
 module Web : sig
   type config
 
-  val config : ?name:string -> ?state_repo:Uri.t -> unit -> config
+  val config :
+    ?name:string ->
+    ?state_repo:Uri.t ->
+    public:bool ->
+    unit -> config
   (** [config ~name ~state_repo ()] is a web configuration.
       If [name] is given, it is used as the main heading, and also as the name of the session cookie
       (useful if you run multiple CIs on the same host, on different ports).
-      If [state_repo] is given, it is used to construct links to the state repository on GitHub. *)
+      If [state_repo] is given, it is used to construct links to the state repository on GitHub.
+      [public] controls whether users who are not logged in can view the site. Performing actions
+      still requires users to log in first. *)
 end
 
 module Config : sig

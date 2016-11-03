@@ -383,26 +383,55 @@ let test_cross_project conn =
   Test_utils.update_pr hooks ~message:"Init" ~id:3907 ~head:"456" ~states:[] >>= fun () ->
   Test_utils.wait_for_file ~switch hooks "user/project/commit/456/status/ci/datakit/test/description" "Compile 456 with 654"
 
+let with_test_auth fn =
+  (* Configures a user "admin"/"fred". *)
+  Utils.with_tmpdir (fun tmp ->
+      let path = Filename.concat tmp "passwords.sexp" in
+      let ch = open_out path in
+      output_string ch "((admin((prf SHA1)(salt\"\\172~\\212>|'\\154\\202\\224\\128?\\158\\160\\245\\243j\")(hashed_password\"_\\231gB\\136\\221\\159!\\164%\\024\\\"0H\\\"\\230\\172\\142\\166\\138\")(count 5000)(dk_len 20))))";
+      close_out ch;
+      CI_web_utils.Auth.create path >>= fn
+    )
+
 let test_auth () =
   Lwt_main.run begin
-    Utils.with_tmpdir (fun tmp ->
-        let path = Filename.concat tmp "passwords.sexp" in
-        let ch = open_out path in
-        output_string ch "((admin((prf SHA1)(salt\"\\172~\\212>|'\\154\\202\\224\\128?\\158\\160\\245\\243j\")(hashed_password\"_\\231gB\\136\\221\\159!\\164%\\024\\\"0H\\\"\\230\\172\\142\\166\\138\")(count 5000)(dk_len 20))))";
-        close_out ch;
-        CI_web_utils.Auth.create path >|= fun auth ->
-        match CI_web_utils.Auth.lookup auth ~user:"foo" ~password:"bar" with
-        | Some _ -> Alcotest.fail "Invalid user!"
-        | None ->
-          match CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred!" with
-          | Some _ -> Alcotest.fail "Invalid password!"
-          | None ->
-            match CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred" with
-            | None -> Alcotest.fail "Valid user!"
-            | Some u ->
-              Alcotest.(check string) "Got user" "admin" (CI_web_utils.User.name u)
-      )
+    with_test_auth @@ fun auth ->
+    match CI_web_utils.Auth.lookup auth ~user:"foo" ~password:"bar" with
+    | Some _ -> Alcotest.fail "Invalid user!"
+    | None ->
+      match CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred!" with
+      | Some _ -> Alcotest.fail "Invalid password!"
+      | None ->
+        match CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred" with
+        | None -> Alcotest.fail "Valid user!"
+        | Some u ->
+          Alcotest.(check string) "Got user" "admin" (CI_web_utils.User.name u);
+          Lwt.return ()
   end
+
+let status_code = Alcotest.of_pp (Fmt.of_to_string Cohttp.Code.string_of_status)
+
+let test_roles conn =
+  let tests = CI_projectID.Map.of_list [
+  ] in
+  let dk = CI_utils.DK.connect conn in
+  let ci = CI_engine.create ~web_ui:(Uri.of_string "http://localhost/") (fun () -> Lwt.return dk) tests in
+  let logs = CI_live_log.create_manager () in
+  with_test_auth @@ fun auth ->
+  let server ~public =
+    let web_config = CI_web_templates.config ~name:"test-ci" ~public () in
+    let routes = CI_web.routes ~config:web_config ~logs ~auth ~ci ~dashboards:(CI_target.Full.map_of_list []) in
+    fun ~expect path ->
+      let request = Cohttp.Request.make (Uri.make ~path ()) in
+      CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >|= function
+      | None -> Alcotest.fail "No response!"
+      | Some (code, _header, _body, _path) ->
+        Alcotest.(check status_code) "Web response" expect code
+  in
+  let test_private_server = server ~public:false in
+  let test_public_server = server ~public:true in
+  test_private_server "/" ~expect:`See_other >>= fun () ->
+  test_public_server "/" ~expect:`OK
 
 let test_set = [
   "Simple",         `Quick, Test_utils.run test_simple;
@@ -417,6 +446,7 @@ let test_set = [
   "Git (clone)",    `Quick, Test_utils.run (test_git_dir ~clone:true);
   "Cross-project",  `Quick, Test_utils.run test_cross_project;
   "Auth",           `Quick, test_auth;
+  "Roles",          `Quick, Test_utils.run_private test_roles;
 ]
 
 let () =

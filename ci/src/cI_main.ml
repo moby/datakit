@@ -39,9 +39,10 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config =
       `Port 8443
     )
   in
+  let routes = CI_web.routes ~config:web_config ~logs ~auth ~ci ~dashboards in
   Lwt.pick [
     main_thread;
-    CI_web.serve ~config:web_config ~logs ~auth ~mode ~ci ~dashboards;
+    CI_web_utils.serve ~routes ~mode
   ]
 
 let start () pr_store web_ui secrets_dir config canaries =

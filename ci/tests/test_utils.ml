@@ -58,25 +58,38 @@ let with_named_socket fn =
        Lwt_unix.unlink path
     )
 
+let with_datakit fn =
+  Store.Repo.create config >>= fun repo ->
+  Store.Repo.branches repo >>= fun branches ->
+  Lwt_list.iter_s (fun branch ->
+      Store.Repo.remove_branch repo branch
+    ) branches
+  >>= fun () ->
+  with_named_socket @@ fun (for_client, for_server) ->
+  let root = Filesystem.create make_task repo in
+  Lwt.async (fun () ->
+      Lwt_unix.accept for_server >>= fun (client, _addr) ->
+      let flow = Flow_lwt_unix.connect client in
+      Server.accept ~root flow >>*= Lwt.return
+    );
+  fn for_client
+
 let run fn () =
   Lwt_main.run begin
-    Store.Repo.create config >>= fun repo ->
-    Store.Repo.branches repo >>= fun branches ->
-    Lwt_list.iter_s (fun branch ->
-      Store.Repo.remove_branch repo branch
-      ) branches
-    >>= fun () ->
-    with_named_socket @@ fun (for_client, for_server) ->
-    let root = Filesystem.create make_task repo in
-    Lwt.async (fun () ->
-        Lwt_unix.accept for_server >>= fun (client, _addr) ->
-        let flow = Flow_lwt_unix.connect client in
-        Server.accept ~root flow >>*= Lwt.return
-      );
+    with_datakit @@ fun for_client ->
     Private.Client9p.connect "unix" for_client () >>*= fun conn ->
     Lwt.finalize
       (fun () -> fn conn)
       (fun () -> Private.Client9p.disconnect conn)
+  end
+
+let run_private fn () =
+  Lwt_main.run begin
+    with_datakit @@ fun for_client ->
+    CI_utils.Client9p.connect "unix" for_client () >>*= fun conn ->
+    Lwt.finalize
+      (fun () -> fn conn)
+      (fun () -> CI_utils.Client9p.disconnect conn)
   end
 
 let update branch values ~message =

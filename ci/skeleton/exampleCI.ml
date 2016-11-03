@@ -17,6 +17,7 @@ let projects = [
 let web_config =
   Web.config
     ~name:"example-ci"
+    ~public:false               (* Allow (read-only) access when not logged in? *)
     ?state_repo:None
     ()
 

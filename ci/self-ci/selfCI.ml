@@ -51,6 +51,7 @@ let web_config =
   Web.config
     ~name:"datakit-ci"
     ~state_repo:(Uri.of_string "https://github.com/docker/datakit.logs")
+    ~public:true
     ()
 
 let () =

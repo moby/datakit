@@ -20,6 +20,8 @@ end
 let () =
   Nocrypto_entropy_unix.initialize ()
 
+type role = [`Reader | `LoggedIn | `Builder]
+
 module Hashed_password = struct
   type t = {
     prf : [`SHA1];
@@ -103,16 +105,23 @@ type server = {
   auth : Auth.t;
   session_backend : Session.Backend.t;
   web_config : CI_web_templates.t;
+  has_role : role -> user:string option -> bool;
 }
 
 let cookie_key t =
   "__ci_session:" ^ t.web_config.CI_web_templates.name
 
-let server ~auth ~web_config =
+let server ~auth ~web_config ~has_role =
   let session_backend = Session.create () in
-  { auth; session_backend; web_config }
+  { auth; session_backend; web_config; has_role }
 
 let web_config t = t.web_config
+
+class type resource = object
+  inherit [Cohttp_lwt_body.t] Wm.resource
+  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
+  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+end
 
 class static ~valid ~mime_type dir =
   object(self)
@@ -207,21 +216,31 @@ class virtual protected_page t =
     val mutable authenticated_user = None
     method private authenticated_user = authenticated_user
 
+    method virtual private required_roles : role list
+
     method! is_authorized rd =
+      let roles_needed = self#required_roles in
       self#session rd >>= fun session ->
       match session.Session_data.username with
       | Some _ as username ->
         authenticated_user <- username;
-        Wm.continue `Authorized rd
+        if List.for_all (t.has_role ~user:username) roles_needed then
+          Wm.continue `Authorized rd
+        else
+          Wm.respond 403 ~body:(`String "Permission denied") rd
       | None ->
-        let login_redirect =
-          match Uri.path rd.Wm.Rd.uri with
-          | "/auth/logout" -> None
-          | _ -> Some (Uri.path_and_query rd.Wm.Rd.uri)
-        in
-        let value = {session with Session_data.login_redirect} in
-        self#session_set (Session_data.to_string value) rd >>= fun () ->
-        Wm.continue (`Redirect (Uri.of_string "/auth/login")) rd
+        if List.for_all (t.has_role ~user:None) roles_needed then
+          Wm.continue `Authorized rd
+        else (
+          let login_redirect =
+            match Uri.path rd.Wm.Rd.uri with
+            | "/auth/logout" -> None
+            | _ -> Some (Uri.path_and_query rd.Wm.Rd.uri)
+          in
+          let value = {session with Session_data.login_redirect} in
+          self#session_set (Session_data.to_string value) rd >>= fun () ->
+          Wm.continue (`Redirect (Uri.of_string "/auth/login")) rd
+        )
   end
 
 class virtual post_page t = object(self)
@@ -253,6 +272,8 @@ end
 
 class logout_page t = object(self)
   inherit post_page t
+
+  method private required_roles = []
 
   method! private process_post rd =
     self#session rd >>= fun session_data ->

@@ -1,4 +1,4 @@
-FROM ocaml/opam:alpine
+FROM ocaml/opam:alpine-3.4_ocaml-4.03.0
 
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term
 

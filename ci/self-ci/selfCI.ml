@@ -50,7 +50,7 @@ let projects = [
 let web_config =
   Web.config
     ~name:"datakit-ci"
-    ?state_repo:None    (* TODO *)
+    ~state_repo:(Uri.of_string "https://github.com/docker/datakit.logs")
     ()
 
 let () =

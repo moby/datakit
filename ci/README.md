@@ -28,12 +28,11 @@ When you're happy with the results, simply start the GitHub bridge to sync every
 
 ## Installation
 
-Build the DataKitCI base image if it isn't available already:
+The `self-ci` directory contains the configuration we use to test DataKit itself.
+`self-ci/README.md` explains how to use Docker Compose to deploy your own instance.
 
-    docker build -f Dockerfile.ci -t docker/datakit:ci .
-
-The go to the `ci/skeleton` directory, which has an example CI configuration.
-The easiest way to build the example is using Docker:
+The `skeleton` directory contains a very minimal example for this tutorial.
+You can build the example using Docker:
 
     cd ci/skeleton
     docker build -t my-ci --build-arg CONFIG=exampleCI .

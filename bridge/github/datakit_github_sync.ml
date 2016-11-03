@@ -144,6 +144,9 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     State.import token bridge repos >>= fun bridge ->
     let t = { t with bridge } in
     call_github_api ~token ~first_sync t >>= fun t ->
+    (* FIXME: we should be able to configure if we want to
+       prune or not. *)
+    let t = { t with bridge = Snapshot.prune t.bridge } in
     update_datakit t tr
 
   (* On startup, build the initial state by looking at the active

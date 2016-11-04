@@ -24,7 +24,6 @@ depends: [
   "channel"
   "conduit"
   "io-page"
-  "dockerfile"
   "pbkdf"
   "webmachine"
   "session"

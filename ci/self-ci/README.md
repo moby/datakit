@@ -28,7 +28,8 @@ To use this as a template for your own projects:
 
 6. `docker-compose up` to get everything running.
 
-7. Commit an empty `.monitor` file to the `github-metadata` branch of `data/datakit/data` for every repository you want to monitor. e.g. to monitor `docker/datakit`, we create the file `docker/datakit/.monitor`. As soon as this is committed, the `bridge` service should start populating the branch with information about the branches, tags and open PRs in the repository and the CI will start testing them.
+On startup, the CI should commit to the `data/datakit/data` repository's `github-metadata` branch a request to monitor the projects it is testing.
+The `bridge` service should then start populating the branch with information about the branches, tags and open PRs in the repository, and the CI will start testing them.
 
 [DataKitCI]: https://github.com/talex5/datakit/tree/self-ci/ci
 [ocaml-github]: https://github.com/mirage/ocaml-github

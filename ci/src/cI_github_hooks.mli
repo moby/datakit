@@ -62,6 +62,9 @@ val project : snapshot -> CI_projectID.t -> (PR.t list * Ref.t list) Lwt.t
 val snapshot : t -> snapshot Lwt.t
 (** [snapshot t] is a snapshot of the current head of the metadata branch. *)
 
+val enable_monitoring : t -> CI_projectID.t list -> unit Lwt.t
+(** [enable_monitoring t projects] ensures that a [".monitor"] file exists for each project in [projects], creating them as needed. *)
+
 val monitor : t -> ?switch:Lwt_switch.t -> (snapshot -> unit Lwt.t) -> [`Abort] Lwt.t
 (** [monitor t fn] is a thread that watches the "github-metadata" branch and calls [fn snapshot] on each update.
     Returns [`Abort] when the switch is turned off. *)

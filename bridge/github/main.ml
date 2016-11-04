@@ -49,20 +49,19 @@ let serviceid = "C378280D-DA14-42C8-A24E-0DE92A1028E3"
 
 let token () =
   let cookie = "datakit" in
+  let error_msg = "Missing cookie: use `git-jar make -s repo <user> " ^ cookie ^"`" in
   Lwt_main.run (
     Lwt.catch (fun () ->
         let open Lwt.Infix in
         Github_cookie_jar.init () >>= fun jar ->
         Github_cookie_jar.get jar ~name:cookie >|= function
-        | Some t -> Some (Github.Token.of_string t.Github_t.auth_token)
-        | None   -> None
+        | Some t -> Ok (Github.Token.of_string t.Github_t.auth_token)
+        | None   -> Error (`Msg error_msg)
       ) (fun e ->
-        Log.err (fun l ->
-            l "Missing cookie: use git-jar to create cookie `%s`.\n%s%!"
-              cookie (Printexc.to_string e)
-          );
-        Lwt.return_none)
-  )
+           Log.err (fun l -> l "%s\n%s%!" error_msg (Printexc.to_string e));
+           Lwt.return (Error (`Msg error_msg))
+      )
+   )
 
 let parse_address address =
   match String.cut ~sep:":" address with
@@ -102,8 +101,8 @@ let start () sandbox no_listen listen_urls datakit branch cap webhook =
         branch
     );
   let token = match token () with
-    | None   -> failwith "Missing datakit GitHub token"
-    | Some t -> t
+    | Ok t -> t
+    | Error (`Msg m) -> failwith m
   in
   let webhook = match webhook with
     | None   -> None

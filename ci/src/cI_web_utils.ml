@@ -146,11 +146,11 @@ class static ~valid ~mime_type dir =
           Wm.continue (`String body) rd
         ) else (
           Log.debug (fun f -> f "Missing static resource %S" name);
-          Wm.respond 404 rd
+          Wm.respond 404 rd ~body:(`String "No such static resource")
         )
       ) else (
         Log.debug (fun f -> f "Invalid static resource name %S" name);
-        Wm.respond 404 rd
+        Wm.respond 404 rd ~body:(`String "Invalid static resource name")
       )
   end
 
@@ -174,7 +174,7 @@ class static_crunch ~mime_type read =
         Wm.continue (`String data) rd
       | None ->
         Log.info (fun f -> f "Missing static resource %S" name);
-        Wm.respond 404 rd
+        Wm.respond 404 rd ~body:(`String "No such static resource")
   end
 
 module Session_data = struct

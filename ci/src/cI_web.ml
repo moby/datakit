@@ -137,10 +137,10 @@ class pr_page t = object(self)
     let project = CI_projectID.v ~user ~project in
     let projects = CI_engine.targets t.ci in
     match CI_projectID.Map.find project projects with
-    | None -> Wm.respond 404 rd
+    | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (prs, _) ->
       match IntMap.find id prs with
-      | None -> Wm.respond 404 rd
+      | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
       | Some target ->
         CI_engine.jobs target |> Lwt_list.map_s (fun job ->
             let state = CI_engine.state job in
@@ -166,10 +166,10 @@ class ref_page t = object(self)
     let project = CI_projectID.v ~user ~project in
     let projects = CI_engine.targets t.ci in
     match CI_projectID.Map.find project projects with
-    | None -> Wm.respond 404 rd
+    | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (_, refs) ->
       match Datakit_path.Map.find id refs with
-      | exception Not_found -> Wm.respond 404 rd
+      | exception Not_found -> Wm.respond 404 rd ~body:(`String "No such ref")
       | target ->
         CI_engine.jobs target |> Lwt_list.map_s (fun job ->
             let state = CI_engine.state job in

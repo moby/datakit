@@ -197,6 +197,13 @@ let with_ci ?(project=ProjectID.v ~user:"user" ~project:"project") conn workflow
   in
   Utils.with_switch @@ fun switch ->
   Lwt.async (fun () -> Private.listen ci ~switch);
+  DK.branch dk "github-metadata" >>*= fun hooks ->
+  (* Work-around for https://github.com/mirage/irmin/issues/373 *)
+  DK.Branch.wait_for_path hooks (ProjectID.path project / ".monitor") (function
+      | None -> Lwt.return (Ok `Again)
+      | Some _ -> Lwt.return (Ok (`Finish ()))
+    )
+  >>*= fun _ ->
   let set_handler key value = handlers := String.Map.add key value !handlers in
   fn ~logs ~switch dk (with_handler set_handler)
 

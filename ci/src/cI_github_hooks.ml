@@ -207,6 +207,31 @@ let snapshot t =
   | None -> failf "Metadata branch does not exist!"
   | Some snapshot -> snapshot
 
+let enable_monitoring t projects =
+  DK.branch t metadata_branch >>*= fun metadata_branch ->
+  DK.Branch.with_transaction metadata_branch (fun tr ->
+      let changes = ref false in
+      projects |> Lwt_list.iter_s (fun p ->
+          let dir = CI_projectID.path p in
+          let path = dir / ".monitor" in
+          DK.Transaction.exists_file tr path >>*= function
+          | true -> Lwt.return ()
+          | false ->
+            Log.info (fun f -> f "Adding monitor file for %a" Datakit_path.pp path);
+            changes := true;
+            DK.Transaction.make_dirs tr dir >>*= fun () ->
+            DK.Transaction.create_file tr path (Cstruct.of_string "") >|*= fun () -> ()
+        )
+      >>= fun () ->
+      if !changes then (
+        DK.Transaction.commit tr ~message:"Add .monitor files"
+      ) else (
+        DK.Transaction.abort tr >|= fun () -> Ok ()
+      )
+    )
+  >>*= fun () ->
+  Lwt.return ()
+
 let monitor t ?switch fn =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.wait_for_head metadata ?switch (function

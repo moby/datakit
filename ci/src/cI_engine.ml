@@ -277,6 +277,7 @@ let listen ?switch t =
     end >>= fun target ->
     Lwt_list.iter_s (recalculate t ~snapshot) target.jobs
   in
+  CI_github_hooks.enable_monitoring gh_hooks (List.map fst (CI_projectID.Map.bindings t.projects)) >>= fun () ->
   CI_github_hooks.monitor ?switch gh_hooks (fun snapshot ->
       t.projects |> CI_projectID.Map.bindings |> Lwt_list.iter_s (fun (project_id, project) ->
           CI_github_hooks.project snapshot project_id >>= fun (prs, refs) ->

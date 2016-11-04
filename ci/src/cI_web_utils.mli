@@ -1,5 +1,12 @@
 module Wm : Webmachine.S with type 'a io = 'a Lwt.t
 
+type role = [`Reader | `LoggedIn | `Builder]
+(** Roles are:
+    - [Reader] permitted to look at the CI state, build logs, etc
+    - [LoggedIn] must be logged in (not anonymous)
+    - [Builder] permitted to control the builds (cancel, rebuild)
+  *)
+
 module User : sig
   type t
   val name : t -> string
@@ -19,7 +26,11 @@ end
 
 type server
 
-val server : auth:Auth.t -> web_config:CI_web_templates.t -> server
+val server :
+  auth:Auth.t ->
+  web_config:CI_web_templates.t ->
+  has_role:(role -> user:string option -> bool) ->
+  server
 val web_config : server -> CI_web_templates.t
 
 module Session_data : sig
@@ -27,19 +38,17 @@ module Session_data : sig
   val csrf_token : t -> string
 end
 
-class static : valid:Str.regexp -> mime_type:(Uri.t -> string option) -> string -> object
+class type resource = object
   inherit [Cohttp_lwt_body.t] Wm.resource
   method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
   method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
 end
+
+class static : valid:Str.regexp -> mime_type:(Uri.t -> string option) -> string -> resource
 (** [new static ~valid ~mime_type dir] serves up files from the directory [dir], taking the leafname from the context.
     Names must match the RE [valid] and the MIME type returned will be [mime_type uri]. *)
 
-class static_crunch : mime_type:(Uri.t -> string option) -> (string -> string option) -> object
-  inherit [Cohttp_lwt_body.t] Wm.resource
-  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
-end
+class static_crunch : mime_type:(Uri.t -> string option) -> (string -> string option) -> resource
 (** [new static_crunch ~mime_type read] serves up files using the function [read], taking the path from the context.
     The MIME type returned will be [mime_type uri]. *)
 
@@ -49,16 +58,17 @@ class virtual resource_with_session : server -> object
 end
 (** [resource_with_session] ensures there is a session for each request. *)
 
-class login_page : server -> object
-    inherit resource_with_session
-    method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-    method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
-  end
+class login_page : server -> resource
 (** Page to serve at [/auth/login]. *)
 
 class virtual protected_page : server -> object
   inherit resource_with_session
+
   method private authenticated_user : string option
+
+  method virtual private required_roles : role list
+  (* Users must have all these roles in order to view the page.
+     If empty then the page can be viewed by anyone. *)
 end
 (** The [is_authorized] method checks that the session has an associated user and asks the
     user to log in if not.
@@ -72,9 +82,7 @@ end
 (** [post_page] accepts form POST submissions.
     It overrides [forbidden] to check that the CSRF token is present and correct. *)
 
-class logout_page : server -> object
-    inherit post_page
-  end
+class logout_page : server -> resource
 (** Posting to this page logs the user out and redirects to [/]. *)
 
 val serve :

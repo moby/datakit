@@ -10,13 +10,16 @@ type logs =
 type t = {
   name : string;
   state_repo : Uri.t option;
+  public : bool;
 }
+
+type page = user:string option -> [`Html] Tyxml.Html.elt
 
 let err_no_state_repo = "no-state-repo"
 
 let error_link id = "/error/" ^ id
 
-let config ?(name="datakit-ci") ?state_repo () = { name; state_repo }
+let config ?(name="datakit-ci") ?state_repo ~public () = { name; state_repo; public }
 
 let state_repo_url t fmt =
   fmt |> Fmt.kstrf @@ fun path ->
@@ -388,15 +391,12 @@ let login_page ~csrf_token t ~user =
     ]
   ] t
 
-let protected_page title tab body t ~user =
-  page title tab body t ~user:(Some user)
-
 let user_page ~csrf_token =
   let query = [
     "CSRFToken", [csrf_token];
   ] in
   let action = Printf.sprintf "/auth/logout?%s" (Uri.encoded_of_query query) in
-  protected_page "Profile" Nav.Home [
+  page "Profile" Nav.Home [
     form ~a:[a_class ["logout-form"]; a_action action; a_method `Post] [
       button ~a:[a_class ["btn"; "btn-default"]; a_button_type `Submit] [
         pcdata "Log out"
@@ -418,7 +418,7 @@ let main_page ~csrf_token ~ci ~dashboards =
     in
     CI_projectID.Map.fold dashboard_table combined []
   in
-  protected_page title Nav.Home @@ opt_warning ci @ dashboard_widgets @ [
+  page title Nav.Home @@ opt_warning ci @ dashboard_widgets @ [
       h2 [pcdata "Resource pools"];
       resource_pools ~csrf_token;
     ]
@@ -428,21 +428,21 @@ let prs_page ~ci =
   let sections = List.map pr_table projects in
   let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
-  protected_page title Nav.PRs @@ opt_warning ci @ sections
+  page title Nav.PRs @@ opt_warning ci @ sections
 
 let branches_page ~ci =
   let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
   let sections = List.map branch_table projects in
   let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
-  protected_page title Nav.Branches @@ opt_warning ci @ sections
+  page title Nav.Branches @@ opt_warning ci @ sections
 
 let tags_page ~ci =
   let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
   let sections = List.map tag_table projects in
   let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
-  protected_page title Nav.Tags @@ opt_warning ci @ sections
+  page title Nav.Tags @@ opt_warning ci @ sections
 
 let history_button url =
   a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href url;] [span ~a:[a_class["glyphicon"; "glyphicon-time"]] []; pcdata "History"]
@@ -565,7 +565,7 @@ let pr_page ~csrf_token ~target jobs t =
     | jobs -> [table ~a:[a_class ["table"; "table-bordered"]] (List.map job_row jobs)]
   in
   let page_url = pr_url project pr_id in
-  protected_page title Nav.PRs (
+  page title Nav.PRs (
     table ~a:[a_class ["table"; "table-bordered"]] [
       row "PR on GitHub" [
         a ~a:[a_href (gh_pr_url pr)] [pcdata (string_of_int pr_id)];
@@ -600,7 +600,7 @@ let ref_page ~csrf_token ~target jobs t =
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false
     in
-    protected_page title nav (
+    page title nav (
       table ~a:[a_class["table table-bordered"]][
         row "Branch on GitHub" [
           a ~a:[a_href (gh_ref_url r)] [pcdata title];
@@ -615,7 +615,7 @@ let ref_page ~csrf_token ~target jobs t =
     ) t
 
 let error_page id =
-  protected_page "Error" Nav.Home (
+  page "Error" Nav.Home (
     if id = err_no_state_repo then
       [
         p [pcdata "No web mirror of the state repository has been configured, so can't link to it."];

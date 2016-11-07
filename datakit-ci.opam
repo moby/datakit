@@ -28,6 +28,7 @@ depends: [
   "webmachine"
   "session"
   "asetmap"
+  "github"
   "ppx_sexp_conv" {build}
   "crunch" {build}
   "datakit" {test}

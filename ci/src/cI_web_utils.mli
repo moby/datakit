@@ -15,7 +15,12 @@ end
 module Auth : sig
   type t
 
-  val create : string -> t Lwt.t
+  type github_auth = {
+    client_id : string;
+    client_secret : string;
+  }
+
+  val create : ?github:github_auth -> string -> t Lwt.t
   (** [create path] is a user authenticator with configuration at [path]. If [path] does not exist, the
       user is prompted to create one. *)
 
@@ -60,6 +65,9 @@ end
 
 class login_page : server -> resource
 (** Page to serve at [/auth/login]. *)
+
+class github_callback : server -> resource
+(** Page to serve at [/auth/github-callback] *)
 
 class virtual protected_page : server -> object
   inherit resource_with_session

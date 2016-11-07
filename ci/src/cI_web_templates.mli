@@ -30,6 +30,7 @@ val unescape_ref : string -> Datakit_path.t
 type page = user:string option -> [`Html] Tyxml.Html.elt
 
 val login_page :
+  ?github:Uri.t ->
   csrf_token:string ->
   t ->
   page

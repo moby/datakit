@@ -370,7 +370,7 @@ let resource_pools ~csrf_token =
     items
   )
 
-let login_page ~csrf_token t ~user =
+let login_page ?github ~csrf_token t ~user =
   let query = [
     "CSRFToken", [csrf_token];
   ] in
@@ -382,13 +382,23 @@ let login_page ~csrf_token t ~user =
       input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name] ()
     ]
   in
+  let github_login =
+    match github with
+    | None ->
+      p [pcdata "(configure webauth to allow GitHub logins)"]
+    | Some github ->
+      p [
+        a ~a:[a_href (Uri.to_string github)] [pcdata "Log in with GitHub"];
+      ]
+  in
   page "Login" Nav.Home ~user [
     h2 [pcdata "Login"];
     form ~a:[a_class ["login-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
       field "Username" `Text "user";
       field "Password" `Password "password";
       div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
-    ]
+    ];
+    github_login;
   ] t
 
 let user_page ~csrf_token =

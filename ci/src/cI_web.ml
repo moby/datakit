@@ -266,6 +266,7 @@ let routes ~config ~logs ~ci ~auth ~dashboards =
     (* Auth *)
     ("/auth/login",     fun () -> new CI_web_utils.login_page t.server);
     ("/auth/logout",    fun () -> new CI_web_utils.logout_page t.server);
+    ("/auth/github-callback",    fun () -> new CI_web_utils.github_callback t.server);
     ("/user/profile",   fun () -> new user_page t);
     (* Overview pages *)
     ("/",               fun () -> new main t);

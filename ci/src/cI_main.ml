@@ -87,7 +87,9 @@ let canaries =
   in
   Arg.(value (opt_all CI_target.Full.arg [] doc))
 
-let run config =
+let default_info = Term.info "DataKitCI"
+
+let run ?(info=default_info) config =
   let spec = Term.(const start
                    $ CI_log_reporter.setup_log
                    $ pr_store
@@ -96,6 +98,6 @@ let run config =
                    $ config
                    $ canaries
                   ) in
-  match Term.eval (spec, Term.info "DataKitCI") with
+  match Term.eval (spec, info) with
   | `Error _ -> exit 1
   | _ -> exit (if Logs.err_count () > 0 then 1 else 0)

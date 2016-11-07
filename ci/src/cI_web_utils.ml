@@ -60,17 +60,33 @@ module User = struct
   let name t = t.name
 end
 
+let memo generate =
+  let cached  = Hashtbl.create 5 in
+  fun k ->
+    try Hashtbl.find cached k
+    with Not_found ->
+      let v = generate k in
+      Hashtbl.add cached k v;
+      v
+
 module Auth = struct
   type password_file = (string * Hashed_password.t) list [@@deriving sexp]
+
+  type user_attributes = {
+    github_orgs : string list Lwt.t Lazy.t;
+    can_read_github : CI_projectID.t -> bool Lwt.t;
+  }
 
   type github_auth = {
     client_id : string;
     client_secret : string;
+    callback : Uri.t option;
   }
 
   type t = {
     github : github_auth option;
     local_users : User.t String.Map.t;
+    mutable attributes : user_attributes String.Map.t;
   }
 
   let lookup t ~user ~password =
@@ -109,30 +125,85 @@ module Auth = struct
       |> String.Map.of_list
       |> String.Map.mapi (fun name password -> { User.name; password })
     in
-    { github; local_users }
+    { github; local_users; attributes = String.Map.empty }
+
+  let scopes = [`Read_org; `Repo]
 
   let github_login_url ~csrf_token t =
     match t.github with
     | None -> None
-    | Some github -> Some (Github.URI.authorize ~client_id:github.client_id ~state:csrf_token ())
+    | Some github ->
+      let url = Github.URI.authorize
+          ~scopes
+          ~client_id:github.client_id
+          ?redirect_uri:github.callback
+          ~state:csrf_token
+          ()
+      in
+      Some url
 
   let handle_github_callback t ~code =
     match t.github with
     | None -> Lwt.return @@ Error "GitHub auth is not configured!"
     | Some github ->
       Github.Token.of_code ~client_id:github.client_id ~client_secret:github.client_secret ~code () >>= function
-      | None -> Lwt.return @@ Error "Token.of_code failed (no further information available)"
-      | Some token ->
-        Github.Monad.run (Github.User.current_info ~token ()) >|= fun resp ->
-        let user_info = Github.Response.value resp in
-        Ok ("github:" ^ user_info.Github_t.user_info_login)
+       | None -> Lwt.return @@ Error "Token.of_code failed (no further information available)"
+       | Some token ->
+         Github.Monad.run (Github.User.current_info ~token ()) >|= fun resp ->
+         let user_info = Github.Response.value resp in
+         let github_orgs = lazy (
+           Github.Monad.run begin
+             let open! Github.Monad in
+             Github.User.current_info ~token () >|= Github.Response.value >>= fun user_info ->
+             let user = user_info.Github_t.user_info_login in
+             Github.Organization.user_orgs ~token ~user () |> Github.Stream.to_list >|= fun orgs ->
+             let orgs = List.map (fun org -> org.Github_t.org_login) orgs in
+             Log.info (fun f -> f "User %S belongs to %a" user (Fmt.Dump.list Fmt.string) orgs);
+             orgs
+           end
+         ) in
+         let user = "github:" ^ user_info.Github_t.user_info_login in
+         let can_read_github project =
+           Lwt.try_bind (fun () ->
+               Github.Monad.run begin
+                 let open! Github.Monad in
+                 let {CI_projectID.user; project = repo} = project in
+                 Github.Repo.info ~token ~user ~repo () >|= Github.Response.value
+               end
+             )
+             (fun (_:Github_t.repository) ->
+                 Log.info (fun f -> f "%S can read %a" user CI_projectID.pp project);
+                 Lwt.return true
+             )
+             (fun ex ->
+                Log.info (fun f -> f "%S can't read %a" user CI_projectID.pp project);
+                Log.debug (fun f -> f "%S can't read %a: %a" user CI_projectID.pp project Fmt.exn ex);
+                Lwt.return false
+             )
+         in
+         let attributes = {
+           github_orgs;
+           can_read_github = memo can_read_github;
+         } in
+         t.attributes <- String.Map.add user attributes t.attributes;
+         Ok user
+
+  let github_orgs t ~user =
+    match String.Map.find user t.attributes with
+    | Some attrs -> Lazy.force attrs.github_orgs
+    | None -> Lwt.return []
+
+  let can_read_github t ~user project =
+    match String.Map.find user t.attributes with
+    | Some attrs -> attrs.can_read_github project
+    | None -> Lwt.return false
 end
 
 type server = {
   auth : Auth.t;
   session_backend : Session.Backend.t;
   web_config : CI_web_templates.t;
-  has_role : role -> user:string option -> bool;
+  has_role : role -> user:string option -> bool Lwt.t;
 }
 
 let cookie_key t =
@@ -251,14 +322,14 @@ class virtual protected_page t =
       match session.Session_data.username with
       | Some _ as username ->
         authenticated_user <- username;
-        if List.for_all (t.has_role ~user:username) roles_needed then
-          Wm.continue `Authorized rd
-        else
-          Wm.respond 403 ~body:(`String "Permission denied") rd
+        begin Lwt_list.for_all_s (t.has_role ~user:username) roles_needed >>= function
+          | true -> Wm.continue `Authorized rd
+          | false -> Wm.continue (`Redirect (CI_web_templates.Error.(uri permission_denied))) rd
+        end
       | None ->
-        if List.for_all (t.has_role ~user:None) roles_needed then
-          Wm.continue `Authorized rd
-        else (
+        Lwt_list.for_all_s (t.has_role ~user:None) roles_needed >>= function
+        | true -> Wm.continue `Authorized rd
+        | false ->
           let login_redirect =
             match Uri.path rd.Wm.Rd.uri with
             | "/auth/logout" -> None
@@ -267,7 +338,6 @@ class virtual protected_page t =
           let value = {session with Session_data.login_redirect} in
           self#session_set (Session_data.to_string value) rd >>= fun () ->
           Wm.continue (`Redirect (Uri.of_string "/auth/login")) rd
-        )
   end
 
 class virtual post_page t = object(self)

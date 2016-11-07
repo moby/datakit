@@ -22,7 +22,8 @@ let state_repo =
 let web_config =
   Web.config
     ~name:"example-ci"
-    ~public:false               (* Allow (read-only) access when not logged in? *)
+    ~can_read:ACL.(everyone)
+    ~can_build:ACL.(username "admin")
     ?state_repo
     ()
 

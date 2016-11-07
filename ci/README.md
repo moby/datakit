@@ -197,6 +197,20 @@ The format of the JSON file is:
         "client-secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     }
 
+You can also specify `callback` here, if you want to override the one configured above. This might be useful if you have several CI instances using a single `client-id`.
+
+Once GitHub authentication is configured, you can write policies that depend on GitHub permissions. e.g.
+
+    ~can_read:ACL.(
+      any [
+        username "admin";
+        can_read_github "my-org/my-private-project";
+      ]
+    )
+
+This will allow read access to the CI if the user is the local "admin" user, or
+is a GitHub user who can read the "my-org/my-private-repository" repository.
+
 
 ## Extending DataKitCI
 

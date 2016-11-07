@@ -57,7 +57,12 @@ let github_auth t =
       in
       let client_id = member "client-id" in
       let client_secret = member "client-secret" in
-      Some { CI_web_utils.Auth.client_id; client_secret }
+      let callback =
+        match U.member "callback" json with
+        | `Null -> None
+        | x -> Some (U.to_string x |> Uri.of_string)
+      in
+      Some { CI_web_utils.Auth.client_id; client_secret; callback }
     with ex ->
       failwith (Fmt.strf "Error reading %S:@,%a" path pp_exn ex)
 

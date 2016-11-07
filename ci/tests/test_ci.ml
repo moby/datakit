@@ -419,7 +419,9 @@ let test_roles conn =
   let logs = CI_live_log.create_manager () in
   with_test_auth @@ fun auth ->
   let server ~public =
-    let web_config = CI_web_templates.config ~name:"test-ci" ~public () in
+    let can_read = if public then CI_ACL.everyone else CI_ACL.username "admin" in
+    let can_build = CI_ACL.username "admin" in
+    let web_config = CI_web_templates.config ~name:"test-ci" ~can_read ~can_build () in
     let routes = CI_web.routes ~config:web_config ~logs ~auth ~ci ~dashboards:(CI_target.Full.map_of_list []) in
     fun ~expect path ->
       let request = Cohttp.Request.make (Uri.make ~path ()) in

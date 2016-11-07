@@ -13,6 +13,7 @@ module Github_hooks = CI_github_hooks
 module Cache = CI_cache
 module type BUILDER = CI_s.BUILDER
 module DK = Utils.DK
+module ACL = CI_ACL
 
 module Web = struct
   type config = CI_web_templates.t

@@ -10,22 +10,28 @@ type logs =
 type t = {
   name : string;
   state_repo : Uri.t option;
-  public : bool;
+  can_read : CI_ACL.t;
+  can_build : CI_ACL.t;
 }
 
 type page = user:string option -> [`Html] Tyxml.Html.elt
 
-let err_no_state_repo = "no-state-repo"
+module Error = struct
+  type t = string
+  let no_state_repo = "no-state-repo"
+  let permission_denied = "permission-denied"
 
-let error_link id = "/error/" ^ id
+  let uri_path id = "/error/" ^ id
+  let uri id = Uri.of_string (uri_path id)
+end
 
-let config ?(name="datakit-ci") ?state_repo ~public () = { name; state_repo; public }
+let config ?(name="datakit-ci") ?state_repo ~can_read ~can_build () = { name; state_repo; can_read; can_build }
 
 let state_repo_url t fmt =
   fmt |> Fmt.kstrf @@ fun path ->
   match t.state_repo with
   | Some base -> Fmt.strf "%a/%s" Uri.pp_hum base path
-  | None -> error_link err_no_state_repo
+  | None -> Error.(uri_path no_state_repo)
 
 let log_commit_url t commit =
   state_repo_url t "commit/%s" commit
@@ -626,13 +632,17 @@ let ref_page ~csrf_token ~target jobs t =
 
 let error_page id =
   page "Error" Nav.Home (
-    if id = err_no_state_repo then
+    if id = Error.no_state_repo then
       [
         p [pcdata "No web mirror of the state repository has been configured, so can't link to it."];
         p [pcdata "Configure DataKit to push to a GitHub repository and then pass the repository's URL using ";
            code [pcdata "Web.config ~state_repo"];
            pcdata "."
           ];
+      ]
+    else if id = Error.permission_denied then
+      [
+        p [pcdata "Permission denied"];
       ]
     else
       [

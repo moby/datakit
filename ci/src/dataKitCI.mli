@@ -248,8 +248,12 @@ module Config : sig
 end
 
 module Main : sig
-  val run : Config.t Cmdliner.Term.t -> unit
-  (** [run config] runs DataKitCI. *)
+  val run : ?info:Cmdliner.Term.info -> Config.t Cmdliner.Term.t -> unit
+  (** [run ?info config] runs DataKitCI.  [info] defaults to a term
+      that describes the binary as [DataKitCI], but does not include any
+      of the other metadata such as versioning. Call {!Cmdliner.Term.info}
+      directly to obtain an [info] value that exposes all this extra data
+      on the resulting command line. *)
 
   val logs : Live_log.manager
   (** The singleton log manager. *)

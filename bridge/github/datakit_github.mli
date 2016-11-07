@@ -38,11 +38,14 @@ end
 
 module Repo: sig
 
-  type t = { user: string; repo: string }
+  type t = private { user: string; repo: string }
   (** The type for Github repositories. *)
 
   type state = [`Monitored | `Ignored]
   (** The type for repository state. *)
+
+  val create : user:string -> repo:string -> t
+  (** [create user string] will create a fresh {!t}. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)

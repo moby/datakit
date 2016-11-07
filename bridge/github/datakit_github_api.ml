@@ -208,7 +208,7 @@ module Event = struct
   let of_gh e =
     let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
       | None  -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
-      | Some (user, repo) -> { Repo.user; repo }
+      | Some (user, repo) -> Repo.create ~user ~repo
     in
     of_gh_constr repo e.event_payload
 
@@ -246,7 +246,7 @@ let repos token ~user =
   Github.User.repositories ~token ~user ()
   |> Github.Stream.to_list
   |> Github.Monad.map
-  @@ List.map (fun r -> { Repo.user; repo = r.repository_name})
+  @@ List.map (fun r -> Repo.create ~user ~repo:r.repository_name)
   |> run
 
 let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
@@ -326,7 +326,7 @@ module Webhook = struct
 
   include Hook
 
-  let to_repo (user, repo) = { Repo.user; repo }
+  let to_repo (user, repo) = Repo.create ~user ~repo
   let of_repo { Repo.user; repo } = user, repo
 
   let events t =

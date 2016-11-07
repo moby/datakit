@@ -47,6 +47,11 @@ let pp_path = Fmt.(list ~sep:(unit "/") string)
 module Repo = struct
 
   type t = { user: string; repo: string }
+  let create ~user ~repo =
+   let user = String.trim user in
+   let repo = String.trim repo in
+   { user; repo }
+
   let pp ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
   let compare (x:t) (y:t) = Pervasives.compare x y
   type state = [`Monitored | `Ignored]

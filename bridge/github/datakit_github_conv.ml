@@ -59,7 +59,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         let t = match path with
           | [] | [_]             -> None
           | user :: repo :: path ->
-            let repo = { Repo.user; repo } in
+            let repo = Repo.create ~user ~repo in
             match path with
             | [] | [".monitor"] -> Some (`Repo repo)
             | "pr" :: id :: _   -> Some (`PR (repo, int_of_string id))
@@ -124,7 +124,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         Lwt_list.fold_left_s (fun acc repo ->
             safe_read_file tree (root / user /repo / ".monitor") >|= function
             | None   -> acc
-            | Some _ -> Repo.Set.add { Repo.user; repo } acc
+            | Some _ -> Repo.Set.add (Repo.create ~user ~repo) acc
           ) acc repos
       ) Repo.Set.empty users >|= fun repos ->
     Log.debug (fun l -> l "repos -> @;@[<2>%a@]" Repo.Set.pp repos);

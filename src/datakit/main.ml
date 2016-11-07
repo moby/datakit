@@ -128,6 +128,11 @@ let http_server uri git =
   end >>= fun spec ->
   Cohttp_lwt_unix.Server.create ~timeout ~mode spec
 
+let () =
+  Lwt.async_exception_hook := (fun exn ->
+      Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
+    )
+
 let start listen_9p listen_http sandbox git =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;

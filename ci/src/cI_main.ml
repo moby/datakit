@@ -58,7 +58,7 @@ let pr_store =
     Arg.info ~doc:"DataKit store for metadata."
       ~docv:"ADDR" ["metadata-store"]
   in
-  Arg.(required (opt (some (pair ~sep:':' string string)) None doc))
+  Arg.(value (opt (pair ~sep:':' string string) ("tcp","localhost:5640") doc))
 
 let secrets_dir =
   let doc =

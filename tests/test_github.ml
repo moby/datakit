@@ -186,7 +186,7 @@ module User = struct
     fold (fun r acc ->
         let repo = { Repo.user = r.R.user; repo = r.R.repo } in
         List.fold_left (fun acc (id, _) ->
-            Commit.Set.add { Commit.repo; id } acc
+            Commit.Set.add (Commit.create repo id) acc
           ) acc r.R.commits
       ) t Commit.Set.empty
 

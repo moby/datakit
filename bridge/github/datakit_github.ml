@@ -95,6 +95,7 @@ module Commit = struct
 
   type t = { repo: Repo.t; id : string }
 
+  let create repo id = {repo; id = String.trim id }
   let pp ppf t = Fmt.pf ppf "{%a %s}" Repo.pp t.repo t.id
   let id t = t.id
   let repo t = t.repo
@@ -294,6 +295,10 @@ module Ref = struct
   }
 
   type id = Repo.t * string list
+
+  let create head name =
+    let name = List.map (fun s -> String.trim s) name in
+    { head; name }
 
   let repo t = t.head.Commit.repo
   let id t = repo t, t.name

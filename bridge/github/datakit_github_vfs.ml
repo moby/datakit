@@ -174,7 +174,7 @@ module Make (API: API) = struct
     Logs.debug (fun l -> l "commit_root %a" Repo.pp t.repo);
     let ls () = Vfs.ok [] in
     let lookup id =
-      let commit = { Commit.repo = t.repo; id } in
+      let commit = Commit.create t.repo id in
       let status = Vfs.Inode.dir "status" @@ commit_status_root t commit in
       Vfs.Inode.dir id @@ Vfs.Dir.of_list (fun () -> Vfs.ok [status])
       |> Vfs.ok

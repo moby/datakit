@@ -140,7 +140,7 @@ module Named_pipe = struct
     Named_pipe_lwt.Server.connect p >>= function
     | false ->
       Log.err (fun f -> f "Named-pipe connection failed on %s" path);
-      Lwt.return ()
+      Lwt_unix.sleep 0.1 >>= fun () -> accept_forever ?backlog path callback;
     | true ->
       let _ = (* background thread *)
         let fd = Named_pipe_lwt.Server.to_fd p in

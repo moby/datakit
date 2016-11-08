@@ -43,6 +43,29 @@ let ensure_crt ~private_key path =
     Lwt_io.with_file ~mode:Lwt_io.output path (fun ch -> Lwt_io.write ch data)
   )
 
+let github_auth t =
+  let path = t.secrets_dir / "github.json" in
+  match Sys.file_exists path with
+  | false -> None
+  | true ->
+    try
+      let json = Yojson.Basic.from_file path in
+      let module U = Yojson.Basic.Util in
+      let member s =
+        try json |> U.member s |> U.to_string
+        with ex -> failwith (Fmt.strf "Error getting %S member: %a" s pp_exn ex)
+      in
+      let client_id = member "client-id" in
+      let client_secret = member "client-secret" in
+      let callback =
+        match U.member "callback" json with
+        | `Null -> None
+        | x -> Some (U.to_string x |> Uri.of_string)
+      in
+      Some { CI_web_utils.Auth.client_id; client_secret; callback }
+    with ex ->
+      failwith (Fmt.strf "Error reading %S:@,%a" path pp_exn ex)
+
 let create ~key_bits secrets_dir =
   let t = { secrets_dir } in
   get_private_key ~key_bits (private_key_path t) >>= fun private_key ->

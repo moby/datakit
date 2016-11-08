@@ -3,7 +3,8 @@
 type t = private {
   name : string;
   state_repo : Uri.t option;
-  public : bool;        (* Do unauthenticated users get (read-only) access? *)
+  can_read : CI_ACL.t;
+  can_build : CI_ACL.t;
 }
 
 type logs =
@@ -12,7 +13,12 @@ type logs =
   | `Pair of logs * logs
   | `Saved_log of string * string * string ]
 
-val config : ?name:string -> ?state_repo:Uri.t -> public:bool -> unit -> t
+val config :
+  ?name:string ->
+  ?state_repo:Uri.t ->
+  can_read:CI_ACL.t ->
+  can_build:CI_ACL.t ->
+  unit -> t
 (** [config ~name ~state_repo ()] is a web configuration.
     If [name] is given, it is used as the main heading, and also as the name of the session cookie
     (useful if you run multiple CIs on the same host, on different ports).
@@ -29,7 +35,20 @@ val unescape_ref : string -> Datakit_path.t
 
 type page = user:string option -> [`Html] Tyxml.Html.elt
 
+module Error : sig
+  type t
+
+  val permission_denied : t
+
+  val uri_path : t -> string
+  (** Path to redirect users to to see this error. *)
+
+  val uri : t -> Uri.t
+  (** [uri t] is [Uri.of_string (uri_path t)] *)
+end
+
 val login_page :
+  ?github:Uri.t ->
   csrf_token:string ->
   t ->
   page

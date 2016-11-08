@@ -253,12 +253,21 @@ let mime_type uri =
   | "png"   -> Some "image/png"
   | _       -> None
 
+let rec matches_acl ~auth ~user acl =
+  match acl, user with
+  | `Everyone, _ -> Lwt.return true
+  | `Username required, Some actual -> Lwt.return (required = actual)
+  | `Github_org org, Some user -> CI_web_utils.Auth.github_orgs auth ~user >|= List.mem org
+  | `Can_read project, Some user -> CI_web_utils.Auth.can_read_github auth ~user project
+  | `Any xs, _ -> Lwt_list.exists_s (matches_acl ~auth ~user) xs
+  | (`Username _ | `Github_org _ | `Can_read _), None -> Lwt.return false
+
 let routes ~config ~logs ~ci ~auth ~dashboards =
   let has_role r ~user =
-    match user, r with
-    | None, `Reader -> config.CI_web_templates.public
-    | None, _ -> false
-    | Some _, (`Reader | `LoggedIn | `Builder) -> true
+    match r with
+    | `Reader -> matches_acl config.CI_web_templates.can_read ~auth ~user
+    | `Builder -> matches_acl config.CI_web_templates.can_build ~auth ~user
+    | `LoggedIn -> Lwt.return (user <> None)
   in
   let server = CI_web_utils.server ~auth ~web_config:config ~has_role in
   let t = { logs; ci; server; dashboards } in
@@ -266,6 +275,7 @@ let routes ~config ~logs ~ci ~auth ~dashboards =
     (* Auth *)
     ("/auth/login",     fun () -> new CI_web_utils.login_page t.server);
     ("/auth/logout",    fun () -> new CI_web_utils.logout_page t.server);
+    ("/auth/github-callback",    fun () -> new CI_web_utils.github_callback t.server);
     ("/user/profile",   fun () -> new user_page t);
     (* Overview pages *)
     ("/",               fun () -> new main t);

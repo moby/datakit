@@ -10,22 +10,28 @@ type logs =
 type t = {
   name : string;
   state_repo : Uri.t option;
-  public : bool;
+  can_read : CI_ACL.t;
+  can_build : CI_ACL.t;
 }
 
 type page = user:string option -> [`Html] Tyxml.Html.elt
 
-let err_no_state_repo = "no-state-repo"
+module Error = struct
+  type t = string
+  let no_state_repo = "no-state-repo"
+  let permission_denied = "permission-denied"
 
-let error_link id = "/error/" ^ id
+  let uri_path id = "/error/" ^ id
+  let uri id = Uri.of_string (uri_path id)
+end
 
-let config ?(name="datakit-ci") ?state_repo ~public () = { name; state_repo; public }
+let config ?(name="datakit-ci") ?state_repo ~can_read ~can_build () = { name; state_repo; can_read; can_build }
 
 let state_repo_url t fmt =
   fmt |> Fmt.kstrf @@ fun path ->
   match t.state_repo with
   | Some base -> Fmt.strf "%a/%s" Uri.pp_hum base path
-  | None -> error_link err_no_state_repo
+  | None -> Error.(uri_path no_state_repo)
 
 let log_commit_url t commit =
   state_repo_url t "commit/%s" commit
@@ -370,7 +376,7 @@ let resource_pools ~csrf_token =
     items
   )
 
-let login_page ~csrf_token t ~user =
+let login_page ?github ~csrf_token t ~user =
   let query = [
     "CSRFToken", [csrf_token];
   ] in
@@ -382,13 +388,23 @@ let login_page ~csrf_token t ~user =
       input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name] ()
     ]
   in
+  let github_login =
+    match github with
+    | None ->
+      p [pcdata "(configure webauth to allow GitHub logins)"]
+    | Some github ->
+      p [
+        a ~a:[a_href (Uri.to_string github)] [pcdata "Log in with GitHub"];
+      ]
+  in
   page "Login" Nav.Home ~user [
     h2 [pcdata "Login"];
     form ~a:[a_class ["login-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
       field "Username" `Text "user";
       field "Password" `Password "password";
       div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
-    ]
+    ];
+    github_login;
   ] t
 
 let user_page ~csrf_token =
@@ -616,13 +632,17 @@ let ref_page ~csrf_token ~target jobs t =
 
 let error_page id =
   page "Error" Nav.Home (
-    if id = err_no_state_repo then
+    if id = Error.no_state_repo then
       [
         p [pcdata "No web mirror of the state repository has been configured, so can't link to it."];
         p [pcdata "Configure DataKit to push to a GitHub repository and then pass the repository's URL using ";
            code [pcdata "Web.config ~state_repo"];
            pcdata "."
           ];
+      ]
+    else if id = Error.permission_denied then
+      [
+        p [pcdata "Permission denied"];
       ]
     else
       [

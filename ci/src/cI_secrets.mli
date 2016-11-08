@@ -10,6 +10,9 @@ val certificate_path : t -> string
 val passwords_path : t -> string
 (** [passwords_path t] is the path of the file in which passwords, roles, etc should be saved. *)
 
+val github_auth : t -> CI_web_utils.Auth.github_auth option
+(** [github_auth t] is the GitHub authentication configuration, if any. *)
+
 val create : key_bits:int -> string -> t Lwt.t
 (** [create ~key_bits secrets_dir] connects to [secrets_dir], creating a new [key_bits] long RSA pair-key and
     self-signed certificate if there isn't one there already. *)

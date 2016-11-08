@@ -15,13 +15,27 @@ end
 module Auth : sig
   type t
 
-  val create : string -> t Lwt.t
+  type github_auth = {
+    client_id : string;
+    client_secret : string;
+    callback : Uri.t option;
+  }
+
+  val create : ?github:github_auth -> string -> t Lwt.t
   (** [create path] is a user authenticator with configuration at [path]. If [path] does not exist, the
       user is prompted to create one. *)
 
   val lookup : t -> user:string -> password:string -> User.t option
   (** [lookup t (username, password)] returns the user with name [username] if the user exists and
       the password is correct. *)
+
+  val github_orgs : t -> user:string -> string list Lwt.t
+  (** [github_orgs t ~user] is the list of GitHub organisations to which the user belongs.
+      Results are cached (and therefore may not be completely up-to-date until the user logs out and back in again). *)
+
+  val can_read_github : t -> user:string -> CI_projectID.t -> bool Lwt.t
+  (** [can_read_github t ~user project] checks whether the user can read the details of the given repository.
+      Results are cached (and therefore may not be completely up-to-date until the user logs out and back in again). *)
 end
 
 type server
@@ -29,7 +43,7 @@ type server
 val server :
   auth:Auth.t ->
   web_config:CI_web_templates.t ->
-  has_role:(role -> user:string option -> bool) ->
+  has_role:(role -> user:string option -> bool Lwt.t) ->
   server
 val web_config : server -> CI_web_templates.t
 
@@ -60,6 +74,9 @@ end
 
 class login_page : server -> resource
 (** Page to serve at [/auth/login]. *)
+
+class github_callback : server -> resource
+(** Page to serve at [/auth/github-callback] *)
 
 class virtual protected_page : server -> object
   inherit resource_with_session

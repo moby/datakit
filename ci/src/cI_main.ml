@@ -21,7 +21,8 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config =
   let dashboards = CI_projectID.Map.map (fun p -> p.CI_config.dashboards) projects in
   let projects = CI_projectID.Map.map (fun p -> p.CI_config.tests) projects in
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
-  CI_web_utils.Auth.create (CI_secrets.passwords_path secrets) >>= fun auth ->
+  let github = CI_secrets.github_auth secrets in
+  CI_web_utils.Auth.create ?github (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
   let connect_dk () = connect proto addr >|*= DK.connect in
   let canaries =
@@ -47,7 +48,11 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config =
 
 let start () pr_store web_ui secrets_dir config canaries =
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
-  Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config)
+  try
+    Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config)
+  with Failure msg ->
+    Fmt.epr "Failure:@,%s@." msg;
+    exit 1
 
 (* Command-line parsing *)
 

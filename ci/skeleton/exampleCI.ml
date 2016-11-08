@@ -14,11 +14,17 @@ let projects = [
     ];
 ]
 
+(* The URL of a mirror on GitHub of DataKit's state repository (optional). *)
+let state_repo =
+  None
+  (* Some (Uri.of_string "https://github.com/my-org/my-project.logs") *)
+
 let web_config =
   Web.config
     ~name:"example-ci"
-    ~public:false               (* Allow (read-only) access when not logged in? *)
-    ?state_repo:None
+    ~can_read:ACL.(everyone)
+    ~can_build:ACL.(username "admin")
+    ?state_repo
     ()
 
 (* The main entry-point *)

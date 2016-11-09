@@ -21,3 +21,5 @@ depends: [
   "protocol-9p" {>= "0.7.0"}
   "cmdliner"
 ]
+
+available: [ocaml-version >= "4.02.3"]

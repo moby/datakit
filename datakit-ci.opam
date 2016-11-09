@@ -35,3 +35,5 @@ depends: [
   "irmin-unix" {test}
   "alcotest" {test}
 ]
+
+available: [ocaml-version >= "4.03.0"]

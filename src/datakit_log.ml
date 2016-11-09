@@ -2,20 +2,23 @@ open Astring
 open Cmdliner
 
 type t =
-  | Stderr
+  | Quiet
+  | Verbose
   | Eventlog
   | ASL
 
 let parser x = match String.Ascii.lowercase x with
-  | "stderr" -> `Ok Stderr
+  | "quiet"    -> `Ok Quiet
+  | "stderr"   -> `Ok Verbose
   | "eventlog" -> `Ok Eventlog
-  | "asl" -> `Ok ASL
+  | "asl"      -> `Ok ASL
   | _ -> `Error("Unknown log destination: expected stderr / eventlog / asl")
 
 let printer fmt x = Format.pp_print_string fmt (match x with
-    | Stderr -> "stderr"
+    | Quiet    -> "quiet"
+    | Verbose  -> "versbose"
     | Eventlog -> "eventlog"
-    | ASL -> "asl")
+    | ASL      -> "asl")
 
 let conv = parser, printer
 
@@ -51,10 +54,11 @@ let reporter log_clock =
 let setup style_renderer log_destination level log_clock =
   Logs.set_level level;
   match log_destination with
+  | Quiet    -> Logs.set_reporter (Logs_fmt.reporter ())
   | Eventlog ->
     let eventlog = Eventlog.register "Docker.exe" in
     Logs.set_reporter (Log_eventlog.reporter ~eventlog ())
-  | Stderr ->
+  | Verbose ->
     Fmt_tty.setup_std_outputs ?style_renderer ();
     Logs.set_reporter (reporter log_clock)
   | ASL ->
@@ -64,7 +68,7 @@ let setup style_renderer log_destination level log_clock =
 
 let log_destination =
   let doc = Arg.info ~doc:"Destination for the logs" [ "log-destination" ] in
-  Arg.(value & opt conv Stderr & doc)
+  Arg.(value & opt conv Quiet & doc)
 
 let log_clock =
   let doc = Arg.info ~doc:"Kind of clock" ["log-clock"] in

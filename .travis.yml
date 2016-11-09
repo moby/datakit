@@ -6,14 +6,14 @@ dist: trusty
 env:
   global:
   - EXTRA_DEPS="inotify"
-  - PINS="github:https://github.com/samoht/ocaml-github.git#push-event-head-commit datakit-client:. datakit-server:. datakit-github:. datakit-ci:. datakit:."
+  - PINS="datakit-client:. datakit-server:. datakit-github:. datakit-ci:. datakit:."
   - ALCOTEST_SHOW_ERRORS="1"
   matrix:
   - OCAML_VERSION=4.02 PACKAGE="datakit-client"
   - OCAML_VERSION=4.03 PACKAGE="datakit-client"
   - OCAML_VERSION=4.03 PACKAGE="datakit-server"
   - OCAML_VERSION=4.03 PACKAGE="datakit-github"
-  - OCAML_VERSION=4.03 PACKAGE="datakit-ci" PINS="github:https://github.com/samoht/ocaml-github.git#push-event-head-commit multipart-form-data:https://github.com/cryptosense/multipart-form-data.git datakit-client:. datakit-server:. datakit-github:. datakit-ci:. datakit:."
+  - OCAML_VERSION=4.03 PACKAGE="datakit-ci" PINS="multipart-form-data:https://github.com/cryptosense/multipart-form-data.git datakit-client:. datakit-server:. datakit-github:. datakit-ci:. datakit:."
   - OCAML_VERSION=4.03 PACKAGE="datakit"
 os:
   - linux

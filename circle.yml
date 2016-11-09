@@ -21,10 +21,11 @@ dependencies:
   - opam pin add datakit . -n
   - opam install depext && opam depext osx-fsevents datakit
   - opam list
-  - opam reinstall datakit-server datakit
+  - opam reinstall datakit-server datakit -v
   - opam config exec -- make COMMIT
   - mkdir -p _build/src/datakit
-  - opam config exec -- cp /Users/distiller/.opam/4.02.3/bin/datakit _build/src/datakit/main.native
+  - opam config var bin
+  - opam config exec -- cp /Users/distiller/.opam/system/bin/datakit _build/src/datakit/main.native
   - opam config exec -- make bundle
 test:
   override:

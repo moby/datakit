@@ -134,19 +134,26 @@ end
 
 module Named_pipe = struct
 
+  open Lwt.Infix
+
+  let with_connect p ~path f =
+    Lwt.catch
+      (fun () -> Named_pipe_lwt.Server.connect p >>= f)
+      (fun e ->
+         Log.err
+           (fun f -> f "Named-pipe connection failed on %s: %a" path Fmt.exn e);
+         Lwt.return ())
+
   let rec accept_forever ?backlog path callback =
-    let open Lwt.Infix in
     let p = Named_pipe_lwt.Server.create path in
-    Named_pipe_lwt.Server.connect p >>= function
-    | false ->
-      Log.err (fun f -> f "Named-pipe connection failed on %s" path);
-      Lwt.return ()
-    | true ->
-      let _ = (* background thread *)
-        let fd = Named_pipe_lwt.Server.to_fd p in
-        callback fd
-      in
-      accept_forever ?backlog path callback
+    with_connect p ~path (fun () ->
+        Lwt.async (fun () ->  (* background thread *)
+            let fd = Named_pipe_lwt.Server.to_fd p in
+            callback fd
+          );
+        Lwt.return_unit
+      ) >>= fun () ->
+    accept_forever ?backlog path callback
 
 end
 

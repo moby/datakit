@@ -159,7 +159,9 @@ let run fn =
       Irmin.Task.create ~date ~owner:"irmin9p" msg
     in
     let root = Filesystem.create make_task repo in
-    let server_thread = Server.accept ~root for_server >>*= Lwt.return in
+    let server_thread =
+      Server.accept ~root ~msg:"test" for_server >>*= Lwt.return
+    in
     Lwt.finalize
       (fun () -> Client.connect for_client () >>*= fn repo)
       (fun () -> Lwt.cancel server_thread; Lwt.return ())

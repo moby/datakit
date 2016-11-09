@@ -33,22 +33,20 @@ module Unix = struct
     Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path);
     Lwt.return s
 
-  let handle ~make_root fd =
-    Log.debug (fun l -> l "New unix client");
-    Lwt.catch
-      (fun () ->
+  let handle ~make_root client fd =
+    Lwt.catch (fun () ->
          let flow = Flow_lwt_unix.connect fd in
          (* Re-build the filesystem for each client because command files
             need per-client state. *)
          let root = make_root () in
-         UnixServer.accept ~root flow >|= function
+         UnixServer.accept ~root ~msg:client flow >|= function
          | Error (`Msg msg) ->
            Log.debug (fun l -> l "Error handling client connection: %s" msg)
          | Ok () -> ()
       ) (fun e ->
           Log.err (fun l ->
               l "Caught %s: closing connection" (Printexc.to_string e));
-          Lwt.return ()
+          Lwt.return_unit
         )
 
   let accept_forever ?(backlog=128) url socket callback =
@@ -82,7 +80,7 @@ module HyperV = struct
     in
     { Hvsock.vmid; serviceid }
 
-  let handle ~make_root fd =
+  let handle ~make_root uri fd =
     Log.debug (fun l -> l "New Hyper-V client");
     Lwt.catch
       (fun () ->
@@ -90,7 +88,7 @@ module HyperV = struct
          (* Re-build the filesystem for each client because command files
             need per-client state. *)
          let root = make_root () in
-         HyperVServer.accept ~root flow >|= function
+         HyperVServer.accept ~root ~msg:(Uri.to_string uri) flow >|= function
          | Error (`Msg msg) ->
            Log.debug (fun l -> l "Error handling client connection: %s" msg)
          | Ok () -> ()
@@ -162,12 +160,11 @@ let default d = function
   | None -> d
 
 let accept_forever ?backlog ~sandbox ~serviceid ~make_root url =
-  Lwt.catch
-    (fun () ->
+  Lwt.catch (fun () ->
        (* Check if it looks like a UNC name before a URI *)
        if Astring.String.is_prefix ~affix:"\\\\" url then begin
          Log.info (fun f -> f "Accepting connections on named pipe %s" url);
-         Named_pipe.accept_forever url (Unix.handle ~make_root)
+         Named_pipe.accept_forever url (Unix.handle ~make_root url)
        end else if String.is_prefix ~affix:"fd:" url then begin
          let i = String.with_range ~first:3 url in
          ( match String.to_int i with
@@ -181,14 +178,14 @@ let accept_forever ?backlog ~sandbox ~serviceid ~make_root url =
          Unix.of_fd x >>= fun socket ->
          let socket' = Lwt_unix.of_unix_file_descr socket in
          Unix.accept_forever ?backlog
-           (Uri.of_string url) socket' (Unix.handle ~make_root)
+           (Uri.of_string url) socket' (Unix.handle ~make_root url)
        end else
          let uri = Uri.of_string url in
          match Uri.scheme uri with
          | Some "file" ->
            let prefix = if sandbox then "." else "" in
            Unix.of_path (prefix ^ Uri.path uri) >>= fun socket ->
-           Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root)
+           Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root url)
          | Some "tcp" ->
            begin match Uri.path uri with
              | "" | "/" -> ()
@@ -207,14 +204,14 @@ let accept_forever ?backlog ~sandbox ~serviceid ~make_root url =
            (* Makes testing easier *)
            Lwt_unix.setsockopt socket Lwt_unix.SO_REUSEADDR true;
            Lwt_unix.bind socket addr;
-           Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root)
+           Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root url)
          | Some "hyperv-connect" ->
            HyperV.connect_forever uri
-             (HyperV.of_uri ~serviceid uri) (HyperV.handle ~make_root)
+             (HyperV.of_uri ~serviceid uri) (HyperV.handle ~make_root uri)
          | Some "hyperv-accept" ->
            let socket = Flow_lwt_unix_hvsock.Hvsock.create () in
            Flow_lwt_unix_hvsock.Hvsock.bind socket (HyperV.of_uri ~serviceid uri);
-           HyperV.accept_forever ?backlog uri socket (HyperV.handle ~make_root)
+           HyperV.accept_forever ?backlog uri socket (HyperV.handle ~make_root uri)
          | _ ->
            Printf.fprintf stderr
              "Unknown URL schema. Please use file: or tcp:\n";

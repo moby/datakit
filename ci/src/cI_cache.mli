@@ -3,6 +3,7 @@
 open CI_utils
 
 module Path : sig
+  val log : Datakit_path.t      (* The job's log output *)
   val value : Datakit_path.t    (* Store build results in this directory *)
 end
 

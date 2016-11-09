@@ -7,12 +7,6 @@ type t = private {
   can_build : CI_ACL.t;
 }
 
-type logs =
-  [ `Live_log of string * string option
-  | `No_log
-  | `Pair of logs * logs
-  | `Saved_log of string * string * string ]
-
 val config :
   ?name:string ->
   ?state_repo:Uri.t ->
@@ -80,17 +74,30 @@ val tags_page :
   t ->
   page
 
-val pr_page :
+val target_page :
   csrf_token:string ->
   target:CI_engine.target ->
-  (CI_engine.job * logs) list ->
+  CI_engine.job list ->
   t ->
   page
 
-val ref_page :
-  csrf_token:string ->
-  target:CI_engine.target ->
-  (CI_engine.job * logs) list ->
+val live_log_frame :
+  branch:string ->
+  live_log:CI_live_log.t ->
+  have_history:bool ->
+  t ->
+  page
+
+val saved_log_frame :
+  commit:string ->
+  branch:string ->
+  log_data:Cstruct.t ->
+  t ->
+  page
+
+(** A basic page just the error text and no header, footer, etc. *)
+val plain_error :
+  string ->
   t ->
   page
 

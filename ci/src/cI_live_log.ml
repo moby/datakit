@@ -4,6 +4,7 @@ open Astring
 module Log = CI_utils.Log
 
 type t = {
+  title : string;
   buffer : Buffer.t;
   cond : unit Lwt_condition.t;          (* Fires when [buffer] changes *)
   mutable finished : bool;
@@ -17,7 +18,7 @@ type t = {
 
   switch : Lwt_switch.t option;
 }
-and manager = t String.Map.t ref
+and manager = t String.Map.t ref        (* Branch -> current live log *)
 
 type stream = {
   data : string;
@@ -27,9 +28,10 @@ type stream = {
 let create_manager () =
   ref String.Map.empty
 
-let create ?switch ~pending ~branch manager =
+let create ?switch ~pending ~branch ~title manager =
   let pending_updated, pending_waker = Lwt.wait () in
   let t = {
+    title;
     buffer = Buffer.create 10000;
     cond = Lwt_condition.create ();
     pending = [pending];
@@ -50,6 +52,7 @@ let create ?switch ~pending ~branch manager =
 let lookup ~branch manager = String.Map.find branch !manager
 
 let branch t = t.branch
+let title t = t.title
 
 let stream t =
   let rec loop offset =

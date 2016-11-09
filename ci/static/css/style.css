@@ -57,3 +57,55 @@ form.cancel {
   display: inline;
   padding-right: 1em;
 }
+
+iframe.log {
+  width: 100%;
+  flex-grow: 40;
+  overflow: auto;
+  border: 0;
+}
+
+body.split-page {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+body.log {
+  padding: 1em;
+  color: black;
+  background: white;
+}
+
+div.upper {
+  flex-grow: 60;
+  width: 100%;
+  border-bottom: 1px solid #ccc;
+  overflow: auto;
+  height: 1em;
+}
+
+body.split-page nav.navbar-fixed-top {
+  position: static;
+  flex-grow: 0;
+  margin-bottom: 0;
+}
+
+button.rebuild {
+  margin-right: 1em;
+}
+
+button.failed {
+  color: white;
+  background: red;
+}
+
+table.results {
+  margin-bottom: 0;
+}
+
+a.selected-log {
+  background: yellow;
+}

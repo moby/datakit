@@ -1,7 +1,10 @@
 module Step_log = struct
   type saved = {
+    title : string;
     commit : string;
     branch : string;
+    failed : bool;
+    rebuild : unit Lwt.t Lazy.t;
   }
 
   type t =

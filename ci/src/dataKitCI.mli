@@ -7,8 +7,8 @@ module Live_log : sig
 
   type t
 
-  val create : ?switch:Lwt_switch.t -> pending:string -> branch:string -> manager -> t
-  (** [create ~pending ~branch manager] is a fresh, empty log with pending reason [pending].
+  val create : ?switch:Lwt_switch.t -> pending:string -> branch:string -> title:string -> manager -> t
+  (** [create ~pending ~branch ~title manager] is a fresh, empty log with pending reason [pending].
       It is an error to have two live logs on the same branch at the same time (finish the other one first). *)
 
   val finish : t -> unit
@@ -194,9 +194,6 @@ module Term : sig
 
   val dk : (unit -> DK.t Lwt.t) t
   (** [dk] is a function for getting the current DataKit connection. *)
-
-  val add_rebuild_action : string -> (unit -> unit Lwt.t) -> unit t
-  (** [add_rebuild_action label callback] adds a button the user can click to rebuild an artifact. *)
 
   val ci_status : string -> [`Pending | `Success | `Failure | `Error] option t
   (** [ci_status ci] is the status reported by CI [ci].

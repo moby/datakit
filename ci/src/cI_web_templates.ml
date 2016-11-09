@@ -1,12 +1,6 @@
 open! Astring
 open! Tyxml.Html
 
-type logs =
-  [ `Live_log of string * string option
-  | `No_log
-  | `Pair of logs * logs
-  | `Saved_log of string * string * string ]
-
 type t = {
   name : string;
   state_repo : Uri.t option;
@@ -42,28 +36,28 @@ let log_branch_history_url t branch =
 let log_branch_results_url t branch =
   state_repo_url t "tree/%s" branch
 
-let gh_ref_url r =
-  let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
-  let id = CI_github_hooks.Ref.name r in
-  match Datakit_path.unwrap id with
-  | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project (String.concat ~sep:"/" id)
-  | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user project Datakit_path.pp id
+let gh_target_url = function
+  | `PR pr ->
+    let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
+    let id = CI_github_hooks.PR.id pr in
+    Printf.sprintf "https://github.com/%s/%s/pull/%d" user project id
+  | `Ref r ->
+    let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
+    let id = CI_github_hooks.Ref.name r in
+    match Datakit_path.unwrap id with
+    | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project (String.concat ~sep:"/" id)
+    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user project Datakit_path.pp id
 
-let ref_metadata_url t r =
-  let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
-  let id = CI_github_hooks.Ref.name r in
-  state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user project
-    Datakit_path.pp id
-
-let gh_pr_url pr =
-  let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
-  let id = CI_github_hooks.PR.id pr in
-  Printf.sprintf "https://github.com/%s/%s/pull/%d" user project id
-
-let pr_metadata_url t pr =
-  let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
-  let id = CI_github_hooks.PR.id pr in
-  state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user project id
+let metadata_url t = function
+  | `PR pr ->
+    let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
+    let id = CI_github_hooks.PR.id pr in
+    state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user project id
+  | `Ref r ->
+    let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
+    let id = CI_github_hooks.Ref.name r in
+    state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user project
+      Datakit_path.pp id
 
 let commit_history_url t target =
   let { CI_projectID.user; project }, commit =
@@ -235,45 +229,66 @@ let build_navbar active =
     item Tags "/tag";
   ]
 
-let page page_title active children t ~user =
+let page ?logs page_title active children t ~user =
   let navbar = build_navbar active in
   let user = user |> CI_utils.default "not logged in" in
+  let nav_header =
+    nav ~a:[a_class["navbar";"navbar-inverse";"navbar-fixed-top"]] [
+      div ~a:[a_class["container"]] [
+        div ~a:[a_class["navbar-header"]] [
+          button ~a:[a_user_data "toggle" "collapse"; a_user_data "target" "#navbar"; a_class ["navbar-toggle"]; a_button_type `Button;] [
+
+            span ~a:[a_class["sr-only"]] [pcdata "Toggle Navigation"];
+            span ~a:[a_class["icon-bar"]] [];
+            span ~a:[a_class["icon-bar"]] [];
+            span ~a:[a_class["icon-bar"]] [];
+
+          ];
+          a ~a:[a_class["navbar-brand"]; a_href "/"] [pcdata t.name];
+        ];
+        div ~a:[a_id "navbar"; a_class["collapse"; "navbar-collapse"]] [
+          ul ~a:[a_class ["nav"; "navbar-nav"]] navbar;
+          ul ~a:[a_class ["nav"; "navbar-nav"; "navbar-right"]] [
+            li [a ~a:[a_href "/user/profile"] [pcdata user]]
+          ];
+        ];
+      ];
+    ]
+  in
+  let content =
+    [
+      div ~a:[a_class ["container"]] [
+        div ~a:[a_class ["content"]] children;
+      ];
+    ]
+  in
+  let body =
+    match logs with
+    | Some init ->
+      let attrs =
+        match init with
+        | None -> []
+        | Some init -> [a_src init]
+      in
+      body ~a:[a_class ["split-page"]] [
+        nav_header;
+        div ~a:[a_class ["upper"]] content;
+        iframe ~a:(a_id "iframe_log" :: a_class ["log"] :: a_onload "highlight_log()" :: a_name "iframe_log" :: attrs) [];
+      ]
+    | None ->
+      body (nav_header :: content)
+  in
   html
     (head (title (pcdata page_title)) [
         meta ~a:[a_charset "utf-8"] ();
         meta ~a:[a_http_equiv "X-UA-Compatible"; a_content "IE=edge"] ();
         meta ~a:[a_name "viewport"; a_content "width=device-width, initial-scale=1"] ();
         link ~rel:[`Icon] ~a:[a_mime_type "image/png"] ~href:"/images/favicon.png" ();
+        script ~a:[a_mime_type "text/javascript"; a_src "/js/ci.js"] (pcdata "");
         link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
         link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
       ])
-    (body [
-        nav ~a:[a_class["navbar";"navbar-inverse";"navbar-fixed-top"]] [
-          div ~a:[a_class["container"]] [
-            div ~a:[a_class["navbar-header"]] [
-              button ~a:[a_user_data "toggle" "collapse"; a_user_data "target" "#navbar"; a_class ["navbar-toggle"]; a_button_type `Button;] [
-
-                span ~a:[a_class["sr-only"]] [pcdata "Toggle Navigation"];
-                span ~a:[a_class["icon-bar"]] [];
-                span ~a:[a_class["icon-bar"]] [];
-                span ~a:[a_class["icon-bar"]] [];
-
-              ];
-              a ~a:[a_class["navbar-brand"]; a_href "/"] [pcdata t.name];
-            ];
-            div ~a:[a_id "navbar"; a_class["collapse"; "navbar-collapse"]] [
-              ul ~a:[a_class ["nav"; "navbar-nav"]] navbar;
-              ul ~a:[a_class ["nav"; "navbar-nav"; "navbar-right"]] [
-                li [a ~a:[a_href "/user/profile"] [pcdata user]]
-              ];
-            ];
-          ];
-        ];
-        div ~a:[a_class ["container"]] [
-          div ~a:[a_class ["content"]] children;
-        ]
-      ]
-    )
+    body
 
 let opt_warning ci =
   let dk = CI_engine.dk ci in
@@ -463,172 +478,249 @@ let tags_page ~ci =
 let history_button url =
   a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href url;] [span ~a:[a_class["glyphicon"; "glyphicon-time"]] []; pcdata "History"]
 
-let log_end_anchor_link branch =
-  Printf.sprintf "#log-%s" branch
-
-let log_end_anchor branch =
-  span ~a:[a_id (Fmt.strf "log-%s" branch)] []
-
-let log_button_group history log_url anchor_link =
+let log_button_group history log_url =
   div ~a:[a_class["btn-group";"pull-right"]] [
     history;
     a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href log_url;] [span ~a:[a_class["glyphicon"; "glyphicon-book"]] []; pcdata "Artefacts"];
-    a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href anchor_link;] [span ~a:[a_class["glyphicon"; "glyphicon-chevron-down"]] []; pcdata "Skip to End"];
   ]
 
-let rec log t = function
-  | `No_log -> []
-  | `Live_log (data, branch) ->
-    let link =
-      match branch with
-      | None -> []
-      | Some branch -> [history_button (log_branch_history_url t branch)]
+let encode = Uri.pct_encode ~scheme:"http"
+
+module LogScore : sig
+  type t
+  type log = [`Live of CI_live_log.t | `Saved of CI_result.Step_log.saved]
+
+  val create : unit -> t
+  val update : t -> log -> unit
+  val best : t -> log option
+end = struct
+  type score = int
+  type log = [`Live of CI_live_log.t | `Saved of CI_result.Step_log.saved]
+  type t = (score * log) option ref
+
+  let ok = 1
+  let pending = 2
+  let failed = 3
+
+  let create () = ref None
+
+  let update (best:t) (x:log) =
+    let new_score =
+      match x with
+      | `Live _ -> pending
+      | `Saved {CI_result.Step_log.failed = true; _} -> failed
+      | `Saved _ -> ok
     in
-    [
-      p (pcdata "Still running" :: link);
-      pre ~a:[a_class ["log"]] [pcdata data]
-    ]
-  | `Saved_log (data, commit, branch) ->
-    let commit_url = log_commit_url t commit in
-    let history = history_button (log_branch_history_url t branch) in
-    let log_url = log_branch_results_url t branch in
-    let end_link = log_end_anchor_link branch in
-    let end_anchor = log_end_anchor branch in
-    [
-      div ~a:[a_class ["row"]] [
-        div ~a:[a_class ["col-md-6"]] [
-          p [pcdata "Loaded from commit "; a ~a:[a_href commit_url] [pcdata commit]]
+    match !best with
+    | None -> best := Some (new_score, x)
+    | Some (score, _) when score < new_score -> best := Some (new_score, x)
+    | _ -> ()
+
+  let best t =
+    match !t with
+    | None -> None
+    | Some (_, x) -> Some x
+end
+
+let logs_frame_link = function
+  | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
+  | `Saved {CI_result.Step_log.branch; commit; _} -> Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
+
+let score_logs ~best job =
+  let open CI_result.Step_log in
+  let rec aux = function
+    | Empty -> ()
+    | Live live_log -> LogScore.update best (`Live live_log);
+    | Saved saved -> LogScore.update best (`Saved saved);
+    | Pair (a, b) -> aux a; aux b
+  in
+  aux (CI_engine.state job).CI_state.logs
+
+let logs ~csrf_token ~page_url ~selected logs =
+  let open CI_result.Step_log in
+  let seen = ref String.Set.empty in
+  let selected_branch =
+    match selected with
+    | Some (`Live x) -> Some (CI_live_log.branch x)
+    | Some (`Saved x) -> Some x.CI_result.Step_log.branch
+    | None -> None
+  in
+  let class_of branch =
+    if Some branch = selected_branch then ["log-link"; "selected-log"]
+    else ["log-link"]
+  in
+  let rec aux = function
+    | Empty -> []
+    | Live log when String.Set.mem (CI_live_log.branch log) !seen -> []
+    | Saved { branch; _ } when String.Set.mem branch !seen -> []
+    | Live live_log ->
+      let branch = CI_live_log.branch live_log in
+      let cl = class_of branch in
+      seen := String.Set.add branch !seen;
+      let log_link = logs_frame_link (`Live live_log) in
+      let title = CI_live_log.title live_log in
+      [
+        form [
+          button ~a:[a_class ["btn"; "btn-default"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
+            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+          a ~a:[a_href log_link; a_target "iframe_log"; a_class cl] [pcdata title]
         ];
-        div ~a:[a_class ["col-md-6"]] [
-          log_button_group history log_url end_link;
-        ];
-      ];
-      div ~a:[a_class ["row"]] [
-        div ~a:[a_class["col-md-12"]] [
-          pre ~a:[a_class ["log"]] [pcdata data];
+      ]
+    | Saved ({CI_result.Step_log.commit = _; branch; title; rebuild = _; failed} as saved) ->
+      let cl = class_of branch in
+      let log_link = logs_frame_link (`Saved saved) in
+      seen := String.Set.add branch !seen;
+      let query = [
+        "CSRFToken", [csrf_token];
+        "redirect", [page_url];
+      ] in
+      let action = Printf.sprintf "/log/rebuild/%s?%s" branch (Uri.encoded_of_query query) in
+      let status = if failed then "failed" else "passed" in
+      [
+        form ~a:[a_action action; a_method `Post] [
+          button ~a:[a_class ["btn"; "btn-default"; "rebuild"; status]; a_button_type `Submit] [
+            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+          a ~a:[a_href log_link; a_target "iframe_log"; a_class cl] [pcdata title];
         ]
-      ];
-      end_anchor
-    ]
-  | `Pair (a, b) -> log t a @ log t b
+      ]
+    | Pair (a, b) -> aux a @ aux b
+  in
+  aux logs
 
 let job_id job_name =
   Fmt.strf "job-%s" job_name
 
-let job t ~csrf_token ~page_url ~target (job, log_data) =
-  let target = CI_engine.git_target target in
-  let state = CI_engine.state job in
-  let metadata =
-    let row head content = tr [heading head; td content] in
-    table ~a:[a_class["table"; "table-bordered"; "table-hover"]] [
-      row "State"        [
-        status state;
-        pcdata " [ ";
-        a ~a:[a_href (commit_history_url t target)] [pcdata "history"];
-        pcdata " ]"];
-      row "Details"      [pcdata state.CI_state.descr];
-    ] in
-  let rebuild_buttons =
-    CI_engine.rebuild_actions job |> List.map (fun label ->
-        let query = [
-          "action", [label];
-          "CSRFToken", [csrf_token];
-        ] in
-        let job_name = CI_engine.job_name job in
-        let action = Printf.sprintf "%s/%s/rebuild/?%s" page_url job_name (Uri.encoded_of_query query) in
-        let msg = Fmt.strf "Rebuild : %s" label in
-        form ~a:[a_class ["rebuild"]; a_action action; a_method `Post] [
-          button ~a:[a_class ["btn"; "btn-default"]; a_button_type `Submit] [
-            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata msg];
-        ]
-      )
-  in
-  let job_name = CI_engine.job_name job in
-  div [
-    h2 ~a:[a_id (job_id job_name)] [pcdata job_name];
-    div ~a:[a_class ["job"]] (
-      [metadata] @
-      rebuild_buttons @
-      [h3 [pcdata "Logs"]; ] @
-      log t log_data @
-      [metadata];
-    )
-  ]
-
-let job_row (job, _log_data) =
+let job_row ~csrf_token ~page_url ~best_log job =
   let state = CI_engine.state job in
   let job_name = CI_engine.job_name job in
   tr [
     th [ a ~a:[a_href (Fmt.strf "#%s" (job_id job_name))] [pcdata job_name]];
     td [status state];
-    td [pcdata state.CI_state.descr];
+    td (
+      p [pcdata state.CI_state.descr] ::
+      logs ~csrf_token ~page_url ~selected:best_log (CI_engine.state job).CI_state.logs
+    );
   ]
 
-let pr_page ~csrf_token ~target jobs t =
-  let pr =
-    match CI_engine.git_target target with
-    | `PR pr -> pr
-    | `Ref _ -> assert false
-  in
-  let pr_id = CI_github_hooks.PR.id pr in
-  let title = Printf.sprintf "PR %d" pr_id in
-  let project = CI_github_hooks.PR.project pr in
-  let commit = CI_github_hooks.Commit.hash (CI_github_hooks.PR.head pr) in
-  let row head content = tr [heading head; td content] in
-  let state_summary =
-    match jobs with
-    | [_] -> []       (* Only display a summary when we have multiple jobs *)
-    | jobs -> [table ~a:[a_class ["table"; "table-bordered"]] (List.map job_row jobs)]
-  in
-  let page_url = pr_url project pr_id in
-  page title Nav.PRs (
-    table ~a:[a_class ["table"; "table-bordered"]] [
-      row "PR on GitHub" [
-        a ~a:[a_href (gh_pr_url pr)] [pcdata (string_of_int pr_id)];
-        pcdata " [ ";
-        a ~a:[a_href (pr_metadata_url t pr)] [pcdata "history"];
-        pcdata " ]";
-      ];
-      row "Title"        [pcdata (CI_github_hooks.PR.title pr)];
-      row "Commit"       [a ~a:[a_href (commit_url ~project commit)] [pcdata commit]];
-    ]
-    :: state_summary @
-    List.map (job t ~csrf_token ~page_url ~target) jobs
-  ) t
+let target_title = function
+  | `PR pr -> Printf.sprintf "PR %d" (CI_github_hooks.PR.id pr)
+  | `Ref r -> Fmt.strf "Ref %a" Datakit_path.pp (CI_github_hooks.Ref.name r)
 
-let ref_page ~csrf_token ~target jobs t =
-  match CI_engine.git_target target with
-  | `PR _ -> assert false
-  | `Ref r ->
-    let project = CI_github_hooks.Ref.project r in
-    let commit = CI_github_hooks.Commit.hash (CI_github_hooks.Ref.head r) in
-    let row head content = tr [heading head; td content] in
-    let state_summary =
-      match jobs with
-      | [_] -> []       (* Only display a summary when we have multiple jobs *)
-      | jobs -> [table ~a:[a_class ["table"; "table-bordered"]] (List.map job_row jobs)]
-    in
-    let title = Fmt.strf "Ref on Github %a" Datakit_path.pp (CI_github_hooks.Ref.name r) in
-    let page_url = ref_url project (CI_github_hooks.Ref.name r) in
-    let nav =
+let target_commit = function
+  | `PR pr -> CI_github_hooks.Commit.hash (CI_github_hooks.PR.head pr)
+  | `Ref r -> CI_github_hooks.Commit.hash (CI_github_hooks.Ref.head r)
+
+let target_project = function
+  | `PR pr -> CI_github_hooks.PR.project pr
+  | `Ref r -> CI_github_hooks.Ref.project r
+
+let target_page_url target =
+  let project = target_project target in
+  match target with
+  | `PR pr -> pr_url project (CI_github_hooks.PR.id pr)
+  | `Ref r -> ref_url project (CI_github_hooks.Ref.name r)
+
+let target_page ~csrf_token ~target jobs t =
+  let target = CI_engine.git_target target in
+  let title = target_title target in
+  let project = target_project target in
+  let commit = target_commit target in
+  let page_url = target_page_url target in
+  let best_log =
+    let best = LogScore.create () in
+    List.iter (score_logs ~best) jobs;
+    LogScore.best best
+  in
+  let state_summary = [
+    table ~a:[a_class ["table"; "table-bordered"; "results"]] (List.map (job_row ~csrf_token ~page_url ~best_log) jobs)
+  ] in
+  let nav =
+    match target with
+    | `PR _ -> Nav.PRs
+    | `Ref r ->
       match CI_github_hooks.Ref.name r |> Datakit_path.unwrap with
       | "heads" :: _ -> Nav.Branches
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false
-    in
-    page title nav (
-      table ~a:[a_class["table table-bordered"]][
-        row "Branch on GitHub" [
-          a ~a:[a_href (gh_ref_url r)] [pcdata title];
-          pcdata " [ ";
-          a ~a:[a_href (ref_metadata_url t r)] [pcdata "history"];
-          pcdata " ]";
+  in
+  let logs =
+    match best_log with
+    | None -> None
+    | Some best -> Some (logs_frame_link best)
+  in
+  page ~logs title nav (
+    p [
+      a ~a:[a_href (gh_target_url target)] [pcdata title];
+      pcdata " has head commit ";
+      a ~a:[a_href (commit_url ~project commit)] [pcdata commit];
+      pcdata " [ ";
+      a ~a:[a_href (metadata_url t target)] [pcdata "head history"];
+      pcdata " ]";
+      pcdata " [ ";
+      a ~a:[a_href (commit_history_url t target)] [pcdata "status history for this head"];
+      pcdata " ]";
+    ]
+    :: state_summary
+  ) t
+
+let plain_page ~page_title =
+  html
+    (head (title (pcdata page_title)) [
+        meta ~a:[a_charset "utf-8"] ();
+        link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
+        link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
+      ])
+
+let iframe_page ~page_title =
+  html
+    (head (title (pcdata page_title)) [
+        meta ~a:[a_charset "utf-8"] ();
+        link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
+        link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
+        base ~a:[a_target "_parent"] ();
+      ])
+
+let plain_error msg _t ~user:_ =
+  plain_page ~page_title:"Error" (body [pcdata msg])
+
+let live_log_frame ~branch ~live_log ~have_history t ~user:_ =
+  let buttons =
+    if have_history then [history_button (log_branch_history_url t branch)]
+    else []
+  in
+  let page_title = Fmt.strf "Logging to branch %s" branch in
+  iframe_page ~page_title
+    (body ~a:[a_class ["log"]] [
+        div ~a:[a_class ["row"]] [
+          div ~a:[a_class ["col-md-9"]] [
+            p [pcdata "Still running..."];
+          ];
+          div ~a:[a_class ["col-md-3"]] [
+            div ~a:[a_class["btn-group";"pull-right"]] buttons
+          ]
         ];
-        row "Commit" [a ~a:[a_href (commit_url ~project commit)] [pcdata commit]];
+        pre [pcdata (CI_live_log.contents live_log)];
       ]
-      :: state_summary @
-      List.map (job t ~csrf_token ~page_url ~target) jobs
-    ) t
+    )
+
+let saved_log_frame ~commit ~branch ~log_data t ~user:_ =
+  let page_title = Fmt.strf "Log from commit %s" commit in
+  let history = history_button (log_branch_history_url t branch) in
+  let log_url = log_branch_results_url t branch in
+  let commit_url = log_commit_url t commit in
+  iframe_page ~page_title
+    (body ~a:[a_class ["log"]] [
+        div ~a:[a_class ["row"]] [
+          div ~a:[a_class ["col-md-9"]] [
+            p [pcdata "Loaded from commit "; a ~a:[a_href commit_url] [pcdata commit]]
+          ];
+          div ~a:[a_class ["col-md-3"]] [
+            log_button_group history log_url;
+          ];
+        ];
+        pre [pcdata (Cstruct.to_string log_data)];
+      ]
+    )
 
 let error_page id =
   page "Error" Nav.Home (

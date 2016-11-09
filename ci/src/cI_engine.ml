@@ -16,7 +16,6 @@ type job = {
   mutable term : string CI_term.t;
   mutable cancel : unit -> unit;        (* Cancel the previous evaluation, if any *)
   mutable state : string * CI_state.t;                 (* The last result of evaluating [term] (commit, state) *)
-  mutable rebuild_actions : (string * (unit -> unit Lwt.t)) list;  (* Mark as needing rebuild *)
 }
 and target = {
   project_id : CI_projectID.t;
@@ -166,12 +165,11 @@ let rec recalculate t ~snapshot job =
           )
       )
   in
-  let rebuild_actions = ref [] in
   job.cancel ();        (* Stop any previous evaluation *)
   let head = job.parent.head in
   Lwt.catch
     (fun () ->
-       let r, cancel = CI_term.run ~snapshot ~target:head ~recalc ~dk:(fun () -> dk t) ~rebuild_actions job.term in
+       let r, cancel = CI_term.run ~snapshot ~target:head ~recalc ~dk:(fun () -> dk t) job.term in
        job.cancel <- cancel;
        r
     )
@@ -197,8 +195,7 @@ let rec recalculate t ~snapshot job =
   )
   end >|= fun () ->
   let state = (new_hash, { CI_state.status; descr; logs }) in
-  job.state <- state;
-  job.rebuild_actions <- !rebuild_actions
+  job.state <- state
 
 let make_job ~parent name term =
   let head_commit = commit parent.head in
@@ -217,7 +214,6 @@ let make_job ~parent name term =
     term;
     cancel = ignore;
     state = (hash, state);
-    rebuild_actions = []
   }
 
 let apply_canaries canaries prs refs =
@@ -318,37 +314,39 @@ let listen ?switch t =
         )
     )
 
-let rebuild t project_id ~target ~job action =
-  match CI_projectID.Map.find project_id t.projects with
-  | None -> failf "Unknown project %a" CI_projectID.pp project_id
-  | Some project ->
-    let target =
-      match target with
-      | `PR pr ->
-        begin match IntMap.find pr project.open_prs with
-        | None -> failf "Unknown PR %d" pr
-        | Some x -> x
-        end
-      | `Ref r ->
-        begin match Datakit_path.Map.find r project.refs with
-        | exception Not_found -> failf "Unknown ref %a" Datakit_path.pp r
-        | x -> x
-        end
-    in
-    match List.find (fun j -> j.name = job) target.jobs with
-    | exception Not_found -> failf "Unknown job %S" job
-    | job ->
-      match List.assoc action job.rebuild_actions with
-      | exception Not_found -> failf "Rebuild action %S is not currently available" action
-      | cb ->
-        Log.info (fun f -> f "Marking %a/%s as needing a rebuild" pp_target target action);
-        Lwt_mutex.with_lock t.term_lock (fun () ->
-            job.rebuild_actions <- [];
-            cb () >>= fun () ->
-            gh_hooks t >>= fun gh_hooks ->
-            CI_github_hooks.snapshot gh_hooks >>= fun snapshot ->
-            recalculate t ~snapshot job
-          )
-
-let rebuild_actions job =
-  List.map fst job.rebuild_actions |> List.rev
+let rebuild t ~branch_name =
+  let jobs_needing_recalc = ref [] in
+  let triggers = ref [] in
+  let rec check_logs =
+    let open CI_result.Step_log in
+    function
+    | Saved {branch; rebuild; _} when branch = branch_name ->
+      if not (Lazy.is_val rebuild) then triggers := Lazy.force rebuild :: !triggers;
+      true
+    | Saved _ -> false
+    | Empty -> false
+    | Pair (a, b) ->
+      let a = check_logs a in
+      let b = check_logs b in
+      a || b
+    | Live _ -> false
+  in
+  let check_job job =
+    let _, state = job.state in
+    if check_logs state.CI_state.logs then
+      jobs_needing_recalc := job :: !jobs_needing_recalc
+  in
+  let check_target target = List.iter check_job target.jobs in
+  t.projects |> CI_projectID.Map.iter (fun _ project ->
+      project.open_prs |> IntMap.iter (fun _ x -> check_target x);
+      project.refs |> Datakit_path.Map.iter (fun _ x -> check_target x);
+    );
+  match !triggers, !jobs_needing_recalc with
+  | [], [] -> CI_utils.failf "No job depends on %S, so can't rebuild anything" branch_name
+  | triggers, jobs_needing_recalc ->
+    Lwt.join triggers >>= fun () ->
+    Lwt_mutex.with_lock t.term_lock (fun () ->
+        gh_hooks t >>= fun gh_hooks ->
+        CI_github_hooks.snapshot gh_hooks >>= fun snapshot ->
+        Lwt_list.iter_s (recalculate t ~snapshot) jobs_needing_recalc
+      )

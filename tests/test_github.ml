@@ -169,7 +169,7 @@ module User = struct
   let prune monitored_repos t =
     let repos =
       String.Map.filter (fun _ { R.user; repo; _ } ->
-          Repo.Set.mem { Repo.user; repo } monitored_repos
+          Repo.Set.mem (Repo.create ~user ~repo) monitored_repos
         ) t.repos
     in
     let repos = String.Map.map R.prune repos in
@@ -179,12 +179,12 @@ module User = struct
 
   let repos t =
     fold (fun { R.user; repo; _ } acc ->
-        Repo.Set.add { Repo.user; repo } acc
+        Repo.Set.add (Repo.create ~user ~repo) acc
       ) t Repo.Set.empty
 
   let commits t =
     fold (fun r acc ->
-        let repo = { Repo.user = r.R.user; repo = r.R.repo } in
+        let repo = Repo.create ~user:r.R.user ~repo:r.R.repo in
         List.fold_left (fun acc (id, _) ->
             Commit.Set.add (Commit.create repo id) acc
           ) acc r.R.commits
@@ -392,7 +392,7 @@ module API = struct
     | Some u ->
       String.Map.dom u.User.repos
       |> String.Set.elements
-      |> List.map (fun repo -> { Repo.user; repo })
+      |> List.map (fun repo -> Repo.create ~user ~repo)
       |> return
 
   let set_repo_aux t (s, r) =
@@ -547,9 +547,9 @@ let user = "test"
 let repo = "test"
 let branch = "test"
 
-let repo = { Repo.user; repo }
-let commit_bar = { Commit.repo; id = "bar" }
-let commit_foo = { Commit.repo; id = "foo" }
+let repo = Repo.create ~user ~repo
+let commit_bar = Commit.create repo "bar"
+let commit_foo = Commit.create repo "foo"
 
 let s1 =
   Status.create ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
@@ -578,8 +578,8 @@ let pr3 =
 let pr4 =
   { PR.number = 2; state = `Open  ; head = commit_bar; title = "toto"; base }
 
-let ref1 = { Ref.head = commit_bar; name = ["heads";"master"] }
-let ref2 = { Ref.head = commit_foo; name = ["heads";"master"] }
+let ref1 = Ref.create commit_bar ["heads";"master"]
+let ref2 = Ref.create commit_foo ["heads";"master"]
 
 let events0 = [
   Event.PR pr1;
@@ -682,7 +682,7 @@ module Gen = struct
     let rec aux () =
       let user = choose ~random Data.users in
       let repo = choose ~random Data.repos in
-      let r = { Repo.user; repo } in
+      let r = Repo.create ~user ~repo in
       if List.exists (fun x -> Repo.compare x r = 0) x then aux () else r
     in
     aux ()
@@ -699,7 +699,7 @@ module Gen = struct
     let rec aux () =
       let id = choose ~random Data.commits in
       let repo = match r with Some r -> r | None -> repo ~random () in
-      let r = { Commit.id; repo } in
+      let r = Commit.create repo id in
       if List.exists (fun x -> Commit.compare x r = 0) x then aux () else r
     in
     aux ()
@@ -720,7 +720,7 @@ module Gen = struct
     let rec aux () =
       let head = commit ?repo ~random () in
       let name = choose ~random Data.names in
-      let r = { Ref.head; name } in
+      let r = Ref.create head name in
       if List.exists (Ref.same_id r) x then aux () else r
     in
     aux ()
@@ -747,10 +747,10 @@ module Gen = struct
           | old_ref ->
             if Random.State.bool random then [] else
               let head = commit ~random ~repo () in
-              [{ old_ref with Ref.head }]
+              [ Ref.create head (Ref.name old_ref) ]
         ) else (
           let head = commit ~random ~repo () in
-          [{ Ref.head; name }]
+          [ Ref.create head name ]
         ))
     |> List.concat
 
@@ -826,7 +826,7 @@ module Gen = struct
     let commits =
       let (++) = Commit.Set.union in
       let l f s = Commit.Set.of_list (List.map f s) in
-      l (fun (id, _) -> { Commit.repo; id }) old_status
+      l (fun (id, _) -> Commit.create repo id) old_status
       ++ l PR.commit prs ++ l Ref.commit refs
     in
     let commits =
@@ -846,7 +846,7 @@ module Gen = struct
         in
         let repos =
           Data.repos |> Array.to_list |> List.map (fun repo ->
-              let r = { Repo.user; repo } in
+              let r = Repo.create ~user ~repo in
               let old_prs, old_status, old_refs =
                 match String.Map.find repo old_user.User.repos with
                 | None      -> [], [], []
@@ -931,7 +931,7 @@ let test_basic_snapshot_once random =
   let r2 = Gen.ref ~x:[r1] ~random ~repo () in
   let r3 =
     let head = Gen.commit ~x:[Ref.commit r2] ~repo ~random () in
-    { r2 with Ref.head }
+    Ref.create head (Ref.name r2)
   in
   let s1 = mk_snapshot ~refs:[r2; r1] () in
   let s2 = mk_snapshot ~refs:[r3; r1] () in
@@ -1408,8 +1408,8 @@ let rec read_state ~user ~repo ~commit tree path context =
           | None   -> failwith (Fmt.strf "Bad state %S" status)
           | Some x -> x
         in
-        let repo = { Repo.user; repo } in
-        let commit = { Commit.repo; id = commit } in
+        let repo = Repo.create ~user ~repo in
+        let commit = Commit.create repo commit in
          [ Status.create ?description ?url commit context state]
     end
     >>= fun this_state ->
@@ -1451,8 +1451,8 @@ let read_prs tree ~user ~repo =
       read "head"  >>= fun head ->
       read "title" >>= fun title ->
       read "base"  >>= fun base ->
-      let repo = { Repo.user; repo } in
-      let head = { Commit.repo; id = head } in
+      let repo = Repo.create ~user ~repo in
+      let head = Commit.create repo head in
             Lwt.return { PR.head; number; state = `Open; title; base}
     )
 
@@ -1460,13 +1460,13 @@ let read_refs tree ~user ~repo =
   let path = Datakit_path.of_steps_exn [user; repo; "ref"] in
   let rec aux acc name =
     let path = Datakit_path.(path /@ of_steps_exn name) in
-    DK.Tree.read_file tree (path / "head") >>= begin function
-      | Error _ -> Lwt.return acc
+    DK.Tree.read_file tree (path / "head") >|= begin function
+      | Error _ -> acc
       | Ok head ->
         let head = String.trim (Cstruct.to_string head) in
-        let repo = { Repo.user; repo } in
-        let head = { Commit.repo; id = head } in
-        Lwt.return ({ Ref.head; name} :: acc )
+        let repo = Repo.create ~user ~repo in
+        let head = Commit.create repo head in
+        Ref.create head name :: acc
     end
     >>= fun acc ->
     DK.Tree.read_dir tree path >>= function
@@ -1541,7 +1541,7 @@ let ensure_github_in_sync ~msg github datakit =
 let all_repos =
   Array.fold_left (fun acc user ->
       Array.fold_left (fun acc repo ->
-          Repo.Set.add {Repo.user; repo} acc
+          Repo.Set.add (Repo.create ~user ~repo) acc
         ) acc Data.repos
     ) Repo.Set.empty Data.users
 
@@ -1550,7 +1550,7 @@ exception DK_error of DK.error
 let monitor repos branch =
   DK.Branch.with_transaction branch (fun t ->
       let monitor ~user ~repo =
-        Conv.update_elt t (`Repo { Repo.user; repo })
+        Conv.update_elt t (`Repo (Repo.create ~user ~repo))
       in
       Lwt_list.iter_p (fun { Repo.user; repo } ->
           monitor ~user ~repo
@@ -1562,7 +1562,7 @@ let monitor repos branch =
 let random_monitor ~random branch =
   DK.Branch.with_transaction branch (fun t ->
       let monitor ~user ~repo =
-        let elt = `Repo { Repo.user; repo } in
+        let elt = `Repo (Repo.create ~user ~repo) in
         match Random.State.bool random with
         | true  -> Conv.update_elt t elt
         | false -> Conv.remove_elt t elt

@@ -4,7 +4,6 @@ FROM docker/datakit:server
 RUN cd /home/opam/opam-repository && git pull && opam update -y
 
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
-RUN opam pin add github.dev https://github.com/samoht/ocaml-github.git#push-event-head-commit -n
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
 RUN opam depext datakit-github && opam install datakit-github --deps

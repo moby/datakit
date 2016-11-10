@@ -23,5 +23,5 @@ depends: [
   "datakit-server"
   "datakit-client"
   "github-hooks" {>= "0.1.1"}
-  "github" {>= "2.0.0"}
+  "github" {>= "2.1.0"}
 ]

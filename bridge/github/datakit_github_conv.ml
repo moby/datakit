@@ -59,13 +59,13 @@ module Make (DK: Datakit_S.CLIENT) = struct
         let t = match path with
           | [] | [_]             -> None
           | user :: repo :: path ->
-            let repo = { Repo.user; repo } in
+            let repo = Repo.create ~user ~repo in
             match path with
             | [] | [".monitor"] -> Some (`Repo repo)
             | "pr" :: id :: _   -> Some (`PR (repo, int_of_string id))
-            | "commit" :: [id]  -> Some (`Commit { Commit.repo; id })
+            | "commit" :: [id]  -> Some (`Commit (Commit.create repo id))
             | "commit" :: id :: "status" :: (_ :: _ :: _ as tl) ->
-              Some (`Status ({ Commit.repo; id }, without_last tl))
+              Some (`Status ((Commit.create repo id), without_last tl))
             | "ref" :: ( _ :: _ :: _ as tl)  ->
               Some (`Ref (repo, without_last tl))
             |  _ -> None
@@ -124,7 +124,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         Lwt_list.fold_left_s (fun acc repo ->
             safe_read_file tree (root / user /repo / ".monitor") >|= function
             | None   -> acc
-            | Some _ -> Repo.Set.add { Repo.user; repo } acc
+            | Some _ -> Repo.Set.add (Repo.create ~user ~repo) acc
           ) acc repos
       ) Repo.Set.empty users >|= fun repos ->
     Log.debug (fun l -> l "repos -> @;@[<2>%a@]" Repo.Set.pp repos);
@@ -197,7 +197,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
                 Repo.pp repo number);
           "master"
       in
-      let head = { Commit.repo; id } in
+      let head = Commit.create repo id in
       let title = match title with None -> "" | Some t -> t in
       let state = match PR.state_of_string state with
         | Some s -> s
@@ -245,13 +245,13 @@ module Make (DK: Datakit_S.CLIENT) = struct
       None
     | true  ->
       Log.debug (fun l -> l "commit {%a %s} -> true" Repo.pp repo id);
-      Some { Commit.repo; id }
+      Some (Commit.create repo id)
 
   let commits_of_repo tree repo =
     let dir = root repo / "commit" in
     safe_read_dir tree dir >|= fun commits ->
     List.fold_left (fun s id ->
-        Commit.Set.add { Commit.repo; id } s
+        Commit.Set.add (Commit.create repo id) s
       ) Commit.Set.empty commits
     |> fun cs ->
     Log.debug
@@ -353,8 +353,8 @@ module Make (DK: Datakit_S.CLIENT) = struct
       None
     | Some id ->
       Log.debug (fun l -> l "ref_ %a:%a -> %s" Repo.pp repo pp_path name id);
-      let head = { Commit.repo; id } in
-      Some { Ref.head; name }
+      let head = Commit.create repo id in
+      Some (Ref.create head name)
 
   let refs_of_repo tree repo =
     let dir = root repo / "ref" in

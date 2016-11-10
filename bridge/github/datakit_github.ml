@@ -47,6 +47,11 @@ let pp_path = Fmt.(list ~sep:(unit "/") string)
 module Repo = struct
 
   type t = { user: string; repo: string }
+  let create ~user ~repo =
+   let user = String.trim user in
+   let repo = String.trim repo in
+   { user; repo }
+
   let pp ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
   let compare (x:t) (y:t) = Pervasives.compare x y
   type state = [`Monitored | `Ignored]
@@ -95,6 +100,7 @@ module Commit = struct
 
   type t = { repo: Repo.t; id : string }
 
+  let create repo id = {repo; id = String.trim id }
   let pp ppf t = Fmt.pf ppf "{%a %s}" Repo.pp t.repo t.id
   let id t = t.id
   let repo t = t.repo
@@ -294,6 +300,10 @@ module Ref = struct
   }
 
   type id = Repo.t * string list
+
+  let create head name =
+    let name = List.map (fun s -> String.trim s) name in
+    { head; name }
 
   let repo t = t.head.Commit.repo
   let id t = repo t, t.name

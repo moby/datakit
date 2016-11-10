@@ -12,7 +12,7 @@ module PR = struct
   include PR
 
   let of_gh repo pr =
-    let head = { Commit.repo; id = pr.pull_head.branch_sha } in
+    let head = Commit.create repo pr.pull_head.branch_sha in
     { head;
       number = pr.pull_number;
       state  = pr.pull_state;
@@ -29,7 +29,7 @@ module PR = struct
 
   let of_event repo pr =
     let id = pr.pull_request_event_pull_request.pull_head.branch_sha in
-    let head = { Commit.repo; id } in
+    let head = Commit.create repo id in
     {
       head;
       number = pr.pull_request_event_number;
@@ -86,7 +86,7 @@ module Status = struct
     }
 
   let of_event repo s =
-    let commit = { Commit.repo; id = s.status_event_sha } in
+    let commit = Commit.create repo s.status_event_sha in
     let description = s.status_event_description in
     let url = s.status_event_target_url in
     let context = to_list s.status_event_context in
@@ -124,8 +124,8 @@ module Ref = struct
 
   let of_gh_commit_ref ~repo r =
     assert (r.git_ref_obj.obj_ty = `Commit);
-    let head = { Commit.repo; id = r.git_ref_obj.obj_sha } in
-    { head; name = to_list r.git_ref_name }
+    let head = Commit.create repo r.git_ref_obj.obj_sha in
+    Ref.create head (to_list r.git_ref_name)
 
   let of_gh ~token ~repo r =
     to_commit_ref ~token ~repo r >|= function
@@ -137,16 +137,16 @@ module Ref = struct
     match r.push_event_hook_head_commit with
     | Some c ->
       let id = c.push_event_hook_commit_id in
-      let head = { Commit.repo; id } in
-      let t = { head; name } in
+      let head = Commit.create repo id in
+      let t = Ref.create head name in
       if r.push_event_hook_created then `Created t else `Updated t
     | None ->
       `Removed (repo, name)
 
   let of_event repo r =
     let id = r.push_event_head in
-    let head = { Commit.repo; id } in
-    let t = { head; name = to_list r.push_event_ref } in
+    let head = Commit.create repo id in
+    let t = Ref.create head (to_list r.push_event_ref) in
     `Updated t
 
 end
@@ -208,7 +208,7 @@ module Event = struct
   let of_gh e =
     let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
       | None  -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
-      | Some (user, repo) -> { Repo.user; repo }
+      | Some (user, repo) -> Repo.create ~user ~repo
     in
     of_gh_constr repo e.event_payload
 
@@ -246,7 +246,7 @@ let repos token ~user =
   Github.User.repositories ~token ~user ()
   |> Github.Stream.to_list
   |> Github.Monad.map
-  @@ List.map (fun r -> { Repo.user; repo = r.repository_name})
+  @@ List.map (fun r -> Repo.create ~user ~repo:r.repository_name)
   |> run
 
 let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
@@ -326,7 +326,7 @@ module Webhook = struct
 
   include Hook
 
-  let to_repo (user, repo) = { Repo.user; repo }
+  let to_repo (user, repo) = Repo.create ~user ~repo
   let of_repo { Repo.user; repo } = user, repo
 
   let events t =

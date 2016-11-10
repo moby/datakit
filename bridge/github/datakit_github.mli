@@ -38,11 +38,14 @@ end
 
 module Repo: sig
 
-  type t = { user: string; repo: string }
+  type t = private { user: string; repo: string }
   (** The type for Github repositories. *)
 
   type state = [`Monitored | `Ignored]
   (** The type for repository state. *)
+
+  val create : user:string -> repo:string -> t
+  (** [create user string] will create a fresh {!t}. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)
@@ -60,8 +63,11 @@ end
 
 module Commit: sig
 
-  type t = { repo: Repo.t; id: string }
+  type t = private { repo: Repo.t; id: string }
   (** The type for commits. *)
+
+  val create : Repo.t -> string -> t
+  (** [create repo id] builds a fresh {!t} with [repo] and [id]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for commits. *)
@@ -213,11 +219,14 @@ end
 
 module Ref: sig
 
-  type t = {
+  type t = private {
     head: Commit.t;
     name: string list;
   }
   (** The type for Git references. *)
+
+  val create : Commit.t -> string list -> t
+  (** [create head name] is a fresh {!t}} with the [head] commit and [name]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)

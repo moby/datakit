@@ -14,7 +14,7 @@ depends: [
   "ocamlfind" {build}
   "multipart-form-data"
   "datakit-client"
-  "protocol-9p"
+  "protocol-9p" {>= "0.7.4"}
   "astring"
   "cmdliner"
   "fmt"

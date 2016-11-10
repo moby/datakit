@@ -7,9 +7,9 @@ module type S = sig
   (** The type for communication "channels" between the clients and
       the server. *)
 
-  val accept: root:Vfs.Dir.t -> flow -> unit Protocol_9p.Error.t Lwt.t
-  (** [accept root f] accepts connection on [f], processs requests
+  (** [accept ~root f] accepts connection on [f], processs requests
       and returns when the connection has beenn closed. *)
+  val accept: root:Vfs.Dir.t -> msg:string -> flow -> unit Protocol_9p.Error.t Lwt.t
 
 end
 

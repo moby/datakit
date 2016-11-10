@@ -35,7 +35,7 @@ let max_chunk_size = Int32.of_int (100 * 1024)
 
 module type S = sig
   type flow
-  val accept: root:Vfs.Dir.t -> flow -> unit or_err
+  val accept: root:Vfs.Dir.t -> msg:string -> flow -> unit or_err
 end
 
 (* 9p inodes: wrap VFS inodes with Qids. *)
@@ -363,7 +363,8 @@ module Make (Flow: V1_LWT.FLOW) = struct
 
   module Server = P.Server.Make(Log)(Flow)(Dispatcher)
 
-  let accept ~root flow =
+  let accept ~root ~msg flow =
+    Log.info (fun l -> l "accepted a new connection on %s" msg);
     Server.connect root flow () >>= function
     | Error _ as e -> Flow.close flow >|= fun () -> e
     | Ok t         ->

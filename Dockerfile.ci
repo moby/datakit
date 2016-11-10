@@ -1,6 +1,9 @@
 FROM ocaml/opam:alpine-3.4_ocaml-4.03.0
 RUN sudo apk add tzdata
 
+# TMP
+RUN cd /home/opam/opam-repository && git pull && opam update -y
+
 RUN opam depext -ui cohttp yojson ssl tyxml fmt rresult logs lwt conf-libev react camlp4 \
     tls pbkdf ppx_sexp_conv webmachine session asetmap
 

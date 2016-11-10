@@ -1,9 +1,10 @@
 (** Datakit loggers. *)
 
-(** Type for datakit log destination: standard error, ASL, or Window
+(** Type for datakit log destination: quiet, verbose, ASL, or Window
     event logs. *)
 type t =
-  | Stderr
+  | Quiet
+  | Verbose
   | Eventlog
   | ASL
 

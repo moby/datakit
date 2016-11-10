@@ -8,7 +8,10 @@ bug-reports:  "https://github.com/docker/datakit-ci/issues"
 dev-repo:     "https://github.com/docker/datakit-ci.git"
 doc:          "https://docker.github.io/datakit-ci/"
 
-build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false" "-n" "datakit-ci"]
+build: [
+  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false"
+  "-n" "datakit-ci"
+]
 
 depends: [
   "ocamlfind" {build}
@@ -35,3 +38,4 @@ depends: [
   "irmin-unix" {test}
   "alcotest" {test}
 ]
+available: [ocaml-version >= "4.03.0"]

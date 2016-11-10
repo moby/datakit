@@ -1,5 +1,8 @@
 FROM ocaml/opam:alpine
 
+# TMP
+RUN cd /home/opam/opam-repository && git pull && opam update -y
+
 RUN opam depext -ui lwt alcotest conf-libev
 
 # cache opam install of dependencies

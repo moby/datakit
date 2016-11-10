@@ -21,7 +21,7 @@ depends: [
   "datakit-server"
   "cmdliner"
   "rresult" "astring" "fmt"
-  "git" {>= "1.9.0"}
+  "git"         {>= "1.9.3"}
   "mirage-tc" "uri"
   "mirage-types"
   "irmin"       {>= "0.10.1"}

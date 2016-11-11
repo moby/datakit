@@ -1,10 +1,11 @@
 (** Datakit loggers. *)
 
-(** Type for datakit log destination: quiet, verbose, ASL, or Window
+(** Type for datakit log destination: quiet (simple outputs on
+    stdout), timestamp (timestamped outputs on stdout), ASL, or Window
     event logs. *)
 type t =
   | Quiet
-  | Verbose
+  | Timestamp
   | Eventlog
   | ASL
 

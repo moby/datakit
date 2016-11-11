@@ -1,26 +1,17 @@
-open Astring
 open Cmdliner
 
 type t =
   | Quiet
-  | Verbose
+  | Timestamp
   | Eventlog
   | ASL
 
-let parser x = match String.Ascii.lowercase x with
-  | "quiet"    -> `Ok Quiet
-  | "stderr"   -> `Ok Verbose
-  | "eventlog" -> `Ok Eventlog
-  | "asl"      -> `Ok ASL
-  | _ -> `Error("Unknown log destination: expected stderr / eventlog / asl")
-
-let printer fmt x = Format.pp_print_string fmt (match x with
-    | Quiet    -> "quiet"
-    | Verbose  -> "versbose"
-    | Eventlog -> "eventlog"
-    | ASL      -> "asl")
-
-let conv = parser, printer
+let conv = Arg.enum [
+    "quiet"    , Quiet;
+    "timestamp", Timestamp;
+    "eventlog" , Eventlog;
+    "asl"      , ASL
+  ]
 
 let pp_ptime f () =
   let open Unix in
@@ -58,7 +49,7 @@ let setup style_renderer log_destination level log_clock =
   | Eventlog ->
     let eventlog = Eventlog.register "Docker.exe" in
     Logs.set_reporter (Log_eventlog.reporter ~eventlog ())
-  | Verbose ->
+  | Timestamp ->
     Fmt_tty.setup_std_outputs ?style_renderer ();
     Logs.set_reporter (reporter log_clock)
   | ASL ->

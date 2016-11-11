@@ -4,9 +4,6 @@ open Lwt.Infix
 
 module PathSet = Ivfs_merge.PathSet
 
-let src = Logs.Src.create "ivfs" ~doc:"Irmin to VFS"
-module Log = (val Logs.src_log src: Logs.LOG)
-
 module type S = sig
   type repo
   val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
@@ -39,7 +36,6 @@ module Make (Store : Ivfs_tree.STORE) = struct
   module RW = Ivfs_rw.Make(Tree)
   module Merge = Ivfs_merge.Make(Store)(RW)
   module Remote = Ivfs_remote.Make(Store)
-  module View = Irmin.View(Store)
 
   let empty_file = Ivfs_blob.empty
 

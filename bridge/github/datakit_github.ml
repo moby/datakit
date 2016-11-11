@@ -179,12 +179,6 @@ module PR = struct
     let compare_num x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_repo; compare_num ]
 
-  module IdSet = Set(struct
-      type t = id
-      let pp = pp_id
-      let compare = compare_id
-    end)
-
   module Set = struct
     include Set(struct
         type nonrec t = t
@@ -271,12 +265,6 @@ module Status = struct
     let compare_commit x y = Commit.compare (fst x) (fst y) in
     let compare_context x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_commit; compare_context ]
-
-  module IdSet = Set(struct
-      type t = id
-      let pp = pp_id
-      let compare = compare_id
-    end)
 
   module Set = struct
     include Set(struct
@@ -388,12 +376,6 @@ module Event = struct
           |`Updated r) -> Ref.repo r
 
     | Other o  -> fst o
-
-  module Set = Set(struct
-      type nonrec t = t
-      let pp = pp
-      let compare = compare
-    end)
 
 end
 

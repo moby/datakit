@@ -2,9 +2,6 @@ open Astring
 open Rresult
 open Lwt.Infix
 
-let src = Logs.Src.create "vfs" ~doc:"Datakit VFS"
-module Log = (val Logs.src_log src : Logs.LOG)
-
 type perm = [`Normal | `Exec | `Link of string]
 
 type metadata = {

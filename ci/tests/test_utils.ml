@@ -70,7 +70,7 @@ let with_datakit fn =
   Lwt.async (fun () ->
       Lwt_unix.accept for_server >>= fun (client, _addr) ->
       let flow = Flow_lwt_unix.connect client in
-      Server.accept ~root flow >>*= Lwt.return
+      Server.accept ~root ~msg:"test connection" flow >>*= Lwt.return
     );
   fn for_client
 

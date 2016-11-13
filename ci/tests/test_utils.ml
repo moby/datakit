@@ -170,7 +170,7 @@ let with_handler set_handler ~logs ?pending key fn =
   in
   let branch = "log-branch-for-" ^ key in
   let switch = Lwt_switch.create () in
-  let log = Live_log.create ~switch ~pending ~branch logs in
+  let log = Live_log.create ~switch ~pending ~branch ~title:"Title" logs in
   set_handler key (Error (`Pending (pending, finished)), DataKitCI.Step_log.Live log);
   fn ~switch log >|= fun result ->
   DataKitCI.Live_log.finish log;

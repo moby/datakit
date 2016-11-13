@@ -6,14 +6,11 @@ module Context = struct
     target : [`PR of CI_github_hooks.PR.t | `Ref of CI_github_hooks.Ref.t];
     mutable recalc : unit -> unit;              (* Call this to schedule a recalculation. *)
     dk : unit -> CI_utils.DK.t Lwt.t;
-    rebuild_actions : (string * (unit -> unit Lwt.t)) list ref;
   }
 
   let head   t = t.target
   let dk     t = t.dk
   let github t = t.github
-
-  let rebuild_actions t = t.rebuild_actions
 
   let disable t =
     t.recalc <- (fun () -> CI_utils.Log.debug (fun f -> f "recalculate called, but term is finished"))
@@ -66,11 +63,6 @@ let ci_status     = ci_state CI_github_hooks.Commit_state.status
 let ci_descr      = ci_state CI_github_hooks.Commit_state.descr
 let ci_target_url = ci_state CI_github_hooks.Commit_state.target_url
 
-let add_rebuild_action label cb =
-  value Context.rebuild_actions >>= fun actions ->
-  actions := (label, cb) :: !actions;
-  return ()
-
 let pp_opt_descr f = function
   | None -> ()
   | Some descr -> Fmt.pf f " (%s)" descr
@@ -86,6 +78,6 @@ let ci_success_target_url ci =
     | None -> fail "%s succeeded, but has no URL!" ci
     | Some url -> return url
 
-let run ~snapshot ~target ~recalc ~dk ~rebuild_actions term =
-  let ctx = { Context.target; recalc; dk; rebuild_actions; github = snapshot } in
+let run ~snapshot ~target ~recalc ~dk term =
+  let ctx = { Context.target; recalc; dk; github = snapshot } in
   (run ctx term, fun () -> Context.disable ctx)

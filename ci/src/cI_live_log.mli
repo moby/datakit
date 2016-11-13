@@ -7,9 +7,12 @@ val create_manager : unit -> manager
 type t
 type stream
 
-val create : ?switch:Lwt_switch.t -> pending:string -> branch:string -> manager -> t
-(** [create ~pending ~branch manager] is a fresh, empty log with pending reason [pending].
+val create : ?switch:Lwt_switch.t -> pending:string -> branch:string -> title:string -> manager -> t
+(** [create ~pending ~branch ~title manager] is a fresh, empty log with pending reason [pending].
     It is an error to have two live logs on the same branch at the same time (finish the other one first). *)
+
+val title : t -> string
+(** [title t] is the title, as passed to [create]. *)
 
 val lookup : branch:string -> manager -> t option
 (** [lookup ~branch manager] is the currently-active log for [branch]. *)

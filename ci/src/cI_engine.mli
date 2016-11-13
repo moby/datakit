@@ -51,8 +51,6 @@ val project : target -> CI_projectID.t
 val title : target -> string
 (** [title t] is the title of PR [t]. *)
 
-val rebuild_actions : job -> string list
-(** [rebuild_actions job] is the list of cached results from [job] that can be rebuilt. *)
-
-val rebuild : t -> CI_projectID.t -> target:[`PR of int | `Ref of Datakit_path.t] -> job:string -> string -> unit Lwt.t
-(** [rebuild t project ~target ~job action] triggers [target/job]'s [action] as needing to be rebuilt. *)
+val rebuild : t -> branch_name:string -> unit Lwt.t
+(** [rebuild t ~branch_name] triggers a rebuild for results branch [branch_name] and recalculates any terms that depend on it.
+    An error is reported if no term currently depends on [branch_name]. *)

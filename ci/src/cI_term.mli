@@ -20,9 +20,6 @@ val tag : CI_projectID.t -> string -> CI_github_hooks.Commit.t t
 val dk : (unit -> CI_utils.DK.t Lwt.t) t
 (** [dk] is a function for getting the current DataKit connection. *)
 
-val add_rebuild_action : string -> (unit -> unit Lwt.t) -> unit t
-(** [add_rebuild_action label callback] adds a button the user can click to rebuild an artifact. *)
-
 val ci_status : string -> [`Pending | `Success | `Failure | `Error] option t
 (** [ci_status ci] is the status reported by CI [ci].
     Note that even if the CI is e.g. pending, this returns a successful result with
@@ -40,6 +37,5 @@ val run :
   target:[`PR of CI_github_hooks.PR.t | `Ref of CI_github_hooks.Ref.t] ->
   recalc:(unit -> unit) ->
   dk:(unit -> CI_utils.DK.t Lwt.t) ->
-  rebuild_actions:(string * (unit -> unit Lwt.t)) list ref ->
   'a t -> ('a CI_result.t * CI_result.Step_log.t) Lwt.t * (unit -> unit)
-(* [run ~snapshot ~target ~recalc ~dk ~rebuild_actions] is the pair [(state, cancel)]. *)
+(* [run ~snapshot ~target ~recalc ~dk] is the pair [(state, cancel)]. *)

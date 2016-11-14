@@ -568,7 +568,7 @@ let logs ~csrf_token ~page_url ~selected logs =
       let title = CI_live_log.title live_log in
       [
         form [
-          button ~a:[a_class ["btn"; "btn-default"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
+          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
           log_link ~branch ~title (`Live live_log);
         ];
@@ -583,7 +583,7 @@ let logs ~csrf_token ~page_url ~selected logs =
       let status = if failed then "failed" else "passed" in
       [
         form ~a:[a_action action; a_method `Post] [
-          button ~a:[a_class ["btn"; "btn-default"; "rebuild"; status]; a_button_type `Submit] [
+          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"; status]; a_button_type `Submit] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
           log_link ~branch ~title (`Saved saved);
         ]

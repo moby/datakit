@@ -545,9 +545,18 @@ let logs ~csrf_token ~page_url ~selected logs =
     | Some (`Saved x) -> Some x.CI_result.Step_log.branch
     | None -> None
   in
-  let class_of branch =
-    if Some branch = selected_branch then ["log-link"; "selected-log"]
-    else ["log-link"]
+  let log_link ~branch ~title log =
+    let cl =
+      if Some branch = selected_branch then ["log-link"; "selected-log"]
+      else ["log-link"]
+    in
+    let href = logs_frame_link log in
+    span [
+      pcdata "[ ";
+      a ~a:[a_href href; a_target "iframe_log"; a_class cl] [pcdata "logs"];
+      pcdata " ] ";
+      pcdata title;
+    ]
   in
   let rec aux = function
     | Empty -> []
@@ -555,20 +564,16 @@ let logs ~csrf_token ~page_url ~selected logs =
     | Saved { branch; _ } when String.Set.mem branch !seen -> []
     | Live live_log ->
       let branch = CI_live_log.branch live_log in
-      let cl = class_of branch in
       seen := String.Set.add branch !seen;
-      let log_link = logs_frame_link (`Live live_log) in
       let title = CI_live_log.title live_log in
       [
         form [
           button ~a:[a_class ["btn"; "btn-default"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
-          a ~a:[a_href log_link; a_target "iframe_log"; a_class cl] [pcdata title]
+          log_link ~branch ~title (`Live live_log);
         ];
       ]
     | Saved ({CI_result.Step_log.commit = _; branch; title; rebuild = _; failed} as saved) ->
-      let cl = class_of branch in
-      let log_link = logs_frame_link (`Saved saved) in
       seen := String.Set.add branch !seen;
       let query = [
         "CSRFToken", [csrf_token];
@@ -580,7 +585,7 @@ let logs ~csrf_token ~page_url ~selected logs =
         form ~a:[a_action action; a_method `Post] [
           button ~a:[a_class ["btn"; "btn-default"; "rebuild"; status]; a_button_type `Submit] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
-          a ~a:[a_href log_link; a_target "iframe_log"; a_class cl] [pcdata title];
+          log_link ~branch ~title (`Saved saved);
         ]
       ]
     | Pair (a, b) -> aux a @ aux b

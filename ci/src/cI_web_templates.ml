@@ -587,14 +587,11 @@ let logs ~csrf_token ~page_url ~selected logs =
   in
   aux logs
 
-let job_id job_name =
-  Fmt.strf "job-%s" job_name
-
 let job_row ~csrf_token ~page_url ~best_log job =
   let state = CI_engine.state job in
   let job_name = CI_engine.job_name job in
   tr [
-    th [ a ~a:[a_href (Fmt.strf "#%s" (job_id job_name))] [pcdata job_name]];
+    th [pcdata job_name];
     td [status state];
     td (
       p [pcdata state.CI_state.descr] ::

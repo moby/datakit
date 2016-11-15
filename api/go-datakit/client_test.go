@@ -6,6 +6,8 @@ import (
 	"log"
 	"testing"
 
+	p9p "github.com/docker/go-p9p"
+
 	"golang.org/x/net/context"
 )
 
@@ -78,11 +80,10 @@ func TestInit(t *testing.T) {
 	file.Close(ctx)
 	file.Close(ctx) // should be idempotent
 
-	t.Logf("max read size is %v", client.session.MaxReadSize())
-	t.Logf("max write size is %v", client.session.MaxWriteSize())
 	largeFilePath := append(path, "largefile")
 	var largeDataInput []byte
-	for ix := 0; ix < client.session.MaxReadSize()*2+150; ix++ {
+
+	for ix := 0; ix < p9p.DefaultMSize*2+150; ix++ {
 		largeDataInput = append(largeDataInput, byte(ix))
 	}
 	file, err = client.Create(ctx, largeFilePath...)

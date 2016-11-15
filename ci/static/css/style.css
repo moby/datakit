@@ -94,7 +94,7 @@ body.split-page nav.navbar-fixed-top {
 }
 
 button.rebuild {
-  margin-right: 1em;
+  margin-right: 0.5em;
 }
 
 button.failed {

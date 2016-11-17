@@ -1,3 +1,39 @@
+### 0.7.0 (2016-11-17)
+
+The highlight of that release is `datakit-ci`: a new library to help
+creating new CI pipelines built on top of DataKit.
+
+- ci: improve UI for viewing logs (#341, #342, @talex5)
+- ci: specify a metadata store default that matches datakit (#330, @avsm)
+- ci: let CI binaries specify custom CLI term info (#329, @avsm)
+- ci: add GitHub-based login to web UI (#328, @talex5)
+- ci: return some HTML body text for more errors (#325, @talex5)
+- ci: add .monitor files automatically (#324, @talex5)
+- ci: add setting to configure a public CI (#320, @talex5)
+- ci: add a CI script to test DataKit itself (#314, @talex5)
+- ci: allow configuring CI name, dashboard config in config file (@306, @talex5)
+- ci: Add library for writing DataKit-based Continuous Integration systems
+  (#302, @talex5)
+
+- github: add a more specific error when there is no datakit-github token
+  (#323, @avsm)
+- github: major refactoring to use only one branch in datakit to persist
+  the data and keep the rest in memory otherwise. Also use a stronger model
+  of ownership to decide whether datakit or GitHub is right (#311, @samoht)
+
+- datakit: update to irmin.0.12.0 to use faster native watch notifications
+  instead of file-system polling and full scanning (#347, @samoht)
+
+- client: simplify path handling: when creating things, pass the full
+  path as one argument rather than a directory and a name. (#306, @talex5)
+
+- server: Fix log-destination command-line arguments (#340, @samoht)
+- server: improve named-pipe support (#333, by @simonferquel and @samoht)
+- server: Catch top level Lwt.async exceptions (#327, @samoht)
+- server: expose `Vfs.Logs` to expose the state of `Logs.Src` over 9p. This
+  is used by datakit and datakit-bridge to expose `/debug` and let other
+  datakit servers to easily do the same thing (#295, @samoht)
+
 ### 0.6.0 (2016-10-03)
 
 - fix META files (#278, @dsj55)

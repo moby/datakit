@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Datakit_client_9p.html">
+<link rel="previous" href="Ivfs_blob.html">
 <link rel="next" href="Datakit_github_api.html">
 <link rel="Up" href="index.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
@@ -13,49 +13,70 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><link title="Printable Sets" rel="Section" href="#1_PrintableSets">
+<link title="Data-model" rel="Section" href="#1_Datamodel">
+<link title="API" rel="Section" href="#1_API">
+<title>Datakit_github</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Datakit_client_9p.html" title="Datakit_client_9p">Previous</a>
+<div class="navbar"><a class="pre" href="Ivfs_blob.html" title="Ivfs_blob">Previous</a>
 &nbsp;<a class="up" href="index.html" title="Index">Up</a>
 &nbsp;<a class="post" href="Datakit_github_api.html" title="Datakit_github_api">Next</a>
 </div>
 <h1>Module <a href="type_Datakit_github.html">Datakit_github</a></h1>
 
 <pre><span class="keyword">module</span> Datakit_github: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
-Virtual filesystem for the GitHub API.<br>
+Main object types used by the GitHub bridge.<br>
 </div>
 <hr width="100%">
+<br>
+<h1 id="1_PrintableSets">Printable Sets</h1><br>
 
-<pre><span class="keyword">module</span> <a href="Datakit_github.Status_state.html">Status_state</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Status_state.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
-Signature for status states.
+<pre><span class="keyword">module type</span> <a href="Datakit_github.ELT.html">ELT</a> = <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.ELT.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+Pretty-printable <code class="code"><span class="constructor">Set</span>.<span class="constructor">OrderedType</span></code>.
 </div>
 
+<pre><span class="keyword">module type</span> <a href="Datakit_github.SET.html">SET</a> = <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.SET.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+Pretty-printable <code class="code"><span class="constructor">Set</span>.<span class="constructor">S</span></code>.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.Set.html">Set</a>: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">E</span></code><code class="code"> : </code><code class="type"><a href="Datakit_github.ELT.html">ELT</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="type"><a href="Datakit_github.SET.html">SET</a></code><code class="type">  with type elt = E.t</code></div></pre><div class="info">
+<code class="code"><span class="constructor">Set</span></code> is similar to <code class="code"><span class="constructor">Set</span>.<span class="constructor">Make</span></code> but for pretty-printable sets.
+</div>
+<br>
+<h1 id="1_Datamodel">Data-model</h1><br>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.Status_state.html">Status_state</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Status_state.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_github.Repo.html">Repo</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Repo.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_github.Commit.html">Commit</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Commit.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_github.PR.html">PR</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.PR.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_github.Status.html">Status</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Status.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_github.Ref.html">Ref</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Ref.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_github.Event.html">Event</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Event.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_github.Elt.html">Elt</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Elt.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_github.Snapshot.html">Snapshot</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Snapshot.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_github.Diff.html">Diff</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Diff.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><br>
+<h1 id="1_API">API</h1><br>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.Capabilities.html">Capabilities</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Capabilities.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+API capabilities, used to restrict the scope of an
+    <a href="Datakit_github.API.html#TYPEtoken"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token</code></a>.
+</div>
+
 <pre><span class="keyword">module type</span> <a href="Datakit_github.API.html">API</a> = <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.API.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
 Signature for the GitHub API.
 </div>
 
-<pre><span class="keyword">module</span> <a href="Datakit_github.Snapshot.html">Snapshot</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Snapshot.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
-<pre><span class="keyword">module</span> <a href="Datakit_github.Diff.html">Diff</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Diff.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
-<pre><span class="keyword">module</span> <a href="Datakit_github.Conv.html">Conv</a>: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">DK</span></code><code class="code"> : </code><code class="type"><a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Conv.html">..</a> <code class="code"><span class="keyword">end</span></code></div></pre><div class="info">
-Conversion between GitHub and DataKit states.
+<pre><span class="keyword">module</span> <a href="Datakit_github.State.html">State</a>: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">API</span></code><code class="code"> : </code><code class="type"><a href="Datakit_github.API.html">API</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.State.html">..</a> <code class="code"><span class="keyword">end</span></code></div></pre><div class="info">
+API State: TODO find a better name?
 </div>
-
-<pre><span class="keyword">module</span> <a href="Datakit_github.Capabilities.html">Capabilities</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Capabilities.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
-<pre><span class="keyword">module</span> <a href="Datakit_github.Sync.html">Sync</a>: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">API</span></code><code class="code"> : </code><code class="type"><a href="Datakit_github.API.html">API</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">DK</span></code><code class="code"> : </code><code class="type"><a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Sync.html">..</a> <code class="code"><span class="keyword">end</span></code></div></div></pre></body></html>
+</body></html>

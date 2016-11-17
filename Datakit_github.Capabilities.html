@@ -4,8 +4,8 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Datakit_github.Conv.html">
-<link rel="next" href="Datakit_github.Sync.html">
+<link rel="previous" href="Datakit_github.Diff.html">
+<link rel="next" href="Datakit_github.State.html">
 <link rel="Up" href="Datakit_github.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -13,26 +13,29 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.Capabilities</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Datakit_github.Conv.html" title="Datakit_github.Conv">Previous</a>
+<div class="navbar"><a class="pre" href="Datakit_github.Diff.html" title="Datakit_github.Diff">Previous</a>
 &nbsp;<a class="up" href="Datakit_github.html" title="Datakit_github">Up</a>
-&nbsp;<a class="post" href="Datakit_github.Sync.html" title="Datakit_github.Sync">Next</a>
+&nbsp;<a class="post" href="Datakit_github.State.html" title="Datakit_github.State">Next</a>
 </div>
 <h1>Module <a href="type_Datakit_github.Capabilities.html">Datakit_github.Capabilities</a></h1>
 
-<pre><span class="keyword">module</span> Capabilities: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Capabilities.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+<pre><span class="keyword">module</span> Capabilities: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Capabilities.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info module top">
+API capabilities, used to restrict the scope of an
+    <a href="Datakit_github.API.html#TYPEtoken"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">API</span>.token</code></a>.<br>
+</div>
+<hr width="100%">
 
 <pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
 <div class="info ">
@@ -44,22 +47,47 @@ The type for API capabilities.<br>
 <code class="code">pp</code> is the pretty-printer for capabilities.<br>
 </div>
 
-<pre><span id="VALof_string"><span class="keyword">val</span> of_string</span> : <code class="type">string -> [ `Error of string | `Ok of <a href="Datakit_github.Capabilities.html#TYPEt">t</a> ]</code></pre><div class="info ">
-<code class="code">of_string s</code> is <code class="code"><span class="constructor">Some</span> t</code> if there exists <code class="code">t</code> such that <code class="code">s</code> is
-      the string representation of <code class="code">t</code>; and <code class="code"><span class="constructor">None</span></code> otherwise.<br>
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -> <a href="Datakit_github.Capabilities.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">equal</code> equalizes capabilities.<br>
 </div>
 
-<pre><span id="TYPEop"><span class="keyword">type</span> <code class="type"></code>op</span> = <code class="type">[ `Read | `Write ]</code> </pre>
+<pre><span id="VALparse"><span class="keyword">val</span> parse</span> : <code class="type">string -> [ `Error of string | `Ok of <a href="Datakit_github.Capabilities.html#TYPEt">t</a> ]</code></pre><div class="info ">
+<code class="code">parse</code> is the parses capabilites, such that <code class="code">parse
+      (<span class="constructor">Fmt</span>.to_to_string pp x) = <span class="keywordsign">`</span><span class="constructor">Ok</span> x</code>.<br>
+</div>
+
+<pre><span id="TYPEop"><span class="keyword">type</span> <code class="type"></code>op</span> = <code class="type">[ `Excl | `Read | `Write ]</code> </pre>
 <div class="info ">
-The type for API operations.<br>
+The type for API operations.
+      <ul>
+<li><code class="code"><span class="keywordsign">`</span><span class="constructor">Read</span></code> allows the bridge to read the corresponding kind of
+         GitHub resources</li>
+<li><code class="code"><span class="keywordsign">`</span><span class="constructor">Write</span></code> allows the bridge to update the corresponding kind
+         of resource.</li>
+<li><code class="code"><span class="keywordsign">`</span><span class="constructor">Excl</span></code> means that the bridge has exclusive write access
+         to the corresponding GitHub resource. In particular, this
+         means that when the bridge is disconnect/reconnect it will
+         always try to update GitHub to match with the current state
+         of its local resources and it will revert any changes made
+         by other GitHub users on this kind of resources.</li>
+</ul>
+<br>
 </div>
 
 
-<pre><span id="TYPEresource"><span class="keyword">type</span> <code class="type"></code>resource</span> = <code class="type">[ `PR | `Ref | `Status | `Webhook ]</code> </pre>
+<pre><span id="VALpp_op"><span class="keyword">val</span> pp_op</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEop">op</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp_op</code> is the pretty-printer for resource operations.<br>
+</div>
+
+<pre><span id="TYPEresource"><span class="keyword">type</span> <code class="type"></code>resource</span> = <code class="type">[ `Commit<br>       | `PR<br>       | `Ref<br>       | `Repo of string list<br>       | `Status of string list<br>       | `Webhook ]</code> </pre>
 <div class="info ">
 The type for API resources.<br>
 </div>
 
+
+<pre><span id="VALpp_resource"><span class="keyword">val</span> pp_resource</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEresource">resource</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp_resource</code> is the pretty-printer for resources.<br>
+</div>
 
 <pre><span id="VALnone"><span class="keyword">val</span> none</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">none</code> is the capability to do nothing.<br>
@@ -69,12 +97,12 @@ The type for API resources.<br>
 <code class="code">all</code> is the capability to do everything.<br>
 </div>
 
-<pre><span id="VALallow"><span class="keyword">val</span> allow</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEop">op</a> -><br>       [ `All | `PR | `Ref | `Status | `Webhook ] -> <a href="Datakit_github.Capabilities.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALallow"><span class="keyword">val</span> allow</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEop">op</a> -><br>       [ `Commit<br>       | `Default<br>       | `PR<br>       | `Ref<br>       | `Repo of string list<br>       | `Status of string list<br>       | `Webhook ] -> <a href="Datakit_github.Capabilities.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">allow t o r</code> is <code class="code">t</code> with the capability to do API calls of type
       <code class="code">o</code> to the kind of resource <code class="code">r</code>.<br>
 </div>
 
-<pre><span id="VALdisallow"><span class="keyword">val</span> disallow</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEop">op</a> -><br>       [ `All | `PR | `Ref | `Status | `Webhook ] -> <a href="Datakit_github.Capabilities.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALdisallow"><span class="keyword">val</span> disallow</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEop">op</a> -><br>       [ `Commit<br>       | `Default<br>       | `PR<br>       | `Ref<br>       | `Repo of string list<br>       | `Status of string list<br>       | `Webhook ] -> <a href="Datakit_github.Capabilities.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">disallow t o r</code> is <code class="code">t</code> without the capability to do API calls
       of type <code class="code">o</code> to the kind of resource <code class="code">r</code>.<br>
 </div>
@@ -82,5 +110,11 @@ The type for API resources.<br>
 <pre><span id="VALcheck"><span class="keyword">val</span> check</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEop">op</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEresource">resource</a> -> bool</code></pre><div class="info ">
 <code class="code">check t o r</code> is true if <code class="code">t</code> is allowed to to <code class="code">o</code> on the kind of
       resource <code class="code">r</code>.<br>
+</div>
+
+<pre><span id="VALfilter_diff"><span class="keyword">val</span> filter_diff</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEop">op</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEdiff">Datakit_github.Snapshot.diff</a> -> <a href="Datakit_github.Snapshot.html#TYPEdiff">Datakit_github.Snapshot.diff</a></code></pre><div class="info ">
+<code class="code">filter_diff t op d</code> filters the diff <code class="code">d</code> to only apply the
+      subset of operations <code class="code">op</code> over the capabilities defined by
+      <code class="code">t</code>.<br>
 </div>
 </body></html>

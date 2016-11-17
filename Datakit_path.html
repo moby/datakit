@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Ivfs_blob.html">
+<link rel="previous" href="Fs9p.html">
 <link rel="next" href="Datakit_S.html">
 <link rel="Up" href="index.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
@@ -13,20 +13,19 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_path</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Ivfs_blob.html" title="Ivfs_blob">Previous</a>
+<div class="navbar"><a class="pre" href="Fs9p.html" title="Fs9p">Previous</a>
 &nbsp;<a class="up" href="index.html" title="Index">Up</a>
 &nbsp;<a class="post" href="Datakit_S.html" title="Datakit_S">Next</a>
 </div>
@@ -64,6 +63,11 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <pre><span id="VALof_string_exn"><span class="keyword">val</span> of_string_exn</span> : <code class="type">string -> <a href="Datakit_path.html#TYPEt">t</a></code></pre>
 <pre><span id="VALunwrap"><span class="keyword">val</span> unwrap</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> string list</code></pre><div class="info ">
 Cast to a list of strings<br>
+</div>
+
+<pre><span id="VALpop"><span class="keyword">val</span> pop</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> (<a href="Datakit_path.html#TYPEt">t</a> * string) option</code></pre><div class="info ">
+<code class="code">pop (dir / leaf)</code> is <code class="code"><span class="constructor">Some</span> (dir, leaf)</code>.
+    <code class="code">pop empty</code> is <code class="code"><span class="constructor">None</span></code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">

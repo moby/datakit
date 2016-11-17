@@ -13,14 +13,13 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.Repo</title>
@@ -34,7 +33,7 @@
 
 <pre><span class="keyword">module</span> Repo: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Repo.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
-<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = {</code></pre><table class="typetable">
+<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = private {</code></pre><table class="typetable">
 <tr>
 <td align="left" valign="top" >
 <code>&nbsp;&nbsp;</code></td>
@@ -62,15 +61,23 @@ The type for repository state.<br>
 </div>
 
 
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">user:string -> repo:string -> <a href="Datakit_github.Repo.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">create user string</code> will create a fresh <a href="Datakit_github.Repo.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t</code></a>.<br>
+</div>
+
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for Github repositories.<br>
+</div>
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+<code class="code">compare</code> compares repositories.<br>
 </div>
 
 <pre><span id="VALpp_state"><span class="keyword">val</span> pp_state</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEstate">state</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp_state</code> is the pretty-printer for repository state.<br>
 </div>
 
-<pre><span class="keyword">module</span> <a href="Datakit_github.Repo.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Repo.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
+<pre><span class="keyword">module</span> <a href="Datakit_github.Repo.Set.html">Set</a>: <code class="type"><a href="Datakit_github.SET.html">Datakit_github.SET</a></code><code class="type">  with type elt = t</code></pre><div class="info">
 Sets of repositories.
 </div>
 </body></html>

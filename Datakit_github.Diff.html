@@ -5,7 +5,7 @@
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.Snapshot.html">
-<link rel="next" href="Datakit_github.Conv.html">
+<link rel="next" href="Datakit_github.Capabilities.html">
 <link rel="Up" href="Datakit_github.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -13,72 +13,74 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><link title="Github diffs" rel="Section" href="#1_Githubdiffs">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><link title="GitHub Diffs" rel="Section" href="#1_GitHubDiffs">
 <title>Datakit_github.Diff</title>
 </head>
 <body>
 <div class="navbar"><a class="pre" href="Datakit_github.Snapshot.html" title="Datakit_github.Snapshot">Previous</a>
 &nbsp;<a class="up" href="Datakit_github.html" title="Datakit_github">Up</a>
-&nbsp;<a class="post" href="Datakit_github.Conv.html" title="Datakit_github.Conv">Next</a>
+&nbsp;<a class="post" href="Datakit_github.Capabilities.html" title="Datakit_github.Capabilities">Next</a>
 </div>
 <h1>Module <a href="type_Datakit_github.Diff.html">Datakit_github.Diff</a></h1>
 
 <pre><span class="keyword">module</span> Diff: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Diff.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 <br>
-<h1 id="1_Githubdiffs">Github diffs</h1><br>
+<h1 id="1_GitHubDiffs">GitHub Diffs</h1><br>
 
-<pre><span id="TYPEid"><span class="keyword">type</span> <code class="type"></code>id</span> = <code class="type">[ `Commit of string<br>       | `PR of int<br>       | `Ref of string list<br>       | `Repo<br>       | `Status of string * string list<br>       | `Unknown ]</code> </pre>
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = <code class="type"><a href="Datakit_github.Snapshot.html#TYPEdiff">Datakit_github.Snapshot.diff</a></code> </pre>
 <div class="info ">
-The type for diff identifiers.<br>
-</div>
-
-
-<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = {</code></pre><table class="typetable">
-<tr>
-<td align="left" valign="top" >
-<code>&nbsp;&nbsp;</code></td>
-<td align="left" valign="top" >
-<code><span id="TYPEELTt.repo">repo</span>&nbsp;: <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code>;</code></td>
-
-</tr>
-<tr>
-<td align="left" valign="top" >
-<code>&nbsp;&nbsp;</code></td>
-<td align="left" valign="top" >
-<code><span id="TYPEELTt.id">id</span>&nbsp;: <code class="type"><a href="Datakit_github.Diff.html#TYPEid">id</a></code>;</code></td>
-
-</tr></table>
-}
-
-<div class="info ">
-The type for filesystem diffs.<br>
+The type for differences between GitHub states.<br>
 </div>
 
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
-<code class="code">pp</code> is the pretty-printer for diff values.<br>
+<code class="code">pp</code> is the pretty-printer for diffs.<br>
 </div>
 
 <pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a> -> int</code></pre><div class="info ">
-<code class="code">compare</code> is the comparison function for diff values.<br>
+<code class="code">compare_diff</code> is the comparison function for diffs.<br>
 </div>
 
-<pre><span class="keyword">module</span> <a href="Datakit_github.Diff.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Diff.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
-Set of changes.
+<pre><span id="VALcommit_message"><span class="keyword">val</span> commit_message</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">commit_message d</code> is the commit message corresponding to the
+      diff <code class="code">d</code>.<br>
 </div>
 
-<pre><span id="VALchanges"><span class="keyword">val</span> changes</span> : <code class="type"><a href="Datakit_path.html#TYPEt">Datakit_path.t</a> <a href="Datakit_S.html#TYPEdiff">Datakit_S.diff</a> list -> Set.t</code></pre><div class="info ">
-<code class="code">changes d</code> is the set of GitHub changes carried over in the
-      filesystem changes <code class="code">d</code>.<br>
+<pre><span id="VALempty"><span class="keyword">val</span> empty</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">empty</code> is the empty diff.<br>
+</div>
+
+<pre><span id="VALis_empty"><span class="keyword">val</span> is_empty</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">is_empty d</code> is true if <code class="code">d</code> is empty.<br>
+</div>
+
+<pre><span id="VALupdate"><span class="keyword">val</span> update</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> Datakit_github.Elt.Set.t</code></pre><div class="info ">
+<code class="code">update d</code> are the elements in <code class="code">d</code> which needs to be added or
+      updated.<br>
+</div>
+
+<pre><span id="VALremove"><span class="keyword">val</span> remove</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> Datakit_github.Elt.IdSet.t</code></pre><div class="info ">
+<code class="code">remove d</code> are the elements in <code class="code">d</code> which needs to be deleted.<br>
+</div>
+
+<pre><span id="VALapply"><span class="keyword">val</span> apply</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> -> <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a></code></pre><div class="info ">
+<code class="code">snapsho d s</code> applies <code class="code">d</code> on top of the snapshot <code class="code">s</code>.<br>
+</div>
+
+<pre><span id="VALwith_update"><span class="keyword">val</span> with_update</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">with_update e d</code> is <code class="code">d</code> augmented with the update of <code class="code">e</code>.<br>
+</div>
+
+<pre><span id="VALwith_remove"><span class="keyword">val</span> with_remove</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEid">Datakit_github.Elt.id</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">with_remove e d</code> is <code class="code">d</code> augmented with the removal of <code class="code">e</code>.<br>
 </div>
 </body></html>

@@ -13,14 +13,13 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><link title="Reading" rel="Section" href="#2_Reading">
@@ -48,27 +47,26 @@ All changes to a branch are made in transactions. When a
 <br>
 <h2 id="2_Writing">Writing</h2><br>
 
-<pre><span id="VALcreate_dir"><span class="keyword">val</span> create_dir</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       dir:<a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_dir t ~dir name</code> creates the directory <code class="code">dir/name</code>.<br>
+<pre><span id="VALcreate_dir"><span class="keyword">val</span> create_dir</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">create_dir t path</code> creates the directory <code class="code">path</code>.<br>
 </div>
 
-<pre><span id="VALcreate_file"><span class="keyword">val</span> create_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       dir:<a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       string -><br>       ?executable:bool -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_file t ~dir name ?executable content</code> creates the file
-        <code class="code">dir/name</code>.<br>
+<pre><span id="VALcreate_file"><span class="keyword">val</span> create_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       ?executable:bool -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">create_file t path ?executable content</code> creates the file
+        <code class="code">path</code>.<br>
 </div>
 
-<pre><span id="VALcreate_symlink"><span class="keyword">val</span> create_symlink</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       dir:<a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       string -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_symlink t ~dir name target</code> creates the symlink
-        <code class="code">dir/name</code>.<br>
+<pre><span id="VALcreate_symlink"><span class="keyword">val</span> create_symlink</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">create_symlink t path target</code> creates the symlink <code class="code">path</code>.<br>
 </div>
 
-<pre><span id="VALreplace_file"><span class="keyword">val</span> replace_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       dir:<a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       string -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">replace_file t ~dir name new_content</code> changes the content of
-        the existing file <code class="code">dir/name</code>.<br>
+<pre><span id="VALreplace_file"><span class="keyword">val</span> replace_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">replace_file t path new_content</code> changes the content of
+        the existing file <code class="code">path</code>.<br>
 </div>
 
-<pre><span id="VALcreate_or_replace_file"><span class="keyword">val</span> create_or_replace_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       dir:<a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       string -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_or_replace_file t ~dir leaf content</code> uses either <code class="code">create_file</code>
+<pre><span id="VALcreate_or_replace_file"><span class="keyword">val</span> create_or_replace_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
+<code class="code">create_or_replace_file t path content</code> uses either <code class="code">create_file</code>
         or <code class="code">replace_file</code> as appropriate to set the contents.<br>
 </div>
 

@@ -13,14 +13,13 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.Commit</title>
@@ -34,7 +33,7 @@
 
 <pre><span class="keyword">module</span> Commit: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Commit.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
-<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = {</code></pre><table class="typetable">
+<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = private {</code></pre><table class="typetable">
 <tr>
 <td align="left" valign="top" >
 <code>&nbsp;&nbsp;</code></td>
@@ -56,8 +55,16 @@ The type for commits.<br>
 </div>
 
 
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> string -> <a href="Datakit_github.Commit.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">create repo id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.<br>
+</div>
+
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for commits.<br>
+</div>
+
+<pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">t</a> -> int</code></pre><div class="info ">
+<code class="code">compare</code> compares commits.<br>
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
@@ -66,6 +73,10 @@ The type for commits.<br>
 
 <pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> string</code></pre><div class="info ">
 <code class="code">id t</code> is <code class="code">t</code>'s SHA1.<br>
+</div>
+
+<pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
+<code class="code">equal</code> is the equality functions for commits.<br>
 </div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.Commit.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Commit.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">

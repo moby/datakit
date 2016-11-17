@@ -9,14 +9,13 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Index of types</title>
@@ -27,6 +26,11 @@
 <h1>Index of types</h1>
 <table>
 <tr><td align="left"><br>D</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#TYPEdiff">diff</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+The type for snapshot diffs.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.html#TYPEdiff">diff</a> [<a href="Datakit_S.html">Datakit_S</a>]</td>
 <td></td></tr>
 <tr><td align="left"><br>E</td></tr>
@@ -37,6 +41,11 @@ The type for generic errors.
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#TYPEerror">error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.Ref.html#TYPEevent">event</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<td><div class="info">
+The type for reference events' state.
+</div>
+</td></tr>
 <tr><td align="left"><br>F</td></tr>
 <tr><td><a href="Vfs.File.html#TYPEfd">fd</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
@@ -61,9 +70,21 @@ The type for file IDs (hashes).
 </div>
 </td></tr>
 <tr><td align="left"><br>I</td></tr>
-<tr><td><a href="Datakit_github.Diff.html#TYPEid">id</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
+<tr><td><a href="Datakit_github.Elt.html#TYPEid">id</a> [<a href="Datakit_github.Elt.html">Datakit_github.Elt</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Ref.html#TYPEid">id</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
 <td><div class="info">
-The type for diff identifiers.
+The type for Git reference IDs.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status.html#TYPEid">id</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+The type for build-status IDs.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.PR.html#TYPEid">id</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
+<td><div class="info">
+The type for commit ids.
 </div>
 </td></tr>
 <tr><td align="left"><br>K</td></tr>
@@ -124,11 +145,6 @@ The type for API resources.
 The type for results.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.Conv.html#TYPEresult">result</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
-<td><div class="info">
-The type for conversion results.
-</div>
-</td></tr>
 <tr><td align="left"><br>S</td></tr>
 <tr><td><a href="Vfs.File.Stream.html#TYPEsession">session</a> [<a href="Vfs.File.Stream.html">Vfs.File.Stream</a>]</td>
 <td><div class="info">
@@ -137,11 +153,6 @@ The type for stream sessions.
 </td></tr>
 <tr><td><a href="Datakit_S.html#TYPEstat">stat</a> [<a href="Datakit_S.html">Datakit_S</a>]</td>
 <td></td></tr>
-<tr><td><a href="Datakit_github.Ref.html#TYPEstate">state</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
-<td><div class="info">
-The type for reference state.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_github.Repo.html#TYPEstate">state</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
 <td><div class="info">
 The type for repository state.
@@ -162,11 +173,6 @@ The type for Irmin stores.
 The type for the webhook server state.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.Sync.html#TYPEt">t</a> [<a href="Datakit_github.Sync.html">Datakit_github.Sync</a>]</td>
-<td><div class="info">
-The type for synchronizer state.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_github.Capabilities.html#TYPEt">t</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
 <td><div class="info">
 The type for API capabilities.
@@ -174,14 +180,16 @@ The type for API capabilities.
 </td></tr>
 <tr><td><a href="Datakit_github.Diff.html#TYPEt">t</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
 <td><div class="info">
-The type for filesystem diffs.
+The type for differences between GitHub states.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html#TYPEt">t</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
 <td><div class="info">
-The type for filesystem snapshots.
+The type for GitHub snapshot.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Elt.html#TYPEt">t</a> [<a href="Datakit_github.Elt.html">Datakit_github.Elt</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Event.html#TYPEt">t</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td><div class="info">
 The type for event values.
@@ -217,6 +225,21 @@ The type for Github repositories.
 The type for status states.
 </div>
 </td></tr>
+<tr><td><a href="Ivfs_blob.html#TYPEt">t</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
+<td><div class="info">
+A <code class="code">t</code> is an immutable sequence of bytes.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
+<td><div class="info">
+An immutable directory node.
+</div>
+</td></tr>
+<tr><td><a href="Ivfs_tree.S.File.html#TYPEt">t</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
+<td><div class="info">
+The type for file contents.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
 <td><div class="info">
 A <code class="code">t</code> is a named pointer to a commit.
@@ -237,21 +260,6 @@ A <code class="code">t</code> is a connection to a Datakit server.
 <tr><td><a href="Datakit_path.html#TYPEt">t</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 A <code class="code">path</code> identifies a file or directory (relative to some other directory).
-</div>
-</td></tr>
-<tr><td><a href="Ivfs_blob.html#TYPEt">t</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
-<td><div class="info">
-A <code class="code">t</code> is an immutable sequence of bytes.
-</div>
-</td></tr>
-<tr><td><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
-<td><div class="info">
-An immutable directory node.
-</div>
-</td></tr>
-<tr><td><a href="Ivfs_tree.S.File.html#TYPEt">t</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
-<td><div class="info">
-The type for file contents.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Inode.html#TYPEt">t</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
@@ -281,12 +289,12 @@ The type for FS errors.
 </td></tr>
 <tr><td><a href="Datakit_github.API.html#TYPEtoken">token</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
-The type for API tokens.
+API tokens
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.Conv.html#TYPEtree">tree</a> [<a href="Datakit_github.Conv.html">Datakit_github.Conv</a>]</td>
+<tr><td><a href="Datakit_github.State.html#TYPEtoken">token</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
 <td><div class="info">
-The type for readable filesystem trees.
+The type for state token.
 </div>
 </td></tr>
 </table>

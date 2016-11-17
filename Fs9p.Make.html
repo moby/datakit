@@ -11,14 +11,13 @@
 <link title="Index of module types" rel=Appendix href="index_module_types.html">
 <link title="Vfs" rel="Chapter" href="Vfs.html">
 <link title="Fs9p" rel="Chapter" href="Fs9p.html">
-<link title="Ivfs" rel="Chapter" href="Ivfs.html">
-<link title="Ivfs_debug" rel="Chapter" href="Ivfs_debug.html">
-<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
-<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
-<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
 <link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
 <link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Fs9p.Make</title>
@@ -54,8 +53,8 @@ The type for communication "channels" between the clients and
 </div>
 
 
-<pre><span id="VALaccept"><span class="keyword">val</span> accept</span> : <code class="type">root:<a href="Vfs.Dir.html#TYPEt">Vfs.Dir.t</a> -> <a href="Fs9p.S.html#TYPEflow">flow</a> -> unit Protocol_9p.Error.t Lwt.t</code></pre><div class="info ">
-<code class="code">accept root f</code> accepts connection on <code class="code">f</code>, processs requests
+<pre><span id="VALaccept"><span class="keyword">val</span> accept</span> : <code class="type">root:<a href="Vfs.Dir.html#TYPEt">Vfs.Dir.t</a> -> msg:string -> <a href="Fs9p.S.html#TYPEflow">flow</a> -> unit Protocol_9p.Error.t Lwt.t</code></pre><div class="info ">
+<code class="code">accept ~root f</code> accepts connection on <code class="code">f</code>, processs requests
       and returns when the connection has beenn closed.<br>
 </div>
 </body></html>

@@ -6,7 +6,7 @@ environment:
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
   TESTS: "false"
   OPAM_SWITCH: "4.03.0+mingw64c"
-  PINS: "datakit-server:."
+  PINS: "datakit-server:. irmin.0.12.0:--dev"
 
 install:
   - appveyor DownloadFile https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/appveyor-opam.sh

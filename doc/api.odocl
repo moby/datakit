@@ -1,17 +1,15 @@
-src/vfs/Vfs
+src/datakit-server/Vfs
+src/datakit-server/Fs9p
 
-src/fs9p/Fs9p
+src/datakit-client/Datakit_path
+src/datakit-client/Datakit_S
+src/datakit-client/Datakit_client_9p
 
-src/ivfs/Ivfs
-src/ivfs/Ivfs_debug
-src/ivfs/Ivfs_tree
-src/ivfs/Ivfs_remote
-src/ivfs/Ivfs_blob
+src/datakit/Ivfs
+src/datakit/Ivfs_tree
+src/datakit/Ivfs_remote
+src/datakit/Ivfs_blob
 
-src/client/Datakit_path
-src/client/Datakit_S
-src/client/Datakit_client_9p
-
-bridge/github/src/Datakit_github
-bridge/github/src/Datakit_github_api
-bridge/github/src/Datakit_github_vfs
+bridge/github/Datakit_github
+bridge/github/Datakit_github_api
+bridge/github/Datakit_github_vfs

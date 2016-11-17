@@ -226,7 +226,7 @@ module Ref: sig
   (** The type for Git references. *)
 
   val create : Commit.t -> string list -> t
-  (** [create head name] is a fresh {!t}} with the [head] commit and [name]. *)
+  (** [create head name] is a fresh {!t} with the [head] commit and [name]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)

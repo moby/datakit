@@ -20,8 +20,8 @@ depends: [
   "lwt"
   "logs" "fmt" "mtime" "asl" "win-eventlog" "hvsock"
   "hex" "nocrypto" "conduit"
-  "datakit-server"
-  "datakit-client"
+  "datakit-server" {>= "0.7.0"}
+  "datakit-client" {>= "0.7.0"}
   "github-hooks" {>= "0.1.1"}
   "github" {>= "2.1.0"}
 ]

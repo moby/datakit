@@ -24,7 +24,7 @@ depends: [
   "git"         {>= "1.9.3"}
   "mirage-tc" "uri"
   "mirage-types"
-  "irmin"       {>= "0.10.1"}
+  "irmin"       {>= "0.12.0"}
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result" "lwt"
@@ -36,7 +36,7 @@ depends: [
   "win-eventlog"
   "asl"         {>= "0.10"}
   "mtime"
-  "irmin-watcher" {>= "0.1.3"}
+  "irmin-watcher" {>= "0.2.0"}
   "datakit-client" {test}
   "datakit-server"
   "datakit-github" {test}

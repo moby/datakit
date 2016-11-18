@@ -109,3 +109,12 @@ table.results {
 a.selected-log {
   background: yellow;
 }
+
+span.status {
+  border: 1px solid black;
+  padding: 1px;
+}
+
+table.results span.status {
+  margin-right: 8px;
+}

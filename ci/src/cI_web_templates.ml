@@ -120,20 +120,28 @@ let status state =
   in
   span ~a:[a_class ["label"; colour;]] [span ~a:[a_class ["glyphicon"; icon]] []; pcdata status]
 
+let status_flag ?label status =
+  let cl, icon, status =
+    match status with
+    | `Pending -> "label-warning", "glyphicon-hourglass", "pending"
+    | `Success -> "label-success", "glyphicon-ok","success"
+    | `Error -> "label-danger", "glyphicon-warning-sign", "error"
+    | `Failure -> "label-danger", "glyphicon-remove", "failure"
+  in
+  let tooltip =
+    match label with
+    | None -> status
+    | Some label -> Printf.sprintf "%s : %s" label status
+  in
+  span ~a:[a_class ["status"; "glyphicon"; icon; cl]; a_title tooltip] []
+
 let status_list jobs =
   table ~a:[a_class ["ci-status-list"]] [
     tr (
       jobs |> List.map (fun job ->
           let state = CI_engine.state job in
-          let cl, icon, status =
-            match state.CI_state.status with
-            | `Pending -> "label-warning", "glyphicon-hourglass", "pending"
-            | `Success -> "label-success", "glyphicon-ok","success"
-            | `Error -> "label-danger", "glyphicon-warning-sign", "error"
-            | `Failure -> "label-danger", "glyphicon-remove", "failure"
-          in
-          let tooltip = Printf.sprintf "%s : %s" (CI_engine.job_name job) status in
-          td ~a:[a_class [cl]; a_title tooltip] [span ~a:[a_class ["glyphicon"; icon]] []]
+          let label = CI_engine.job_name job in
+          td [status_flag ~label state.CI_state.status];
         )
     )
   ]
@@ -536,8 +544,10 @@ let score_logs ~best job =
   in
   aux (CI_engine.state job).CI_state.logs
 
-let logs ~csrf_token ~page_url ~selected logs =
+let logs ~csrf_token ~page_url ~selected state =
   let open CI_result.Step_log in
+  let logs = state.CI_state.logs in
+  let last_title = ref None in
   let seen = ref String.Set.empty in
   let selected_branch =
     match selected with
@@ -566,8 +576,10 @@ let logs ~csrf_token ~page_url ~selected logs =
       let branch = CI_live_log.branch live_log in
       seen := String.Set.add branch !seen;
       let title = CI_live_log.title live_log in
+      last_title := Some title;
       [
         form [
+          status_flag `Pending;
           button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
           log_link ~branch ~title (`Live live_log);
@@ -580,17 +592,26 @@ let logs ~csrf_token ~page_url ~selected logs =
         "redirect", [page_url];
       ] in
       let action = Printf.sprintf "/log/rebuild/%s?%s" branch (Uri.encoded_of_query query) in
-      let status = if failed then "failed" else "passed" in
+      let status = if failed then `Failure else `Success in
+      last_title := Some title;
       [
         form ~a:[a_action action; a_method `Post] [
-          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"; status]; a_button_type `Submit] [
+          status_flag status;
+          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
           log_link ~branch ~title (`Saved saved);
         ]
       ]
-    | Pair (a, b) -> aux a @ aux b
+    | Pair (a, b) ->
+      let a = aux a in  (* Order matters, for [last_title] *)
+      let b = aux b in
+      a @ b
   in
-  aux logs
+  let items = aux logs in
+  (* Don't show the overall status if it's the same as the last log title. *)
+  match !last_title with
+  | Some shown when shown = state.CI_state.descr -> items
+  | _ -> items @ [p [status_flag state.CI_state.status; pcdata state.CI_state.descr]]
 
 let job_row ~csrf_token ~page_url ~best_log job =
   let state = CI_engine.state job in
@@ -599,8 +620,7 @@ let job_row ~csrf_token ~page_url ~best_log job =
     th [pcdata job_name];
     td [status state];
     td (
-      p [pcdata state.CI_state.descr] ::
-      logs ~csrf_token ~page_url ~selected:best_log (CI_engine.state job).CI_state.logs
+      logs ~csrf_token ~page_url ~selected:best_log (CI_engine.state job)
     );
   ]
 

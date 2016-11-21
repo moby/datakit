@@ -95,6 +95,10 @@ module type BUILDER = sig
   type value
   (** Output of the builder. *)
 
+  val name : t -> string
+  (** A unique name for this builder.
+      This is used for metric reporting. *)
+
   val title : t -> Key.t -> string
   (** [title t key] is a one-line summary of the operation that is performed by [generate].
       It is used as the reason string for the pending state and as the title of the log. *)

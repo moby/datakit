@@ -88,6 +88,9 @@ module Builder = struct
 
   type value = Commit.t
 
+  let name t =
+    "git:" ^ t.dir
+
   let title _t key =
     Fmt.strf "Git fetch %a" Key.pp key
 
@@ -183,6 +186,9 @@ module Shell_builder = struct
   type context = string         (* Reason to pass to resource pool *)
 
   type value = unit
+
+  let name t =
+    "shell:" ^ t.label
 
   let title t commit =
     Fmt.strf "Run %s on commit %a" t.label Commit.pp commit

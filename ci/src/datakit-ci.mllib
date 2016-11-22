@@ -9,6 +9,7 @@ CI_live_log
 CI_log_reporter
 CI_main
 CI_monitored_pool
+CI_prometheus
 CI_process
 CI_projectID
 CI_result

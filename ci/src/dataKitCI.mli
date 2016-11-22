@@ -230,13 +230,18 @@ module Web : sig
   val config :
     ?name:string ->
     ?state_repo:Uri.t ->
+    ?metrics_token:[`SHA256 of string] ->
     can_read:ACL.t ->
     can_build:ACL.t ->
     unit -> config
   (** [config ~name ~state_repo ~can_read ~can_build ()] is a web configuration.
       If [name] is given, it is used as the main heading, and also as the name of the session cookie
       (useful if you run multiple CIs on the same host, on different ports).
-      If [state_repo] is given, it is used to construct links to the state repository on GitHub. *)
+      If [state_repo] is given, it is used to construct links to the state repository on GitHub.
+      If [metrics_token] is [Some (`SHA256 expected)] given then doing an HTTP
+      GET on [/metrics] with an Authorization header containing "Bearer TTT"
+      will return Prometheus-format metrics if sha256(TTT) = expected. There is
+      no rate limiting, so pick a long [token]. *)
 end
 
 module Config : sig
@@ -349,6 +354,10 @@ module type BUILDER = sig
 
   type value
   (** Output of the builder. *)
+
+  val name : t -> string
+  (** A unique name for this builder.
+      This is used for metric reporting. *)
 
   val title : t -> Key.t -> string
   (** [title t key] is a one-line summary of the operation that is performed by [generate].

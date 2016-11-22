@@ -1,3 +1,12 @@
+module Metrics = struct
+  let namespace = "DataKitCI"
+  let subsystem = "term"
+
+  let evals =
+    let help = "Number of term evaluations" in
+    CI_prometheus.Counter.v ~help ~namespace ~subsystem "evals_total"
+end
+
 module Context = struct
   (* The context in which a term is evaluated. We create a fresh context each time
      the term is evaluated. *)
@@ -79,5 +88,6 @@ let ci_success_target_url ci =
     | Some url -> return url
 
 let run ~snapshot ~target ~recalc ~dk term =
+  CI_prometheus.Counter.inc_one Metrics.evals;
   let ctx = { Context.target; recalc; dk; github = snapshot } in
   (run ctx term, fun () -> Context.disable ctx)

@@ -5,6 +5,27 @@ open Lwt.Infix
 
 module IntSet = Set.Make(CI_utils.Int)
 
+module Metrics = struct
+  let namespace = "DataKitCI"
+  let subsystem = "engine"
+
+  let connection_attempts =
+    let help = "Number of attempted connections to DataKit" in
+    CI_prometheus.Counter.v ~help ~namespace ~subsystem "connection_attempts_total"
+
+  let connection_failures =
+    let help = "Number of failed attempts to connect to DataKit" in
+    CI_prometheus.Counter.v ~help ~namespace ~subsystem "connection_failures_total"
+
+  let status_updates =
+    let help = "Number of status updates" in
+    CI_prometheus.Counter.v ~help ~namespace ~subsystem "status_updates_total"
+
+  let update_notifications =
+    let help = "Number of notifications from DataKit" in
+    CI_prometheus.Counter.v ~help ~namespace ~subsystem "update_notifications_total"
+end
+
 type database = {
   dk : DK.t;
   gh_hooks : CI_github_hooks.t;
@@ -63,14 +84,16 @@ type t = {
 let rec connect connect_dk =
   Lwt.catch
     (fun () ->
-      connect_dk () >|= fun dk ->
-      let gh_hooks = CI_github_hooks.connect dk in
-      {
-        dk;
-        gh_hooks;
-      }
+       CI_prometheus.Counter.inc_one Metrics.connection_attempts;
+       connect_dk () >|= fun dk ->
+       let gh_hooks = CI_github_hooks.connect dk in
+       {
+         dk;
+         gh_hooks;
+       }
     )
     (fun ex ->
+       CI_prometheus.Counter.inc_one Metrics.connection_failures;
        Log.warn (fun f -> f "Failed to connect to DataKit: %s (will retry in 10s)" (Printexc.to_string ex));
        Lwt_unix.sleep 10.0 >>= fun () ->
        connect connect_dk
@@ -112,6 +135,7 @@ let escape_ref path =
   Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" (Datakit_path.unwrap path))
 
 let set_status t { CI_projectID.user; project } target name ~status ~descr =
+  CI_prometheus.Counter.inc_one Metrics.status_updates;
   let commit, target_url =
     match target with
     | `PR pr ->
@@ -275,6 +299,7 @@ let listen ?switch t =
   in
   CI_github_hooks.enable_monitoring gh_hooks (List.map fst (CI_projectID.Map.bindings t.projects)) >>= fun () ->
   CI_github_hooks.monitor ?switch gh_hooks (fun snapshot ->
+      CI_prometheus.Counter.inc_one Metrics.update_notifications;
       t.projects |> CI_projectID.Map.bindings |> Lwt_list.iter_s (fun (project_id, project) ->
           CI_github_hooks.project snapshot project_id >>= fun (prs, refs) ->
           Log.debug (fun f -> f "Monitor iter");

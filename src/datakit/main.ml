@@ -1,6 +1,5 @@
 open Lwt.Infix
 open Result
-open Astring
 
 let src = Logs.Src.create "Datakit" ~doc:"Datakit 9p server"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -57,16 +56,14 @@ module Git_fs_store = struct
     Irmin.Private.Watch.set_listen_dir_hook Irmin_watcher.hook
   )
 
-  let repo ~sandbox path =
-    let path = (if sandbox then "." else "") ^ path in
+  let repo path =
     let config = Irmin_git.config ~root:path ~bare:true () in
     Store.Repo.create config
 
-  let connect ~sandbox path =
+  let connect path =
     Lazy.force listener;
-    let s = if sandbox then " (sandboxed)" else "" in
-    Log.debug (fun l -> l "Using Git-format store %S%s" path s);
-    repo ~sandbox path >|= fun repo ->
+    Log.debug (fun l -> l "Using Git-format store %s" path);
+    repo path >|= fun repo ->
     fun () -> Filesystem.create make_task repo
 end
 
@@ -120,9 +117,9 @@ let http_server uri git =
       In_memory_store.repo () >>= fun repo ->
       In_memory_store.Store.master make_task repo >|= fun t ->
       HTTP.http_spec (t "HTTP server for the in-memory store")
-    | Some (sandbox, path) -> (* on-disk store *)
+    | Some path -> (* on-disk store *)
       let module HTTP = HTTP(Git_fs_store.Store) in
-      Git_fs_store.repo ~sandbox path >>= fun repo ->
+      Git_fs_store.repo path >>= fun repo ->
       Git_fs_store.Store.master make_task repo >|= fun t ->
       HTTP.http_spec (t "HTTP server for the on-disk store")
   end >>= fun spec ->
@@ -133,7 +130,7 @@ let () =
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
     )
 
-let start listen_9p listen_http sandbox git =
+let start listen_9p listen_http git =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -157,11 +154,11 @@ let start listen_9p listen_http sandbox git =
   in
   let serve_9p =
     begin match git with
-      | None                 -> In_memory_store.connect ()
-      | Some (sandbox, path) -> Git_fs_store.connect ~sandbox path
+      | None      -> In_memory_store.connect ()
+      | Some path -> Git_fs_store.connect path
     end >|= fun make_root ->
     List.map (fun addr ->
-        Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid addr
+        Datakit_conduit.accept_forever ~make_root ~serviceid addr
       ) listen_9p
   in
   serve_9p >>= fun serve_9p ->
@@ -177,9 +174,8 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Log.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () listen_9p listen_http sandbox git auto_push =
-  let git = match git with None -> None | Some p -> Some (sandbox, p) in
-  let start () = start listen_9p listen_http sandbox git in
+let start () listen_9p listen_http git auto_push =
+  let start () = start listen_9p listen_http git in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()
@@ -191,10 +187,8 @@ let start () listen_9p listen_http sandbox git auto_push =
           In_memory_store.Store.Repo.watch_branches repo (fun _ _ ->
               Lwt.fail_with "TOTO"
             )
-        | Some (sandbox, path) ->
+        | Some path ->
           Lazy.force Git_fs_store.listener;
-          let prefix = if sandbox then "." else "" in
-          let path = prefix ^ path in
           let push br =
             Log.info (fun l -> l "Pushing %s to %s:%s" path remote br);
             Lwt.catch
@@ -211,7 +205,7 @@ let start () listen_9p listen_http sandbox git auto_push =
                  Lwt.return ()
               )
           in
-          Git_fs_store.repo ~sandbox path >>= fun repo ->
+          Git_fs_store.repo path >>= fun repo ->
           Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)
       in
       watch () >>= fun unwatch ->
@@ -259,15 +253,6 @@ let listen_http =
   in
   Arg.(value & opt (some string) None doc)
 
-let sandbox =
-  let doc =
-    Arg.info ~doc:
-      "Assume we're running inside an OSX sandbox but not a chroot. \
-       All paths will be manually rewritten to be relative \
-       to the current directory." ["sandbox"]
-  in
-  Arg.(value & flag & doc)
-
 let auto_push =
   let doc =
     Arg.info ~doc:"Auto-push the local repository to a remote source."
@@ -282,7 +267,7 @@ let term =
     `P "$(tname) is a Git-like database with a 9p interface.";
   ] in
   Term.(pure start $ setup_log $ listen_9p $ listen_http
-        $ sandbox $ git $ auto_push),
+        $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

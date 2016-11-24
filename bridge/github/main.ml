@@ -84,7 +84,7 @@ let () =
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
     )
 
-let start () sandbox no_listen listen_urls datakit branch cap webhook =
+let start () no_listen listen_urls datakit branch cap webhook =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -144,7 +144,7 @@ let start () sandbox no_listen listen_urls datakit branch cap webhook =
     else
       let make_root = let r = VG.root token in fun () -> r in
       List.map (fun addr ->
-          Datakit_conduit.accept_forever ~make_root ~sandbox ~serviceid addr
+          Datakit_conduit.accept_forever ~make_root ~serviceid addr
         ) listen_urls
   in
   Lwt_main.run @@ Lwt.choose (
@@ -182,15 +182,6 @@ let listen_urls =
   in
   (* FIXME: maybe we want to not listen by default *)
   Arg.(value & opt (list string) [ "tcp://127.0.0.1:5641" ] doc)
-
-let sandbox =
-  let doc =
-    Arg.info ~doc:
-      "Assume we are running inside an OSX sandbox but not a chroot. \
-       All paths will be manually rewritten to be relative \
-       to the current directory." ["sandbox"]
-  in
-  Arg.(value & flag & doc)
 
 let datakit =
   let doc =
@@ -239,7 +230,7 @@ let term =
         filesystem. Also connect to a DataKit instance and ensure a \
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
-  Term.(pure start $ setup_log $ sandbox $ no_listen $ listen_urls $
+  Term.(pure start $ setup_log $ no_listen $ listen_urls $
         datakit $ branch $ capabilities $ webhook),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 

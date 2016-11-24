@@ -159,7 +159,7 @@ let default d = function
   | Some x -> x
   | None -> d
 
-let accept_forever ?backlog ~sandbox ~serviceid ~make_root url =
+let accept_forever ?backlog ~serviceid ~make_root url =
   Lwt.catch (fun () ->
        (* Check if it looks like a UNC name before a URI *)
        if Astring.String.is_prefix ~affix:"\\\\" url then begin
@@ -183,8 +183,7 @@ let accept_forever ?backlog ~sandbox ~serviceid ~make_root url =
          let uri = Uri.of_string url in
          match Uri.scheme uri with
          | Some "file" ->
-           let prefix = if sandbox then "." else "" in
-           Unix.of_path (prefix ^ Uri.path uri) >>= fun socket ->
+           Unix.of_path (Uri.path uri) >>= fun socket ->
            Unix.accept_forever ?backlog uri socket (Unix.handle ~make_root url)
          | Some "tcp" ->
            begin match Uri.path uri with

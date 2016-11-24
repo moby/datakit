@@ -146,6 +146,12 @@ module Ref = struct
     let t = Ref.create head (to_list r.push_event_ref) in
     `Updated t
 
+  let of_deleted_event repo r =
+    match r.delete_event_ref with
+    | `Repository -> Event.Other (repo, "repo-delete")
+    | `Branch s   -> Event.Ref (`Removed (repo, ["refs"; "heads"; s]))
+    | `Tag s      -> Event.Ref (`Removed (repo, ["refs"; "tags"; s]))
+
 end
 
 module Event = struct
@@ -159,7 +165,7 @@ module Event = struct
     | `PullRequest pr -> PR (PR.of_event repo pr)
     | `Push p         -> Ref (Ref.of_event repo p)
     | `Create _       -> other "create"
-    | `Delete _       -> other "delete"
+    | `Delete d       -> Ref.of_deleted_event repo d
     | `Download       -> other "download"
     | `Follow         -> other "follow"
     | `Fork _         -> other "fork"

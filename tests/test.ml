@@ -730,9 +730,37 @@ let test_set = [
   "Debug",      `Quick , run test_debug;
 ]
 
+
+let endpoint = Alcotest.testable Datakit_conduit.pp (=)
+
+type expt = Same | Expect of string
+
+let test_conduit () =
+  let check (te, got, expect) =
+    let expect = match expect with Same -> got | Expect s -> s in
+      match Datakit_conduit.parse ~default_tcp_port:123 got with
+      | `Error e -> Alcotest.fail e
+      | `Ok t    ->
+        Alcotest.(check endpoint) "parse" te t;
+        let got = Fmt.to_to_string Datakit_conduit.pp t in
+        Alcotest.(check string) "pp" expect got
+  in
+  let uri s = Uri.of_string @@ Fmt.strf "hyperv-%s://test" s in
+  List.iter check [
+    `Tcp ("localhost", 1234)      , "tcp://localhost:1234"  ,Same;
+    `Tcp ("localhost", 123)       , "tcp://localhost",
+    Expect "tcp://localhost:123";
+    `File ("foo/bar")             , "file://foo/bar"       , Same;
+    `NamedPipe "\\\\file\\on\\win", "\\\\file\\on\\win"    , Same;
+    `Fd 42                        , "fd://42"              , Same;
+    `HyperV_connect(uri "connect"), "hyperv-connect://test", Same;
+    `HyperV_accept (uri "accept") , "hyperv-accept://test" , Same;
+  ]
+
 let () =
   Alcotest.run "datakit" [
-    "server", test_set;
-    "client", Test_client.test_set;
-    "github", Test_github.test_set;
+    "server" , test_set;
+    "client" , Test_client.test_set;
+    "github" , Test_github.test_set;
+    "conduit", [ "basic", `Quick, test_conduit ];
   ]

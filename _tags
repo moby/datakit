@@ -50,6 +50,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 <tests/*>: package(git irmin.git)
 <tests/*>: package(datakit-client datakit-server.vfs datakit-server.fs9p)
 <tests/*>: package(datakit-github)
+<tests/*>: thread, package(conduit.lwt-unix hvsock.lwt-unix named-pipe.lwt)
 
 ### Painful
 

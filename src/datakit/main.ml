@@ -217,6 +217,8 @@ open Cmdliner
 
 let env_docs = "ENVIRONMENT VARIABLES"
 
+let endpoint port = Datakit_conduit.(parse ~default_tcp_port:port, pp)
+
 let setup_log =
   let env =
     Arg.env_var ~docs:env_docs
@@ -242,7 +244,7 @@ let listen_9p =
        hyperv-accept://vmid/serviceid"
       ["url"; "listen-9p"]
   in
-  Arg.(value & opt (list string) [ "tcp://127.0.0.1:5640" ] doc)
+  Arg.(value & opt (list (endpoint 5640)) [ `Tcp ("127.0.0.1", 5640) ] doc)
 
 let listen_http =
   let doc =

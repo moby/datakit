@@ -63,11 +63,6 @@ let token () =
       )
    )
 
-let parse_address address =
-  match String.cut ~sep:":" address with
-  | Some (proto, address) -> proto, address
-  | _ -> failwith (address ^ ": wrong address, use proto:address")
-
 let set_signal_if_supported signal handler =
   try
     Sys.set_signal signal handler
@@ -117,22 +112,25 @@ let start () no_listen listen_urls datakit branch cap webhook =
       Some (Datakit_github_api.Webhook.create token u)
   in
   let connect_to_datakit () =
-    let proto, address = parse_address datakit in
-    Log.app (fun l -> l "Connecting to %s." datakit);
-    (Lwt.catch
+    Log.app (fun l -> l "Connecting to %a." Datakit_conduit.pp datakit);
+    let proto, address = match datakit with
+      | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
+      | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
+      | p ->
+        Log.err (fun l ->
+            l "Cannot connect over 9p to %a: transport not (yet) supported"
+              Datakit_conduit.pp p);
+        failwith "connect to datakit"
+    in
+    Lwt.catch
        (fun () -> Client9p.connect proto address ())
-       (fun _ ->
-          let str = Fmt.strf
-              "%s is not a valid connect adress. Use 'tcp:hostname:port' or \
-               'unix:path'." datakit
-          in Lwt.fail_with str
-       ))
+       (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
     >>= function
     | Error (`Msg e) ->
       Log.err (fun l -> l "cannot connect: %s" e);
       Lwt.fail_with "connecting to datakit"
     | Ok conn        ->
-      Log.info (fun l -> l "Connected to %s" datakit);
+      Log.info (fun l -> l "Connected to %a" Datakit_conduit.pp datakit);
       let dk = DK.connect conn in
       let t = VG.Sync.empty in
       DK.branch dk branch >>~ fun br ->
@@ -171,6 +169,8 @@ let no_listen =
   in
   Arg.(value & flag doc)
 
+let endpoint port = Datakit_conduit.(parse ~default_tcp_port:port, pp)
+
 let listen_urls =
   let doc =
     Arg.info ~doc:
@@ -181,13 +181,13 @@ let listen_urls =
       ["l"; "listen-urls"]
   in
   (* FIXME: maybe we want to not listen by default *)
-  Arg.(value & opt (list string) [ "tcp://127.0.0.1:5641" ] doc)
+  Arg.(value & opt (list (endpoint 5641)) [ `Tcp ("127.0.0.1", 5641) ] doc)
 
 let datakit =
   let doc =
     Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"]
   in
-  Arg.(value & opt string "tcp:127.0.0.1:5640" doc)
+  Arg.(value & opt (endpoint 5640) (`Tcp ("127.0.0.1", 5640)) doc)
 
 let branch =
   let doc =

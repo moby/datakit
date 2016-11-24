@@ -9,27 +9,27 @@ module Metrics = struct
 
   let builds_started_total =
     let help = "Total number of builds started" in
-    Counter.v_label ~help ~label:"name" ~namespace ~subsystem "builds_started_total"
+    Counter.v_label ~help ~label_name:"name" ~namespace ~subsystem "builds_started_total"
 
   let builds_succeeded_total =
     let help = "Total number of builds that succeeded" in
-    Counter.v_label ~help ~label:"name" ~namespace ~subsystem "builds_succeeded_total"
+    Counter.v_label ~help ~label_name:"name" ~namespace ~subsystem "builds_succeeded_total"
 
   let builds_failed_total =
     let help = "Total number of builds that failed" in
-    Counter.v_label ~help ~label:"name" ~namespace ~subsystem "builds_failed_total"
+    Counter.v_label ~help ~label_name:"name" ~namespace ~subsystem "builds_failed_total"
 
   let build_exceptions_total =
     let help = "Total number of builds that raised an exception" in
-    Counter.v_label ~help ~label:"name" ~namespace ~subsystem "build_exceptions_total"
+    Counter.v_label ~help ~label_name:"name" ~namespace ~subsystem "build_exceptions_total"
 
   let builds_in_progress =
     let help = "Number of builds in progress" in
-    Gauge.v_label ~help ~label:"name" ~namespace ~subsystem "builds_in_progress"
+    Gauge.v_label ~help ~label_name:"name" ~namespace ~subsystem "builds_in_progress"
 
   let build_time =
     let help = "Total build time" in
-    Summary.v_label ~help ~label:"name" ~namespace ~subsystem "build_time"
+    Summary.v_label ~help ~label_name:"name" ~namespace ~subsystem "build_time"
 end
 
 module Path = struct

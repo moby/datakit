@@ -159,7 +159,7 @@ module type METRIC = sig
   type t
   val v_labels : label_names:string array -> ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> family
   val labels : family -> string array -> t
-  val v_label : label:string -> ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> (string -> t)
+  val v_label : label_name:string -> ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> (string -> t)
   val v : ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> t
 end
 
@@ -202,8 +202,8 @@ end = struct
       t.children <- LabelSetMap.add label_values child t.children;
       child
 
-  let v_label ~label ?registry ~help ?namespace ?subsystem name =
-    let family = v_labels ~label_names:[|label|] ?registry ~help ?namespace ?subsystem name in
+  let v_label ~label_name ?registry ~help ?namespace ?subsystem name =
+    let family = v_labels ~label_names:[|label_name|] ?registry ~help ?namespace ?subsystem name in
     fun x -> labels family [| x |]
 
   let v ?registry ~help ?namespace ?subsystem name =

@@ -16,7 +16,7 @@ module type METRIC = sig
   val v_labels : label_names:string array -> ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> family
   val labels : family -> string array -> t
 
-  val v_label : label:string -> ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> (string -> t)
+  val v_label : label_name:string -> ?registry:CollectorRegistry.t -> help:string -> ?namespace:string -> ?subsystem:string -> string -> (string -> t)
   (** [v_label] is a convenience wrapper around [v_labels] for the case where there is a single label.
       The result is a function from the single label's value to the metric. *)
 

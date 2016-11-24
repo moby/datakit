@@ -8,18 +8,23 @@ module Metrics = struct
 
   let qlen =
     let help = "Number of users waiting for a resource" in
-    let family = Gauge.v_labels ~help ~label_names:[|"name"|] ~namespace ~subsystem "qlen" in
-    fun name -> Gauge.labels family [|name|]
+    Gauge.v_label ~help ~label_name:"name" ~namespace ~subsystem "qlen"
 
   let wait_time =
     let help = "Time spent waiting for a resource" in
-    let family = Summary.v_labels ~help ~label_names:[|"name"|] ~namespace ~subsystem "wait_time_seconds" in
-    fun name -> Summary.labels family [|name|]
+    Summary.v_label ~help ~label_name:"name" ~namespace ~subsystem "wait_time_seconds"
 
   let use_time =
     let help = "Time spent using a resource" in
-    let family = Summary.v_labels ~help ~label_names:[|"name"|] ~namespace ~subsystem "use_time_seconds" in
-    fun name -> Summary.labels family [|name|]
+    Summary.v_label ~help ~label_name:"name" ~namespace ~subsystem "use_time_seconds"
+
+  let resources_in_use =
+    let help = "Number of resources currently being used" in
+    Gauge.v_label ~help ~label_name:"name" ~namespace ~subsystem "resources_in_use"
+
+  let capacity =
+    let help = "Total pool capacity" in
+    Gauge.v_label ~help ~label_name:"name" ~namespace ~subsystem "capacity"
 end
 
 type t = {
@@ -37,6 +42,7 @@ let create label capacity =
   let t = { label; capacity; active = 0; pool; users = [] } in
   assert (not (String.Map.mem label !registered_pools));
   registered_pools := String.Map.add label t !registered_pools;
+  CI_prometheus.Gauge.set (Metrics.capacity label) (float_of_int capacity);
   t
 
 let rec remove_first msg = function
@@ -55,6 +61,7 @@ let use ?log t ~reason fn =
        CI_prometheus.Summary.observe (Metrics.wait_time t.label) (stop_wait -. start_wait);
        t.active <- t.active + 1;
        t.users <- (reason, log) :: t.users;
+       CI_prometheus.Gauge.track_inprogress (Metrics.resources_in_use t.label) @@ fun () ->
        Lwt.finalize
          (fun () -> fn v)
          (fun () ->

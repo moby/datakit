@@ -22,7 +22,7 @@ depends: [
   "cmdliner"
   "fmt"
   "logs"
-  "tyxml"
+  "tyxml" {>= "4.0.0"}
   "tls"
   "channel"
   "conduit"

@@ -79,7 +79,12 @@ let () =
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
     )
 
-let start () no_listen listen_urls datakit branch cap webhook =
+type datakit_config = {
+  endpoint: Datakit_conduit.t;
+  branch  : string;
+}
+
+let start () no_listen listen_urls datakit cap webhook =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -93,13 +98,9 @@ let start () no_listen listen_urls datakit branch cap webhook =
       Log.debug (fun l -> l "Caught SIGINT, will exit");
       exit 1
     ));
-  Log.app (fun l ->
-      l "Starting %s %s (%a)...@.\
-         Datakit/GitHub branch is %s@"
-        (Filename.basename Sys.argv.(0)) Version.v
-        Datakit_github.Capabilities.pp cap
-        branch
-    );
+  Log.app (fun l -> l "Starting %s %s (%a)..."
+              (Filename.basename Sys.argv.(0)) Version.v
+              Datakit_github.Capabilities.pp cap);
   let token = match token () with
     | Ok t -> t
     | Error (`Msg m) -> failwith m
@@ -112,30 +113,34 @@ let start () no_listen listen_urls datakit branch cap webhook =
       Some (Datakit_github_api.Webhook.create token u)
   in
   let connect_to_datakit () =
-    Log.app (fun l -> l "Connecting to %a." Datakit_conduit.pp datakit);
-    let proto, address = match datakit with
-      | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
-      | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
-      | p ->
-        Log.err (fun l ->
-            l "Cannot connect over 9p to %a: transport not (yet) supported"
-              Datakit_conduit.pp p);
-        failwith "connect to datakit"
-    in
-    Lwt.catch
-       (fun () -> Client9p.connect proto address ())
-       (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
-    >>= function
-    | Error (`Msg e) ->
-      Log.err (fun l -> l "cannot connect: %s" e);
-      Lwt.fail_with "connecting to datakit"
-    | Ok conn        ->
-      Log.info (fun l -> l "Connected to %a" Datakit_conduit.pp datakit);
-      let dk = DK.connect conn in
-      let t = VG.Sync.empty in
-      DK.branch dk branch >>~ fun br ->
-      VG.Sync.sync ~token ?webhook ~cap br t
-      >|= ignore
+    match datakit with
+    | None   -> let t, _ = Lwt.task () in t
+    | Some d ->
+      Log.app (fun l -> l "Connecting to %a [%s]."
+                  Datakit_conduit.pp d.endpoint d.branch);
+      let proto, address = match d.endpoint with
+        | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
+        | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
+        | p ->
+          Log.err (fun l ->
+              l "Cannot connect over 9p to %a: transport not (yet) supported"
+                Datakit_conduit.pp p);
+          failwith "connect to datakit"
+      in
+      Lwt.catch
+        (fun () -> Client9p.connect proto address ())
+        (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
+      >>= function
+      | Error (`Msg e) ->
+        Log.err (fun l -> l "cannot connect: %s" e);
+        Lwt.fail_with "connecting to datakit"
+      | Ok conn        ->
+        Log.info (fun l -> l "Connected to %a" Datakit_conduit.pp d.endpoint);
+        let dk = DK.connect conn in
+        let t = VG.Sync.empty in
+        DK.branch dk d.branch >>~ fun br ->
+        VG.Sync.sync ~token ?webhook ~cap br t
+        >|= ignore
   in
   let accept_9p_connections () =
     if no_listen || listen_urls = [] then []
@@ -152,6 +157,9 @@ let start () no_listen listen_urls datakit branch cap webhook =
 open Cmdliner
 
 let env_docs = "ENVIRONMENT VARIABLES"
+let datakit_options = "DATAKIT OPTIONS"
+let listen_options = "LISTEN OPTIONS"
+let github_options = "GITHUB OPTIONS"
 
 let setup_log =
   let env =
@@ -164,16 +172,18 @@ let setup_log =
         $ Datakit_log.log_clock)
 
 let no_listen =
+  let docs = listen_options in
   let doc =
-    Arg.info ~doc:"Do not expose the GitHub API over 9p" ["no-listen"]
+    Arg.info ~docs ~doc:"Do not expose the GitHub API over 9p" ["no-listen"]
   in
   Arg.(value & flag doc)
 
 let endpoint port = Datakit_conduit.(parse ~default_tcp_port:port, pp)
 
 let listen_urls =
+  let docs = listen_options in
   let doc =
-    Arg.info ~doc:
+    Arg.info ~docs ~doc:
       "Expose the GitHub API over 9p endpoints. That command-line argument \
        takes a comma-separated list of URLs to listen on of the form \
        file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
@@ -183,15 +193,22 @@ let listen_urls =
   (* FIXME: maybe we want to not listen by default *)
   Arg.(value & opt (list (endpoint 5641)) [ `Tcp ("127.0.0.1", 5641) ] doc)
 
-let datakit =
+let no_datakit =
+  let docs = datakit_options in
+  let doc = Arg.info ~doc:"Do not connect to datakit" ~docs ["no-datakit"] in
+  Arg.(value & flag doc)
+
+let datakit_endpoint =
+  let docs = datakit_options in
   let doc =
-    Arg.info ~doc:"The DataKit instance to connect to" ["d"; "datakit"]
+    Arg.info ~docs ~doc:"The DataKit instance to connect to" ["d"; "datakit"]
   in
   Arg.(value & opt (endpoint 5640) (`Tcp ("127.0.0.1", 5640)) doc)
 
 let branch =
+  let docs = datakit_options in
   let doc =
-    Arg.info
+    Arg.info ~docs
       ~doc:"DataKit/GitHub branch. Reflect the GitHub state. \
             Writes to this branch will be translated into    \
             GitHub API calls."
@@ -199,14 +216,21 @@ let branch =
   in
   Arg.(value & opt string "github-metadata" doc)
 
+let datakit =
+  let create no endpoint branch =
+    if no then None else Some { endpoint; branch }
+  in
+  Term.(pure create $ no_datakit $ datakit_endpoint $ branch)
+
 let uri =
   let parse str = `Ok (Uri.of_string str) in
   let print ppf uri = Fmt.string ppf @@ Uri.to_string uri in
   parse, print
 
 let webhook =
+  let docs = github_options in
   let doc =
-    Arg.info ~doc:"Public URI of the GitHub webhook server" ["webhook"]
+    Arg.info ~docs ~doc:"Public URI of the GitHub webhook server" ["webhook"]
   in
   Arg.(value & opt (some uri) None doc)
 
@@ -214,8 +238,9 @@ let cap: Datakit_github.Capabilities.t Cmdliner.Arg.converter =
   Datakit_github.Capabilities.(parse, pp)
 
 let capabilities =
+  let docs = github_options in
   let doc =
-    Arg.info ~doc:
+    Arg.info ~docs ~doc:
       "A comma-separated list of API capabilities, for instance \
        `*:r,status:rw` to allow the read of all resources but only the write \
        of build status." ["c"; "capabilities"]
@@ -230,8 +255,8 @@ let term =
         filesystem. Also connect to a DataKit instance and ensure a \
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
-  Term.(pure start $ setup_log $ no_listen $ listen_urls $
-        datakit $ branch $ capabilities $ webhook),
+  Term.(pure start $ setup_log $ no_listen $ listen_urls
+        $ datakit $ capabilities $ webhook),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

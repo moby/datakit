@@ -216,6 +216,8 @@ let start () listen_9p listen_http git auto_push =
 open Cmdliner
 
 let env_docs = "ENVIRONMENT VARIABLES"
+let listen_options = "LISTEN OPTIONS"
+let git_options = "GIT OPTIONS"
 
 let endpoint port = Datakit_conduit.(parse ~default_tcp_port:port, pp)
 
@@ -230,14 +232,25 @@ let setup_log =
         $ Datakit_log.log_clock)
 
 let git =
+  let docs = git_options in
   let doc =
-    Arg.info ~doc:"The path of an existing Git repository to serve" ["git"]
+    Arg.info ~docs ~doc:"The path of an existing Git repository to serve"
+      ["git"]
+  in
+  Arg.(value & opt (some string) None doc)
+
+let auto_push =
+  let docs = git_options in
+  let doc =
+    Arg.info ~doc:"Auto-push the local repository to a remote source."
+      ~docs ~docv:"URL" ["auto-push"]
   in
   Arg.(value & opt (some string) None doc)
 
 let listen_9p =
+  let docs = listen_options in
   let doc =
-    Arg.info ~doc:
+    Arg.info ~docs ~doc:
       "A comma-separated list of URLs to listen on for 9p connections, on \
        the form file:///var/tmp/foo or tcp://host:port or \
        \\\\\\\\.\\\\pipe\\\\foo or hyperv-connect://vmid/serviceid or \
@@ -247,18 +260,12 @@ let listen_9p =
   Arg.(value & opt (list (endpoint 5640)) [ `Tcp ("127.0.0.1", 5640) ] doc)
 
 let listen_http =
+  let docs = listen_options in
   let doc =
-    Arg.info ~doc:
+    Arg.info ~docs ~doc:
       "An URL to listen on for HTTP connection, on of the form \
        port or host:port"
       ["listen-http"]
-  in
-  Arg.(value & opt (some string) None doc)
-
-let auto_push =
-  let doc =
-    Arg.info ~doc:"Auto-push the local repository to a remote source."
-      ~docv:"URL" ["auto-push"]
   in
   Arg.(value & opt (some string) None doc)
 

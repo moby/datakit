@@ -2,6 +2,9 @@ open Datakit_github
 open Github_t
 open Astring
 
+let src = Logs.Src.create "dkt-github" ~doc:"Github to Git bridge"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 type token = Github.Token.t
 
 module PR = struct
@@ -218,10 +221,47 @@ open Lwt.Infix
 
 type 'a result = ('a, string) Result.result Lwt.t
 
+type t = Run: ('a Github.Monad.t * ('a -> unit)) -> t
+
+module Run = struct
+
+  let events = ref []
+  let cond = Lwt_condition.create ()
+
+  let enqueue e =
+    events := e :: !events;
+    Lwt_condition.signal cond ()
+
+  let rec wait () =
+    match List.rev !events with
+    | []   -> Lwt_condition.wait cond >>= wait
+    | h::t -> events := List.rev t; Lwt.return h
+
+  let rec schedule () =
+    let open Github.Monad in
+    embed (wait ()) >>= fun (Run (x, send)) ->
+    x >>= fun x ->
+    send x;
+    schedule ()
+
+  let rec for_ever () =
+    Lwt.catch
+      (fun () -> Github.Monad.run @@ schedule ())
+      (fun e  ->
+         Log.err
+           (fun l -> l "GitHub scheduler caught %a, restarting" Fmt.exn e);
+         for_ever ())
+
+end
+
+let () = Lwt.async Run.for_ever
+
 let run x =
+  let t, u = Lwt.task () in
+  Run.enqueue (Run (x, Lwt.wakeup u));
   Lwt.catch
-    (fun () -> Github.Monad.run x >|= fun x -> Ok x)
-    (fun e -> Lwt.return (Error (Fmt.strf "Github: %s" (Printexc.to_string e))))
+    (fun () -> t >|= fun x -> Ok x)
+    (fun e  -> Lwt.return (Error (Fmt.strf "Github: %a" Fmt.exn e)))
 
 let user_exists token ~user =
   try

@@ -42,4 +42,4 @@ val run :
   recalc:(unit -> unit) ->
   dk:(unit -> CI_utils.DK.t Lwt.t) ->
   'a t -> ('a CI_result.t * CI_result.Step_log.t) Lwt.t * (unit -> unit)
-(* [run ~snapshot ~recalc ~dk] is the pair [(state, cancel)]. *)
+(* [run ~snapshot ~job_id ~recalc ~dk] is the pair [(state, cancel)]. *)

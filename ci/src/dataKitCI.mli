@@ -209,7 +209,7 @@ module Term : sig
 
   val github_target : Target.Full.t -> Github_hooks.Target.t t
   (** [github_target id] evaluates to the GitHub metadata of the named target.
-      Note that this is a snapshot - it points to the head at the time of the call. *)
+      Note that this is a snapshot. *)
 
   val head : Target.Full.t -> Github_hooks.Commit.t t
   (** [head target] evaluates to the commit at the head [target]. *)

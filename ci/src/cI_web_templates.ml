@@ -386,7 +386,13 @@ let html_of_user ~csrf_token ((job, label), log) =
     "CSRFToken", [csrf_token];
   ] in
   let action = Printf.sprintf "/cancel/%s?%s" branch (Uri.encoded_of_query query) in
-  let reason = Fmt.strf "%a:%s%a" CI_target.Full.pp (fst job) (snd job) pp_opt_label label in
+  let target, job_name = job in
+  let link =
+    match target with
+    | project, `Ref id -> ref_url project id
+    | project, `PR id -> pr_url project id
+  in
+  let reason = Fmt.strf "%a:%s%a" CI_target.Full.pp target job_name pp_opt_label label in
   [
     br ();
     form ~a:[a_class ["cancel"]; a_action action; a_method `Post] [
@@ -394,7 +400,7 @@ let html_of_user ~csrf_token ((job, label), log) =
         span ~a:[a_class ["glyphicon"; "glyphicon-remove"]] []; pcdata "Cancel"
       ];
     ];
-    pcdata reason;
+    a ~a:[a_href link] [pcdata reason];
   ]
 
 let resource_pools ~csrf_token =

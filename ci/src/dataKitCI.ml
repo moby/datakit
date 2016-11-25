@@ -1,5 +1,7 @@
 module Step_log = CI_result.Step_log
 
+type job_id = CI_s.job_id
+
 type 'a lwt_status = 'a CI_s.lwt_status
 
 module Term = CI_term
@@ -14,6 +16,7 @@ module Cache = CI_cache
 module type BUILDER = CI_s.BUILDER
 module DK = Utils.DK
 module ACL = CI_ACL
+module Target = CI_target
 
 module Web = struct
   type config = CI_web_templates.t

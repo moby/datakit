@@ -149,12 +149,12 @@ let connect ~logs ~dir =
     fetches = PR_Cache.create ~logs repo;
   }
 
-let fetch_head t =
+let fetch_head t target =
   let ( >>~= ) = Term.Infix.( >>= ) in
-  Term.target >>~= PR_Cache.term t.fetches Builder.NoContext
+  Term.github_target target >>~= PR_Cache.term t.fetches Builder.NoContext
 
-let with_checkout ~log ~reason {Commit.repo = {dir; dir_lock; _}; hash} fn =
-  Live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (Monitored_pool.use ~log ~reason dir_lock) @@ fun () ->
+let with_checkout ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
+  Live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (Monitored_pool.use ~log dir_lock job_id) @@ fun () ->
   let output = Live_log.write log in
   Lwt_mutex.with_lock git_lock (fun () ->
       Process.run ~cwd:dir ~output ("", [| "git"; "reset"; "--hard"; hash |]) >>= fun () ->
@@ -163,10 +163,10 @@ let with_checkout ~log ~reason {Commit.repo = {dir; dir_lock; _}; hash} fn =
   >>= fun () ->
   fn dir
 
-let with_clone ~log {Commit.repo = {dir; dir_lock; _}; hash} fn =
+let with_clone ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
   let output = Live_log.write log in
   Utils.with_tmpdir ~prefix:"with_clone" ~mode:0o700 @@ fun tmpdir ->
-  Live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (Monitored_pool.use ~log ~reason:"Clone" dir_lock) (fun () ->
+  Live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (Monitored_pool.use ~log dir_lock job_id) (fun () ->
       Process.run ~output ("", [| "git"; "clone"; dir; tmpdir |])
     )
   >>= fun () ->
@@ -183,7 +183,7 @@ module Shell_builder = struct
 
   module Key = Commit
 
-  type context = string         (* Reason to pass to resource pool *)
+  type context = DataKitCI.job_id
 
   type value = unit
 
@@ -193,7 +193,7 @@ module Shell_builder = struct
   let title t commit =
     Fmt.strf "Run %s on commit %a" t.label Commit.pp commit
 
-  let generate t ~switch ~log _trans reason git_dir =
+  let generate t ~switch ~log _trans job_id git_dir =
     let build working_dir =
       Utils.with_timeout ~switch t.timeout (fun switch ->
           let output = Live_log.write log in
@@ -207,9 +207,9 @@ module Shell_builder = struct
         )
     in
     if t.clone then
-      with_clone ~log git_dir build
+      with_clone ~job_id ~log git_dir build
     else
-      with_checkout ~reason ~log git_dir build
+      with_checkout ~job_id ~log git_dir build
 
   let branch t commit =
     Printf.sprintf "shell-of-%s-on-%s" t.label (Commit.hash commit)
@@ -227,6 +227,5 @@ let command ~logs ~timeout ~label ~clone cmds =
 
 let run command git_dir =
   let open! Term.Infix in
-  Term.target >>= fun target ->
-  let reason = Fmt.strf "Build %a" Term.pp_target target in
-  Shell_cache.term command reason git_dir
+  Term.job_id >>= fun job ->
+  Shell_cache.term command job git_dir

@@ -20,15 +20,15 @@ end
 val connect : logs:Live_log.manager -> dir:string -> t
 (** [connect ~logs ~dir] is the local Git repository at [dir]. *)
 
-val fetch_head : t -> Commit.t Term.t
-(** [fetch_head] evaluates to a local branch with a copy of the context PR's head commit (downloading it first if needed). *)
+val fetch_head : t -> Target.Full.t -> Commit.t Term.t
+(** [fetch_head t target] evaluates to a local branch in [t] with a copy of [target]'s head commit (downloading it first if needed). *)
 
-val with_checkout : log:Live_log.t -> reason:string -> Commit.t -> (string -> 'a Lwt.t) -> 'a Lwt.t
-(** [with_checkout ~log ~reason commit fn] is [fn path], where [path] is the path of a local checkout of [commit].
+val with_checkout : log:Live_log.t -> job_id:job_id -> Commit.t -> (string -> 'a Lwt.t) -> 'a Lwt.t
+(** [with_checkout ~log ~job_id commit fn] is [fn path], where [path] is the path of a local checkout of [commit].
     [path] must not be used after [fn]'s thread terminates.
-    The directory is locked while [fn] runs with [reason] displayed to show why it is busy. *)
+    The directory is locked while [fn] runs with [job_id] displayed to show why it is busy. *)
 
-val with_clone : log:Live_log.t -> Commit.t -> (string -> 'a Lwt.t) -> 'a Lwt.t
+val with_clone : log:Live_log.t -> job_id:job_id -> Commit.t -> (string -> 'a Lwt.t) -> 'a Lwt.t
 (** [with_clone] is similar to [with_checkout] but clones the repository to a temporary directory first.
     This means that the repository does not need to be locked while the callback function runs. *)
 

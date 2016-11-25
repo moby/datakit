@@ -1,5 +1,7 @@
 open Astring
 
+type job_id
+
 module DK : Datakit_S.CLIENT with type error = Protocol_9p_error.error
 
 module Live_log : sig
@@ -104,6 +106,12 @@ module Github_hooks : sig
     val dump : t Fmt.t
     val compare : t -> t -> int
   end
+
+  module Target : sig
+    type t = [ `PR of PR.t | `Ref of Ref.t ]
+
+    val head : t -> Commit.t
+  end
 end
 
 module Step_log : sig
@@ -119,6 +127,23 @@ end
 type 'a lwt_status = ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result * Step_log.t
 (** ['a lwt_status] is similar to ['a or_error], except that the pending state also indicates when
     it should be checked again. *)
+
+module Target : sig
+  module ID : sig
+    type t = [ `PR of int | `Ref of Datakit_path.t ]
+    val pp : t Fmt.t
+    val compare : t -> t -> int
+  end
+
+  module Full : sig
+    type t = ProjectID.t * ID.t
+
+    val project : t -> ProjectID.t
+    val id : t -> ID.t
+
+    val pp : t Fmt.t
+  end
+end
 
 module Term : sig
   type 'a t
@@ -178,13 +203,16 @@ module Term : sig
   (** [list_map_p fn l] will map the [l] list of terms to [fn] in parallel and
      return the result list when all of them have completed. *)
 
-  val target : [`PR of Github_hooks.PR.t | `Ref of Github_hooks.Ref.t] t
-  (** [target] evaluates to the PR or branch being tested. *)
+  val job_id : job_id t
+  (** [job_id] evaluates to the job that evaluates the term.
+      This is useful for logging. *)
 
-  val pp_target : [`PR of Github_hooks.PR.t | `Ref of Github_hooks.Ref.t] Fmt.t
+  val github_target : Target.Full.t -> Github_hooks.Target.t t
+  (** [github_target id] evaluates to the GitHub metadata of the named target.
+      Note that this is a snapshot - it points to the head at the time of the call. *)
 
-  val head : Github_hooks.Commit.t t
-  (** [head] evaluates to the commit at the head of the context's PR. *)
+  val head : Target.Full.t -> Github_hooks.Commit.t t
+  (** [head target] evaluates to the commit at the head [target]. *)
 
   val branch_head : ProjectID.t -> string -> Github_hooks.Commit.t t
   (** [branch_head project b] evaluates to the commit at the head of branch [b] in [project]. *)
@@ -195,16 +223,16 @@ module Term : sig
   val dk : (unit -> DK.t Lwt.t) t
   (** [dk] is a function for getting the current DataKit connection. *)
 
-  val ci_status : string -> [`Pending | `Success | `Failure | `Error] option t
-  (** [ci_status ci] is the status reported by CI [ci].
+  val ci_status : string -> Target.Full.t -> [`Pending | `Success | `Failure | `Error] option t
+  (** [ci_status ci target] is the status reported by CI [ci] for [target].
       Note that even if the CI is e.g. pending, this returns a successful result with
       the value [`Pending], not a pending result. *)
 
-  val ci_target_url : string -> Uri.t option t
-  (** [ci_target_url ci] is the target URL reported by CI [ci]. *)
+  val ci_target_url : string -> Target.Full.t -> Uri.t option t
+  (** [ci_target_url ci target] is the target URL reported by CI [ci]. *)
 
-  val ci_success_target_url : string -> Uri.t t
-  (** [ci_success_target_url ci] is the URL of the *successful* build [ci].
+  val ci_success_target_url : string -> Target.Full.t -> Uri.t t
+  (** [ci_success_target_url ci target] is the URL of the *successful* build [ci].
       It is pending until a successful URL is available. *)
 end
 
@@ -252,7 +280,7 @@ module Config : sig
   val project :
     id:string ->
     ?dashboards:string list ->
-    (string * test) list ->
+    (Target.Full.t -> (string * test) list) ->
     project
   (** [project ~id tests] is the configuration for a single GitHub project.
       [tests] is a list tests to apply to branches, tags and open PRs within the project.
@@ -334,9 +362,9 @@ module Monitored_pool : sig
 
   val create : string -> int -> t
 
-  val use : t -> reason:string -> ?log:Live_log.t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
-  (** [use t ~reason fn] evaluates [fn ()] with one pool resource held.
-      [reason] will be displayed as the reason why the resource is in use.
+  val use : t -> ?log:Live_log.t -> ?label:string -> job_id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  (** [use t job fn] evaluates [fn ()] with one pool resource held.
+      [job] (and [label]) will be displayed as the reason why the resource is in use.
       If [log] is provided then a message will be logged if we have to wait, and
       if the log is cancellable then the user will be able to cancel the operation. *)
 end
@@ -420,7 +448,7 @@ module Private : sig
   val connect: Client9p.t -> DK.t
 
   val test_engine : web_ui:Uri.t -> (unit -> DK.t Lwt.t) ->
-    (string Term.t String.Map.t) ProjectID.Map.t ->
+    (Target.Full.t -> string Term.t String.Map.t) ProjectID.Map.t ->
     engine
 
   val listen : ?switch:Lwt_switch.t -> engine -> [`Abort] Lwt.t

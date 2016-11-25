@@ -13,28 +13,28 @@ module Workflows = struct
 
   let circle_success_url = T.ci_success_target_url "ci/circleci" 
 
-  let test_circleci_artifact check_build =
-    circle_success_url >>= fun url ->
+  let test_circleci_artifact check_build target =
+    circle_success_url target >>= fun url ->
     T.of_lwt_slow (check_build (Uri.to_string url))
 
-  let simple_parallel check_build =
+  let simple_parallel check_build _target =
     let a = T.of_lwt_slow (check_build "a") in
     let b = T.of_lwt_slow (check_build "b") in
     T.return (^) $ a $ b
 
-  let test_cross_project _check_build =
+  let test_cross_project _check_build target =
     let other = ProjectID.v ~user:"bob" ~project:"bproj" in
-    let pr = T.head >|= Github_hooks.Commit.hash in
+    let pr = T.head target >|= Github_hooks.Commit.hash in
     let other_master = T.branch_head other "master" >|= Github_hooks.Commit.hash in
     T.return (Fmt.strf "Compile %s with %s") $ pr $ other_master
 
   let ls = DKCI_git.command ~timeout:60.0 ~label:"ls" ~clone:false [[| "ls" |]]
   let ls_clone = DKCI_git.command ~timeout:60.0 ~label:"ls" ~clone:true [[| "ls" |]]
-  let pull_and_run local_repo ~cmd check_build =
-    DKCI_git.fetch_head local_repo >>= DKCI_git.run cmd >>= fun () ->
+  let pull_and_run local_repo ~cmd check_build target =
+    DKCI_git.fetch_head local_repo target >>= DKCI_git.run cmd >>= fun () ->
     T.of_lwt_slow (check_build "a")
 
-  let pass check_build =
+  let pass check_build _target =
     T.of_lwt_slow (check_build "pass")
 end
 

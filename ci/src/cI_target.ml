@@ -20,6 +20,9 @@ module ID_Set = Set.Make(ID)
 module Full = struct
   type t = CI_projectID.t * ID.t
 
+  let project = fst
+  let id = snd
+
   let parse s =
     let ( >>= ) x f =
       match x with

@@ -12,10 +12,9 @@ open! Astring
 open Lwt.Infix
 
 type t = DK.t
-type snapshot = DK.Commit.t
 
 type project_snapshot = {
-  project_id: CI_projectID.t;
+  project_id : CI_projectID.t;
   root : DK.Tree.t;
 }
 
@@ -170,42 +169,83 @@ let read_opt_dir {project_id; root} path =
 
 let prs snapshot =
   read_opt_dir snapshot prs_dir >>=
-  Lwt_list.filter_map_s (fun id ->
+  Lwt_list.fold_left_s (fun acc id ->
       match String.to_int id with
-      | Some id -> pr snapshot id
-      | None -> Log.warn (fun f -> f "Invalid PR ID %S" id); Lwt.return None
-    )
+      | None -> Log.warn (fun f -> f "Invalid PR ID %S" id); Lwt.return acc
+      | Some id -> pr snapshot id >|= function
+        | None -> acc
+        | Some value -> IntMap.add id value acc
+    ) IntMap.empty
 
 let refs snapshot =
   let open! Datakit_path.Infix in
+  let results = ref Datakit_path.Map.empty in
   let rec scan ~context leaf =
     let context = context / leaf in
     read_opt_file snapshot (refs_dir /@ context / "head") >>= function
     | Some head ->
       let hash = String.trim (Cstruct.to_string head) in
       let head = { Commit.snapshot; hash } in
-      Lwt.return [ { Ref.head; name = context } ]
+      results := Datakit_path.Map.add context { Ref.head; name = context } !results;
+      Lwt.return ()
     | None ->
       read_opt_dir snapshot (refs_dir /@ context) >>=
-      Lwt_list.map_s (scan ~context) >|=
-      List.flatten
+      Lwt_list.iter_s (scan ~context)
   in
   read_opt_dir snapshot refs_dir >>=
-  Lwt_list.map_s (scan ~context:Datakit_path.empty) >|=
-  List.flatten
+  Lwt_list.iter_s (scan ~context:Datakit_path.empty) >|= fun () ->
+  !results
 
-let project commit project_id =
-  let root = DK.Commit.tree commit in
-  let snapshot = { project_id; root } in
-  prs snapshot >>= fun prs ->
-  refs snapshot >>= fun refs ->
-  Lwt.return (prs, refs)
+module Target = struct
+  type t = [ `PR of PR.t | `Ref of Ref.t ]
+
+  let dispatch p r = function
+    | `PR x -> p x
+    | `Ref x -> r x
+
+  let head = dispatch PR.head Ref.head
+end
+
+module Snapshot = struct
+  type t = {
+    commit : DK.Commit.t;
+    mutable projects : (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t CI_projectID.Map.t;
+  }
+
+  let project t project_id =
+    match CI_projectID.Map.find project_id t.projects with
+    | Some p -> p
+    | None ->
+      let p =
+        let root = DK.Commit.tree t.commit in
+        let p_snapshot = { project_id; root } in
+        prs p_snapshot >>= fun prs ->
+        refs p_snapshot >>= fun refs ->
+        Lwt.return (prs, refs)
+      in
+      t.projects <- CI_projectID.Map.add project_id p t.projects;
+      p
+
+  let ( >|?= ) x f =
+    match x with
+    | None -> None
+    | Some y -> Some (f y)
+
+  let find id t =
+    project t (CI_target.Full.project id) >|= fun (prs, refs) ->
+    match CI_target.Full.id id with
+    | `PR pr -> IntMap.find pr prs >|?= fun x -> `PR x
+    | `Ref x ->
+      match Datakit_path.Map.find x refs with
+      | x -> Some (`Ref x)
+      | exception Not_found -> None
+end
 
 let snapshot t =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.head metadata >|*= function
   | None -> failf "Metadata branch does not exist!"
-  | Some snapshot -> snapshot
+  | Some commit -> { Snapshot.commit; projects = CI_projectID.Map.empty }
 
 let enable_monitoring t projects =
   DK.branch t metadata_branch >>*= fun metadata_branch ->
@@ -236,7 +276,8 @@ let monitor t ?switch fn =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.wait_for_head metadata ?switch (function
       | None -> ok `Again
-      | Some snapshot ->
+      | Some commit ->
+        let snapshot = { Snapshot.commit; projects = CI_projectID.Map.empty } in
         fn snapshot >>= fun () -> ok `Again
     )
   >|*= function

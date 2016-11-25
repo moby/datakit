@@ -371,7 +371,11 @@ let dashboard_table _id (refs, targets) acc =
   let widget_pairs = make_pairs [] widgets in
   List.fold_left (fun acc x -> dashboard_row acc x) [] widget_pairs @ acc
 
-let html_of_user ~csrf_token (reason, log) =
+let pp_opt_label f = function
+  | None -> ()
+  | Some label -> Fmt.pf f ": %s" label
+
+let html_of_user ~csrf_token ((job, label), log) =
   let cancel_attrs, branch =
     match log with
     | Some log when CI_live_log.can_cancel log -> [], CI_live_log.branch log
@@ -382,6 +386,13 @@ let html_of_user ~csrf_token (reason, log) =
     "CSRFToken", [csrf_token];
   ] in
   let action = Printf.sprintf "/cancel/%s?%s" branch (Uri.encoded_of_query query) in
+  let target, job_name = job in
+  let link =
+    match target with
+    | project, `Ref id -> ref_url project id
+    | project, `PR id -> pr_url project id
+  in
+  let reason = Fmt.strf "%a:%s%a" CI_target.Full.pp target job_name pp_opt_label label in
   [
     br ();
     form ~a:[a_class ["cancel"]; a_action action; a_method `Post] [
@@ -389,7 +400,7 @@ let html_of_user ~csrf_token (reason, log) =
         span ~a:[a_class ["glyphicon"; "glyphicon-remove"]] []; pcdata "Cancel"
       ];
     ];
-    pcdata reason;
+    a ~a:[a_href link] [pcdata reason];
   ]
 
 let resource_pools ~csrf_token =

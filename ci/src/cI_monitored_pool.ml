@@ -32,7 +32,7 @@ type t = {
   capacity: int;
   mutable active: int;
   pool: unit Lwt_pool.t;
-  mutable users : (string * CI_live_log.t option) list;
+  mutable users : ((CI_s.job_id * string option) * CI_live_log.t option) list;
 }
 
 let registered_pools = ref String.Map.empty
@@ -72,7 +72,8 @@ let use ?log t ~reason fn =
             Lwt.return_unit)
     )
 
-let use t ~reason ?log fn =
+let use t ?log ?label job_id fn =
+  let reason = (job_id, label) in
   match log with
   | None -> use ?log t ~reason fn
   | Some log ->

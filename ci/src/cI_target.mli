@@ -9,7 +9,10 @@ end
 module ID_Set : Set.S with type elt = ID.t
 
 module Full : sig
-  type t
+  type t = CI_projectID.t * ID.t
+  val pp : t Fmt.t
   val arg : t Cmdliner.Arg.converter
+  val project : t -> CI_projectID.t
+  val id : t -> ID.t
   val map_of_list : t list -> ID_Set.t CI_projectID.Map.t
 end

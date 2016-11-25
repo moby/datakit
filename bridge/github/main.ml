@@ -102,8 +102,10 @@ let start () no_listen listen_urls datakit cap webhook =
               (Filename.basename Sys.argv.(0)) Version.v
               Datakit_github.Capabilities.pp cap);
   let token = match token () with
-    | Ok t -> t
     | Error (`Msg m) -> failwith m
+    | Ok t           ->
+      let user_agent = "datakit-github/%%NUM_VERSION%%" in
+      Datakit_github_api.token ~token:t ~user_agent
   in
   let webhook = match webhook with
     | None   -> None

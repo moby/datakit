@@ -42,10 +42,15 @@ module Run = struct
     | h::t -> events := List.rev t; Lwt.return h
 
   let rec schedule () =
-    let open Github.Monad in
-    embed (wait ()) >>= fun (Run (x, send)) ->
-    x >>= fun x ->
-    send x;
+    Github.Monad.embed (wait ()) >>+= fun (Run (x, send)) ->
+    let worker () =
+      Lwt.catch
+        (fun () -> Github.(Monad.run @@ x >|= fun x -> send x))
+        (fun e  ->
+           Log.err (fun l -> l "GitHub API worker got: %a, ignoring" Fmt.exn e);
+           Lwt.return_unit)
+    in
+    Lwt.async worker;
     schedule ()
 
   let rec for_ever () =

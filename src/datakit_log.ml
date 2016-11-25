@@ -57,12 +57,16 @@ let setup style_renderer log_destination level log_clock =
     let client = Asl.Client.create ~ident:"Docker" ~facility () in
     Logs.set_reporter (Log_asl.reporter ~client ())
 
+let docs = "LOG OPTIONS"
+
 let log_destination =
-  let doc = Arg.info ~doc:"Destination for the logs" [ "log-destination" ] in
+  let doc =
+    Arg.info ~docs ~doc:"Destination for the logs" [ "log-destination" ]
+  in
   Arg.(value & opt conv Quiet & doc)
 
 let log_clock =
-  let doc = Arg.info ~doc:"Kind of clock" ["log-clock"] in
+  let doc = Arg.info ~docs ~doc:"Kind of clock" ["log-clock"] in
   Arg.(value & opt (enum [
       "monotonic", `Monotonic;
       "posix"    , `Posix

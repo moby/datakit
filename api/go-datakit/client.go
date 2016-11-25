@@ -329,12 +329,7 @@ func (r *ioFileReaderWriter) Read(p []byte) (n int, err error) {
 	r.f.m.Lock()
 	defer r.f.m.Unlock()
 	n, err = r.f.c.session.Read(r.ctx, r.f.fid, p, r.offset)
-	if n == 0 && err == nil {
-		if len(p) == 0 {
-			return 0, io.EOF
-		}
-		return 0, io.ErrUnexpectedEOF
-	}
+
 	r.offset += int64(n)
 	return n, err
 }

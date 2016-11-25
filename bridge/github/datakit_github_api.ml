@@ -25,7 +25,7 @@ let token ~user_agent ~token =
 let (>>+=) = Github.Monad.(>>=)
 let (>>+~) = Github.Monad.(>>~)
 
-type t = Run: ('a Github.Monad.t * ('a -> unit)) -> t
+type t = Run: ('a Github.Monad.t * (('a, exn) Result.result -> unit)) -> t
 
 module Run = struct
 
@@ -45,10 +45,8 @@ module Run = struct
     Github.Monad.embed (wait ()) >>+= fun (Run (x, send)) ->
     let worker () =
       Lwt.catch
-        (fun () -> Github.(Monad.run @@ x >|= fun x -> send x))
-        (fun e  ->
-           Log.err (fun l -> l "GitHub API worker got: %a, ignoring" Fmt.exn e);
-           Lwt.return_unit)
+        (fun () -> Github.(Monad.run @@ x >|= fun x -> send (Ok x)))
+        (fun e  -> send (Error e); Lwt.return_unit)
     in
     Lwt.async worker;
     schedule ()
@@ -68,9 +66,11 @@ let () = Lwt.async Run.for_ever
 let run x =
   let t, u = Lwt.task () in
   Run.enqueue (Run (x, Lwt.wakeup u));
-  Lwt.catch
-    (fun () -> t >|= fun x -> Ok x)
-    (fun e  -> Lwt.return (Error (Fmt.strf "Github: %a" Fmt.exn e)))
+  t >|= function
+  | Ok x    -> Ok x
+  | Error e ->
+    let err = Fmt.strf "Github: %a" Fmt.exn e in
+    Error err
 
 module PR = struct
 

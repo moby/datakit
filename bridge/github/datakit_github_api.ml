@@ -221,20 +221,49 @@ module Ref = struct
     | `Branch s   -> Event.Ref (`Removed (repo, ["refs"; "heads"; s]))
     | `Tag s      -> Event.Ref (`Removed (repo, ["refs"; "tags"; s]))
 
+  let ref_of_name ~token ~repo:{ Repo.user; repo } name =
+    (token.m >>+= fun () ->
+     Github.Repo.get_ref ~user ~repo ~name () >>+~ fun x ->
+     Github.Monad.return x)
+    |> run
+    >|= function
+    | Ok x    -> Some x
+    | Error _ -> None
+
+  let of_created_event ~token repo r =
+    let other str = Event.Other (repo, "create-" ^ str) in
+    match r.create_event_ref with
+    | `Repository -> Lwt.return (Event.Other (repo, "repo"))
+    | `Branch b   ->
+      (ref_of_name ~token ~repo ("heads/" ^ b) >>= function
+        | None   -> Lwt.return (other @@ "branch-unknown-" ^ b)
+        | Some e ->
+          of_gh ~token ~repo e >|= function
+          | None   -> other ("branch-unknownx-" ^ b)
+          | Some e -> Event.Ref (`Created e))
+    | `Tag t ->
+      ref_of_name ~token ~repo ("tags/" ^ t) >>= function
+      | None   -> Lwt.return (other @@ "tag-unknonw-" ^ t)
+      | Some e ->
+        of_gh ~token ~repo e >|= function
+        | None   -> other ("tag-unknonwx-" ^ t)
+        | Some e -> Event.Ref (`Created e)
+
 end
 
 module Event = struct
 
   include Event
 
-  let of_gh_constr repo (e:Github_t.event_constr): t =
-    let other str = Other (repo, str) in
+  let of_gh_constr ~token repo (e:Github_t.event_constr): t Lwt.t =
+    let other str = Lwt.return (Other (repo, str)) in
+    let ret = Lwt.return in
     match e with
-    | `Status s       -> Status (Status.of_event repo s)
-    | `PullRequest pr -> PR (PR.of_event repo pr)
-    | `Push p         -> Ref (Ref.of_event repo p)
-    | `Create _       -> other "create"
-    | `Delete d       -> Ref.of_deleted_event repo d
+    | `Status s       -> ret @@ Status (Status.of_event repo s)
+    | `PullRequest pr -> ret @@ PR (PR.of_event repo pr)
+    | `Push p         -> ret @@ Ref (Ref.of_event repo p)
+    | `Create c       -> Ref.of_created_event ~token repo c
+    | `Delete d       -> ret @@ Ref.of_deleted_event repo d
     | `Download       -> other "download"
     | `Follow         -> other "follow"
     | `Fork _         -> other "fork"
@@ -277,12 +306,12 @@ module Event = struct
     | `PullRequestReviewComment _ -> other "pull-request-review-comment"
     | `CommitComment _            -> other "commit-comment"
 
-  let of_gh e =
+  let of_gh ~token e =
     let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
       | None  -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
       | Some (user, repo) -> Repo.create ~user ~repo
     in
-    of_gh_constr repo e.event_payload
+    of_gh_constr ~token repo e.event_payload
 
 end
 
@@ -383,8 +412,8 @@ let events token r =
   let { Repo.user; repo } = r in
   (token.m >>+= fun () ->
    let events = Github.Event.for_repo ~user ~repo () in
-      Github.Stream.to_list events
-      |> Github.Monad.map (List.map Event.of_gh))
+   Github.Stream.to_list events >>+= fun events ->
+   Github.Monad.embed @@ Lwt_list.map_p (Event.of_gh ~token) events)
   |> run
 
 module Webhook = struct

@@ -322,7 +322,12 @@ module Elt: sig
   val compare_id: id -> id -> int
 
   module Set: SET with type elt = t
-  module IdSet: SET with type elt = id
+  module IdSet: sig
+    include SET with type elt = id
+    val of_repos: Repo.Set.t -> t
+    val of_prs: PR.Set.t -> t
+    val of_refs: Ref.Set.t -> t
+  end
 
 end
 
@@ -555,8 +560,15 @@ module type API = sig
    val prs: token -> Repo.t -> PR.t list result
   (** [prs t r] is the list of open pull-requests for the repo [r]. *)
 
+  val pr: token -> PR.id -> PR.t option result
+  (** [pr t id] is the contents of the pull request whose ID Is
+      [id]. *)
+
   val refs: token -> Repo.t -> Ref.t list result
   (** [refs t r] is the list of references for the the repo [r]. *)
+
+  val ref: token -> Ref.id -> Ref.t option result
+  (** [ref t id] is the Git reference whose ID is [id]. *)
 
   val events: token -> Repo.t -> Event.t list result
   (** [event t r] is the list of events attached to the repository
@@ -617,9 +629,9 @@ module State (API: API): sig
 
   (** {1 Synchronisation} *)
 
-  val import: token -> Snapshot.t -> Repo.Set.t -> Snapshot.t Lwt.t
-  (** [import token t r] imports the state of GitHub for the
-      repositories [r] into [t]. API calls use the token [token]. *)
+  val import: token -> Snapshot.t -> Elt.IdSet.t -> Snapshot.t Lwt.t
+  (** [import token t r] imports the state of GitHub for the elements
+      in [r] into [t]. API calls use the token [token]. *)
 
   val apply: token -> Diff.t -> unit Lwt.t
   (** [apply token d] applies the snapshot diff [d] as a series of

@@ -386,6 +386,15 @@ let prs token r =
    |> Github.Monad.map @@ List.map (PR.of_gh r))
   |> run
 
+let pr token (r, num) =
+  let { Repo.user; repo } = r in
+  (token.m >>+= fun () ->
+   Github.Pull.get ~user ~repo ~num () >>+~ fun pr ->
+  Github.Monad.return (PR.of_gh r pr))
+  |> run >|= function
+  | Error _ -> Ok None
+  | Ok pr   -> Ok (Some pr)
+
 let refs token r =
   let { Repo.user; repo } = r in
   let refs ty =
@@ -407,6 +416,16 @@ let refs token r =
   refs "heads" >>= fun heads ->
   refs "tags"  >|= fun tags  ->
   Ok (heads @ tags)
+
+let ref token (r, name) =
+  let name = String.concat ~sep:"/" name in
+  let { Repo.user; repo } = r in
+  (token.m >>+= fun () ->
+   Github.Repo.get_ref ~user ~repo ~name () >>+~ fun r ->
+   Github.Monad.return r)
+  |> run >>= function
+  | Error _ -> Lwt.return (Ok None)
+  | Ok ref  -> Ref.of_gh ~token ~repo:r ref >|= fun r -> Ok r
 
 let events token r =
   let { Repo.user; repo } = r in

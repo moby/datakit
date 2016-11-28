@@ -56,6 +56,12 @@ module Make (DK: Datakit_S.CLIENT): sig
   type t
   (** The type for filesystem snapshots. *)
 
+  type dirty = Elt.IdSet.t
+  (** The type for dirty elements. *)
+
+  val dirty: t -> dirty
+  (** [dirty t] is the collection of dirty elements in [t]. *)
+
   val snapshot: t -> Snapshot.t
   (** [snapshot t] is [t]'s in-memory snapshot. *)
 
@@ -65,7 +71,7 @@ module Make (DK: Datakit_S.CLIENT): sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for {!snapshot} values. *)
 
-  val diff: DK.Commit.t -> DK.Commit.t -> Diff.t Lwt.t
+  val diff: DK.Commit.t -> DK.Commit.t -> (Diff.t * dirty) Lwt.t
   (** [diff x y] computes the difference between the commits [x] and
       [y]. *)
 
@@ -86,5 +92,9 @@ module Make (DK: Datakit_S.CLIENT): sig
   val apply: debug:string -> Diff.t -> DK.Transaction.t -> unit Lwt.t
   (** [apply d t] applies the snapshot diff [d] into the datakit
       transaction [t]. *)
+
+  val clean: DK.Transaction.t -> dirty -> unit Lwt.t
+  (** [clean t d] removes [d] from the list of dirty elements in
+      [t]. *)
 
 end

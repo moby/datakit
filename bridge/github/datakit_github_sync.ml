@@ -101,8 +101,12 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
 
   let commit t tr =
     let diff = Snapshot.diff t.bridge (Conv.snapshot t.datakit) in
-    if Diff.is_empty diff then
+    let dirty = Conv.dirty t.datakit in
+    if Diff.is_empty diff && Elt.IdSet.is_empty dirty then
       safe_abort tr >|= fun () -> true
+    else if not (Elt.IdSet.is_empty dirty) then
+      let message = "Cleaning up .dirty files" in
+      safe_commit tr ~message
     else
       let message = Diff.commit_message diff in
       Conv.apply ~debug:"commit" diff tr >>= fun () ->
@@ -141,15 +145,24 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
 
   let sync ~token ~webhook ~first_sync ~resync t repos tr =
     process_webhooks ~token ~webhook t repos >>= fun bridge ->
-    let repos =
-      if resync then Repo.Set.union repos (Snapshot.repos bridge) else repos
+    let dirty = Conv.dirty t.datakit in
+    let to_import =
+      let (++) = Elt.IdSet.union in
+      let empty = Elt.IdSet.empty in
+      let of_repos s =
+        Repo.Set.fold (fun r -> Elt.IdSet.add (`Repo r)) s empty
+      in
+      of_repos repos
+      ++ (if resync then of_repos (Snapshot.repos bridge) else empty)
+      ++ dirty
     in
-    State.import token bridge repos >>= fun bridge ->
+    State.import token bridge to_import >>= fun bridge ->
     let t = { t with bridge } in
     call_github_api ~token ~first_sync t >>= fun t ->
     (* FIXME: we should be able to configure if we want to
        prune or not. *)
     let t = { t with bridge = Snapshot.prune t.bridge } in
+    Conv.clean tr dirty >>= fun () ->
     update_datakit t tr
 
   (* On startup, build the initial state by looking at the active

@@ -618,11 +618,11 @@ module State (API: API): sig
   (** {1 Synchronisation} *)
 
   val import: token -> Snapshot.t -> Repo.Set.t -> Snapshot.t Lwt.t
-  (** [import ~token t r] imports the state of GitHub for the
+  (** [import token t r] imports the state of GitHub for the
       repositories [r] into [t]. API calls use the token [token]. *)
 
   val apply: token -> Diff.t -> unit Lwt.t
-  (** [apply ~token d] applies the snapshot diff [d] as a series of
+  (** [apply token d] applies the snapshot diff [d] as a series of
       GitHub API calls, using the token [token]. *)
 
   (** {1 Webhooks} *)

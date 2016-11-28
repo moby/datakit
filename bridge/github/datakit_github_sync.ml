@@ -139,8 +139,11 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     let bridge = Diff.apply diff t.bridge in
     { t with bridge }
 
-  let sync ~token ~webhook ~first_sync t repos tr =
+  let sync ~token ~webhook ~first_sync ~resync t repos tr =
     process_webhooks ~token ~webhook t repos >>= fun bridge ->
+    let repos =
+      if resync then Repo.Set.union repos (Snapshot.repos bridge) else repos
+    in
     State.import token bridge repos >>= fun bridge ->
     let t = { t with bridge } in
     call_github_api ~token ~first_sync t >>= fun t ->
@@ -152,16 +155,16 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
   (* On startup, build the initial state by looking at the active
      repository in datakit. Import the new repositories and call the
      GitHub API with the diff between the GitHub state and datakit. *)
-  let first_sync ~token ~webhook br =
+  let first_sync ~token ~webhook ~resync br =
     create ~debug:"first-sync" ?old:None br >>= fun (tr, t) ->
     Log.debug (fun l -> l "[first_sync]@ %a" pp_state t);
     let repos = Snapshot.repos (Conv.snapshot t.datakit) in
     if Repo.Set.is_empty repos then safe_abort tr >|= fun _ -> t
-    else sync ~token ~webhook ~first_sync:true t repos tr
+    else sync ~token ~webhook ~first_sync:true ~resync t repos tr
 
   (* The main synchonisation function: it is called on every change in
      the datakit branch and when new webhook events are received. *)
-  let sync_once ~token ~webhook old br =
+  let sync_once ~token ~webhook ~resync old br =
     create ~debug:"sync-once" ~old br >>= fun (tr, t) ->
     Log.debug (fun l -> l "[sync_once]@;old:%a@;new:%a" pp_state old pp_state t);
     let repos =
@@ -169,7 +172,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
         (Snapshot.repos @@ Conv.snapshot t.datakit)
         (Snapshot.repos t.bridge)
     in
-    sync ~token ~webhook ~first_sync:false t repos tr
+    sync ~token ~webhook ~first_sync:false ~resync t repos tr
 
   type t = State of state | Starting
 
@@ -201,17 +204,17 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
       in
       Some {watch; events}, run
 
-  let run ~webhook ?switch ~token br t policy =
+  let run ~webhook ?resync_interval ?switch ~token br t policy =
     let webhook, run_webhook = process_webhook webhook in
     let sync_once = function
       | Starting -> first_sync ~token ~webhook br
       | State t  -> sync_once ~token ~webhook t br
     in
     match policy with
-    | `Once   -> sync_once t >|= fun t -> State t
+    | `Once   -> sync_once ~resync:false t >|= fun t -> State t
     | `Repeat ->
       let t = ref t in
-      let updates = ref false in
+      let updates = ref `None in
       let cond = Lwt_condition.create () in
       let pp ppf = function
         | Starting -> Fmt.string ppf "<starting>"
@@ -219,16 +222,30 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
           let repos = Snapshot.repos t.bridge in
           Fmt.pf ppf "active repos: %a" Repo.Set.pp repos
       in
+      let timer () = match resync_interval with
+        | None   -> let t, _ = Lwt.task () in t
+        | Some s ->
+          let rec loop_for_ever () =
+            (* FIXME: hanlde cancellation when [switch] if off. *)
+            Lwt_unix.sleep s >>= fun () ->
+            Log.debug (fun l -> l "polling: waking-up");
+            updates := `Timer;
+            Lwt_condition.signal cond ();
+            loop_for_ever ()
+          in
+          loop_for_ever ()
+      in
       let rec react () =
         if not (continue switch) then Lwt.return_unit
         else
-          (if not !updates then Lwt_condition.wait cond else Lwt.return_unit)
+          (if !updates = `None then Lwt_condition.wait cond else Lwt.return_unit)
           >>= fun () ->
-          updates := false;
+          let u = !updates in
+          updates := `None;
           Log.info (fun l -> l "Processing new entry -- %a" pp !t);
           Lwt.catch
             (fun () ->
-               sync_once !t >|= fun s ->
+               sync_once ~resync:(u = `Timer) !t >|= fun s ->
                t := State s)
             (fun e ->
                Log.err (fun l -> l "error: %s" (Printexc.to_string e));
@@ -236,15 +253,17 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
           >>=
           react
       in
-      let notify () =
-        Log.debug (fun l -> l "webhook event received!");
-        updates := true;
-        Lwt_condition.signal cond ()
+      let webhook () =
+        run_webhook (fun () ->
+            Log.debug (fun l -> l "webhook event received!");
+            updates := `Webhook;
+            Lwt_condition.signal cond ()
+          )
       in
       let watch br =
         let notify _ =
           Log.info (fun l -> l "Change detected in %s" @@ DK.Branch.name br);
-          updates := true;
+          updates := `Datakit;
           Lwt_condition.signal cond ();
           ok `Again
         in
@@ -252,15 +271,15 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
         | Ok _    -> Lwt.return_unit
         | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
       in
-      Lwt.choose [ react () ; watch br; run_webhook notify ]
+      Lwt.choose [ react () ; timer (); watch br; webhook () ]
       >|= fun () ->
       !t
 
-  let sync ~token ?webhook ?switch ?(policy=`Repeat)
+  let sync ~token ?webhook ?resync_interval ?switch ?(policy=`Repeat)
       ?(cap=Capabilities.all) br t =
     Log.debug (fun l -> l "[sync] %s" @@ DK.Branch.name br);
     let token = State.token token cap in
     init_sync br >>= fun () ->
-    run ~webhook ?switch ~token br t policy
+    run ~webhook ?switch ?resync_interval ~token br t policy
 
 end

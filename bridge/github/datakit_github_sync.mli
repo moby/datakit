@@ -14,7 +14,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT): sig
       [b]. The GitHub API calls use the token [token]. The default
       [policy] is [`Repeat] and [cap] is [Cap.all]. *)
   val sync:
-    token:API.token -> ?webhook:API.Webhook.t ->
+    token:API.token -> ?webhook:API.Webhook.t -> ?resync_interval:float ->
     ?switch:Lwt_switch.t -> ?policy:[`Once|`Repeat] -> ?cap:Capabilities.t ->
     DK.Branch.t -> t -> t Lwt.t
 

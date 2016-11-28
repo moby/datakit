@@ -150,6 +150,9 @@ module PR: sig
   val same_id: t -> t -> bool
   (** [same_id x y] is true if [x] and [y] have the same ID. *)
 
+  val compare_id: id -> id -> int
+  (** [compare_id x y] compare the pull-request IDs [x] and [y]. *)
+
   module Set: sig
     include SET with type elt = t
     val repos: t -> Repo.Set.t
@@ -257,6 +260,9 @@ module Ref: sig
 
   val same_id: t -> t -> bool
   (** [same_id x y] is true if [x] and [y] have the same ID. *)
+
+  val compare_id: id -> id -> int
+  (** [compare_id x y] compares the Git reference IDs [x] and [y]. *)
 
   module Set: sig
     include SET with type elt = t

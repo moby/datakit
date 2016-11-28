@@ -472,6 +472,17 @@ module API = struct
     | None   -> return []
     | Some r -> return r.R.prs
 
+  let pr t (repo, _ as id) =
+    t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
+    match lookup_opt t repo with
+    | None   -> return None
+    | Some r ->
+      try
+        List.find (fun pr -> PR.compare_id id (PR.id pr) = 0) r.R.prs
+        |> fun pr -> return @@ Some pr
+      with Not_found ->
+        return None
+
   let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
     match lookup_opt t repo with
@@ -483,6 +494,17 @@ module API = struct
     match lookup_opt t repo with
     | None   -> return []
     | Some r -> return r.R.refs
+
+  let ref t (repo, _ as id) =
+    t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
+    match lookup_opt t repo with
+    | None   -> return None
+    | Some r ->
+      try
+        List.find (fun r -> Ref.compare_id id (Ref.id r) = 0) r.R.refs
+        |> fun r -> return (Some r)
+      with Not_found ->
+        return None
 
   let apply_events t =
     t.users |> Users.iter @@ fun _ user ->
@@ -1069,14 +1091,14 @@ let test_snapshot () =
 
       update ~prs:[pr2] ~status:[] ~refs:[] >>*= fun s1 ->
       expect_head br >>*= fun head1 ->
-      Conv.diff head1 head >>= fun diff1 ->
+      Conv.diff head1 head >>= fun (diff1, _) ->
       Alcotest.(check diff) "diff1" (mk_diff [`Update (`PR pr2)]) diff1;
       Conv.of_commit ~debug:"sd" ~old:sh head1 >>= fun sd ->
       Alcotest.(check snapshot) "snap diff" s1 (Conv.snapshot sd);
 
       update ~prs:[] ~status:[s5] ~refs:[ref2] >>*= fun s2 ->
       expect_head br >>*= fun head2 ->
-      Conv.diff head2 head1 >>= fun diff2 ->
+      Conv.diff head2 head1 >>= fun (diff2, _) ->
       Alcotest.(check diff) "diff2"
         (mk_diff [`Update (`Status s5); `Update (`Ref ref2);
                   `Update (`Commit commit_foo)])
@@ -1094,7 +1116,7 @@ let test_snapshot () =
         ) >>*= fun () ->
       expect_head br >>*= fun head3 ->
 
-      Conv.diff head3 head2 >>= fun diff3 ->
+      Conv.diff head3 head2 >>= fun (diff3, _) ->
       Alcotest.(check diff) "diff3" Diff.empty diff3;
 
       Lwt.return_unit

@@ -14,6 +14,11 @@ module type SET = sig
   val pp: t Fmt.t
 end
 
+module type MAP = sig
+  include Map.S
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+end
+
 let pp_set (type a) k (module S: SET with type t = a) ppf (v:a) =
   if S.is_empty v then Fmt.string ppf "" else
     Fmt.pf ppf "@[<2>%s:@;%a@;@]" k S.pp v
@@ -42,6 +47,11 @@ module Set (E: ELT) = struct
 
 end
 
+module Map (K: ELT) = struct
+  include Map.Make(K)
+  let pp v ppf t = Fmt.(list ~sep:(unit "@;") (pair K.pp v)) ppf (bindings t)
+end
+
 let pp_path = Fmt.(list ~sep:(unit "/") string)
 
 module Repo = struct
@@ -60,12 +70,13 @@ module Repo = struct
     | `Monitored -> Fmt.string ppf "+"
     | `Ignored   -> Fmt.string ppf "-"
 
-  module Set = Set(struct
+  module X = struct
       type nonrec t = t
       let pp = pp
       let compare = compare
-    end)
-
+    end
+  module Set = Set(X)
+  module Map = Map(X)
 end
 
 module Status_state = struct

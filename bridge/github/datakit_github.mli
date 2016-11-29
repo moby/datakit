@@ -14,6 +14,12 @@ module type SET = sig
   val pp: t Fmt.t
 end
 
+(** Pretty-printable {!Map.S}. *)
+module type MAP = sig
+  include Map.S
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+end
+
 module Set (E: ELT): SET with type elt = E.t
 (** [Set] is similar to {!Set.Make} but for pretty-printable sets. *)
 
@@ -58,6 +64,9 @@ module Repo: sig
 
   module Set: SET with type elt = t
   (** Sets of repositories. *)
+
+  module Map: MAP with type key = t
+  (** Maps of repositories. *)
 
 end
 

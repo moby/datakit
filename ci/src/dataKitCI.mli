@@ -342,12 +342,14 @@ end
 module Process : sig
   (** Convenience wrappers around [Lwt_process]. *)
 
-  val run_with_exit_status : ?switch:Lwt_switch.t -> ?log:Live_log.t -> ?cwd:string -> ?env:string array -> output:(string -> unit) -> Lwt_process.command -> Unix.process_status Lwt.t
+  val run_with_exit_status : ?switch:Lwt_switch.t -> ?log:Live_log.t -> ?cwd:string -> ?env:string array -> output:(string -> unit) -> ?log_cmd:Lwt_process.command -> Lwt_process.command -> Unix.process_status Lwt.t
   (** Run [cmd], passing each chunk of output it produces on stdout or stderr to [output].
       A copy of the output is also streamed to our stdout.
-      Returns the exit status of the process when completed. *)
+      Returns the exit status of the process when completed.
+      If [log_cmd] is given, it is displayed in all log messages instead of [cmd].
+      This is useful to hide secret tokens, etc. *)
 
-  val run : ?switch:Lwt_switch.t -> ?log:Live_log.t -> ?cwd:string -> ?env:string array -> output:(string -> unit) -> Lwt_process.command -> unit Lwt.t
+  val run : ?switch:Lwt_switch.t -> ?log:Live_log.t -> ?cwd:string -> ?env:string array -> output:(string -> unit) -> ?log_cmd:Lwt_process.command -> Lwt_process.command -> unit Lwt.t
   (** Run [cmd], passing each chunk of output it produces on stdout or stderr to [output].
       A copy of the output is also streamed to our stdout.
       Raises an exception if the process doesn't return an exit status of zero. *)

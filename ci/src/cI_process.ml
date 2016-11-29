@@ -38,7 +38,8 @@ let open_in ?cwd ?env ?stderr cmd =
         Lwt.return child
       )
 
-let run_with_exit_status ?switch ?log ?cwd ?env ~output cmd =
+let run_with_exit_status ?switch ?log ?cwd ?env ~output ?log_cmd cmd =
+  let log_cmd = CI_utils.default cmd log_cmd in
   let info fmt =
     fmt |> Format.kasprintf @@ fun msg ->
     Log.info (fun f -> f "%s" msg);
@@ -46,7 +47,7 @@ let run_with_exit_status ?switch ?log ?cwd ?env ~output cmd =
       | None -> ()
       | Some log -> CI_live_log.log log "%s" msg
   in
-  info "Running %a" pp_cmd cmd;
+  info "Running %a" pp_cmd log_cmd;
   let is_running = ref true in
   open_in ?cwd ?env ~stderr:(`FD_copy Unix.stdout) cmd >>= fun child ->
   Lwt.catch
@@ -55,7 +56,7 @@ let run_with_exit_status ?switch ?log ?cwd ?env ~output cmd =
          (fun () ->
             Lwt_switch.add_hook_or_exec switch (fun () ->
                 if !is_running then (
-                  info "Switch was turned off, so killing process %a" pp_cmd cmd;
+                  info "Switch was turned off, so killing process %a" pp_cmd log_cmd;
                   child#terminate
                 );
                 Lwt.return ()
@@ -80,12 +81,12 @@ let run_with_exit_status ?switch ?log ?cwd ?env ~output cmd =
          (fun ex -> child#close >>= fun _stat -> is_running := false; Lwt.fail ex)
     )
     (fun ex ->
-       info "Error %s from %a" (Printexc.to_string ex) pp_cmd cmd;
+       info "Error %s from %a" (Printexc.to_string ex) pp_cmd log_cmd;
        Lwt.fail ex
     )
 
-let run ?switch ?log ?cwd ?env ~output cmd =
-  run_with_exit_status ?switch ?log ?cwd ?env ~output cmd >|= fun status ->
+let run ?switch ?log ?cwd ?env ~output ?log_cmd cmd =
+  run_with_exit_status ?switch ?log ?cwd ?env ~output ?log_cmd cmd >|= fun status ->
   match switch with
   | Some switch when not (Lwt_switch.is_on switch) -> failf "Cancelled"
-  | _ -> check_status cmd status
+  | _ -> check_status (CI_utils.default cmd log_cmd) status

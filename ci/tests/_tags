@@ -1,1 +1,2 @@
 true: package(irmin, git, datakit.ivfs, datakit-server.fs9p, irmin.git, irmin.unix, irmin.mem, alcotest, str)
+true: thread

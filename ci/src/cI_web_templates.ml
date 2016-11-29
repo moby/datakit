@@ -179,10 +179,22 @@ let dashboard_widget id ref =
   let state = CI_engine.jobs ref |> summarise in
   let cls, icon, status, comment =
     match state.CI_state.status with
-    | `Pending -> "dashboard-pending", "glyphicon-hourglass", "Pending", "... WAITING ..."
-    | `Success -> "dashboard-success", "glyphicon-ok", "Succeeding", "YAY! The build is fine... Nothing to see here..."
-    | `Error -> "dashboard-error", "glyphicon-warning-sign", "Erroring", "OH NO! Something has gone terribly wrong"
-    | `Failure -> "dashboard-failure", "glyphicon-remove", "Failing", "SOUND THE ALARM!!! The build has been broken!"
+    | `Pending -> "dashboard-pending",
+                  "glyphicon-hourglass",
+                  "Pending",
+                  "... WAITING ..."
+    | `Success -> "dashboard-success",
+                  "glyphicon-ok",
+                  "Succeeding",
+                  "YAY! The build is fine... Nothing to see here..."
+    | `Error   -> "dashboard-error",
+                  "glyphicon-warning-sign",
+                  "Erroring",
+                  "OH NO! Something has gone terribly wrong"
+    | `Failure -> "dashboard-failure",
+                  "glyphicon-remove",
+                  "Failing",
+                  "SOUND THE ALARM!!! The build has been broken!"
   in
   let title =
     match Datakit_path.unwrap id with

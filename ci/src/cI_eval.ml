@@ -55,6 +55,16 @@ module Make(C:CI_s.CONTEXT) = struct
     | Error _ as problem, _ -> Lwt.return (problem, logs)
     | Ok _, (Error _ as problem) -> Lwt.return (problem, logs)
 
+  let without_logs x ctx =
+    x ctx >|= fun (x, _) -> x, L.Empty
+
+  let wait_for (x: 'a t) ~while_pending ~on_failure ctx =
+    x ctx >|= fun (x, x_logs) ->
+    match x with
+    | Ok _ -> Ok (), x_logs
+    | Error (`Pending _) -> Error (`Pending while_pending), x_logs
+    | Error (`Failure _) -> Error (`Failure on_failure), x_logs
+
   module Infix = struct
     let ( >>= ) x f ctx =
       x ctx >>= fun (x, x_logs) ->
@@ -83,4 +93,20 @@ module Make(C:CI_s.CONTEXT) = struct
         pair acc (f x) >|= fun (acc, x) -> x :: acc
       ) (return []) l
 
+  let pp_names = Fmt.(list ~sep:(const string ", ") string)
+
+  let wait_for_all l =
+    let partition (ps, fs) (name, state) =
+      match state with
+      | Ok _ -> (ps, fs)
+      | Error (`Pending _) -> (name :: ps), fs
+      | Error (`Failure _) -> ps, (name :: fs)
+    in   
+    let get_state (name, x) = state x >|= fun s -> (name, s) in
+    list_map_p get_state l >>= fun states ->
+    match List.fold_left partition ([], []) states with
+    | [], [] -> return ()
+    | [], fs -> fail "%a failed" pp_names fs
+    | ps, [] -> pending "Waiting for %a" pp_names ps
+    | ps, fs -> pending "%a failed (still waiting for %a)" pp_names fs pp_names ps
 end

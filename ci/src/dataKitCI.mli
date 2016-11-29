@@ -183,6 +183,10 @@ module Term : sig
       If [a] is not successful, the result is the same as [a].
       Otherwise, if [b] is not successful then the result is the same as [b]. *)
 
+  val without_logs : 'a t -> 'a t
+  (** [without_logs t] evaluates to the same result as [t], but does not link to its logs.
+      This is useful if [t]'s logs are already being reported as part of another job. *)
+
   module Infix : sig
     val ( $ ) : ('a -> 'b) t -> 'a t -> 'b t
     (** [fn $ x] is the result of applying the evaluation of the term [fn] to the evaluation of the term [x].
@@ -202,6 +206,21 @@ module Term : sig
   val list_map_p : ('a -> 'b t) -> 'a list -> 'b list t
   (** [list_map_p fn l] will map the [l] list of terms to [fn] in parallel and
      return the result list when all of them have completed. *)
+
+  val wait_for : 'a t -> while_pending:string -> on_failure:string -> unit t
+  (** [wait_for t ~while_pending ~on_failure] evaluates successfully to unit if
+      [t] evaluates successfully. It is pending with reason [while_pending] while
+      [t] is pending, and fails with error [on_failure] if [t] fails.
+      This is useful in the case where one test case depends on another, to avoid
+      reporting the same status twice. Consider wrapping with [without_logs] if [t]'s
+      logs will be reported as part of another job. *)
+
+  val wait_for_all : (string * 'a t) list -> unit t
+  (** [wait_for_all xs] evaluates successfully to unit if all terms in the assoc
+      list [xs] evaluate successfully. Otherwise, it is pending or failed with
+      a suitable message, based on the names of the terms it is waiting for.
+      Consider wrapping with [without_logs] if [xs]'s logs will be reported as
+      part of another job. *)
 
   val job_id : job_id t
   (** [job_id] evaluates to the job that evaluates the term.

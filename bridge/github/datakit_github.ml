@@ -309,8 +309,20 @@ module Ref = struct
 
   type id = Repo.t * string list
 
+  let validate = function
+    | 'a' .. 'z'
+    | 'A' .. 'Z'
+    | '0' .. '9'
+    | '-' | '_' -> ()
+    | c -> invalid_arg (Fmt.strf "invalid character %c in reference name" c)
+
   let v head name =
-    let name = List.map (fun s -> String.trim s) name in
+    let name =
+      List.map (fun s ->
+          let s = String.trim s in
+          String.iter validate s;
+          s) name
+    in
     { head; name }
 
   let repo t = t.head.Commit.repo

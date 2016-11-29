@@ -250,7 +250,9 @@ module Ref: sig
   (** The type for Git references. *)
 
   val v : Commit.t -> string list -> t
-  (** [v head name] is a fresh {!t} with the [head] commit and [name]. *)
+  (** [v head name] is a fresh {!t} with the [head] commit and
+      [name]. [name] should only contain alpha-numeric character,
+      ['_'] and ['-']. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)

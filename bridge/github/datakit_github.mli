@@ -205,6 +205,9 @@ module Status: sig
   val id: t -> id
   (** [id t] is [t]'s ID. *)
 
+  val compare_id: id -> id -> int
+  (** [compare_id] compares build status IDs. *)
+
   val context: t -> string list
   (** [context t] is [t]'s context. *)
 

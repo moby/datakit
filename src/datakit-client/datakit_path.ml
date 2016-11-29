@@ -40,6 +40,14 @@ let to_hum = Fmt.to_to_string pp
 
 let compare = compare
 
+let dirname t = match List.rev t with
+  | []   -> []
+  | _::t -> List.rev t
+
+let basename t = match List.rev t with
+  | []   -> None
+  | h::_ -> Some h
+
 let pop = function
   | [] -> None
   | x::xs ->

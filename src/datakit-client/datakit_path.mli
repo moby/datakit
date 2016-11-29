@@ -37,6 +37,12 @@ val compare: t -> t -> int
 val to_hum : t -> string
 (** Convert to a string, in the same format as [pp]. *)
 
+val basename: t -> string option
+(** [basename t] is [t]'s basename. *)
+
+val dirname: t -> t
+(** [dirname t] is [t]'s dirname. *)
+
 module Set: Set.S with type elt = t
 (** Sets of paths. *)
 

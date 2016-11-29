@@ -405,6 +405,9 @@ module Snapshot: sig
   (** [with_elts] is like {!with_elt} but for a collection of
       elements. *)
 
+  val find: Elt.id -> t -> Elt.t option
+  (** [find id t] finds the element with ID [id] in [t]. *)
+
 end
 
 module Diff: sig

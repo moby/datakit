@@ -689,6 +689,15 @@ module Snapshot = struct
   let with_elts = Elt.Set.fold with_elt
   let without_elts = Elt.IdSet.fold without_elt
 
+  let find (id:Elt.id) t =
+    match
+      elts t
+      |> Elt.Set.elements
+      |> List.find (fun e -> Elt.compare_id (Elt.id e) id = 0)
+    with
+    | exception Not_found -> None
+    | e -> Some (e:Elt.t)
+
   let with_event = function
     | Event.Repo (`Ignored,r) -> without_repo r
     | Event.Repo (_, r)       -> with_repo r

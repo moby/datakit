@@ -45,6 +45,22 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | Error _ -> None
     | Ok b    -> Some (String.trim (Cstruct.to_string b))
 
+  let safe_create_file tr file contents =
+    match Datakit_path.basename file with
+    | None   ->
+      Log.err (fun l -> l "%a is not a file" Datakit_path.pp file);
+      Lwt.return_unit
+    | Some _ ->
+      let dir  = Datakit_path.dirname file in
+      (DK.Transaction.make_dirs tr dir >>*= fun () ->
+       DK.Transaction.create_or_replace_file tr file contents)
+      >|= function
+      | Ok ()   -> ()
+      | Error e ->
+        Log.err (fun l ->
+            l "Got %a while creating %a, skipping."
+              DK.pp_error e Datakit_path.pp file)
+
   let lift_errors name f = f >>= function
     | Error e -> Lwt.fail_with @@ Fmt.strf "%s: %a" name DK.pp_error e
     | Ok x    -> Lwt.return x
@@ -480,6 +496,12 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let clean tr dirty =
     Lwt_list.iter_p (fun d -> safe_remove tr (dirty_file d))
+      @@ Elt.IdSet.elements dirty
+
+  let empty = Cstruct.of_string ""
+
+  let stain tr dirty =
+    Lwt_list.iter_p (fun d -> safe_create_file tr (dirty_file d) empty)
       @@ Elt.IdSet.elements dirty
 
   (* Diffs *)

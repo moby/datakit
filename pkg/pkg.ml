@@ -65,6 +65,8 @@ let () =
       Pkg.lib   "pkg/META.github"     ~dst:"META";
       Pkg.lib   "datakit-github.opam" ~dst:"opam";
       Pkg.mllib "bridge/github/datakit-github.mllib";
+      Pkg.mllib "bridge/github/datakit-github-client.mllib";
+      Pkg.mllib "bridge/github/datakit-github-server.mllib";
       Pkg.bin   "bridge/github/main" ~dst:"datakit-github" ;
     ]
   | "datakit-ci" -> Ok [

@@ -100,19 +100,17 @@ end
 
 module Ref = struct
   type t = {
-    name : Datakit_path.t;              (* Relative to refs_dir *)
+    name : string;
     head : Commit.t;
   }
 
   let project t = Commit.project t.head
   let name t = t.name
   let head t = t.head
-  let dump f t = Fmt.pf f "ref/%a (head=%a)"
-      Datakit_path.pp t.name
-      Commit.pp t.head
+  let dump f t = Fmt.pf f "ref/%s (head=%a)" t.name Commit.pp t.head
 
   let compare a b =
-    match Datakit_path.compare a.name b.name with
+    match String.compare a.name b.name with
     | 0 -> Commit.compare a.head b.head
     | r -> r
 end
@@ -179,14 +177,15 @@ let prs snapshot =
 
 let refs snapshot =
   let open! Datakit_path.Infix in
-  let results = ref Datakit_path.Map.empty in
+  let results = ref String.Map.empty in
   let rec scan ~context leaf =
     let context = context / leaf in
     read_opt_file snapshot (refs_dir /@ context / "head") >>= function
     | Some head ->
       let hash = String.trim (Cstruct.to_string head) in
       let head = { Commit.snapshot; hash } in
-      results := Datakit_path.Map.add context { Ref.head; name = context } !results;
+      let name = Datakit_path.to_hum context in
+      results := String.Map.add name { Ref.head; name } !results;
       Lwt.return ()
     | None ->
       read_opt_dir snapshot (refs_dir /@ context) >>=
@@ -209,7 +208,7 @@ end
 module Snapshot = struct
   type t = {
     commit : DK.Commit.t;
-    mutable projects : (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t CI_projectID.Map.t;
+    mutable projects : (PR.t CI_utils.IntMap.t * Ref.t String.Map.t) Lwt.t CI_projectID.Map.t;
   }
 
   let project t project_id =
@@ -236,9 +235,9 @@ module Snapshot = struct
     match CI_target.Full.id id with
     | `PR pr -> IntMap.find pr prs >|?= fun x -> `PR x
     | `Ref x ->
-      match Datakit_path.Map.find x refs with
-      | x -> Some (`Ref x)
-      | exception Not_found -> None
+      match String.Map.find x refs with
+      | None   -> None
+      | Some x -> Some (`Ref x)
 end
 
 let snapshot t =

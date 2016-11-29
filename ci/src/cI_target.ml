@@ -2,16 +2,16 @@ open Astring
 open Asetmap
 
 module ID = struct
-  type t = [ `PR of int | `Ref of Datakit_path.t ]
+  type t = [ `PR of int | `Ref of string ]
 
   let pp f = function
     | `PR x -> Fmt.pf f "prs/%d" x
-    | `Ref x -> Datakit_path.pp f x
+    | `Ref x -> Fmt.string f x
 
   let compare a b =
     match a, b with
-    | `PR a, `PR b -> compare a b
-    | `Ref a, `Ref b -> Datakit_path.compare a b
+    | `PR a , `PR b -> compare a b
+    | `Ref a, `Ref b -> String.compare a b
     | _ -> compare a b
 end
 
@@ -36,10 +36,8 @@ module Full = struct
     in
     let parse_target = function
       | ("heads" | "tags") as ref_type, ref ->
-        let open! Datakit_path.Infix in
-        let ref_type = Datakit_path.of_steps_exn [ref_type] in
         begin match Datakit_path.of_string ref with
-          | Ok path -> `Ok (`Ref (ref_type /@ path))
+          | Ok path -> `Ok (`Ref (Fmt.strf "%s/%a" ref_type Datakit_path.pp path))
           | Error msg -> `Error msg
         end
       | "prs", id ->

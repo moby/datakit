@@ -30,7 +30,7 @@ val dk : t -> DK.t Lwt.t
 (** [dk t] is the connection to DataKit. If not currently connected, this will be a sleeping
     thread that will resolve to the next successful connection. *)
 
-val targets : t -> (target IntMap.t * target Datakit_path.Map.t) CI_projectID.Map.t
+val targets : t -> (target IntMap.t * target String.Map.t) CI_projectID.Map.t
 (** [targets t] is a snapshot of the current state of all known PRs and branches. *)
 
 val jobs : target -> job list

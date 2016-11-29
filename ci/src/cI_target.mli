@@ -1,7 +1,7 @@
 open Asetmap
 
 module ID : sig
-  type t = [ `PR of int | `Ref of Datakit_path.t ]
+  type t = [ `PR of int | `Ref of string ]
   val pp : t Fmt.t
   val compare : t -> t -> int
 end

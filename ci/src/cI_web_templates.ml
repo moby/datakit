@@ -51,9 +51,9 @@ let gh_target_url = function
   | `Ref r ->
     let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
     let id = CI_github_hooks.Ref.name r in
-    match Datakit_path.unwrap id with
-    | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project (String.concat ~sep:"/" id)
-    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user project Datakit_path.pp id
+    match String.cut ~sep:"tags/" id with
+    | Some (_, id) -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project id
+    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%s" user project id
 
 let metadata_url t = function
   | `PR pr ->
@@ -63,8 +63,7 @@ let metadata_url t = function
   | `Ref r ->
     let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
     let id = CI_github_hooks.Ref.name r in
-    state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user project
-      Datakit_path.pp id
+    state_repo_url t "commits/github-metadata/%s/%s/ref/%s" user project id
 
 let commit_history_url t target =
   let { CI_projectID.user; project }, commit =
@@ -82,27 +81,21 @@ let commit_url ~project commit =
 let pr_url { CI_projectID.user; project} pr =
   Printf.sprintf "/pr/%s/%s/%d" user project pr
 
-let escape_ref path =
-  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" (Datakit_path.unwrap path))
-
-let unescape_ref s =
-  Uri.pct_decode s |> Datakit_path.of_string_exn
-
 let ref_url { CI_projectID.user; project} r =
-  Printf.sprintf "/ref/%s/%s/%s" user project (escape_ref r)
+  Printf.sprintf "/ref/%s/%s/%s" user project r
 
 let tag_map f map =
-  Datakit_path.Map.fold (fun key value acc ->
-      match Datakit_path.unwrap key with
-      | "tags" :: _ -> [f key value] @ acc
-      | _ -> acc
+  String.Map.fold (fun key value acc ->
+      match String.cut ~sep:"tags/" key with
+      | Some _ -> [f key value] @ acc
+      | _      -> acc
     ) map []
 
 let branch_map f map =
-  Datakit_path.Map.fold (fun key value acc ->
-      match Datakit_path.unwrap key with
-      | "heads" :: _ -> [f key value] @ acc
-      | _ -> acc
+  String.Map.fold (fun key value acc ->
+      match String.cut ~sep:"heads/" key with
+      | Some _ -> [f key value] @ acc
+      | _      -> acc
     ) map []
 
 let int_map f map =
@@ -111,7 +104,7 @@ let int_map f map =
     ) map []
 
 let dash_map f map targets =
-  Datakit_path.Map.fold (fun key value acc ->
+  String.Map.fold (fun key value acc ->
       match CI_target.ID_Set.mem (`Ref key) targets with
       | true -> [f key value] @ acc
       | false -> acc
@@ -196,8 +189,7 @@ let dashboard_widget id ref =
                   "Failing",
                   "SOUND THE ALARM!!! The build has been broken!"
   in
-  let title =
-    match Datakit_path.unwrap id with
+  let title = match String.cuts ~sep:"/" id with
     | ("heads" | "tags") :: tl -> tl
     | x -> x
   in
@@ -212,7 +204,7 @@ let ref_job ~project id ref =
   let jobs = CI_engine.jobs ref in
   let summary = summarise jobs in
   tr [
-    td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Datakit_path.pp id)]];
+    td [a ~a:[a_href (ref_url project id)] [pcdata id]];
     td [status_list jobs];
     td [pcdata summary.CI_state.descr];
   ]
@@ -655,8 +647,8 @@ let job_row ~csrf_token ~page_url ~best_log job =
   ]
 
 let target_title = function
-  | `PR pr -> Printf.sprintf "PR %d" (CI_github_hooks.PR.id pr)
-  | `Ref r -> Fmt.strf "Ref %a" Datakit_path.pp (CI_github_hooks.Ref.name r)
+  | `PR pr -> Fmt.strf "PR %d" (CI_github_hooks.PR.id pr)
+  | `Ref r -> Fmt.strf "Ref %s" (CI_github_hooks.Ref.name r)
 
 let target_commit = function
   | `PR pr -> CI_github_hooks.Commit.hash (CI_github_hooks.PR.head pr)
@@ -684,13 +676,14 @@ let target_page ~csrf_token ~target jobs t =
     LogScore.best best
   in
   let state_summary = [
-    table ~a:[a_class ["table"; "table-bordered"; "results"]] (List.map (job_row ~csrf_token ~page_url ~best_log) jobs)
+    table ~a:[a_class ["table"; "table-bordered"; "results"]]
+      (List.map (job_row ~csrf_token ~page_url ~best_log) jobs)
   ] in
   let nav =
     match target with
     | `PR _ -> Nav.PRs
     | `Ref r ->
-      match CI_github_hooks.Ref.name r |> Datakit_path.unwrap with
+      match String.cuts ~sep:"/" (CI_github_hooks.Ref.name r) with
       | "heads" :: _ -> Nav.Branches
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false

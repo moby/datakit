@@ -84,7 +84,7 @@ type datakit_config = {
   branch  : string;
 }
 
-let start () no_listen listen_urls datakit cap webhook =
+let start () no_listen listen_urls datakit cap webhook resync_interval =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -141,7 +141,7 @@ let start () no_listen listen_urls datakit cap webhook =
         let dk = DK.connect conn in
         let t = VG.Sync.empty in
         DK.branch dk d.branch >>~ fun br ->
-        VG.Sync.sync ~token ?webhook ~cap br t
+        VG.Sync.sync ~token ?webhook ?resync_interval ~cap br t
         >|= ignore
   in
   let accept_9p_connections () =
@@ -236,6 +236,23 @@ let webhook =
   in
   Arg.(value & opt (some uri) None doc)
 
+let resync_interval =
+  let docs = github_options in
+  let doc =
+    Arg.info ~docs ~doc:"Interval to wait before doing full resyncrhonisation \
+                         of the repositories." ["resync-interval"]
+  in
+  Arg.(value & opt float (60. *. 60. (* every hour *)) doc)
+
+let no_resync =
+  let docs = github_options in
+  let doc = Arg.info ~docs ~doc:"Do not resync." ["no-resync"] in
+  Arg.(value & flag doc)
+
+let resync =
+  Term.(pure (fun i -> function false -> Some i | true -> None)
+        $ resync_interval $ no_resync)
+
 let cap: Datakit_github.Capabilities.t Cmdliner.Arg.converter =
   Datakit_github.Capabilities.(parse, pp)
 
@@ -258,7 +275,7 @@ let term =
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ no_listen $ listen_urls
-        $ datakit $ capabilities $ webhook),
+        $ datakit $ capabilities $ webhook $ resync),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

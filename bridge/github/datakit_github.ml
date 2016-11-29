@@ -179,6 +179,12 @@ module PR = struct
     let compare_num x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_repo; compare_num ]
 
+  module IdSet = Set (struct
+      type t = id
+      let pp = pp_id
+      let compare = compare_id
+    end)
+
   module Set = struct
     include Set(struct
         type nonrec t = t
@@ -454,6 +460,25 @@ module Elt = struct
         let pp = pp_id
         let compare = compare_id
       end)
+
+    let filter_repos s =
+      fold
+        (fun e acc -> match e with `Repo r -> Repo.Set.add r acc | _ -> acc)
+        s Repo.Set.empty
+
+    let filter_prs s =
+      fold
+        (fun e acc -> match e with `PR pr -> PR.IdSet.add pr acc | _ -> acc)
+        s PR.IdSet.empty
+
+    let filter_refs s =
+      fold
+        (fun e acc -> match e with `Ref r -> Ref.IdSet.add r acc | _ -> acc)
+        s Ref.IdSet.empty
+
+    let of_repos s = Repo.Set.fold (fun r -> add (`Repo r)) s empty
+    let of_prs s = PR.Set.fold (fun p -> add (`PR (PR.id p))) s empty
+    let of_refs s = Ref.Set.fold (fun r -> add (`Ref (Ref.id r))) s empty
 
     let refs t =
       elements t
@@ -1063,7 +1088,9 @@ module type API = sig
   val remove_ref: token -> Repo.t -> string list -> unit result
   val set_pr: token -> PR.t -> unit result
   val prs: token -> Repo.t -> PR.t list result
+  val pr: token -> PR.id -> PR.t option result
   val refs: token -> Repo.t -> Ref.t list result
+  val ref: token -> Ref.id -> Ref.t option result
   val events: token -> Repo.t -> Event.t list result
   module Webhook: sig
     type t
@@ -1154,12 +1181,58 @@ module State (API: API) = struct
           new_refs
       ) Ref.Set.empty new_refs
 
+  let read_prs token ids =
+    Lwt_list.map_p (fun pr ->
+        Log.info (fun l -> l "API.pr %a" PR.pp_id pr);
+        if not (Capabilities.check token.c `Read `PR) then ok None
+        else
+          API.pr token.t pr >|= function
+          | Error e      -> Error (pr, e)
+          | Ok None      -> Ok None
+          | Ok (Some pr) ->
+            if pr.PR.state = `Open then Ok (Some pr) else Ok None
+      ) (PR.IdSet.elements ids)
+    >|= fun new_prs ->
+    List.fold_left (fun new_prs -> function
+        | Ok (Some pr)  -> PR.Set.add pr new_prs
+        | Ok None       -> PR.Set.empty
+        | Error (pr, e) ->
+          Log.err (fun l -> l "API.pr %a: %s" PR.pp_id pr e);
+          new_prs
+      ) PR.Set.empty new_prs
+
+  let read_refs token ids =
+    Lwt_list.map_p (fun r ->
+        Log.info (fun l -> l "API.ref %a" Ref.pp_id r);
+        if not (Capabilities.check token.c `Read `PR) then ok None
+        else
+          API.ref token.t r >|= function
+          | Error e -> Error (r, e)
+          | Ok r    -> Ok r
+      ) (Ref.IdSet.elements ids)
+    >|= fun new_refs ->
+    List.fold_left (fun new_refs -> function
+        | Ok (Some r)  -> Ref.Set.add r new_refs
+        | Ok None      -> Ref.Set.empty
+        | Error (r, e) ->
+          Log.err (fun l -> l "API.ref %a: %s" Ref.pp_id r e);
+          new_refs
+      ) Ref.Set.empty new_refs
+
   (* Import http://github.com/usr/repo state. *)
-  let import token t repos =
+  let import token t ids =
+    let repos = Elt.IdSet.filter_repos ids in
     new_prs token repos >>= fun new_prs ->
     new_refs token repos >>= fun new_refs ->
+    let prs = Elt.IdSet.filter_prs ids in
+    let refs = Elt.IdSet.filter_refs ids in
+    read_prs token prs >>= fun prs ->
+    let new_prs = PR.Set.union prs new_prs in
+    read_refs token refs >>= fun refs ->
+    let new_refs = Ref.Set.union refs new_refs in
     let new_commits =
-      Commit.Set.union (PR.Set.commits new_prs) (Ref.Set.commits new_refs)
+      let (++) = Commit.Set.union in
+      PR.Set.commits new_prs ++ Ref.Set.commits new_refs
     in
     status_of_commits token new_commits >|= fun new_status ->
     let new_t =

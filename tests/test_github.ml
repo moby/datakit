@@ -472,6 +472,17 @@ module API = struct
     | None   -> return []
     | Some r -> return r.R.prs
 
+  let pr t (repo, _ as id) =
+    t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
+    match lookup_opt t repo with
+    | None   -> return None
+    | Some r ->
+      try
+        List.find (fun pr -> PR.compare_id id (PR.id pr) = 0) r.R.prs
+        |> fun pr -> return @@ Some pr
+      with Not_found ->
+        return None
+
   let events t repo =
     t.ctx.Counter.events <- t.ctx.Counter.events + 1;
     match lookup_opt t repo with
@@ -483,6 +494,17 @@ module API = struct
     match lookup_opt t repo with
     | None   -> return []
     | Some r -> return r.R.refs
+
+  let ref t (repo, _ as id) =
+    t.ctx.Counter.refs <- t.ctx.Counter.refs + 1;
+    match lookup_opt t repo with
+    | None   -> return None
+    | Some r ->
+      try
+        List.find (fun r -> Ref.compare_id id (Ref.id r) = 0) r.R.refs
+        |> fun r -> return (Some r)
+      with Not_found ->
+        return None
 
   let apply_events t =
     t.users |> Users.iter @@ fun _ user ->
@@ -550,6 +572,7 @@ let branch = "test"
 let repo = Repo.create ~user ~repo
 let commit_bar = Commit.create repo "bar"
 let commit_foo = Commit.create repo "foo"
+let r1 = Repo.create ~user:"xxx" ~repo:"yyy"
 
 let s1 =
   Status.create ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
@@ -615,6 +638,7 @@ let snapshot: Snapshot.t Alcotest.testable =
 let diff: Diff.t Alcotest.testable =
   (module struct include Diff let equal x y = Diff.compare x y = 0 end)
 
+let dirty = Alcotest.testable Elt.IdSet.pp Elt.IdSet.equal
 let counter: Counter.t Alcotest.testable = (module Counter)
 let capabilities: Capabilities.t Alcotest.testable = (module Capabilities)
 
@@ -632,6 +656,8 @@ let mk_diff l =
     | `Remove x -> Diff.with_remove x acc
   in
   List.fold_left diff Diff.empty l
+
+let mk_dirty = Elt.IdSet.of_list
 
 module Data = struct
 
@@ -1041,7 +1067,7 @@ let test_snapshot () =
   Test_utils.run (fun _repo conn ->
       let dkt = DK.connect conn in
       DK.branch dkt "test-snapshot" >>*= fun br ->
-      let update ~prs ~status ~refs =
+      let update ~prs ~status ~refs ~dirty =
         DK.Branch.with_transaction br (fun tr ->
             Lwt_list.iter_p (Conv.update_elt tr)
               (`Repo repo ::
@@ -1049,11 +1075,12 @@ let test_snapshot () =
                (List.map (fun s  -> `Status s) status) @
                (List.map (fun r  -> `Ref r) refs))
             >>= fun () ->
+            Conv.stain tr (Elt.IdSet.of_list dirty) >>= fun () ->
             DK.Transaction.commit tr ~message:"init" >>*= fun () ->
             Conv.of_branch ~debug:"init" br >>= fun (_, s) ->
             ok (Conv.snapshot s))
       in
-      update ~prs:prs0 ~status:status0 ~refs:refs0 >>*= fun s ->
+      update ~prs:prs0 ~status:status0 ~refs:refs0 ~dirty:[] >>*= fun s ->
       expect_head br >>*= fun head ->
       let se =
         let prs = PR.Set.of_list prs0 in
@@ -1067,20 +1094,26 @@ let test_snapshot () =
       Alcotest.(check snapshot) "snap transaction" se s;
       Alcotest.(check snapshot) "snap head" se (Conv.snapshot sh);
 
-      update ~prs:[pr2] ~status:[] ~refs:[] >>*= fun s1 ->
+      update ~prs:[pr2] ~status:[] ~refs:[] ~dirty:[`PR (PR.id pr1)]
+      >>*= fun s1 ->
       expect_head br >>*= fun head1 ->
-      Conv.diff head1 head >>= fun diff1 ->
+      Conv.diff head1 head >>= fun (diff1, dirty1) ->
       Alcotest.(check diff) "diff1" (mk_diff [`Update (`PR pr2)]) diff1;
+      Alcotest.(check dirty) "dirty1" (mk_dirty [`PR (PR.id pr1)]) dirty1;
       Conv.of_commit ~debug:"sd" ~old:sh head1 >>= fun sd ->
       Alcotest.(check snapshot) "snap diff" s1 (Conv.snapshot sd);
 
-      update ~prs:[] ~status:[s5] ~refs:[ref2] >>*= fun s2 ->
+      update ~prs:[] ~status:[s5] ~refs:[ref2] ~dirty:[`Ref (Ref.id ref2);
+                                                       `Repo r1]
+      >>*= fun s2 ->
       expect_head br >>*= fun head2 ->
-      Conv.diff head2 head1 >>= fun diff2 ->
+      Conv.diff head2 head1 >>= fun (diff2, dirty2) ->
       Alcotest.(check diff) "diff2"
         (mk_diff [`Update (`Status s5); `Update (`Ref ref2);
                   `Update (`Commit commit_foo)])
         diff2;
+      Alcotest.(check dirty) "dirty2"
+        (mk_dirty [`Ref (Ref.id ref2); `Repo r1]) dirty2;
       Conv.of_commit ~debug:"sd1" ~old:sh head2 >>= fun sd1 ->
       Conv.of_commit ~debug:"ss2" ~old:sd head2 >>= fun sd2 ->
       Alcotest.(check snapshot) "snap diff1" s2 (Conv.snapshot sd1);
@@ -1094,7 +1127,7 @@ let test_snapshot () =
         ) >>*= fun () ->
       expect_head br >>*= fun head3 ->
 
-      Conv.diff head3 head2 >>= fun diff3 ->
+      Conv.diff head3 head2 >>= fun (diff3, _) ->
       Alcotest.(check diff) "diff3" Diff.empty diff3;
 
       Lwt.return_unit

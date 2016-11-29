@@ -51,10 +51,25 @@ module Make (DK: Datakit_S.CLIENT): sig
   (** [update_event t e] applies the (webhook) event [e] to the
       transaction [t]. *)
 
-  (** {1 Snapshots and diffs} *)
+  (** {1 Dirty *)
+
+  type dirty = Elt.IdSet.t
+  (** The type for dirty elements. *)
 
   type t
   (** The type for filesystem snapshots. *)
+
+  val stain: DK.Transaction.t -> dirty -> unit Lwt.t
+  (** [stain tr d] makes all the elements in [d] dirty. *)
+
+  val clean: DK.Transaction.t -> dirty -> unit Lwt.t
+  (** [clean t d] removes [d] from the list of dirty elements in
+      [t]. *)
+
+  val dirty: t -> dirty
+  (** [dirty t] is the collection of dirty elements in [t]. *)
+
+  (** {1 Snapshots and diffs} *)
 
   val snapshot: t -> Snapshot.t
   (** [snapshot t] is [t]'s in-memory snapshot. *)
@@ -65,7 +80,7 @@ module Make (DK: Datakit_S.CLIENT): sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for {!snapshot} values. *)
 
-  val diff: DK.Commit.t -> DK.Commit.t -> Diff.t Lwt.t
+  val diff: DK.Commit.t -> DK.Commit.t -> (Diff.t * dirty) Lwt.t
   (** [diff x y] computes the difference between the commits [x] and
       [y]. *)
 

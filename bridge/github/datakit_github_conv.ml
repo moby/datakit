@@ -45,6 +45,22 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | Error _ -> None
     | Ok b    -> Some (String.trim (Cstruct.to_string b))
 
+  let safe_create_file tr file contents =
+    match Datakit_path.basename file with
+    | None   ->
+      Log.err (fun l -> l "%a is not a file" Datakit_path.pp file);
+      Lwt.return_unit
+    | Some _ ->
+      let dir  = Datakit_path.dirname file in
+      (DK.Transaction.make_dirs tr dir >>*= fun () ->
+       DK.Transaction.create_or_replace_file tr file contents)
+      >|= function
+      | Ok ()   -> ()
+      | Error e ->
+        Log.err (fun l ->
+            l "Got %a while creating %a, skipping."
+              DK.pp_error e Datakit_path.pp file)
+
   let lift_errors name f = f >>= function
     | Error e -> Lwt.fail_with @@ Fmt.strf "%s: %a" name DK.pp_error e
     | Ok x    -> Lwt.return x
@@ -52,32 +68,45 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let path_of_diff = function
     | `Added f | `Removed f | `Updated f -> Datakit_path.unwrap f
 
+  type dirty = Elt.IdSet.t
+
   let changes diff =
-    let without_last l = List.rev (List.tl (List.rev l)) in
-    List.fold_left (fun acc d ->
+    let rdecons l = match List.rev l with
+      | []   -> assert false
+      | h::t -> h, List.rev t
+    in
+    List.fold_left (fun (acc, dirty) d ->
         let path = path_of_diff d in
+        let added = match d with `Removed _ -> false | _ -> true in
         let t = match path with
           | [] | [_]             -> None
           | user :: repo :: path ->
             let repo = Repo.create ~user ~repo in
+            let pr repo id = `PR (repo, int_of_string id) in
             match path with
-            | [] | [".monitor"] -> Some (`Repo repo)
-            | "pr" :: id :: _   -> Some (`PR (repo, int_of_string id))
-            | "commit" :: [id]  -> Some (`Commit (Commit.create repo id))
+            | [] | [".monitor"]    -> Some (`Repo repo)
+            | [".dirty"] when added  -> Some (`Dirty (`Repo repo))
+            | ["pr"; id; ".dirty"] when added -> Some (`Dirty (pr repo id))
+            | "pr" :: id :: _ -> Some (pr repo id)
+            | ["commit"; id] -> Some (`Commit (Commit.create repo id))
             | "commit" :: id :: "status" :: (_ :: _ :: _ as tl) ->
-              Some (`Status ((Commit.create repo id), without_last tl))
+              let _, last = rdecons tl in
+              Some (`Status ((Commit.create repo id), last))
             | "ref" :: ( _ :: _ :: _ as tl)  ->
-              Some (`Ref (repo, without_last tl))
+              let f, last = rdecons tl in
+              let r = `Ref (repo, last) in
+              if f = ".dirty" then Some (`Dirty r) else Some r
             |  _ -> None
         in
         match t with
-        | None   -> acc
-        | Some t -> Elt.IdSet.add t acc
-      ) Elt.IdSet.empty diff
+        | None                -> acc, dirty
+        | Some (`Dirty d)     -> acc, Elt.IdSet.add d dirty
+        | Some (#Elt.id as e) ->  Elt.IdSet.add e acc, dirty
+      ) (Elt.IdSet.empty, Elt.IdSet.empty) diff
 
   let safe_diff x y =
     DK.Commit.diff x y >|= function
-    | Error _ -> Elt.IdSet.empty
+    | Error _ -> Elt.IdSet.empty, Elt.IdSet.empty
     | Ok d    -> changes d
 
   let walk
@@ -415,6 +444,66 @@ module Make (DK: Datakit_S.CLIENT) = struct
     repos tree >>= fun repos ->
     snapshot_of_repos tree repos
 
+  (* Dirty *)
+
+  let dirty_repos tree =
+    let root = Datakit_path.empty in
+    safe_read_dir tree root >>= fun users ->
+    Lwt_list.fold_left_s (fun acc user ->
+        safe_read_dir tree (root / user) >>= fun repos ->
+        Lwt_list.fold_left_s (fun acc repo ->
+            safe_exists_file tree (root / user /repo / ".dirty") >|= function
+            | false -> acc
+            | true  -> Elt.IdSet.add (`Repo (Repo.create ~user ~repo)) acc
+          ) acc repos
+      ) Elt.IdSet.empty users
+
+  let dirty_prs tree repo =
+    let dir = root repo / "pr"  in
+    safe_read_dir tree dir >>= fun nums ->
+    Lwt_list.fold_left_s (fun acc n ->
+        let d = dir / n / ".dirty" in
+        safe_exists_file tree d >|= function
+        | false -> acc
+        | true  ->
+          try Elt.IdSet.add (`PR (repo, int_of_string n)) acc
+          with Failure _ -> acc
+      ) Elt.IdSet.empty nums
+
+  let dirty_refs tree repo =
+    let dir = root repo / "ref" in
+    let r name = Lwt.return (Some (`Ref (repo, name))) in
+    walk (module Elt.IdSet) tree dir (".dirty", r)
+
+  let dirty_of_commit c: dirty Lwt.t =
+    let t = DK.Commit.tree c in
+    let (++) = Elt.IdSet.union in
+    (* we handle dirty repo even if not monitored *)
+    dirty_repos t >>= fun dirty_repos ->
+    repos t       >>= fun repos ->
+    (* we only check for dirty prs/refs for monitored repos only *)
+    Lwt_list.fold_left_s (fun acc r ->
+        dirty_prs t r  >>= fun prs  ->
+        dirty_refs t r >|= fun refs ->
+        acc ++ prs ++ refs
+      ) dirty_repos (Repo.Set.elements repos)
+
+  let dirty_file: Elt.id -> Datakit_path.t = function
+    | `Repo r      -> root r / ".dirty"
+    | `PR (r, id)  -> root r / "pr" / string_of_int id / ".dirty"
+    | `Ref (r, n) -> root r / "ref" /@ Datakit_path.of_steps_exn n / ".dirty"
+    | _ -> failwith "TODO"
+
+  let clean tr dirty =
+    Lwt_list.iter_p (fun d -> safe_remove tr (dirty_file d))
+      @@ Elt.IdSet.elements dirty
+
+  let empty = Cstruct.of_string ""
+
+  let stain tr dirty =
+    Lwt_list.iter_p (fun d -> safe_create_file tr (dirty_file d) empty)
+      @@ Elt.IdSet.elements dirty
+
   (* Diffs *)
 
   let combine_repo t tree r =
@@ -465,17 +554,20 @@ module Make (DK: Datakit_S.CLIENT) = struct
   type t = {
     head    : DK.Commit.t;
     snapshot: Snapshot.t;
+    dirty   : dirty;
   }
 
   let snapshot t = t.snapshot
   let head t = t.head
+  let dirty t = t.dirty
 
   let pp ppf s =
     Fmt.pf ppf "@[%a:@;@[<2>%a@]@]" DK.Commit.pp s.head Snapshot.pp s.snapshot
 
   let diff x y =
-    safe_diff x y >>= fun diff ->
-    apply_on_commit diff x
+    safe_diff x y >>= fun (diff, dirty) ->
+    apply_on_commit diff x >|= fun s ->
+    s, dirty
 
   let tr_head tr =
     DK.Transaction.parents tr >>= function
@@ -500,11 +592,13 @@ module Make (DK: Datakit_S.CLIENT) = struct
       tr_head tr >>= fun head ->
       match old with
       | None ->
-        snapshot_of_commit head >|= fun snapshot -> tr, { head; snapshot }
+        snapshot_of_commit head >>= fun snapshot ->
+        dirty_of_commit head    >|= fun dirty ->
+        tr, { head; snapshot; dirty }
       | Some old ->
-        diff head old.head >|= fun diff ->
+        diff head old.head >|= fun (diff, dirty) ->
         let snapshot = Diff.apply diff old.snapshot in
-        tr, { head; snapshot }
+        tr, { head; snapshot; dirty }
 
   let of_commit ~debug ?old head =
     Log.debug (fun l ->
@@ -512,11 +606,14 @@ module Make (DK: Datakit_S.CLIENT) = struct
         l "snapshot %s old=%s" debug c
       );
     match old with
-    | None     -> snapshot_of_commit head >|= fun snapshot -> { head; snapshot }
+    | None     ->
+      snapshot_of_commit head >>= fun snapshot ->
+      dirty_of_commit head    >|= fun dirty ->
+      { head; snapshot; dirty }
     | Some old ->
-      diff head old.head >|= fun diff ->
+      diff head old.head >|= fun (diff, dirty) ->
       let snapshot = Diff.apply diff old.snapshot in
-      { head; snapshot }
+      { head; snapshot; dirty }
 
   let remove_elt tr = function
     | `Repo repo -> remove_repo tr repo

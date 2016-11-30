@@ -77,12 +77,14 @@ module MetricMap = Map.Make(MetricInfo)
 module CollectorRegistry = struct
   type t = {
     mutable metrics : (unit -> (string * float) list LabelSetMap.t) MetricMap.t;
+    mutable pre_collect : (unit -> unit) list;
   }
 
   type snapshot = (string * float) list LabelSetMap.t MetricMap.t
 
   let create () = {
-    metrics = MetricMap.empty
+    metrics = MetricMap.empty;
+    pre_collect = [];
   }
 
   let default = create ()
@@ -92,6 +94,7 @@ module CollectorRegistry = struct
     t.metrics <- MetricMap.add info collector t.metrics
 
   let collect t =
+    List.iter (fun f -> f ()) t.pre_collect;
     MetricMap.map (fun f -> f ()) t.metrics
 end
 
@@ -289,3 +292,79 @@ module Summary = struct
          Lwt.return_unit
       )
 end
+
+module Runtime = struct
+  let start_time = Unix.gettimeofday ()
+
+  let current = ref (Gc.stat ())
+  let update () =
+    current := Gc.stat ()
+
+  let simple_metric ~metric_type ~help name fn =
+    let info = {
+      MetricInfo.
+      name = MetricName.v name;
+      help;
+      metric_type;
+      label_names = [| |];
+    }
+    in
+    let collect () =
+      LabelSetMap.singleton [| |] ["", fn ()]
+    in
+    info, collect
+
+  let ocaml_gc_allocated_bytes =
+    simple_metric ~metric_type:Counter "ocaml_gc_allocated_bytes" Gc.allocated_bytes
+      ~help:"Total number of bytes allocated since the program was started."
+
+  let ocaml_gc_major_words =
+    simple_metric ~metric_type:Counter "ocaml_gc_major_words" (fun () -> (!current).Gc.major_words)
+      ~help:"Number of words allocated in the major heap since the program was started."
+
+  let ocaml_gc_minor_collections =
+    simple_metric ~metric_type:Counter "ocaml_gc_minor_collections" (fun () -> float_of_int (!current).Gc.minor_collections)
+      ~help:"Number of minor collection cycles completed since the program was started."
+
+  let ocaml_gc_major_collections =
+    simple_metric ~metric_type:Counter "ocaml_gc_major_collections" (fun () -> float_of_int (!current).Gc.major_collections)
+      ~help:"Number of major collection cycles completed since the program was started."
+
+  let ocaml_gc_heap_words =
+    simple_metric ~metric_type:Gauge "ocaml_gc_heap_words" (fun () -> float_of_int (!current).Gc.heap_words)
+      ~help:"Total size of the major heap, in words."
+
+  let ocaml_gc_compactions =
+    simple_metric ~metric_type:Counter "ocaml_gc_compactions" (fun () -> float_of_int (!current).Gc.compactions)
+      ~help:"Number of heap compactions since the program was started."
+
+  let ocaml_gc_top_heap_words =
+    simple_metric ~metric_type:Counter "ocaml_gc_top_heap_words" (fun () -> float_of_int (!current).Gc.top_heap_words)
+      ~help:"Maximum size reached by the major heap, in words."
+
+  let process_cpu_seconds_total =
+    simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
+      ~help:"Total user and system CPU time spent in seconds."
+
+  let process_start_time_seconds =
+    simple_metric ~metric_type:Counter "process_start_time_seconds" (fun () -> start_time)
+      ~help:"Start time of the process since unix epoch in seconds."
+
+  let metrics = [
+    ocaml_gc_allocated_bytes;
+    ocaml_gc_major_words;
+    ocaml_gc_minor_collections;
+    ocaml_gc_major_collections;
+    ocaml_gc_heap_words;
+    ocaml_gc_compactions;
+    ocaml_gc_top_heap_words;
+    process_cpu_seconds_total;
+    process_start_time_seconds;
+  ]
+end
+
+let () =
+  CollectorRegistry.(default.pre_collect <- Runtime.update :: default.pre_collect);
+  let add (info, collector) =
+    CollectorRegistry.(register default) info collector in
+  List.iter add Runtime.metrics

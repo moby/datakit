@@ -186,6 +186,9 @@ module PR: sig
   module Index: MAP with type key = id
   (** Maps indexed by pull-request IDs. *)
 
+  val index: Set.t -> t Index.t Repo.Map.t
+  (** [index s] indexes [s] by pull-request IDs. *)
+
 end
 
 module Status: sig
@@ -255,6 +258,9 @@ module Status: sig
   module Index: MAP with type key = id
   (** Maps indexed by build status IDs. *)
 
+  val index: Set.t -> t Index.t Repo.Map.t
+  (** [index s] indexes [s] by build status IDs. *)
+
 end
 
 module Ref: sig
@@ -321,6 +327,9 @@ module Ref: sig
 
   module Index: MAP with type key = id
   (** Maps indexed by Git reference IDs. *)
+
+  val index: Set.t -> t Index.t Repo.Map.t
+  (** [index s] indexes [s] by Git reference IDs. *)
 
 end
 

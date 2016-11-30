@@ -232,6 +232,17 @@ module PR = struct
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
 
+  let index s =
+    Set.fold (fun t acc ->
+        let repo = repo t in
+        let id = id t in
+        let idx = match Repo.Map.find repo acc with
+          | None     -> Index.singleton id t
+          | Some idx -> Index.add id t idx
+        in
+        Repo.Map.add repo idx acc
+      ) s Repo.Map.empty
+
 end
 
 module Status = struct
@@ -326,6 +337,17 @@ module Status = struct
       let pp = pp_id
     end)
 
+  let index s =
+    Set.fold (fun t acc ->
+        let repo = repo t in
+        let id = id t in
+        let idx = match Repo.Map.find repo acc with
+          | None     -> Index.singleton id t
+          | Some idx -> Index.add id t idx
+        in
+        Repo.Map.add repo idx acc
+      ) s Repo.Map.empty
+
 end
 
 module Ref = struct
@@ -387,6 +409,17 @@ module Ref = struct
     let commits t =
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
+
+  let index s =
+    Set.fold (fun t acc ->
+        let repo = repo t in
+        let id = id t in
+        let idx = match Repo.Map.find repo acc with
+          | None     -> Index.singleton id t
+          | Some idx -> Index.add id t idx
+        in
+        Repo.Map.add repo idx acc
+      ) s Repo.Map.empty
 
   type event = [`Created of t | `Updated of t  | `Removed of id]
 

@@ -17,6 +17,7 @@ end
 module type MAP = sig
   include Map.S
   val pp: 'a Fmt.t -> 'a t Fmt.t
+  val of_list: (key * 'a) list -> 'a t
 end
 
 let pp_set (type a) k (module S: SET with type t = a) ppf (v:a) =
@@ -62,6 +63,7 @@ end
 module Map (K: ELT) = struct
   include Map.Make(K)
   let pp v ppf t = Fmt.(list ~sep:(unit "@;") (pair K.pp v)) ppf (bindings t)
+  let of_list l = List.fold_left (fun acc (k, v) -> add k v acc) empty l
 end
 
 let pp_path = Fmt.(list ~sep:(unit "/") string)

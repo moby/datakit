@@ -18,6 +18,7 @@ end
 module type MAP = sig
   include Map.S
   val pp: 'a Fmt.t -> 'a t Fmt.t
+  val of_list: (key * 'a) list -> 'a t
 end
 
 module Set (E: ELT): SET with type elt = E.t

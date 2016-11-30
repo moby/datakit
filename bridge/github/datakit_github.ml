@@ -10,14 +10,13 @@ module type ELT = sig
 end
 
 module type SET = sig
-  include Set.S
+  include Asetmap.Set.S
   val pp: t Fmt.t
 end
 
 module type MAP = sig
-  include Map.S
+  include Asetmap.Map.S
   val pp: 'a Fmt.t -> 'a t Fmt.t
-  val of_list: (key * 'a) list -> 'a t
 end
 
 let pp_set (type a) k (module S: SET with type t = a) ppf (v:a) =
@@ -40,7 +39,7 @@ let trim_and_validate s =
 
 module Set (E: ELT) = struct
 
-  include Set.Make(E)
+  include Asetmap.Set.Make(E)
 
   let pp ppf t = Fmt.(list ~sep:(unit "@;") E.pp) ppf (elements t)
 
@@ -61,9 +60,8 @@ module Set (E: ELT) = struct
 end
 
 module Map (K: ELT) = struct
-  include Map.Make(K)
+  include Asetmap.Map.Make(K)
   let pp v ppf t = Fmt.(list ~sep:(unit "@;") (pair K.pp v)) ppf (bindings t)
-  let of_list l = List.fold_left (fun acc (k, v) -> add k v acc) empty l
 end
 
 let pp_path = Fmt.(list ~sep:(unit "/") string)

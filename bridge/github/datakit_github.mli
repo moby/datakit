@@ -10,15 +10,14 @@ end
 
 (** Pretty-printable {!Set.S}. *)
 module type SET = sig
-  include Set.S
+  include Asetmap.Set.S
   val pp: t Fmt.t
 end
 
 (** Pretty-printable {!Map.S}. *)
 module type MAP = sig
-  include Map.S
+  include Asetmap.Map.S
   val pp: 'a Fmt.t -> 'a t Fmt.t
-  val of_list: (key * 'a) list -> 'a t
 end
 
 module Set (E: ELT): SET with type elt = E.t

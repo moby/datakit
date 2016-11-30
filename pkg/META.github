@@ -10,7 +10,7 @@ exists_if       = "datakit-github.cma"
 package "client" (
   description = "Client abstraction for the GitHub API, using datakit"
   version = "%%VERSION%%"
-  requires = "astring cstruct datakit-client fmt logs result rresult uri"
+  requires = "astring cstruct datakit-client fmt logs result rresult uri asetmap"
   archive(byte)   = "datakit-github-client.cma"
   archive(native) = "datakit-github-client.cmxa"
   plugin(byte)    = "datakit-github-client.cma"

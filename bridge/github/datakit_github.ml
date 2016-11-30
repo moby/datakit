@@ -211,11 +211,13 @@ module PR = struct
     let compare_num x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_repo; compare_num ]
 
-  module IdSet = Set (struct
-      type t = id
-      let pp = pp_id
-      let compare = compare_id
-    end)
+  module Id = struct
+    type t = id
+    let pp = pp_id
+    let compare = compare_id
+  end
+  module IdSet = Set (Id)
+  module Index = Map(Id)
 
   module Set = struct
     include Set(struct
@@ -316,6 +318,12 @@ module Status = struct
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
 
+  module Index = Map(struct
+      type t = id
+      let compare = compare_id
+      let pp = pp_id
+    end)
+
 end
 
 module Ref = struct
@@ -346,6 +354,8 @@ module Ref = struct
       Pervasives.compare;
     ]
 
+  let pp_name = pp_path
+
   let pp ppf t =
     Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_id t)
 
@@ -356,11 +366,13 @@ module Ref = struct
     let compare_context x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_repo; compare_context ]
 
-  module IdSet = Set (struct
-      type t = id
-      let pp = pp_id
-      let compare = compare_id
-    end)
+  module Id = struct
+    type t = id
+    let pp = pp_id
+    let compare = compare_id
+  end
+  module IdSet = Set (Id)
+  module Index = Map(Id)
 
   module Set = struct
     include Set(struct

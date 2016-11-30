@@ -10,13 +10,13 @@ end
 
 (** Pretty-printable {!Set.S}. *)
 module type SET = sig
-  include Set.S
+  include Asetmap.Set.S
   val pp: t Fmt.t
 end
 
 (** Pretty-printable {!Map.S}. *)
 module type MAP = sig
-  include Map.S
+  include Asetmap.Map.S
   val pp: 'a Fmt.t -> 'a t Fmt.t
 end
 
@@ -179,6 +179,9 @@ module PR: sig
   end
   (** Sets of pull requests. *)
 
+  module Index: MAP with type key = id
+  (** Maps indexed by pull-request IDs. *)
+
 end
 
 module Status: sig
@@ -245,6 +248,9 @@ module Status: sig
   end
   (** Sets of build status. *)
 
+  module Index: MAP with type key = id
+  (** Maps indexed by build status IDs. *)
+
 end
 
 module Ref: sig
@@ -262,6 +268,9 @@ module Ref: sig
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
+
+  val pp_name: string list Fmt.t
+  (** [pp_name ["a";"b";"c"]] is ["a/b/c"] *)
 
   val compare: t -> t -> int
   (** [compare] compares Git references. *)
@@ -305,6 +314,9 @@ module Ref: sig
 
   val pp_event: event Fmt.t
   (** [pp_event] is the pretty-printer for reference events' state.*)
+
+  module Index: MAP with type key = id
+  (** Maps indexed by Git reference IDs. *)
 
 end
 

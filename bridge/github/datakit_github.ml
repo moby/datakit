@@ -10,12 +10,12 @@ module type ELT = sig
 end
 
 module type SET = sig
-  include Set.S
+  include Asetmap.Set.S
   val pp: t Fmt.t
 end
 
 module type MAP = sig
-  include Map.S
+  include Asetmap.Map.S
   val pp: 'a Fmt.t -> 'a t Fmt.t
 end
 
@@ -29,7 +29,7 @@ let validate_char = function
   | 'a' .. 'z'
   | 'A' .. 'Z'
   | '0' .. '9'
-  | '-' | '_' -> ()
+  | '-' | '_' | '.' -> ()
   | c -> invalid_arg (Fmt.strf "invalid character %c in reference name" c)
 
 let trim_and_validate s =
@@ -39,7 +39,7 @@ let trim_and_validate s =
 
 module Set (E: ELT) = struct
 
-  include Set.Make(E)
+  include Asetmap.Set.Make(E)
 
   let pp ppf t = Fmt.(list ~sep:(unit "@;") E.pp) ppf (elements t)
 
@@ -60,7 +60,7 @@ module Set (E: ELT) = struct
 end
 
 module Map (K: ELT) = struct
-  include Map.Make(K)
+  include Asetmap.Map.Make(K)
   let pp v ppf t = Fmt.(list ~sep:(unit "@;") (pair K.pp v)) ppf (bindings t)
 end
 
@@ -211,11 +211,13 @@ module PR = struct
     let compare_num x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_repo; compare_num ]
 
-  module IdSet = Set (struct
-      type t = id
-      let pp = pp_id
-      let compare = compare_id
-    end)
+  module Id = struct
+    type t = id
+    let pp = pp_id
+    let compare = compare_id
+  end
+  module IdSet = Set (Id)
+  module Index = Map(Id)
 
   module Set = struct
     include Set(struct
@@ -316,6 +318,12 @@ module Status = struct
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
 
+  module Index = Map(struct
+      type t = id
+      let compare = compare_id
+      let pp = pp_id
+    end)
+
 end
 
 module Ref = struct
@@ -346,6 +354,8 @@ module Ref = struct
       Pervasives.compare;
     ]
 
+  let pp_name = pp_path
+
   let pp ppf t =
     Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_id t)
 
@@ -356,11 +366,13 @@ module Ref = struct
     let compare_context x y = Pervasives.compare (snd x) (snd y) in
     compare_fold [ compare_repo; compare_context ]
 
-  module IdSet = Set (struct
-      type t = id
-      let pp = pp_id
-      let compare = compare_id
-    end)
+  module Id = struct
+    type t = id
+    let pp = pp_id
+    let compare = compare_id
+  end
+  module IdSet = Set (Id)
+  module Index = Map(Id)
 
   module Set = struct
     include Set(struct

@@ -23,7 +23,7 @@ services:
   bridge:
     restart: always
     image: docker/datakit:github
-    command: --datakit tcp:datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81
+    command: --datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81
     ports:
      - "81:81"
     volumes:

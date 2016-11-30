@@ -53,6 +53,9 @@ module Repo: sig
   val v : user:string -> repo:string -> t
   (** [v user string] will create a fresh {!t}. *)
 
+  val of_string: string -> t option
+  (** [of_string s] parses strings of the form [":user/:repo"]. *)
+
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)
 

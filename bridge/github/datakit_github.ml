@@ -25,6 +25,18 @@ let pp_set (type a) k (module S: SET with type t = a) ppf (v:a) =
 
 let pp_field k pp ppf v = Fmt.pf ppf "@[<2>%s:@;%a@]" k pp v
 
+let validate_char = function
+  | 'a' .. 'z'
+  | 'A' .. 'Z'
+  | '0' .. '9'
+  | '-' | '_' -> ()
+  | c -> invalid_arg (Fmt.strf "invalid character %c in reference name" c)
+
+let trim_and_validate s =
+  let s = String.trim s in
+  String.iter validate_char s;
+  s
+
 module Set (E: ELT) = struct
 
   include Set.Make(E)
@@ -57,10 +69,16 @@ let pp_path = Fmt.(list ~sep:(unit "/") string)
 module Repo = struct
 
   type t = { user: string; repo: string }
+
   let v ~user ~repo =
-   let user = String.trim user in
-   let repo = String.trim repo in
+   let user = trim_and_validate user in
+   let repo = trim_and_validate repo in
    { user; repo }
+
+  let of_string s = match String.cuts ~sep:"/" s with
+    | [user; repo] ->
+      (try Some (v ~user ~repo) with Invalid_argument _ -> None)
+    | _ -> None
 
   let pp ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
   let compare (x:t) (y:t) = Pervasives.compare x y
@@ -309,20 +327,8 @@ module Ref = struct
 
   type id = Repo.t * string list
 
-  let validate = function
-    | 'a' .. 'z'
-    | 'A' .. 'Z'
-    | '0' .. '9'
-    | '-' | '_' -> ()
-    | c -> invalid_arg (Fmt.strf "invalid character %c in reference name" c)
-
   let v head name =
-    let name =
-      List.map (fun s ->
-          let s = String.trim s in
-          String.iter validate s;
-          s) name
-    in
+    let name = List.map trim_and_validate name in
     { head; name }
 
   let repo t = t.head.Commit.repo

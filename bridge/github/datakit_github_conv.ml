@@ -189,7 +189,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         let v = Cstruct.of_string (v ^ "\n") in
         DK.Transaction.create_or_replace_file t (dir / k) v
       in
-      write "head"  (PR.commit_id pr)                >>*= fun () ->
+      write "head"  (PR.commit_hash pr)              >>*= fun () ->
       write "state" (PR.string_of_state pr.PR.state) >>*= fun () ->
       write "title" pr.PR.title                      >>*= fun () ->
       write "base"  pr.PR.base
@@ -266,15 +266,15 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   (* Commits *)
 
-  let commit tree { Commit.repo; id } =
-    let dir = root repo / "commit" / id in
+  let commit tree { Commit.repo; hash } =
+    let dir = root repo / "commit" / hash in
     safe_exists_dir tree dir >|= function
     | false ->
-      Log.debug (fun l -> l "commit {%a %s} -> false" Repo.pp repo id);
+      Log.debug (fun l -> l "commit {%a %s} -> false" Repo.pp repo hash);
       None
     | true  ->
-      Log.debug (fun l -> l "commit {%a %s} -> true" Repo.pp repo id);
-      Some (Commit.v repo id)
+      Log.debug (fun l -> l "commit {%a %s} -> true" Repo.pp repo hash);
+      Some (Commit.v repo hash)
 
   let commits_of_repo tree repo =
     let dir = root repo / "commit" in
@@ -301,7 +301,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
   (* Status *)
 
   let update_status t s =
-    let dir = root (Status.repo s) / "commit" / (Status.commit_id s)
+    let dir = root (Status.repo s) / "commit" / (Status.commit_hash s)
               / "status" /@ path (Status.context s)
     in
     Log.debug (fun l -> l "update_status %a" Datakit_path.pp dir);
@@ -326,7 +326,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let status tree (commit, context) =
     let context = Datakit_path.of_steps_exn context in
     let dir =
-      root (Commit.repo commit) / "commit" / Commit.id commit / "status"
+      root (Commit.repo commit) / "commit" / Commit.hash commit / "status"
       /@ context
     in
     safe_read_file tree (dir / "state") >>= fun state ->
@@ -351,7 +351,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let statuses_of_commits tree commits =
     Lwt_list.fold_left_s (fun acc commit ->
         let dir = root (Commit.repo commit) / "commit" in
-        let dir = dir / Commit.id commit / "status" in
+        let dir = dir / Commit.hash commit / "status" in
         walk (module Status.Set) tree dir
           ("state", fun c -> status tree (commit, c))
         >|= fun status ->
@@ -410,7 +410,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "update_ref %a" Datakit_path.pp dir);
     let update =
       DK.Transaction.make_dirs tr dir >>*= fun () ->
-      let head = Cstruct.of_string (Ref.commit_id r ^ "\n") in
+      let head = Cstruct.of_string (Ref.commit_hash r ^ "\n") in
       DK.Transaction.create_or_replace_file tr (dir / "head") head
     in
     lift_errors "update_ref" update
@@ -634,12 +634,12 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | `Ref r     -> remove_ref tr r
     | `Status (h, c) ->
       let dir =
-        root (Commit.repo h) / "commit" / Commit.id h / "status"
+        root (Commit.repo h) / "commit" / Commit.hash h / "status"
         /@ path c
       in
       safe_remove tr dir
     | `Commit c ->
-      let dir = root (Commit.repo c) / "commit" / c.Commit.id in
+      let dir = root (Commit.repo c) / "commit" / c.Commit.hash in
       safe_remove tr dir
 
   let update_elt tr = function

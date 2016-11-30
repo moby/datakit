@@ -186,7 +186,7 @@ module Make (API: API) = struct
   (* /github.com/${USER}/${REPO}/pr/${PR}/head *)
   let pr_head t pr =
     Logs.debug (fun l -> l "pr_dir %a %d" Repo.pp t.repo pr.PR.number);
-    let head = PR.commit_id pr in
+    let head = PR.commit_hash pr in
     let file, _ = Vfs.File.rw_of_string (head ^ "\n") in
     file
 

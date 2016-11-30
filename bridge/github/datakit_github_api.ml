@@ -341,7 +341,7 @@ let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
 
 let status token commit =
   let user, repo = user_repo commit in
-  let sha = Commit.id commit in
+  let sha = Commit.hash commit in
   (token.m >>+= fun () ->
    Github.Status.get ~user ~repo ~sha ()
    |> Github.Monad.map Github.Response.value)
@@ -353,7 +353,7 @@ let status token commit =
 let set_status token status =
   let new_status = Status.to_gh status in
   let user, repo = user_repo (Status.commit status) in
-  let sha = Status.commit_id status in
+  let sha = Status.commit_hash status in
   (token.m >>+= fun () ->
    Github.Status.create ~user ~repo ~sha ~status:new_status ())
   |> run

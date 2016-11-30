@@ -51,7 +51,7 @@ module R = struct
     mutable events : Event.t list;
   }
 
-  let create { Repo.user; repo } =
+  let v { Repo.user; repo } =
     { user; repo; commits = []; prs = []; refs = []; events = [] }
 
   let prune r =
@@ -155,21 +155,21 @@ module User = struct
   let add_repo t r =
     if String.Map.mem r.Repo.repo t.repos then t
     else
-      let repos = String.Map.add r.Repo.repo (R.create r) t.repos in
+      let repos = String.Map.add r.Repo.repo (R.v r) t.repos in
       { repos }
 
   let lookup t r =
     match String.Map.find r.Repo.repo t.repos with
     | Some r -> r
     | None   ->
-      let repo = R.create r in
+      let repo = R.v r in
       t.repos <-String.Map.add r.Repo.repo repo t.repos;
       repo
 
   let prune monitored_repos t =
     let repos =
       String.Map.filter (fun _ { R.user; repo; _ } ->
-          Repo.Set.mem (Repo.create ~user ~repo) monitored_repos
+          Repo.Set.mem (Repo.v ~user ~repo) monitored_repos
         ) t.repos
     in
     let repos = String.Map.map R.prune repos in
@@ -179,14 +179,14 @@ module User = struct
 
   let repos t =
     fold (fun { R.user; repo; _ } acc ->
-        Repo.Set.add (Repo.create ~user ~repo) acc
+        Repo.Set.add (Repo.v ~user ~repo) acc
       ) t Repo.Set.empty
 
   let commits t =
     fold (fun r acc ->
-        let repo = Repo.create ~user:r.R.user ~repo:r.R.repo in
+        let repo = Repo.v ~user:r.R.user ~repo:r.R.repo in
         List.fold_left (fun acc (id, _) ->
-            Commit.Set.add (Commit.create repo id) acc
+            Commit.Set.add (Commit.v repo id) acc
           ) acc r.R.commits
       ) t Commit.Set.empty
 
@@ -229,7 +229,7 @@ module Users = struct
     Repo.Set.fold (fun ({Repo.user; repo} as r) acc ->
         let u = String.Map.get user acc in
         let u =
-          { User.repos = String.Map.add repo (R.create r) u.User.repos }
+          { User.repos = String.Map.add repo (R.v r) u.User.repos }
         in
         String.Map.add user u acc
       ) repos users
@@ -294,7 +294,7 @@ module Users = struct
     let prs = PR.Set.diff (prs x) (prs y) in
     let status = Status.Set.diff (status x) (status y) in
     let refs = Ref.Set.diff (refs x) (refs y) in
-    Snapshot.create ~repos ~commits ~status ~prs ~refs
+    Snapshot.v ~repos ~commits ~status ~prs ~refs
 
   let diff_events new_t old_t =
     let news = diff new_t old_t in
@@ -330,7 +330,13 @@ module Users = struct
         (fun pr ->
            keep PR.repo pr && not (PR.Set.exists (PR.same_id pr) new_prs))
       |> PR.Set.elements
-      |> List.map (fun pr -> Event.PR { pr with PR.state = `Closed })
+      |> List.map (fun pr ->
+          let title = pr.PR.title in
+          let base = pr.PR.base in
+          let commit = pr.PR.head in
+          let number = pr.PR.number in
+          let pr = PR.v ~state:`Closed ~title ~base commit number in
+          Event.PR pr)
     in
     let close_refs =
       Snapshot.refs olds
@@ -392,7 +398,7 @@ module API = struct
     | Some u ->
       String.Map.dom u.User.repos
       |> String.Set.elements
-      |> List.map (fun repo -> Repo.create ~user ~repo)
+      |> List.map (fun repo -> Repo.v ~user ~repo)
       |> return
 
   let set_repo_aux t (s, r) =
@@ -535,12 +541,11 @@ module API = struct
 
     let block () = let t, _ = Lwt.task () in t
 
-    let create state _ = { state; repos = Repo.Set.empty  }
     let repos t = t.repos
     let run _ = block ()
     let wait _ = block ()
 
-    let v ?repos state =
+    let create ?repos state =
       let repos = match repos with None -> all_repos state | Some r -> r in
       { state; repos }
 
@@ -558,6 +563,8 @@ module API = struct
 
     let clear t = iter (fun _ -> User.clear) t.state
 
+    let v state _ = { state; repos = Repo.Set.empty  }
+
   end
 
 end
@@ -569,40 +576,36 @@ let user = "test"
 let repo = "test"
 let branch = "test"
 
-let repo = Repo.create ~user ~repo
-let commit_bar = Commit.create repo "bar"
-let commit_foo = Commit.create repo "foo"
-let r1 = Repo.create ~user:"xxx" ~repo:"yyy"
+let repo = Repo.v ~user ~repo
+let commit_bar = Commit.v repo "bar"
+let commit_foo = Commit.v repo "foo"
+let r1 = Repo.v ~user:"xxx" ~repo:"yyy"
 
 let s1 =
-  Status.create ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
+  Status.v ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
 
 let s2 =
-  Status.create ~url:"toto" commit_bar ["foo"; "bar"; "toto"] `Failure
+  Status.v ~url:"toto" commit_bar ["foo"; "bar"; "toto"] `Failure
 
 let s3 =
-  Status.create ~url:"titi" ~description:"foo"
+  Status.v ~url:"titi" ~description:"foo"
     commit_foo ["foo"; "bar"; "baz"] `Success
 
 let s4 =
-  Status.create commit_bar ["foo"] `Pending
+  Status.v commit_bar ["foo"] `Pending
 
 let s5 =
-  Status.create ~url:"titi" commit_foo ["foo"; "bar"; "baz"] `Failure
+  Status.v ~url:"titi" commit_foo ["foo"; "bar"; "baz"] `Failure
 
 let base = "master"
 
-let pr1 =
-  { PR.number = 1; state = `Open  ; head = commit_foo; title = ""; base }
-let pr2 =
-  { PR.number = 1; state = `Closed; head = commit_foo; title = "foo"; base }
-let pr3 =
-  { PR.number = 2; state = `Open  ; head = commit_bar; title = "bar"; base }
-let pr4 =
-  { PR.number = 2; state = `Open  ; head = commit_bar; title = "toto"; base }
+let pr1 = PR.v ~state:`Open   ~title:""     ~base commit_foo 1
+let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base commit_foo 1
+let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base commit_bar 2
+let pr4 = PR.v ~state:`Open   ~title:"toto" ~base commit_bar 2
 
-let ref1 = Ref.create commit_bar ["heads";"master"]
-let ref2 = Ref.create commit_foo ["heads";"master"]
+let ref1 = Ref.v commit_bar ["heads";"master"]
+let ref2 = Ref.v commit_foo ["heads";"master"]
 
 let events0 = [
   Event.PR pr1;
@@ -643,7 +646,7 @@ let counter: Counter.t Alcotest.testable = (module Counter)
 let capabilities: Capabilities.t Alcotest.testable = (module Capabilities)
 
 let mk_snapshot ?(repos=[]) ?(commits=[]) ?(status=[]) ?(prs=[]) ?(refs=[]) () =
-  Snapshot.create
+  Snapshot.v
     ~repos:(Repo.Set.of_list repos)
     ~commits:(Commit.Set.of_list commits)
     ~status:(Status.Set.of_list status)
@@ -708,7 +711,7 @@ module Gen = struct
     let rec aux () =
       let user = choose ~random Data.users in
       let repo = choose ~random Data.repos in
-      let r = Repo.create ~user ~repo in
+      let r = Repo.v ~user ~repo in
       if List.exists (fun x -> Repo.compare x r = 0) x then aux () else r
     in
     aux ()
@@ -725,7 +728,7 @@ module Gen = struct
     let rec aux () =
       let id = choose ~random Data.commits in
       let repo = match r with Some r -> r | None -> repo ~random () in
-      let r = Commit.create repo id in
+      let r = Commit.v repo id in
       if List.exists (fun x -> Commit.compare x r = 0) x then aux () else r
     in
     aux ()
@@ -737,7 +740,7 @@ module Gen = struct
       let number = Random.State.int random 10 in
       let state = pr_state ~random in
       let base = base ~random in
-      let r = { PR.head; number; title; state; base } in
+      let r = PR.v ~title ~base ~state head number in
       if List.exists (PR.same_id r) x then aux () else r
     in
     aux ()
@@ -746,7 +749,7 @@ module Gen = struct
     let rec aux () =
       let head = commit ?repo ~random () in
       let name = choose ~random Data.names in
-      let r = Ref.create head name in
+      let r = Ref.v head name in
       if List.exists (Ref.same_id r) x then aux () else r
     in
     aux ()
@@ -758,7 +761,7 @@ module Gen = struct
       let context = context ~random in
       let description = description ~random in
       let state = build_state ~random in
-      let r = Status.create ?description ?url commit context state in
+      let r = Status.v ?description ?url commit context state in
       if List.exists (Status.same_id r) x then aux () else r
     in
     aux ()
@@ -773,10 +776,10 @@ module Gen = struct
           | old_ref ->
             if Random.State.bool random then [] else
               let head = commit ~random ~repo () in
-              [ Ref.create head (Ref.name old_ref) ]
+              [ Ref.v head (Ref.name old_ref) ]
         ) else (
           let head = commit ~random ~repo () in
-          [ Ref.create head name ]
+          [ Ref.v head name ]
         ))
     |> List.concat
 
@@ -795,7 +798,7 @@ module Gen = struct
         ) else (
           let state = build_state ~random in
           let description = description ~random in
-          [Status.create ?description commit context state]
+          [Status.v ?description commit context state]
         ))
     |> List.concat
 
@@ -804,21 +807,27 @@ module Gen = struct
     let old_prs = List.rev old_prs in
     let old_prs =
       List.fold_left (fun prs pr ->
+          let mk_title = title and mk_base = base in
+          let state = pr.PR.state in
+          let title = pr.PR.title in
+          let head = pr.PR.head in
+          let base = pr.PR.base in
+          let n = pr.PR.number in
           let pr = match Random.State.int random 5 with
             | 0 ->
               let state = match pr.PR.state with
                 | `Open -> `Closed | `Closed -> `Open
               in
-              { pr with PR.state }
+              PR.v ~state ~title ~base head n
             | 1 ->
               let head = commit ~random ~repo () in
-              { pr with PR.head }
+              PR.v ~state ~title ~base head n
             | 2 ->
-              let title = title ~random in
-              { pr with PR.title }
+              let title = mk_title ~random in
+              PR.v ~state ~title ~base head n
             | 3 ->
-              let base = base ~random in
-              { pr with PR.base }
+              let base = mk_base ~random in
+              PR.v ~state ~title ~base head n
             | _ -> pr
           in
           pr :: prs
@@ -835,13 +844,8 @@ module Gen = struct
         let base = base ~random in
         let number = !next_pr in
         incr next_pr;
-        let pr = {
-          PR.head;
-          number;
-          state = `Open;
-          title = "PR#" ^ string_of_int number;
-          base;
-        } in
+        let title = "PR#" ^ string_of_int number in
+        let pr = PR.v ~state:`Open ~title ~base head number in
         make_prs (pr :: acc) (n - 1)
     in
     make_prs old_prs n_prs |> List.rev
@@ -852,7 +856,7 @@ module Gen = struct
     let commits =
       let (++) = Commit.Set.union in
       let l f s = Commit.Set.of_list (List.map f s) in
-      l (fun (id, _) -> Commit.create repo id) old_status
+      l (fun (id, _) -> Commit.v repo id) old_status
       ++ l PR.commit prs ++ l Ref.commit refs
     in
     let commits =
@@ -872,7 +876,7 @@ module Gen = struct
         in
         let repos =
           Data.repos |> Array.to_list |> List.map (fun repo ->
-              let r = Repo.create ~user ~repo in
+              let r = Repo.v ~user ~repo in
               let old_prs, old_status, old_refs =
                 match String.Map.find repo old_user.User.repos with
                 | None      -> [], [], []
@@ -905,7 +909,7 @@ module Gen = struct
     let status =
       mk Status.Set.empty (Status.Set.add (status ~random ())) (int 5)
     in
-    Snapshot.create ~repos ~commits ~prs ~refs ~status
+    Snapshot.v ~repos ~commits ~prs ~refs ~status
 
 end
 
@@ -957,7 +961,7 @@ let test_basic_snapshot_once random =
   let r2 = Gen.ref ~x:[r1] ~random ~repo () in
   let r3 =
     let head = Gen.commit ~x:[Ref.commit r2] ~repo ~random () in
-    Ref.create head (Ref.name r2)
+    Ref.v head (Ref.name r2)
   in
   let s1 = mk_snapshot ~refs:[r2; r1] () in
   let s2 = mk_snapshot ~refs:[r3; r1] () in
@@ -1088,7 +1092,7 @@ let test_snapshot () =
         let refs = Ref.Set.of_list refs0 in
         let repos = Repo.Set.of_list repos0 in
         let commits = Commit.Set.of_list commits0 in
-        Snapshot.create ~repos ~commits ~prs ~status ~refs
+        Snapshot.v ~repos ~commits ~prs ~status ~refs
       in
       Conv.of_commit ~debug:"sh" head >>= fun sh ->
       Alcotest.(check snapshot) "snap transaction" se s;
@@ -1441,9 +1445,9 @@ let rec read_state ~user ~repo ~commit tree path context =
           | None   -> failwith (Fmt.strf "Bad state %S" status)
           | Some x -> x
         in
-        let repo = Repo.create ~user ~repo in
-        let commit = Commit.create repo commit in
-         [ Status.create ?description ?url commit context state]
+        let repo = Repo.v ~user ~repo in
+        let commit = Commit.v repo commit in
+         [ Status.v ?description ?url commit context state]
     end
     >>= fun this_state ->
     items |> Lwt_list.map_s (function
@@ -1483,10 +1487,10 @@ let read_prs tree ~user ~repo =
       in
       read "head"  >>= fun head ->
       read "title" >>= fun title ->
-      read "base"  >>= fun base ->
-      let repo = Repo.create ~user ~repo in
-      let head = Commit.create repo head in
-            Lwt.return { PR.head; number; state = `Open; title; base}
+      read "base"  >|= fun base ->
+      let repo = Repo.v ~user ~repo in
+      let head = Commit.v repo head in
+      PR.v ~state:`Open ~title ~base head number
     )
 
 let read_refs tree ~user ~repo =
@@ -1497,9 +1501,9 @@ let read_refs tree ~user ~repo =
       | Error _ -> acc
       | Ok head ->
         let head = String.trim (Cstruct.to_string head) in
-        let repo = Repo.create ~user ~repo in
-        let head = Commit.create repo head in
-        Ref.create head name :: acc
+        let repo = Repo.v ~user ~repo in
+        let head = Commit.v repo head in
+        Ref.v head name :: acc
     end
     >>= fun acc ->
     DK.Tree.read_dir tree path >>= function
@@ -1574,7 +1578,7 @@ let ensure_github_in_sync ~msg github datakit =
 let all_repos =
   Array.fold_left (fun acc user ->
       Array.fold_left (fun acc repo ->
-          Repo.Set.add (Repo.create ~user ~repo) acc
+          Repo.Set.add (Repo.v ~user ~repo) acc
         ) acc Data.repos
     ) Repo.Set.empty Data.users
 
@@ -1583,7 +1587,7 @@ exception DK_error of DK.error
 let monitor repos branch =
   DK.Branch.with_transaction branch (fun t ->
       let monitor ~user ~repo =
-        Conv.update_elt t (`Repo (Repo.create ~user ~repo))
+        Conv.update_elt t (`Repo (Repo.v ~user ~repo))
       in
       Lwt_list.iter_p (fun { Repo.user; repo } ->
           monitor ~user ~repo
@@ -1595,7 +1599,7 @@ let monitor repos branch =
 let random_monitor ~random branch =
   DK.Branch.with_transaction branch (fun t ->
       let monitor ~user ~repo =
-        let elt = `Repo (Repo.create ~user ~repo) in
+        let elt = `Repo (Repo.v ~user ~repo) in
         match Random.State.bool random with
         | true  -> Conv.update_elt t elt
         | false -> Conv.remove_elt t elt
@@ -1620,7 +1624,7 @@ let test_random_github ~quick _repo conn =
   let dkt = DK.connect conn in
   DK.branch dkt branch >>*= fun branch ->
   let sync (gh, b) =
-    let w = API.Webhook.v gh in
+    let w = API.Webhook.create gh in
     random_monitor ~random branch >>= fun () ->
     Bridge.sync ~cap ~policy:`Once ~token:gh ~webhook:w branch b >|= fun b ->
     Alcotest.(check int) "API.set-*" 0 (Counter.sets gh.API.ctx);
@@ -1634,7 +1638,7 @@ let test_random_github ~quick _repo conn =
         let events = Users.diff_events users gh.API.users in
         API.create ~events users
       in
-      let w = API.Webhook.v gh in
+      let w = API.Webhook.create gh in
       random_monitor ~random branch >>= fun () ->
       Bridge.sync ~cap ~policy:`Once ~token:gh ~webhook:w branch b >>= fun b ->
       Alcotest.(check int) "API.set-*" 0 (Counter.sets gh.API.ctx);

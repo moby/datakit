@@ -77,13 +77,11 @@ module PR = struct
   include PR
 
   let of_gh repo pr =
-    let head = Commit.create repo pr.pull_head.branch_sha in
-    { head;
-      number = pr.pull_number;
-      state  = pr.pull_state;
-      title  = pr.pull_title;
-      base   = pr.pull_base.branch_ref;
-    }
+    let head = Commit.v repo pr.pull_head.branch_sha in
+    let state = pr.pull_state in
+    let title = pr.pull_title in
+    let base = pr.pull_base.branch_ref in
+    PR.v ~state ~title ~base head pr.pull_number
 
   let to_gh pr = {
     update_pull_title = Some pr.title;
@@ -94,14 +92,12 @@ module PR = struct
 
   let of_event repo pr =
     let id = pr.pull_request_event_pull_request.pull_head.branch_sha in
-    let head = Commit.create repo id in
-    {
-      head;
-      number = pr.pull_request_event_number;
-      state  = pr.pull_request_event_pull_request.pull_state;
-      title  = pr.pull_request_event_pull_request.pull_title;
-      base   = pr.pull_request_event_pull_request.pull_base.branch_ref;
-    }
+    let head = Commit.v repo id in
+    let state = pr.pull_request_event_pull_request.pull_state in
+    let title = pr.pull_request_event_pull_request.pull_title in
+    let base = pr.pull_request_event_pull_request.pull_base.branch_ref in
+    let number = pr.pull_request_event_number in
+    PR.v ~state ~title ~base head number
 
 end
 
@@ -128,7 +124,7 @@ module Status = struct
     let url = s.base_status_target_url in
     let context = to_list s.base_status_context in
     let state = of_gh_state s.base_status_state in
-    Status.create ?description ?url commit context state
+    Status.v ?description ?url commit context state
 
   (* To avoid:
      Github: GitHub API error: 422 Unprocessable Entity (WebDAV) (RFC 4918)
@@ -151,12 +147,12 @@ module Status = struct
     }
 
   let of_event repo s =
-    let commit = Commit.create repo s.status_event_sha in
+    let commit = Commit.v repo s.status_event_sha in
     let description = s.status_event_description in
     let url = s.status_event_target_url in
     let context = to_list s.status_event_context in
     let state = of_gh_state s.status_event_state in
-    Status.create ?description ?url commit context state
+    Status.v ?description ?url commit context state
 
 end
 
@@ -190,8 +186,8 @@ module Ref = struct
 
   let of_gh_commit_ref ~repo r =
     assert (r.git_ref_obj.obj_ty = `Commit);
-    let head = Commit.create repo r.git_ref_obj.obj_sha in
-    Ref.create head (to_list r.git_ref_name)
+    let head = Commit.v repo r.git_ref_obj.obj_sha in
+    Ref.v head (to_list r.git_ref_name)
 
   let of_gh ~token ~repo r =
     to_commit_ref ~token ~repo r >|= function
@@ -203,16 +199,16 @@ module Ref = struct
     match r.push_event_hook_head_commit with
     | Some c ->
       let id = c.push_event_hook_commit_id in
-      let head = Commit.create repo id in
-      let t = Ref.create head name in
+      let head = Commit.v repo id in
+      let t = Ref.v head name in
       if r.push_event_hook_created then `Created t else `Updated t
     | None ->
       `Removed (repo, name)
 
   let of_event repo r =
     let id = r.push_event_head in
-    let head = Commit.create repo id in
-    let t = Ref.create head (to_list r.push_event_ref) in
+    let head = Commit.v repo id in
+    let t = Ref.v head (to_list r.push_event_ref) in
     `Updated t
 
   let of_deleted_event repo r =
@@ -309,7 +305,7 @@ module Event = struct
   let of_gh ~token e =
     let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
       | None  -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
-      | Some (user, repo) -> Repo.create ~user ~repo
+      | Some (user, repo) -> Repo.v ~user ~repo
     in
     of_gh_constr ~token repo e.event_payload
 
@@ -338,7 +334,7 @@ let repos token ~user =
    Github.User.repositories ~user ()
    |> Github.Stream.to_list
    |> Github.Monad.map
-   @@ List.map (fun r -> Repo.create ~user ~repo:r.repository_name))
+   @@ List.map (fun r -> Repo.v ~user ~repo:r.repository_name))
   |> run
 
 let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
@@ -448,8 +444,8 @@ module Webhook = struct
 
   include Hook
 
-  let create t = create t.token
-  let to_repo (user, repo) = Repo.create ~user ~repo
+  let v t = create t.token
+  let to_repo (user, repo) = Repo.v ~user ~repo
   let of_repo { Repo.user; repo } = user, repo
 
   let events t =

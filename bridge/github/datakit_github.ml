@@ -14,11 +14,28 @@ module type SET = sig
   val pp: t Fmt.t
 end
 
+module type MAP = sig
+  include Map.S
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+end
+
 let pp_set (type a) k (module S: SET with type t = a) ppf (v:a) =
   if S.is_empty v then Fmt.string ppf "" else
     Fmt.pf ppf "@[<2>%s:@;%a@;@]" k S.pp v
 
 let pp_field k pp ppf v = Fmt.pf ppf "@[<2>%s:@;%a@]" k pp v
+
+let validate_char = function
+  | 'a' .. 'z'
+  | 'A' .. 'Z'
+  | '0' .. '9'
+  | '-' | '_' -> ()
+  | c -> invalid_arg (Fmt.strf "invalid character %c in reference name" c)
+
+let trim_and_validate s =
+  let s = String.trim s in
+  String.iter validate_char s;
+  s
 
 module Set (E: ELT) = struct
 
@@ -42,15 +59,26 @@ module Set (E: ELT) = struct
 
 end
 
+module Map (K: ELT) = struct
+  include Map.Make(K)
+  let pp v ppf t = Fmt.(list ~sep:(unit "@;") (pair K.pp v)) ppf (bindings t)
+end
+
 let pp_path = Fmt.(list ~sep:(unit "/") string)
 
 module Repo = struct
 
   type t = { user: string; repo: string }
-  let create ~user ~repo =
-   let user = String.trim user in
-   let repo = String.trim repo in
+
+  let v ~user ~repo =
+   let user = trim_and_validate user in
+   let repo = trim_and_validate repo in
    { user; repo }
+
+  let of_string s = match String.cuts ~sep:"/" s with
+    | [user; repo] ->
+      (try Some (v ~user ~repo) with Invalid_argument _ -> None)
+    | _ -> None
 
   let pp ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
   let compare (x:t) (y:t) = Pervasives.compare x y
@@ -60,12 +88,13 @@ module Repo = struct
     | `Monitored -> Fmt.string ppf "+"
     | `Ignored   -> Fmt.string ppf "-"
 
-  module Set = Set(struct
+  module X = struct
       type nonrec t = t
       let pp = pp
       let compare = compare
-    end)
-
+    end
+  module Set = Set(X)
+  module Map = Map(X)
 end
 
 module Status_state = struct
@@ -100,7 +129,7 @@ module Commit = struct
 
   type t = { repo: Repo.t; id : string }
 
-  let create repo id = {repo; id = String.trim id }
+  let v repo id = {repo; id = String.trim id }
   let pp ppf t = Fmt.pf ppf "{%a %s}" Repo.pp t.repo t.id
   let id t = t.id
   let repo t = t.repo
@@ -134,6 +163,9 @@ module PR = struct
     title: string;
     base: string;
   }
+
+  let v ?(state=`Open) ~title ?(base="master") head number =
+    { state; title = String.trim title; base = String.trim base; head; number }
 
   type id = Repo.t * int
 
@@ -242,7 +274,7 @@ module Status = struct
       in
       Some (String.trim s)
 
-  let create ?description ?url commit context state =
+  let v ?description ?url commit context state =
     { description = truncate_and_trim description;
       url; commit; context; state }
 
@@ -295,8 +327,8 @@ module Ref = struct
 
   type id = Repo.t * string list
 
-  let create head name =
-    let name = List.map (fun s -> String.trim s) name in
+  let v head name =
+    let name = List.map trim_and_validate name in
     { head; name }
 
   let repo t = t.head.Commit.repo
@@ -584,7 +616,7 @@ module Snapshot = struct
     refs    = Ref.Set.union x.refs y.refs;
   }
 
-  let create ~repos ~commits ~status ~prs ~refs =
+  let v ~repos ~commits ~status ~prs ~refs =
     let repos =
       let (++) = Repo.Set.union in
       repos ++ Commit.Set.repos commits ++ Status.Set.repos status
@@ -688,6 +720,15 @@ module Snapshot = struct
 
   let with_elts = Elt.Set.fold with_elt
   let without_elts = Elt.IdSet.fold without_elt
+
+  let find (id:Elt.id) t =
+    match
+      elts t
+      |> Elt.Set.elements
+      |> List.find (fun e -> Elt.compare_id (Elt.id e) id = 0)
+    with
+    | exception Not_found -> None
+    | e -> Some (e:Elt.t)
 
   let with_event = function
     | Event.Repo (`Ignored,r) -> without_repo r
@@ -953,10 +994,10 @@ module Capabilities = struct
       (fun (r1, x1) (r2, x2) -> r1 = r2 && x1 = x2)
       (sort_extra x.extra) (sort_extra y.extra)
 
-  let create ?(extra=[]) default = { default; extra = sort_extra extra }
+  let v ?(extra=[]) default = { default; extra = sort_extra extra }
 
-  let none = create X.none
-  let all = create X.all
+  let none = v X.none
+  let all = v X.all
 
   let pp ppf t =
     let pp_one = Fmt.(pair ~sep:(unit ":")) pp_resource X.pp in
@@ -991,7 +1032,7 @@ module Capabilities = struct
           | #resource as r, x -> (r, x) :: acc
         ) [] caps
       in
-      `Ok (create default ~extra)
+      `Ok (v default ~extra)
     with Error (s, msg) ->
       Fmt.kstrf (fun e -> `Error e) "%s: %s" s msg
 
@@ -1002,10 +1043,10 @@ module Capabilities = struct
         let x = List.assoc r t.extra in
         let x = f x op in
         let extra = List.filter (fun (s, _) -> s <> r) t.extra in
-        create t.default ~extra:((r, x) :: extra)
+        v t.default ~extra:((r, x) :: extra)
       with Not_found ->
         let x = f X.none op in
-        create t.default ~extra:((r, x) :: t.extra)
+        v t.default ~extra:((r, x) :: t.extra)
 
   let allow = apply X.allow
   let disallow = apply X.disallow
@@ -1094,7 +1135,7 @@ module type API = sig
   val events: token -> Repo.t -> Event.t list result
   module Webhook: sig
     type t
-    val create: token -> Uri.t -> t
+    val v: token -> Uri.t -> t
     val run: t -> unit Lwt.t
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t
@@ -1236,7 +1277,7 @@ module State (API: API) = struct
     in
     status_of_commits token new_commits >|= fun new_status ->
     let new_t =
-      Snapshot.create ~repos ~prs:new_prs ~refs:new_refs ~commits:new_commits
+      Snapshot.v ~repos ~prs:new_prs ~refs:new_refs ~commits:new_commits
         ~status:new_status
     in
     Log.debug (fun l -> l "State.import %a@;@[<2>new:%a@]"
@@ -1247,7 +1288,7 @@ module State (API: API) = struct
     let refs = Ref.Set.union (Snapshot.refs base) new_refs in
     let commits = Commit.Set.union (Snapshot.commits base) new_commits in
     let status = Status.Set.union (Snapshot.status base) new_status in
-    Snapshot.create ~repos ~prs ~commits ~refs ~status
+    Snapshot.v ~repos ~prs ~commits ~refs ~status
 
   let api_set_pr token pr =
     Log.info (fun l -> l "API.set-pr %a" PR.pp pr);

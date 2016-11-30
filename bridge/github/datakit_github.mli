@@ -14,6 +14,12 @@ module type SET = sig
   val pp: t Fmt.t
 end
 
+(** Pretty-printable {!Map.S}. *)
+module type MAP = sig
+  include Map.S
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+end
+
 module Set (E: ELT): SET with type elt = E.t
 (** [Set] is similar to {!Set.Make} but for pretty-printable sets. *)
 
@@ -44,8 +50,11 @@ module Repo: sig
   type state = [`Monitored | `Ignored]
   (** The type for repository state. *)
 
-  val create : user:string -> repo:string -> t
-  (** [create user string] will create a fresh {!t}. *)
+  val v : user:string -> repo:string -> t
+  (** [v user string] will create a fresh {!t}. *)
+
+  val of_string: string -> t option
+  (** [of_string s] parses strings of the form [":user/:repo"]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for Github repositories. *)
@@ -59,6 +68,9 @@ module Repo: sig
   module Set: SET with type elt = t
   (** Sets of repositories. *)
 
+  module Map: MAP with type key = t
+  (** Maps of repositories. *)
+
 end
 
 module Commit: sig
@@ -66,8 +78,8 @@ module Commit: sig
   type t = private { repo: Repo.t; id: string }
   (** The type for commits. *)
 
-  val create : Repo.t -> string -> t
-  (** [create repo id] builds a fresh {!t} with [repo] and [id]. *)
+  val v : Repo.t -> string -> t
+  (** [v repo id] builds a fresh {!t} with [repo] and [id]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for commits. *)
@@ -95,13 +107,19 @@ end
 module PR: sig
 
   (** The type for pull-requests values. *)
-  type t = {
+  type t = private {
     head: Commit.t;
     number: int;
     state: [`Open | `Closed];
     title: string;
     base: string;
   }
+
+  val v: ?state:[`Open|`Closed] -> title:string -> ?base:string ->
+    Commit.t -> int -> t
+  (** [v c n ~title] is the pull-request [n] with head commit [c] and
+      title [title]. If [base] is not set, use ["master"]. If [state]
+      is not set, use [`Open]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for pull-request values. *)
@@ -165,12 +183,18 @@ end
 
 module Status: sig
 
-  type t
+  type t = private {
+    commit: Commit.t;
+    context: string list;
+    url: string option;
+    description: string option;
+    state: Status_state.t;
+  }
   (** The type for status values. *)
 
-  val create: ?description:string -> ?url:string ->
+  val v: ?description:string -> ?url:string ->
     Commit.t -> string list -> Status_state.t -> t
-  (** [create] is a new status. *)
+  (** [v c n] is the status with commit [c] and name [n]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for status values. *)
@@ -183,6 +207,9 @@ module Status: sig
 
   val id: t -> id
   (** [id t] is [t]'s ID. *)
+
+  val compare_id: id -> id -> int
+  (** [compare_id] compares build status IDs. *)
 
   val context: t -> string list
   (** [context t] is [t]'s context. *)
@@ -228,8 +255,10 @@ module Ref: sig
   }
   (** The type for Git references. *)
 
-  val create : Commit.t -> string list -> t
-  (** [create head name] is a fresh {!t} with the [head] commit and [name]. *)
+  val v : Commit.t -> string list -> t
+  (** [v head name] is a fresh {!t} with the [head] commit and
+      [name]. [name] should only contain alpha-numeric character,
+      ['_'] and ['-']. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
@@ -353,11 +382,11 @@ module Snapshot: sig
   val is_empty: t -> bool
   (** [is_empty t] is true if [t] is {!empty}. *)
 
-  val create:
+  val v:
     repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
     prs:PR.Set.t -> refs:Ref.Set.t -> t
-  (** [create ~repos ~commits ~status ~prs ~refs] is a new snapshot
-      [t] with repositories [reps], commits [commits], pull-requests
+  (** [v ~repos ~commits ~status ~prs ~refs] is a new snapshot [t]
+      with repositories [reps], commits [commits], pull-requests
       [prs], build statuses [status] and Git references [refs]. *)
 
   val compare: t -> t -> int
@@ -404,6 +433,9 @@ module Snapshot: sig
   val with_elts: Elt.Set.t -> t -> t
   (** [with_elts] is like {!with_elt} but for a collection of
       elements. *)
+
+  val find: Elt.id -> t -> Elt.t option
+  (** [find id t] finds the element with ID [id] in [t]. *)
 
 end
 
@@ -585,10 +617,10 @@ module type API = sig
     type t
     (** The type for the webhook server state. *)
 
-    val create: token -> Uri.t -> t
-    (** [create tok uri] is the webhook server state configured to
-        listen for incoming webhook events to the public address [uri]
-        and using the token [tok] to perform GitHub API calls. The
+    val v: token -> Uri.t -> t
+    (** [v tok uri] is the webhook server state configured to listen
+        for incoming webhook events to the public address [uri] and
+        using the token [tok] to perform GitHub API calls. The
         function [f] will be called everytime a new event is
         received. *)
 

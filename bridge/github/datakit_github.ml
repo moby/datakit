@@ -29,7 +29,7 @@ let validate_char = function
   | 'a' .. 'z'
   | 'A' .. 'Z'
   | '0' .. '9'
-  | '-' | '_' -> ()
+  | '-' | '_' | '.' -> ()
   | c -> invalid_arg (Fmt.strf "invalid character %c in reference name" c)
 
 let trim_and_validate s =

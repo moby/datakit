@@ -81,17 +81,17 @@ module Make (DK: Datakit_S.CLIENT) = struct
         let t = match path with
           | [] | [_]             -> None
           | user :: repo :: path ->
-            let repo = Repo.create ~user ~repo in
+            let repo = Repo.v ~user ~repo in
             let pr repo id = `PR (repo, int_of_string id) in
             match path with
             | [] | [".monitor"]    -> Some (`Repo repo)
             | [".dirty"] when added  -> Some (`Dirty (`Repo repo))
             | ["pr"; id; ".dirty"] when added -> Some (`Dirty (pr repo id))
             | "pr" :: id :: _ -> Some (pr repo id)
-            | ["commit"; id] -> Some (`Commit (Commit.create repo id))
+            | ["commit"; id] -> Some (`Commit (Commit.v repo id))
             | "commit" :: id :: "status" :: (_ :: _ :: _ as tl) ->
               let _, last = rdecons tl in
-              Some (`Status ((Commit.create repo id), last))
+              Some (`Status ((Commit.v repo id), last))
             | "ref" :: ( _ :: _ :: _ as tl)  ->
               let f, last = rdecons tl in
               let r = `Ref (repo, last) in
@@ -153,7 +153,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         Lwt_list.fold_left_s (fun acc repo ->
             safe_read_file tree (root / user /repo / ".monitor") >|= function
             | None   -> acc
-            | Some _ -> Repo.Set.add (Repo.create ~user ~repo) acc
+            | Some _ -> Repo.Set.add (Repo.v ~user ~repo) acc
           ) acc repos
       ) Repo.Set.empty users >|= fun repos ->
     Log.debug (fun l -> l "repos -> @;@[<2>%a@]" Repo.Set.pp repos);
@@ -226,7 +226,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
                 Repo.pp repo number);
           "master"
       in
-      let head = Commit.create repo id in
+      let head = Commit.v repo id in
       let title = match title with None -> "" | Some t -> t in
       let state = match PR.state_of_string state with
         | Some s -> s
@@ -236,7 +236,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
                 state);
           `Closed
       in
-      Some { PR.head; number; state; title; base }
+      Some (PR.v ~state ~title ~base head number)
 
   let prs_of_repo tree repo =
     let dir = root repo / "pr"  in
@@ -274,13 +274,13 @@ module Make (DK: Datakit_S.CLIENT) = struct
       None
     | true  ->
       Log.debug (fun l -> l "commit {%a %s} -> true" Repo.pp repo id);
-      Some (Commit.create repo id)
+      Some (Commit.v repo id)
 
   let commits_of_repo tree repo =
     let dir = root repo / "commit" in
     safe_read_dir tree dir >|= fun commits ->
     List.fold_left (fun s id ->
-        Commit.Set.add (Commit.create repo id) s
+        Commit.Set.add (Commit.v repo id) s
       ) Commit.Set.empty commits
     |> fun cs ->
     Log.debug
@@ -346,7 +346,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       safe_read_file tree (dir / "description") >>= fun description ->
       safe_read_file tree (dir / "target_url")  >|= fun url ->
       let context = Datakit_path.unwrap context in
-      Some (Status.create ?description ?url commit context state)
+      Some (Status.v ?description ?url commit context state)
 
   let statuses_of_commits tree commits =
     Lwt_list.fold_left_s (fun acc commit ->
@@ -383,8 +383,8 @@ module Make (DK: Datakit_S.CLIENT) = struct
       None
     | Some id ->
       Log.debug (fun l -> l "ref_ %a:%a -> %s" Repo.pp repo pp_path name id);
-      let head = Commit.create repo id in
-      Some (Ref.create head name)
+      let head = Commit.v repo id in
+      Some (Ref.v head name)
 
   let refs_of_repo tree repo =
     let dir = root repo / "ref" in
@@ -439,7 +439,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     prs ~repos tree >>= fun prs ->
     statuses ~commits tree >>= fun status ->
     refs ~repos tree >|= fun refs ->
-    Snapshot.create ~repos ~status ~prs ~refs ~commits
+    Snapshot.v ~repos ~status ~prs ~refs ~commits
 
   let snapshot_of_commit c =
     let tree = DK.Commit.tree c in
@@ -456,7 +456,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         Lwt_list.fold_left_s (fun acc repo ->
             safe_exists_file tree (root / user /repo / ".dirty") >|= function
             | false -> acc
-            | true  -> Elt.IdSet.add (`Repo (Repo.create ~user ~repo)) acc
+            | true  -> Elt.IdSet.add (`Repo (Repo.v ~user ~repo)) acc
           ) acc repos
       ) Elt.IdSet.empty users
 

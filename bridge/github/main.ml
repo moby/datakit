@@ -112,7 +112,7 @@ let start () no_listen listen_urls datakit cap webhook resync_interval =
     | Some u ->
       Log.app (fun l ->
           l "Starting webhook server listening at %s" @@ Uri.to_string u);
-      Some (Datakit_github_api.Webhook.create token u)
+      Some (Datakit_github_api.Webhook.v token u)
   in
   let connect_to_datakit () =
     match datakit with

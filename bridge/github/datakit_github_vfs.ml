@@ -45,8 +45,7 @@ module Make (API: API) = struct
       let description = !current_descr in
       let url = !current_url in
       let new_status =
-        Status.create ?description ?url
-          (Status.commit s) (Status.context s) state
+        Status.v ?description ?url (Status.commit s) (Status.context s) state
       in
       API.set_status t.token new_status;
     in
@@ -158,7 +157,7 @@ module Make (API: API) = struct
     in
     let mkdir name =
       Log.debug (fun l -> l "mkdir %s" name);
-      let new_status = Status.create commit [name] `Pending in
+      let new_status = Status.v commit [name] `Pending in
       API.set_status t.token new_status >>= function
       | Error e -> Vfs.error "set-status %s" e
       | Ok ()   ->
@@ -174,7 +173,7 @@ module Make (API: API) = struct
     Logs.debug (fun l -> l "commit_root %a" Repo.pp t.repo);
     let ls () = Vfs.ok [] in
     let lookup id =
-      let commit = Commit.create t.repo id in
+      let commit = Commit.v t.repo id in
       let status = Vfs.Inode.dir "status" @@ commit_status_root t commit in
       Vfs.Inode.dir id @@ Vfs.Dir.of_list (fun () -> Vfs.ok [status])
       |> Vfs.ok
@@ -262,7 +261,7 @@ module Make (API: API) = struct
       in
       let remove _ = Vfs.Dir.err_read_only in
       let lookup repo =
-        let repo = Repo.create ~user ~repo in
+        let repo = Repo.v ~user ~repo in
         repo_dir { token; repo } >>*= function
         | None   -> Vfs.Dir.err_no_entry
         | Some x -> Vfs.ok x

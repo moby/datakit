@@ -193,9 +193,13 @@ end
 
 module Status: sig
 
+  type context = string list
+  (** The type build build status contexts. ["ci/datakit"] is stored
+      as ["ci"; "datakit"]. *)
+
   type t = private {
     commit: Commit.t;
-    context: string list;
+    context: context;
     url: string option;
     description: string option;
     state: Status_state.t;
@@ -209,7 +213,10 @@ module Status: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for status values. *)
 
-  type id = Commit.t * string list
+  val pp_context: context Fmt.t
+  (** [pp_context] pretty-prints build status' contexts. *)
+
+  type id = Commit.t * context
   (** The type for build-status IDs. *)
 
   val pp_id: id Fmt.t
@@ -221,7 +228,7 @@ module Status: sig
   val compare_id: id -> id -> int
   (** [compare_id] compares build status IDs. *)
 
-  val context: t -> string list
+  val context: t -> context
   (** [context t] is [t]'s context. *)
 
   val state: t -> Status_state.t
@@ -265,13 +272,17 @@ end
 
 module Ref: sig
 
+  type name = string list
+  (** The type for reference names. ["heads/master"] is represented as
+      ["heads";"master"]. *)
+
   type t = private {
     head: Commit.t;
     name: string list;
   }
   (** The type for Git references. *)
 
-  val v : Commit.t -> string list -> t
+  val v : Commit.t -> name -> t
   (** [v head name] is a fresh {!t} with the [head] commit and
       [name]. [name] should only contain alpha-numeric character,
       ['_'] and ['-']. *)
@@ -279,13 +290,13 @@ module Ref: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for references. *)
 
-  val pp_name: string list Fmt.t
+  val pp_name: name Fmt.t
   (** [pp_name ["a";"b";"c"]] is ["a/b/c"] *)
 
   val compare: t -> t -> int
   (** [compare] compares Git references. *)
 
-  type id = Repo.t * string list
+  type id = Repo.t * name
   (** The type for Git reference IDs. *)
 
   val pp_id: id Fmt.t
@@ -294,7 +305,7 @@ module Ref: sig
   val id: t -> id
   (** [id t] is [t]'s ID. *)
 
-  val name: t -> string list
+  val name: t -> name
   (** [name t] is [t]'s name. *)
 
   val repo: t -> Repo.t

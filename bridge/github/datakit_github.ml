@@ -247,6 +247,8 @@ end
 
 module Status = struct
 
+  type context = string list
+
   type t = {
     commit: Commit.t;
     context: string list;
@@ -267,6 +269,7 @@ module Status = struct
   let description t = t.description
   let state t = t.state
   let url t = t.url
+  let pp_context = pp_path
   let commit_hash t = t.commit.Commit.hash
   let same_id x y = commit x = commit y && context x = context y
   let compare_repo x y = Repo.compare (repo x) (repo y)
@@ -351,6 +354,8 @@ module Status = struct
 end
 
 module Ref = struct
+
+  type name = string list
 
   type t = {
     head: Commit.t;

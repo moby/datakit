@@ -127,19 +127,20 @@ let compare_fold fs x y =
 
 module Commit = struct
 
-  type t = { repo: Repo.t; id : string }
+  type t = { repo: Repo.t; hash : string }
 
-  let v repo id = {repo; id = String.trim id }
-  let pp ppf t = Fmt.pf ppf "{%a %s}" Repo.pp t.repo t.id
-  let id t = t.id
+  let v repo hash = {repo; hash = String.trim hash }
+  let pp ppf t = Fmt.pf ppf "{%a %s}" Repo.pp t.repo t.hash
+  let pp_hash f h = Fmt.string f (String.with_range ~len:6 h)
+  let hash t = t.hash
   let repo t = t.repo
   let compare_repo x y = Repo.compare x.repo y.repo
-  let compare_id x y = String.compare x.id y.id
+  let compare_hash x y = String.compare x.hash y.hash
   let equal (x:t) (y:t) = x = y
 
   let compare = compare_fold [
       compare_repo;
-      compare_id;
+      compare_hash;
     ]
 
   module Set = struct
@@ -185,7 +186,7 @@ module PR = struct
   let repo t = t.head.Commit.repo
   let id t = repo t, t.number
   let commit t = t.head
-  let commit_id t = t.head.Commit.id
+  let commit_hash t = t.head.Commit.hash
   let compare_repo x y = Repo.compare (repo x) (repo y)
   let compare_num x y = Pervasives.compare x.number y.number
   let number t = t.number
@@ -202,7 +203,7 @@ module PR = struct
 
   let pp ppf t =
     Fmt.pf ppf "{%a %d[%s] %s %a %S}"
-      Repo.pp (repo t) t.number (commit_id t) t.base pp_state t.state t.title
+      Repo.pp (repo t) t.number (commit_hash t) t.base pp_state t.state t.title
 
   let pp_id ppf (r, n) = Fmt.pf ppf "{%a %d}" Repo.pp r n
 
@@ -255,10 +256,11 @@ module Status = struct
   let description t = t.description
   let state t = t.state
   let url t = t.url
-  let commit_id t = t.commit.Commit.id
+  let commit_hash t = t.commit.Commit.hash
   let same_id x y = commit x = commit y && context x = context y
   let compare_repo x y = Repo.compare (repo x) (repo y)
-  let compare_commit_id x y = Pervasives.compare (commit_id x) (commit_id y)
+  let compare_commit_hash x y =
+    Pervasives.compare (commit_hash x) (commit_hash y)
   let compare_context x y = Pervasives.compare x.context y.context
 
   (* To avoid:
@@ -282,7 +284,7 @@ module Status = struct
 
   let compare = compare_fold [
       compare_repo;
-      compare_commit_id;
+      compare_commit_hash;
       compare_context;
       Pervasives.compare;
     ]
@@ -293,7 +295,7 @@ module Status = struct
 
   let pp ppf t =
     Fmt.pf ppf "{%a %s:%a[%a]%a%a}"
-      Repo.pp (repo t) (commit_id t)
+      Repo.pp (repo t) (commit_hash t)
       pp_path t.context
       Status_state.pp t.state
       (pp_opt "url") t.url
@@ -342,7 +344,7 @@ module Ref = struct
   let repo t = t.head.Commit.repo
   let id t = repo t, t.name
   let commit t = t.head
-  let commit_id t = t.head.Commit.id
+  let commit_hash t = t.head.Commit.hash
   let name t = t.name
   let compare_repo x y = Repo.compare (repo x) (repo y)
   let compare_name x y = Pervasives.compare x.name y.name
@@ -357,7 +359,7 @@ module Ref = struct
   let pp_name = pp_path
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_id t)
+    Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_hash t)
 
   let pp_id ppf (r, p) = Fmt.pf ppf "{%a %a}" Repo.pp r pp_path p
 
@@ -673,8 +675,8 @@ module Snapshot = struct
   let without_repos repos =
     without_repo_f { f = fun f r -> not (Repo.Set.mem (f r) repos) }
 
-  let without_commit { Commit.repo; id } t =
-    let keep x = repo <> Commit.repo x || id <> Commit.id x in
+  let without_commit { Commit.repo; hash } t =
+    let keep x = repo <> Commit.repo x || hash <> Commit.hash x in
     { t with commits = Commit.Set.filter keep t.commits }
 
   let with_commit c t =

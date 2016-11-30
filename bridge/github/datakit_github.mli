@@ -75,7 +75,7 @@ end
 
 module Commit: sig
 
-  type t = private { repo: Repo.t; id: string }
+  type t = private { repo: Repo.t; hash: string }
   (** The type for commits. *)
 
   val v : Repo.t -> string -> t
@@ -84,14 +84,18 @@ module Commit: sig
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for commits. *)
 
+  val pp_hash: string Fmt.t
+  (** [pp_hash] is the pretty-printer for commit hashes which just
+      show the first 8 characters of the hash. *)
+
   val compare: t -> t -> int
   (** [compare] compares commits. *)
 
   val repo: t -> Repo.t
   (** [repo t] is [t]'s repository. *)
 
-  val id: t -> string
-  (** [id t] is [t]'s SHA1. *)
+  val hash: t -> string
+  (** [hash t] is [t]'s SHA1. *)
 
   val equal: t -> t -> bool
   (** [equal] is the equality functions for commits. *)
@@ -142,8 +146,8 @@ module PR: sig
   val commit: t -> Commit.t
   (** [commit t] is [t]'s commit. *)
 
-  val commit_id: t -> string
-  (** [commit_id t] is the SHA1 of [t]'s commit. *)
+  val commit_hash: t -> string
+  (** [commit_hash t] is the SHA1 of [t]'s commit. *)
 
   val number: t -> int
   (** [number t] is [t]'s number. *)
@@ -232,8 +236,8 @@ module Status: sig
   val commit: t -> Commit.t
   (** [commit t] is [t]'s commit. *)
 
-  val commit_id: t -> string
-  (** [commit_id t] is [t]'s commit ID. *)
+  val commit_hash: t -> string
+  (** [commit_hash t] is [t]'s commit SHA1. *)
 
   val same_id: t -> t -> bool
   (** [same_id x y] is true if [x] and [y] have the same ID. *)
@@ -293,8 +297,8 @@ module Ref: sig
   val commit: t -> Commit.t
   (** [commit t] is [t]'s commit. *)
 
-  val commit_id: t -> string
-  (** [commit_id t] is [t]'s commit ID. *)
+  val commit_hash: t -> string
+  (** [commit_hash t] is [t]'s commit SHA1. *)
 
   val same_id: t -> t -> bool
   (** [same_id x y] is true if [x] and [y] have the same ID. *)

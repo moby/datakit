@@ -63,7 +63,7 @@ module R = struct
     in
     let commits =
       List.filter (fun (id, s) ->
-          s <> [] && Commit.Set.exists (fun c -> Commit.id c = id) commits
+          s <> [] && Commit.Set.exists (fun c -> Commit.hash c = id) commits
         ) r.commits
     in
     { r with prs; commits }
@@ -77,7 +77,7 @@ module R = struct
 
   let pp_pr f pr =
     Fmt.pf f "{n=%d;head=%s;title=%S;%a}"
-      pr.PR.number (PR.commit_id pr) pr.PR.title pp_status pr.PR.state
+      pr.PR.number (PR.commit_hash pr) pr.PR.title pp_status pr.PR.state
 
   let pp_state f (commit, states) =
     let states = List.sort Status.compare states in
@@ -85,7 +85,7 @@ module R = struct
 
   let pp_refs f r =
     Fmt.pf f "{name=%a;head=%s}"
-      Fmt.(Dump.list string) r.Ref.name (Ref.commit_id r)
+      Fmt.(Dump.list string) r.Ref.name (Ref.commit_hash r)
 
   let pp f { commits; prs; refs; _ } =
     let prs = List.sort PR.compare prs in
@@ -409,7 +409,7 @@ module API = struct
 
   let set_status_aux t s =
     let repo = lookup t (Status.repo s) in
-    let commit = Status.commit_id s in
+    let commit = Status.commit_hash s in
     let keep (c, _) = c <> commit in
     let commits = List.filter keep repo.R.commits in
     let rest =
@@ -469,7 +469,7 @@ module API = struct
     match lookup_opt t (Commit.repo commit) with
     | None   -> return []
     | Some r ->
-      try return (List.assoc (Commit.id commit) r.R.commits)
+      try return (List.assoc (Commit.hash commit) r.R.commits)
       with Not_found -> return []
 
   let prs t repo =
@@ -784,7 +784,7 @@ module Gen = struct
     |> List.concat
 
   let statuses ~random ~old_status commit =
-    let old_status = match List.assoc (Commit.id commit) old_status with
+    let old_status = match List.assoc (Commit.hash commit) old_status with
       | exception Not_found -> []
       | old_status -> old_status
     in
@@ -863,7 +863,7 @@ module Gen = struct
       Commit.Set.fold (fun c acc ->
           match statuses ~random ~old_status c with
           | [] -> acc
-          | s  -> (Commit.id c, s) :: acc
+          | s  -> (Commit.hash c, s) :: acc
         ) commits []
     in
     prs, commits, refs
@@ -1146,7 +1146,7 @@ let init_github status refs events =
       in
       Hashtbl.replace tbl (Status.commit s) (s :: v)
     ) status;
-  let commits = Hashtbl.fold (fun k v acc -> (Commit.id k, v) :: acc) tbl [] in
+  let commits = Hashtbl.fold (fun k v acc -> (Commit.hash k, v) :: acc) tbl [] in
   let users = String.Map.singleton user {
       User.repos = String.Map.singleton repo.Repo.repo
           { R.user; repo = repo.Repo.repo; commits; refs; prs = []; events }

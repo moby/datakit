@@ -16,18 +16,10 @@ module Make (DK: Datakit_S.CLIENT): sig
 
   (** {1 Status} *)
 
-  val status: tree -> Commit.t -> string list -> Status.t option Lwt.t
-  (** [status t c s] is the commit's build statuses [s] for the commit
-      [c] in the tree [t]. *)
-
   val statuses: ?commits:Commit.Set.t -> tree -> Status.Set.t Lwt.t
   (** [statuses t] is the list of status stored in [t]. *)
 
   (** {1 Pull requests} *)
-
-  val pr: tree -> Repo.t -> int -> PR.t option Lwt.t
-  (** [pr t r n] is the [n]'th pull-request of the repostiry [r] in
-      [t]. *)
 
   val prs: ?repos:Repo.Set.t -> tree -> PR.Set.t Lwt.t
   (** [prs t] is the list of pull requests stored in [t]. *)
@@ -36,6 +28,11 @@ module Make (DK: Datakit_S.CLIENT): sig
 
   val refs: ?repos:Repo.Set.t -> tree -> Ref.Set.t Lwt.t
   (** [refs t] is the list of Git references stored in [t].*)
+
+  (** {1 Elements} *)
+
+  val find: tree -> Elt.id -> Elt.t option Lwt.t
+  (** [find t id] is the elements with ID [id] in [t]. *)
 
   (** {1 Updates} *)
 

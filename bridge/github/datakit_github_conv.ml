@@ -201,7 +201,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     Log.debug (fun l -> l "remove_pr %s" @@ Datakit_path.to_hum dir);
     safe_remove t dir
 
-  let pr tree repo number =
+  let pr tree (repo, number) =
     let dir = root repo / "pr" / string_of_int number in
     Log.debug (fun l -> l "pr %a" Datakit_path.pp dir);
     safe_read_file tree (dir / "head")  >>= fun head ->
@@ -242,7 +242,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     let dir = root repo / "pr"  in
     safe_read_dir tree dir >>= fun nums ->
     Lwt_list.fold_left_s (fun acc n ->
-        pr tree repo (int_of_string n) >|= function
+        pr tree (repo, int_of_string n) >|= function
         | None   -> acc
         | Some p -> PR.Set.add p acc
       ) PR.Set.empty nums >|= fun prs ->
@@ -266,7 +266,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   (* Commits *)
 
-  let commit tree repo id =
+  let commit tree { Commit.repo; id } =
     let dir = root repo / "commit" / id in
     safe_exists_dir tree dir >|= function
     | false ->
@@ -323,7 +323,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
           DK.Transaction.create_or_replace_file t (dir / k) v
       ) kvs
 
-  let status tree commit context =
+  let status tree (commit, context) =
     let context = Datakit_path.of_steps_exn context in
     let dir =
       root (Commit.repo commit) / "commit" / Commit.id commit / "status"
@@ -352,7 +352,8 @@ module Make (DK: Datakit_S.CLIENT) = struct
     Lwt_list.fold_left_s (fun acc commit ->
         let dir = root (Commit.repo commit) / "commit" in
         let dir = dir / Commit.id commit / "status" in
-        walk (module Status.Set) tree dir ("state", status tree commit)
+        walk (module Status.Set) tree dir
+          ("state", fun c -> status tree (commit, c))
         >|= fun status ->
         Status.Set.union status acc
       ) Status.Set.empty (Commit.Set.elements commits)
@@ -373,7 +374,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   (* Refs *)
 
-  let ref_ tree repo name =
+  let ref_ tree (repo, name) =
     let path = Datakit_path.of_steps_exn name in
     let head = root repo / "ref" /@ path / "head" in
     safe_read_file tree head >|= function
@@ -387,7 +388,8 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let refs_of_repo tree repo =
     let dir = root repo / "ref" in
-    walk (module Ref.Set) tree dir ("head", ref_ tree repo) >|= fun refs ->
+    walk (module Ref.Set) tree dir ("head", fun n -> ref_ tree (repo, n)) >|=
+    fun refs ->
     Log.debug (fun l ->
         l "refs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Ref.Set.pp refs);
     refs
@@ -504,6 +506,17 @@ module Make (DK: Datakit_S.CLIENT) = struct
     Lwt_list.iter_p (fun d -> safe_create_file tr (dirty_file d) empty)
       @@ Elt.IdSet.elements dirty
 
+  (* Elements *)
+
+  let find t (id:Elt.id) =
+    let map f = function None -> None | Some x -> Some (f x) in
+    match id with
+    | `Repo id   -> repo t id   >|= map (fun r -> `Repo r)
+    | `Commit id -> commit t id >|= map (fun c -> `Commit c)
+    | `PR id     -> pr t id     >|= map (fun p -> `PR p)
+    | `Ref id    -> ref_ t id   >|= map (fun r -> `Ref r)
+    | `Status id -> status t id >|= map (fun s -> `Status s)
+
   (* Diffs *)
 
   let combine_repo t tree r =
@@ -514,23 +527,23 @@ module Make (DK: Datakit_S.CLIENT) = struct
       Elt.Set.fold Diff.with_update (Snapshot.elts s) t
 
   let combine_commit t tree c =
-    commit tree (Commit.repo c) (Commit.id c) >|= function
+    commit tree c >|= function
     | None   -> Diff.with_remove (`Commit c) t
     | Some c -> Diff.with_update (`Commit c) t
 
-  let combine_pr t tree (r, id as x)  =
-    pr tree r id >|= function
+  let combine_pr t tree id =
+    pr tree id >|= function
     | Some pr -> Diff.with_update (`PR pr) t
-    | None    -> Diff.with_remove (`PR x) t
+    | None    -> Diff.with_remove (`PR id) t
 
-  let combine_status t tree (c, context as x) =
-    status tree c context >|= function
-    | None   -> Diff.with_remove (`Status x) t
+  let combine_status t tree id =
+    status tree id >|= function
+    | None   -> Diff.with_remove (`Status id) t
     | Some s -> Diff.with_update (`Status s) t
 
-  let combine_ref t tree (r, name as x) =
-    ref_ tree r name >|= function
-    | None   -> Diff.with_remove (`Ref x) t
+  let combine_ref t tree id =
+    ref_ tree id >|= function
+    | None   -> Diff.with_remove (`Ref id) t
     | Some r -> Diff.with_update (`Ref r) t
 
   let apply_on_commit diff head =

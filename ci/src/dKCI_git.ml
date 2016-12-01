@@ -25,35 +25,13 @@ let with_gitdir dir env =
   Array.of_list env
 
 module Commit = struct
-  type t = {
-    repo : repo;
-    hash : string;
-  }
-
-  let compare a b =
-    String.compare a.hash b.hash
-
+  type t = { repo : repo; hash : string; }
+  let compare a b = String.compare a.hash b.hash
   let hash t = t.hash
-
-  let pp f t =
-    Fmt.string f t.hash
-
-  let includes_lwt t ~commit =
-    try Hashtbl.find t.repo.is_ancestor (commit, t.hash)
-    with Not_found ->
-      let result =
-        let cmd = "", [| "git"; "merge-base"; "--is-ancestor"; commit; t.hash |] in
-        Process.run_with_exit_status ~cwd:t.repo.dir ~output:ignore cmd >|= function
-        | Unix.WEXITED 0 -> true
-        | Unix.WEXITED _ -> false
-        | x -> Process.check_status cmd x; true
-      in
-      Hashtbl.add t.repo.is_ancestor (commit, t.hash) result;
-      result
-
-  let includes t ~commit =
-    Term.of_lwt_quick (includes_lwt t ~commit)
+  let pp f t = Fmt.string f t.hash
 end
+
+type commit = Commit.t
 
 module Builder = struct
   module Key = struct
@@ -140,7 +118,7 @@ type t = {
   fetches : PR_Cache.t;
 }
 
-let connect ~logs ~dir =
+let v ~logs ~dir =
   let repo = {
     dir;
     dir_lock = Monitored_pool.create dir 1;

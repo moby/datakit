@@ -329,7 +329,7 @@ let test_git_dir conn ~clone =
            Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
            (* Clone a "local" copy *)
            run ["git"; "clone"; tmpdir / "my-repo"; tmpdir / "clone"] >>= fun () ->
-           let local_repo = DKCI_git.connect ~logs ~dir:(tmpdir / "clone") in
+           let local_repo = DKCI_git.v ~logs ~dir:(tmpdir / "clone") in
            (* Start the CI *)
            Test_utils.with_ci conn (Workflows.pull_and_run local_repo ~cmd) @@ fun ~logs ~switch dk with_handler ->
            DK.branch dk "github-metadata" >>*= fun hooks ->

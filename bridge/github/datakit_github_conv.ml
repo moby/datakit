@@ -12,6 +12,7 @@ let ( >>*= ) x f =
   | Error _ as e -> Lwt.return e
 
 let pp_path = Fmt.(list ~sep:(unit "/") string)
+let mapo f = function None -> None | Some x -> Some (f x)
 
 module Make (DK: Datakit_S.CLIENT) = struct
 
@@ -313,7 +314,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     let kvs = [
       "description", description;
       "state"      , Some (Status_state.to_string @@ Status.state s);
-      "target_url" , Status.url s;
+      "target_url" , mapo Uri.to_string (Status.url s);
     ] in
     Lwt_list.iter_s (fun (k, v) -> match v with
         | None   -> safe_remove t (dir / k)
@@ -346,6 +347,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       safe_read_file tree (dir / "description") >>= fun description ->
       safe_read_file tree (dir / "target_url")  >|= fun url ->
       let context = Datakit_path.unwrap context in
+      let url = mapo Uri.of_string url in
       Some (Status.v ?description ?url commit context state)
 
   let statuses_of_commits tree commits =
@@ -509,13 +511,12 @@ module Make (DK: Datakit_S.CLIENT) = struct
   (* Elements *)
 
   let find t (id:Elt.id) =
-    let map f = function None -> None | Some x -> Some (f x) in
     match id with
-    | `Repo id   -> repo t id   >|= map (fun r -> `Repo r)
-    | `Commit id -> commit t id >|= map (fun c -> `Commit c)
-    | `PR id     -> pr t id     >|= map (fun p -> `PR p)
-    | `Ref id    -> ref_ t id   >|= map (fun r -> `Ref r)
-    | `Status id -> status t id >|= map (fun s -> `Status s)
+    | `Repo id   -> repo t id   >|= mapo (fun r -> `Repo r)
+    | `Commit id -> commit t id >|= mapo (fun c -> `Commit c)
+    | `PR id     -> pr t id     >|= mapo (fun p -> `PR p)
+    | `Ref id    -> ref_ t id   >|= mapo (fun r -> `Ref r)
+    | `Status id -> status t id >|= mapo (fun s -> `Status s)
 
   (* Diffs *)
 

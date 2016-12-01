@@ -584,18 +584,18 @@ let r1 = Repo.v ~user:"xxx" ~repo:"yyy"
 let s1 =
   Status.v ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
 
-let s2 =
-  Status.v ~url:"toto" commit_bar ["foo"; "bar"; "toto"] `Failure
+let toto = Uri.of_string "toto"
+let titi = Uri.of_string "titi"
+
+let s2 = Status.v ~url:toto commit_bar ["foo"; "bar"; "toto"] `Failure
 
 let s3 =
-  Status.v ~url:"titi" ~description:"foo"
+  Status.v ~url:titi ~description:"foo"
     commit_foo ["foo"; "bar"; "baz"] `Success
 
-let s4 =
-  Status.v commit_bar ["foo"] `Pending
+let s4 = Status.v commit_bar ["foo"] `Pending
 
-let s5 =
-  Status.v ~url:"titi" commit_foo ["foo"; "bar"; "baz"] `Failure
+let s5 = Status.v ~url:titi commit_foo ["foo"; "bar"; "baz"] `Failure
 
 let base = "master"
 
@@ -697,7 +697,7 @@ module Data = struct
 
   let urls = [|
     None;
-    Some "http://example.com/"
+    Some (Uri.of_string "http://example.com/")
   |]
 
 end
@@ -1429,6 +1429,8 @@ let opt_read_file tree path =
   | Error (`Msg "No such file or directory") -> None
   | Error (`Msg x) -> failwith x
 
+let mapo f = function None -> None | Some x -> Some (f x)
+
 let rec read_state ~user ~repo ~commit tree path context =
   DK.Tree.read_dir tree path >>= function
   | Error _ -> Lwt.return []
@@ -1445,6 +1447,7 @@ let rec read_state ~user ~repo ~commit tree path context =
           | None   -> failwith (Fmt.strf "Bad state %S" status)
           | Some x -> x
         in
+        let url = mapo Uri.of_string url in
         let repo = Repo.v ~user ~repo in
         let commit = Commit.v repo commit in
          [ Status.v ?description ?url commit context state]

@@ -252,7 +252,7 @@ module Status = struct
   type t = {
     commit: Commit.t;
     context: string list;
-    url: string option;
+    url: Uri.t option;
     description: string option;
     state: Status_state.t;
   }
@@ -307,12 +307,14 @@ module Status = struct
     | None   -> ()
     | Some v -> Fmt.pf ppf " %s=%s" k v
 
+  let map f = function None -> None | Some v -> Some (f v)
+
   let pp ppf t =
     Fmt.pf ppf "{%a %s:%a[%a]%a%a}"
       Repo.pp (repo t) (commit_hash t)
       pp_path t.context
       Status_state.pp t.state
-      (pp_opt "url") t.url
+      (pp_opt "url") (map Uri.to_string t.url)
       (pp_opt "descr") t.description
 
   let pp_id ppf (c, s) = Fmt.pf ppf "{%a %a}" Commit.pp c pp_path s

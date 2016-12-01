@@ -232,9 +232,22 @@ module PR = struct
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
 
+  let index s =
+    Set.fold (fun t acc ->
+        let repo = repo t in
+        let id = id t in
+        let idx = match Repo.Map.find repo acc with
+          | None     -> Index.singleton id t
+          | Some idx -> Index.add id t idx
+        in
+        Repo.Map.add repo idx acc
+      ) s Repo.Map.empty
+
 end
 
 module Status = struct
+
+  type context = string list
 
   type t = {
     commit: Commit.t;
@@ -256,6 +269,7 @@ module Status = struct
   let description t = t.description
   let state t = t.state
   let url t = t.url
+  let pp_context = pp_path
   let commit_hash t = t.commit.Commit.hash
   let same_id x y = commit x = commit y && context x = context y
   let compare_repo x y = Repo.compare (repo x) (repo y)
@@ -326,9 +340,22 @@ module Status = struct
       let pp = pp_id
     end)
 
+  let index s =
+    Set.fold (fun t acc ->
+        let repo = repo t in
+        let id = id t in
+        let idx = match Repo.Map.find repo acc with
+          | None     -> Index.singleton id t
+          | Some idx -> Index.add id t idx
+        in
+        Repo.Map.add repo idx acc
+      ) s Repo.Map.empty
+
 end
 
 module Ref = struct
+
+  type name = string list
 
   type t = {
     head: Commit.t;
@@ -387,6 +414,17 @@ module Ref = struct
     let commits t =
       fold (fun c acc -> Commit.Set.add (commit c) acc) t Commit.Set.empty
   end
+
+  let index s =
+    Set.fold (fun t acc ->
+        let repo = repo t in
+        let id = id t in
+        let idx = match Repo.Map.find repo acc with
+          | None     -> Index.singleton id t
+          | Some idx -> Index.add id t idx
+        in
+        Repo.Map.add repo idx acc
+      ) s Repo.Map.empty
 
   type event = [`Created of t | `Updated of t  | `Removed of id]
 

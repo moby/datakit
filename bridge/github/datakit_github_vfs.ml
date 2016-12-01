@@ -7,6 +7,7 @@ let src = Logs.Src.create "dkt-github.vfs" ~doc:"Github to VFS"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 let err_invalid_status s = Vfs.error "%S: invalid status" s
+let mapo f = function None -> None | Some x -> Some (f x)
 
 let ( >>*= ) x f =
   x >>= function
@@ -43,7 +44,7 @@ module Make (API: API) = struct
     let set_status () =
       let state = !current_state in
       let description = !current_descr in
-      let url = !current_url in
+      let url = mapo Uri.of_string !current_url in
       let new_status =
         Status.v ?description ?url (Status.commit s) (Status.context s) state
       in

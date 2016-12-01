@@ -119,9 +119,11 @@ module Status = struct
 
   let to_gh_state s = (s :> Github_t.status_state)
 
+  let map f = function None -> None | Some x -> Some (f x)
+
   let of_gh commit s =
     let description = s.base_status_description in
-    let url = s.base_status_target_url in
+    let url = map Uri.of_string s.base_status_target_url in
     let context = to_list s.base_status_context in
     let state = of_gh_state s.base_status_state in
     Status.v ?description ?url commit context state
@@ -141,7 +143,7 @@ module Status = struct
     assert_short_description (Status.description s);
     {
       new_status_context     = of_list (Status.context s);
-      new_status_target_url  = Status.url s;
+      new_status_target_url  = map Uri.to_string (Status.url s);
       new_status_description = Status.description s;
       new_status_state       = to_gh_state (Status.state s);
     }
@@ -149,7 +151,7 @@ module Status = struct
   let of_event repo s =
     let commit = Commit.v repo s.status_event_sha in
     let description = s.status_event_description in
-    let url = s.status_event_target_url in
+    let url = map Uri.of_string s.status_event_target_url in
     let context = to_list s.status_event_context in
     let state = of_gh_state s.status_event_state in
     Status.v ?description ?url commit context state

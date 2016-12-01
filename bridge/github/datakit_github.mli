@@ -200,13 +200,13 @@ module Status: sig
   type t = private {
     commit: Commit.t;
     context: context;
-    url: string option;
+    url: Uri.t option;
     description: string option;
     state: Status_state.t;
   }
   (** The type for status values. *)
 
-  val v: ?description:string -> ?url:string ->
+  val v: ?description:string -> ?url:Uri.t ->
     Commit.t -> string list -> Status_state.t -> t
   (** [v c n] is the status with commit [c] and name [n]. *)
 
@@ -237,7 +237,7 @@ module Status: sig
   val description: t -> string option
   (** [description t] is [t]'s description. *)
 
-  val url: t -> string option
+  val url: t -> Uri.t option
   (** [url t] is [t]'s target URL. *)
 
   val repo: t -> Repo.t

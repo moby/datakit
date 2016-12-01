@@ -13,11 +13,6 @@ end
 val connect : DK.t -> t
 val update_status: t -> message:string -> Status.t -> unit Lwt.t
 
-module Target : sig
-  type t = [ `PR of PR.t | `Ref of Ref.t ]
-  val head : t -> Commit.t
-end
-
 module Snapshot : sig
   type t
   val prs: t -> Repo.t -> PR.t PR.Index.t Lwt.t
@@ -25,7 +20,7 @@ module Snapshot : sig
   val pr: t -> PR.id -> PR.t option Lwt.t
   val ref: t -> Ref.id -> Ref.t option Lwt.t
   val status: t -> Status.id -> Status.t option Lwt.t
-  val target: t -> CI_target.t -> Target.t option Lwt.t
+  val target: t -> CI_target.t -> CI_target.v option Lwt.t
 end
 
 val snapshot : t -> Snapshot.t Lwt.t

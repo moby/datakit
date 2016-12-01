@@ -50,7 +50,7 @@ let github_target id =
   | Some x -> return x
 
 let head id =
-  github_target id >|= CI_github_hooks.Target.head
+  github_target id >|= CI_target.head
 
 let ref_head repo ref_name =
   match Datakit_path.of_string ref_name with

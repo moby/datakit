@@ -6,7 +6,7 @@ val pp_target : [`PR of PR.t | `Ref of Ref.t] Fmt.t
 val github : CI_github_hooks.Snapshot.t t
 (** [github t] evaluates to the state of the GitHub metadata. *)
 
-val github_target : CI_target.t -> CI_github_hooks.Target.t t
+val github_target : CI_target.t -> CI_target.v t
 (** [github_target id] evaluates to the GitHub metadata of the named target. *)
 
 val job_id : CI_s.job_id t

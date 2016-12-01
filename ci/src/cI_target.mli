@@ -9,3 +9,6 @@ val repo : t -> Repo.t
 val id : t -> [`PR of int | `Ref of string list ]
 module Set: Set.S with type elt = t
 val map_of_list : t list -> Set.t Repo.Map.t
+
+type v = [ `PR of PR.t | `Ref of Ref.t ]
+val head: v -> Commit.t

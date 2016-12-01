@@ -66,3 +66,9 @@ let map_of_list xs =
       map := !map |> Repo.Map.add p (Set.add target old_targets)
     ) xs;
   !map
+
+type v = [ `PR of PR.t | `Ref of Ref.t ]
+
+let head = function
+  | `PR x  -> PR.commit x
+  | `Ref x -> Ref.commit x

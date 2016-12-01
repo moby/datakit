@@ -71,12 +71,6 @@ module Github_hooks: sig
     val circle_ci: t
     val datakit_ci: string -> t
   end
-
-  module Target: sig
-    type t = [ `PR of PR.t | `Ref of Ref.t ]
-
-    val head: t -> Commit.t
-  end
 end
 
 module Step_log: sig
@@ -101,6 +95,7 @@ module Target: sig
   val repo: t -> Repo.t
   val id: t -> [`PR of int | `Ref of string list]
   val pp: t Fmt.t
+  type v = [ `PR of PR.t | `Ref of Ref.t ]
 end
 
 module Term: sig
@@ -206,7 +201,7 @@ module Term: sig
   (** [job_id] evaluates to the job that evaluates the term.  This is
       useful for logging. *)
 
-  val github_target: Target.t -> Github_hooks.Target.t t
+  val github_target: Target.t -> Target.v t
   (** [github_target id] evaluates to the GitHub metadata of the named
       target. Note that this is a snapshot. *)
 

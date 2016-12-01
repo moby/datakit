@@ -30,16 +30,6 @@ let update_status t ~message s =
       DK.Transaction.commit t ~message
     ) >>*= Lwt.return
 
-module Target = struct
-  type t = [ `PR of PR.t | `Ref of Ref.t ]
-
-  let dispatch p r = function
-    | `PR x -> p x
-    | `Ref x -> r x
-
-  let head = dispatch PR.commit Ref.commit
-end
-
 module Snapshot = struct
 
   type t =DK.Tree.t

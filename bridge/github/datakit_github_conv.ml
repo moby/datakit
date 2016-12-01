@@ -376,7 +376,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   (* Refs *)
 
-  let ref_ tree (repo, name) =
+  let ref tree (repo, name) =
     let path = Datakit_path.of_steps_exn name in
     let head = root repo / "ref" /@ path / "head" in
     safe_read_file tree head >|= function
@@ -390,7 +390,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let refs_of_repo tree repo =
     let dir = root repo / "ref" in
-    walk (module Ref.Set) tree dir ("head", fun n -> ref_ tree (repo, n)) >|=
+    walk (module Ref.Set) tree dir ("head", fun n -> ref tree (repo, n)) >|=
     fun refs ->
     Log.debug (fun l ->
         l "refs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Ref.Set.pp refs);
@@ -515,7 +515,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | `Repo id   -> repo t id   >|= mapo (fun r -> `Repo r)
     | `Commit id -> commit t id >|= mapo (fun c -> `Commit c)
     | `PR id     -> pr t id     >|= mapo (fun p -> `PR p)
-    | `Ref id    -> ref_ t id   >|= mapo (fun r -> `Ref r)
+    | `Ref id    -> ref t id   >|= mapo (fun r -> `Ref r)
     | `Status id -> status t id >|= mapo (fun s -> `Status s)
 
   (* Diffs *)
@@ -543,7 +543,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | Some s -> Diff.with_update (`Status s) t
 
   let combine_ref t tree id =
-    ref_ tree id >|= function
+    ref tree id >|= function
     | None   -> Diff.with_remove (`Ref id) t
     | Some r -> Diff.with_update (`Ref r) t
 

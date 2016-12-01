@@ -34,6 +34,15 @@ module Make (DK: Datakit_S.CLIENT): sig
   val find: tree -> Elt.id -> Elt.t option Lwt.t
   (** [find t id] is the elements with ID [id] in [t]. *)
 
+  val pr: tree -> PR.id -> PR.t option Lwt.t
+  (** [pr t id] is the pull-request with ID [id]. *)
+
+  val ref: tree -> Ref.id -> Ref.t option Lwt.t
+  (** [ref t id] is the Git reference with ID [id]. *)
+
+  val status: tree -> Status.id -> Status.t option Lwt.t
+  (** [status t id] is the build status with ID [id]. *)
+
   (** {1 Updates} *)
 
   val update_elt: DK.Transaction.t -> Elt.t -> unit Lwt.t

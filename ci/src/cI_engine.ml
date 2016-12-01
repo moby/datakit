@@ -68,9 +68,7 @@ let git_target job = job.head
 let title pr =
   match pr.head with
   | `PR pr -> PR.title pr
-  | `Ref r ->
-    let open !CI_github_hooks in
-    Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
+  | `Ref r -> Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
 
 let jobs pr = pr.jobs
 let job_name j = j.name
@@ -204,7 +202,6 @@ let set_status t target name ~status ~descr =
     | `Ref r ->
       Log.info (fun f -> f "Job ref %a:%s -> %s" Ref.pp_id (Ref.id r) name descr);
       let url =
-        let open !CI_github_hooks in
         Uri.with_path t.web_ui
           (Fmt.strf "ref/%s/%s/%a" user repo Ref.pp_name (escape_ref (Ref.name r)))
       in
@@ -314,7 +311,6 @@ let make_job snapshot ~parent name term =
     state = (hash, state); }
 
 let apply_canaries canaries prs refs =
-  let open !CI_github_hooks in
   match canaries with
   | None -> (prs, refs)
   | Some canaries ->
@@ -331,7 +327,6 @@ let apply_canaries canaries prs refs =
     (prs, refs)
 
 let listen ?switch t =
-  let open !CI_github_hooks in
   auto_restart t ?switch "monitor" @@ fun () ->
   Log.info (fun f -> f "Starting monitor loop");
   let check_pr ~snapshot project (id, pr) =
@@ -415,7 +410,6 @@ let listen ?switch t =
     )
 
 let rebuild t ~branch_name =
-  let open !CI_github_hooks in
   let jobs_needing_recalc = ref [] in
   let triggers = ref [] in
   let rec check_logs =

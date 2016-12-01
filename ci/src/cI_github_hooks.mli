@@ -37,7 +37,7 @@ module PR : sig
   val repo : t -> Repo.t
   val dump : t Fmt.t
   val compare : t -> t -> int
-  module Index: Map.S with type key = int
+  module Index: Map.S with type key = Repo.t * int
 end
 
 module Ref : sig
@@ -49,7 +49,7 @@ module Ref : sig
   val dump : t Fmt.t
   val compare : t -> t -> int
   val pp_name: string list Fmt.t
-  module Index: Map.S with type key = string list
+  module Index: Map.S with type key = Repo.t * string list
 end
 
 val connect : DK.t -> t

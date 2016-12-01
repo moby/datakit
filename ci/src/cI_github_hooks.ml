@@ -111,8 +111,8 @@ module PR = struct
     | r -> r
 
   module Index = Map.Make(struct
-      type t = int
-      let compare (a:int) (b:int) = Pervasives.compare a b
+      type t = (Repo.t * int)
+      let compare (a:t) (b:t) = Pervasives.compare a b
     end)
 end
 
@@ -134,7 +134,7 @@ module Ref = struct
     | r -> r
 
   module Index = Map.Make(struct
-      type t = string list
+      type t = Repo.t * string list
       let compare = Pervasives.compare
     end)
 end
@@ -198,7 +198,7 @@ let prs snapshot =
       | None -> Log.warn (fun f -> f "Invalid PR ID %S" id); Lwt.return acc
       | Some id -> pr snapshot id >|= function
         | None -> acc
-        | Some value -> PR.Index.add id value acc
+        | Some value -> PR.Index.add (snapshot.repo, id) value acc
     ) PR.Index.empty
 
 let refs snapshot =
@@ -211,7 +211,7 @@ let refs snapshot =
       let hash = String.trim (Cstruct.to_string head) in
       let head = { Commit.snapshot; hash } in
       let name = Datakit_path.unwrap context in
-      results := Ref.Index.add name { Ref.head; name } !results;
+      results := Ref.Index.add (snapshot.repo, name) { Ref.head; name } !results;
       Lwt.return ()
     | None ->
       read_opt_dir snapshot (refs_dir /@ context) >>=
@@ -261,8 +261,9 @@ module Snapshot = struct
     | Some y -> Some (f y)
 
   let find id t =
-    repo t (CI_target.repo id) >|= fun (prs, refs) ->
-    match CI_target.id id with
+    let r = CI_target.repo id in
+    repo t r >|= fun (prs, refs) ->
+    match id with
     | `PR pr -> PR.Index.find pr prs >|?= fun x -> `PR x
     | `Ref x ->
       match Ref.Index.find x refs with

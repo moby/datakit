@@ -266,13 +266,13 @@ let apply_canaries canaries prs refs =
   | None -> (prs, refs)
   | Some canaries ->
     let prs =
-      PR.Index.filter (fun id t ->
-          CI_target.Set.mem (`PR (PR.repo t, id)) canaries
+      PR.Index.filter (fun id _ ->
+          CI_target.Set.mem (`PR id) canaries
         ) prs
     in
     let refs =
-      Ref.Index.filter (fun id t ->
-          CI_target.Set.mem (`Ref (Ref.repo t, id)) canaries
+      Ref.Index.filter (fun id _ ->
+          CI_target.Set.mem (`Ref id) canaries
         ) refs
     in
     (prs, refs)
@@ -291,7 +291,7 @@ let listen ?switch t =
           head = `PR pr;
           jobs = [];
         } in
-        let terms = project.make_terms @@ `PR (repo, id) in
+        let terms = project.make_terms @@ `PR id in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:open_pr name term)
         >>= fun jobs ->
@@ -314,7 +314,7 @@ let listen ?switch t =
           head = `Ref r;
           jobs = [];
         } in
-        let terms = project.make_terms @@ `Ref (repo, id) in
+        let terms = project.make_terms @@ `Ref id in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:target name term)
         >>= fun jobs ->
@@ -338,7 +338,7 @@ let listen ?switch t =
           let is_current id open_pr =
             let current = PR.Index.mem id prs in
             if not current then (
-              Log.info (fun f -> f "Removing closed PR#%d" id);
+              Log.info (fun f -> f "Removing closed PR#%d" (snd id));
               List.iter (fun j -> j.cancel ()) open_pr.jobs
             );
             current
@@ -352,7 +352,7 @@ let listen ?switch t =
           let is_current id target =
             let current = Ref.Index.mem id refs in
             if not current then (
-              Log.info (fun f -> f "Removing closed branch %a" Ref.pp_name id);
+              Log.info (fun f -> f "Removing closed branch %a" Ref.pp_name (snd id));
               List.iter (fun j -> j.cancel ()) target.jobs
             );
             current

@@ -95,14 +95,14 @@ let ref_url { Repo.user; repo} r =
 
 let tag_map f map =
   CI_github_hooks.Ref.Index.fold (fun key value acc ->
-      match key with
+      match snd key with
       | "tags" :: _ -> [f key value] @ acc
       | _ -> acc
     ) map []
 
 let branch_map f map =
   CI_github_hooks.Ref.Index.fold (fun key value acc ->
-      match key with
+      match snd key with
       | "heads" :: _ -> [f key value] @ acc
       | _ -> acc
     ) map []
@@ -114,7 +114,7 @@ let pr_map f map =
 
 let dash_map f map targets =
   CI_github_hooks.Ref.Index.fold (fun key value acc ->
-      match CI_target.Set.mem (`Ref (CI_engine.repo value, key)) targets with
+      match CI_target.Set.mem (`Ref key) targets with
       | true -> [f key value] @ acc
       | false -> acc
     ) map []
@@ -177,7 +177,7 @@ let summarise jobs =
     else combine `Success states
   )
 
-let dashboard_widget id ref =
+let dashboard_widget (_repo, id) ref =
   let state = CI_engine.jobs ref |> summarise in
   let cls, icon, status, comment =
     match state.CI_state.status with
@@ -197,7 +197,7 @@ let dashboard_widget id ref =
     small [ pcdata comment ];
   ]
 
-let ref_job ~project id ref =
+let ref_job (project, id) ref =
   let jobs = CI_engine.jobs ref in
   let summary = summarise jobs in
   tr [
@@ -206,11 +206,11 @@ let ref_job ~project id ref =
     td [pcdata summary.CI_state.descr];
   ]
 
-let pr_job ~project id open_pr =
+let pr_job (repo, id) open_pr =
   let jobs = CI_engine.jobs open_pr in
   let summary = summarise jobs in
   tr [
-    td [a ~a:[a_href (pr_url project id)] [pcdata (string_of_int id)]];
+    td [a ~a:[a_href (pr_url repo id)] [pcdata (string_of_int id)]];
     td [pcdata (CI_engine.title open_pr)];
     td [status_list jobs];
     td [pcdata summary.CI_state.descr];
@@ -320,7 +320,7 @@ let pr_table (id, (prs, _)) =
     h2 [pcdata (Fmt.strf "PR status for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "PR"; heading "Title"; heading "State"; heading "Details"] ::
-      (pr_map (pr_job ~project:id) prs)
+      (pr_map pr_job prs)
     );
   ]
 
@@ -329,7 +329,7 @@ let branch_table (id, (_, refs)) =
     h2 [pcdata (Fmt.strf "Branches for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
-      (branch_map (ref_job ~project:id) refs)
+      (branch_map ref_job refs)
     );
   ]
 
@@ -338,7 +338,7 @@ let tag_table (id, (_, refs)) =
     h2 [pcdata (Fmt.strf "Tags for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
-      (tag_map (ref_job ~project:id) refs)
+      (tag_map ref_job refs)
     );
   ]
 

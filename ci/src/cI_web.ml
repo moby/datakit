@@ -146,12 +146,12 @@ class pr_page t = object(self)
     let repo = Rd.lookup_path_info_exn "repo" rd in
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = int_of_string id in
-    let project = Repo.v ~user ~repo in
+    let repo = Repo.v ~user ~repo in
     let projects = CI_engine.targets t.ci in
-    match Repo.Map.find project projects with
+    match Repo.Map.find repo projects with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (prs, _) ->
-      match CI_github_hooks.PR.Index.find id prs with
+      match CI_github_hooks.PR.Index.find (repo, id) prs with
       | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
       | Some target ->
         let jobs = CI_engine.jobs target in
@@ -175,7 +175,7 @@ class ref_page t = object(self)
     match Repo.Map.find repo projects with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (_, refs) ->
-      match CI_github_hooks.Ref.Index.find id refs with
+      match CI_github_hooks.Ref.Index.find (repo, id) refs with
       | None        -> Wm.respond 404 rd ~body:(`String "No such ref")
       | Some target ->
         let jobs = CI_engine.jobs target in

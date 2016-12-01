@@ -46,12 +46,26 @@ let projects = [
   Config.project ~id:"docker/datakit" datakit_tests
 ]
 
+let metrics_path = "./metrics_token"
+
+let metrics_token =
+  if Sys.file_exists metrics_path then (
+    let ch = open_in "metrics_token" in
+    let token = input_line ch in
+    close_in ch;
+    Some (`SHA256 (B64.decode token))
+  ) else (
+    Fmt.epr "%S does not exist; metrics will not be available@." metrics_path;
+    None
+  )
+
 let web_config =
   Web.config
     ~name:"datakit-ci"
     ~state_repo:(Uri.of_string "https://github.com/docker/datakit.logs")
     ~can_read:ACL.everyone
     ~can_build:ACL.(username "admin")
+    ?metrics_token
     ()
 
 let () =

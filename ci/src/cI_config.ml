@@ -13,8 +13,7 @@ type t = {
   projects : project Repo.Map.t;
 }
 
-let id_of_branch name =
-  `Ref (Datakit_path.of_string_exn ("heads/" ^ name))
+let id_of_branch name = `Ref ("heads" :: String.cuts ~sep:"/" name)
 
 let project ~id ?(dashboards=["master"]) tests =
   let id = match Repo.of_string id with

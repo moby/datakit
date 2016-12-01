@@ -151,7 +151,7 @@ class pr_page t = object(self)
     match Repo.Map.find project projects with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (prs, _) ->
-      match IntMap.find id prs with
+      match CI_github_hooks.PR.Index.find id prs with
       | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
       | Some target ->
         let jobs = CI_engine.jobs target in
@@ -175,9 +175,9 @@ class ref_page t = object(self)
     match Repo.Map.find repo projects with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (_, refs) ->
-      match Datakit_path.Map.find id refs with
-      | exception Not_found -> Wm.respond 404 rd ~body:(`String "No such ref")
-      | target ->
+      match CI_github_hooks.Ref.Index.find id refs with
+      | None        -> Wm.respond 404 rd ~body:(`String "No such ref")
+      | Some target ->
         let jobs = CI_engine.jobs target in
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in

@@ -1,3 +1,4 @@
+open Asetmap
 open Datakit_github
 open CI_utils
 open! Result
@@ -37,16 +38,19 @@ module PR : sig
   val repo : t -> Repo.t
   val dump : t Fmt.t
   val compare : t -> t -> int
+  module Index: Map.S with type key = int
 end
 
 module Ref : sig
   type t
 
   val repo : t -> Repo.t
-  val name : t -> Datakit_path.t
+  val name : t -> string list
   val head : t -> Commit.t
   val dump : t Fmt.t
   val compare : t -> t -> int
+  val pp_name: string list Fmt.t
+  module Index: Map.S with type key = string list
 end
 
 val connect : DK.t -> t
@@ -66,8 +70,7 @@ end
 module Snapshot : sig
   type t
 
-  val repo :
-    t -> Repo.t -> (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t
+  val repo: t -> Repo.t -> (PR.t PR.Index.t * Ref.t Ref.Index.t) Lwt.t
   (** [repo snapshot r] is the state of the open PRs, branches and
       tags in [snapshot] for repository [r]. *)
 

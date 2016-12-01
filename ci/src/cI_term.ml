@@ -53,7 +53,7 @@ let head id =
 let ref_head project_id ref_name =
   match Datakit_path.of_string ref_name with
   | Error msg -> fail "Invalid ref name %S: %s" ref_name msg
-  | Ok ref_path -> head (project_id, `Ref ref_path)
+  | Ok ref_path -> head (project_id, `Ref (Datakit_path.unwrap ref_path))
 
 let branch_head project_id branch =
   ref_head project_id ("heads/" ^ branch)

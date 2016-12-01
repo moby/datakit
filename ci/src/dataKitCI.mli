@@ -104,7 +104,7 @@ module Github_hooks: sig
     type t
 
     val repo: t -> Repo.t
-    val name: t -> Datakit_path.t
+    val name: t -> string list
     val head: t -> Commit.t
     val dump: t Fmt.t
     val compare: t -> t -> int
@@ -135,7 +135,7 @@ type 'a lwt_status =
 
 module Target: sig
   module ID: sig
-    type t = [ `PR of int | `Ref of Datakit_path.t ]
+    type t = [ `PR of int | `Ref of string list ]
     val pp: t Fmt.t
     val compare: t -> t -> int
   end

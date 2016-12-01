@@ -64,10 +64,14 @@ let pp_job f j =
 
 let state job = snd job.state
 let git_target job = job.head
+
 let title pr =
   match pr.head with
   | `PR pr -> CI_github_hooks.PR.title pr
-  | `Ref r -> Fmt.strf "Branch %a" Datakit_path.pp (CI_github_hooks.Ref.name r)
+  | `Ref r ->
+    let open !CI_github_hooks in
+    Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
+
 let jobs pr = pr.jobs
 let job_name j = j.name
 let repo target = target.repo
@@ -75,8 +79,8 @@ let repo target = target.repo
 type project = {
   make_terms : CI_target.Full.t -> string CI_term.t String.Map.t;
   canaries : CI_target.ID_Set.t option;
-  mutable open_prs : target IntMap.t;
-  mutable refs : target Datakit_path.Map.t;
+  mutable open_prs : target CI_github_hooks.PR.Index.t;
+  mutable refs : target CI_github_hooks.Ref.Index.t;
 }
 
 type t = {
@@ -125,8 +129,8 @@ let create ~web_ui ?canaries connect_dk projects =
                  |> CI_utils.default CI_target.ID_Set.empty)
         in
         { make_terms;
-          open_prs = IntMap.empty;
-          refs = Datakit_path.Map.empty;
+          open_prs = CI_github_hooks.PR.Index.empty;
+          refs = CI_github_hooks.Ref.Index.empty;
           canaries }
       ) projects
   in
@@ -144,8 +148,7 @@ let gh_hooks t = t.db >|= fun db -> db.gh_hooks
 let targets t =
   t.projects |> Repo.Map.map (fun project -> project.open_prs, project.refs)
 
-let escape_ref path =
-  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" (Datakit_path.unwrap path))
+let escape_ref path = List.map (fun p -> Uri.pct_encode ~scheme:"http" p) path
 
 let set_status t { Repo.user; repo } target name ~status ~descr =
   CI_prometheus.Counter.inc_one Metrics.status_updates;
@@ -158,8 +161,11 @@ let set_status t { Repo.user; repo } target name ~status ~descr =
       (commit, url)
     | `Ref r ->
       Log.info (fun f -> f "Job ref %a:%s -> %s" CI_github_hooks.Ref.dump r name descr);
-      let url = Uri.with_path t.web_ui (Printf.sprintf "ref/%s/%s/%s"
-                                          user repo (escape_ref (CI_github_hooks.Ref.name r))) in
+      let url =
+        let open !CI_github_hooks in
+        Uri.with_path t.web_ui
+          (Fmt.strf "ref/%s/%s/%a" user repo Ref.pp_name (escape_ref (Ref.name r)))
+      in
       let commit = CI_github_hooks.Ref.head r in
       (commit, url)
   in
@@ -255,20 +261,22 @@ let make_job ~parent name term =
   }
 
 let apply_canaries canaries prs refs =
+  let open !CI_github_hooks in
   match canaries with
   | None -> (prs, refs)
   | Some canaries ->
-    let prs = prs |> IntMap.filter (fun id _ -> CI_target.ID_Set.mem (`PR id) canaries) in
-    let refs = refs |> Datakit_path.Map.filter (fun id _ -> CI_target.ID_Set.mem (`Ref id) canaries) in
+    let prs = prs |> PR.Index.filter (fun id _ -> CI_target.ID_Set.mem (`PR id) canaries) in
+    let refs = refs |> Ref.Index.filter (fun id _ -> CI_target.ID_Set.mem (`Ref id) canaries) in
     (prs, refs)
 
 let listen ?switch t =
+  let open !CI_github_hooks in
   auto_restart t ?switch "monitor" @@ fun () ->
   Log.info (fun f -> f "Starting monitor loop");
   gh_hooks t >>= fun gh_hooks ->
   let check_pr ~snapshot ~repo project (id, pr) =
     Log.debug (fun f -> f "Checking for work on %a" CI_github_hooks.PR.dump pr);
-    begin match IntMap.find id project.open_prs with
+    begin match PR.Index.find id project.open_prs with
       | None ->
         let open_pr = {
           repo;
@@ -280,7 +288,7 @@ let listen ?switch t =
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:open_pr name term)
         >>= fun jobs ->
         open_pr.jobs <- jobs;
-        project.open_prs <- IntMap.add id open_pr project.open_prs;
+        project.open_prs <- PR.Index.add id open_pr project.open_prs;
         Lwt.return open_pr
       | Some open_pr ->
         open_pr.head <- `PR pr; (* Update in all cases, because we read other things from the same snapshot.
@@ -291,8 +299,8 @@ let listen ?switch t =
   in
   let check_ref ~snapshot ~repo project (id, r) =
     Log.debug (fun f -> f "Checking for work on %a" CI_github_hooks.Ref.dump r);
-    begin match Datakit_path.Map.find id project.refs with
-      | exception Not_found ->
+    begin match Ref.Index.find id project.refs with
+      | None ->
         let target = {
           repo;
           head = `Ref r;
@@ -303,9 +311,9 @@ let listen ?switch t =
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:target name term)
         >>= fun jobs ->
         target.jobs <- jobs;
-        project.refs <- Datakit_path.Map.add id target project.refs;
+        project.refs <- Ref.Index.add id target project.refs;
         Lwt.return target
-      | target ->
+      | Some target ->
         target.head <- `Ref r;
         Lwt.return target
     end >>= fun target ->
@@ -320,35 +328,36 @@ let listen ?switch t =
           let prs, refs = apply_canaries project.canaries prs refs in
           (* PRs *)
           let is_current id open_pr =
-            let current = IntMap.mem id prs in
+            let current = PR.Index.mem id prs in
             if not current then (
               Log.info (fun f -> f "Removing closed PR#%d" id);
               List.iter (fun j -> j.cancel ()) open_pr.jobs
             );
             current
           in
-          project.open_prs <- IntMap.filter is_current project.open_prs;
+          project.open_prs <- PR.Index.filter is_current project.open_prs;
           Lwt_mutex.with_lock t.term_lock (fun () ->
-              IntMap.bindings prs |> Lwt_list.iter_s (check_pr ~snapshot ~repo project)
+              PR.Index.bindings prs |> Lwt_list.iter_s (check_pr ~snapshot ~repo project)
             )
           >>= fun () ->
           (* Refs *)
           let is_current id target =
-            let current = Datakit_path.Map.mem id refs in
+            let current = Ref.Index.mem id refs in
             if not current then (
-              Log.info (fun f -> f "Removing closed branch %a" Datakit_path.pp id);
+              Log.info (fun f -> f "Removing closed branch %a" Ref.pp_name id);
               List.iter (fun j -> j.cancel ()) target.jobs
             );
             current
           in
-          project.refs <- Datakit_path.Map.filter is_current project.refs;
+          project.refs <- Ref.Index.filter is_current project.refs;
           Lwt_mutex.with_lock t.term_lock (fun () ->
-              Datakit_path.Map.bindings refs |> Lwt_list.iter_s (check_ref ~snapshot ~repo project)
+              Ref.Index.bindings refs |> Lwt_list.iter_s (check_ref ~snapshot ~repo project)
             )
         )
     )
 
 let rebuild t ~branch_name =
+  let open !CI_github_hooks in
   let jobs_needing_recalc = ref [] in
   let triggers = ref [] in
   let rec check_logs =
@@ -372,8 +381,8 @@ let rebuild t ~branch_name =
   in
   let check_target target = List.iter check_job target.jobs in
   t.projects |> Repo.Map.iter (fun _ project ->
-      project.open_prs |> IntMap.iter (fun _ x -> check_target x);
-      project.refs |> Datakit_path.Map.iter (fun _ x -> check_target x);
+      project.open_prs |> PR.Index.iter (fun _ x -> check_target x);
+      project.refs |> Ref.Index.iter (fun _ x -> check_target x);
     );
   match !triggers, !jobs_needing_recalc with
   | [], [] -> CI_utils.failf "No job depends on %S, so can't rebuild anything" branch_name

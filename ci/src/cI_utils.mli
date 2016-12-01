@@ -1,5 +1,4 @@
 open! Result
-open Asetmap
 
 module Log: Logs.LOG
 val src: Logs.src
@@ -15,9 +14,6 @@ module DK: sig
   include Datakit_S.CLIENT with type error = Protocol_9p_error.error
   val connect: Client9p.t -> t
 end
-
-module IntMap: Map.S with type key = int
-module Int: sig type t = int val compare: t -> t -> int end
 
 val chdir_lock: Lwt_mutex.t
 

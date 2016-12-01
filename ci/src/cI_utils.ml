@@ -1,4 +1,3 @@
-open Asetmap
 open Result
 open Lwt.Infix
 
@@ -6,11 +5,6 @@ let src9p = Logs.Src.create "Client9p" ~doc:"9p client"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
 module Client9p = Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
-module Int = struct
-  type t = int
-  let compare (a:t) (b:t) = compare a b
-end
-module IntMap = Map.Make(Int)
 
 let src = Logs.Src.create "datakit-ci" ~doc:"DataKit-based CI system"
 module Log = (val Logs.src_log src : Logs.LOG)

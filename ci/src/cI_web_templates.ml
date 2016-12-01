@@ -53,9 +53,9 @@ let gh_target_url = function
   | `Ref r ->
     let { Repo.user; repo } = CI_github_hooks.Ref.repo r in
     let id = CI_github_hooks.Ref.name r in
-    match Datakit_path.unwrap id with
+    match id with
     | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user repo (String.concat ~sep:"/" id)
-    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user repo Datakit_path.pp id
+    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user repo CI_github_hooks.Ref.pp_name id
 
 let metadata_url t = function
   | `PR pr ->
@@ -66,7 +66,7 @@ let metadata_url t = function
     let { Repo.user; repo } = CI_github_hooks.Ref.repo r in
     let id = CI_github_hooks.Ref.name r in
     state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user repo
-      Datakit_path.pp id
+      CI_github_hooks.Ref.pp_name id
 
 let commit_history_url t target =
   let { Repo.user; repo }, commit =
@@ -85,35 +85,35 @@ let pr_url { Repo.user; repo} pr =
   Printf.sprintf "/pr/%s/%s/%d" user repo pr
 
 let escape_ref path =
-  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" (Datakit_path.unwrap path))
+  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" path)
 
 let unescape_ref s =
-  Uri.pct_decode s |> Datakit_path.of_string_exn
+  Uri.pct_encode ~scheme:"http" s |> (fun s -> String.cuts ~sep:"/" s)
 
 let ref_url { Repo.user; repo} r =
-  Printf.sprintf "/ref/%s/%s/%s" user repo (escape_ref r)
+  Fmt.strf "/ref/%s/%s/%s" user repo (escape_ref r)
 
 let tag_map f map =
-  Datakit_path.Map.fold (fun key value acc ->
-      match Datakit_path.unwrap key with
+  CI_github_hooks.Ref.Index.fold (fun key value acc ->
+      match key with
       | "tags" :: _ -> [f key value] @ acc
       | _ -> acc
     ) map []
 
 let branch_map f map =
-  Datakit_path.Map.fold (fun key value acc ->
-      match Datakit_path.unwrap key with
+  CI_github_hooks.Ref.Index.fold (fun key value acc ->
+      match key with
       | "heads" :: _ -> [f key value] @ acc
       | _ -> acc
     ) map []
 
-let int_map f map =
-  CI_utils.IntMap.fold (fun key value acc ->
+let pr_map f map =
+  CI_github_hooks.PR.Index.fold (fun key value acc ->
       [f key value] @ acc
     ) map []
 
 let dash_map f map targets =
-  Datakit_path.Map.fold (fun key value acc ->
+  CI_github_hooks.Ref.Index.fold (fun key value acc ->
       match CI_target.ID_Set.mem (`Ref key) targets with
       | true -> [f key value] @ acc
       | false -> acc
@@ -186,8 +186,7 @@ let dashboard_widget id ref =
     | `Error -> "dashboard-error", "glyphicon-warning-sign", "Erroring", "OH NO! Something has gone terribly wrong"
     | `Failure -> "dashboard-failure", "glyphicon-remove", "Failing", "SOUND THE ALARM!!! The build has been broken!"
   in
-  let title =
-    match Datakit_path.unwrap id with
+  let title = match id with
     | ("heads" | "tags") :: tl -> tl
     | x -> x
   in
@@ -202,7 +201,7 @@ let ref_job ~project id ref =
   let jobs = CI_engine.jobs ref in
   let summary = summarise jobs in
   tr [
-    td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Datakit_path.pp id)]];
+    td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string CI_github_hooks.Ref.pp_name id)]];
     td [status_list jobs];
     td [pcdata summary.CI_state.descr];
   ]
@@ -321,7 +320,7 @@ let pr_table (id, (prs, _)) =
     h2 [pcdata (Fmt.strf "PR status for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "PR"; heading "Title"; heading "State"; heading "Details"] ::
-      (int_map (pr_job ~project:id) prs)
+      (pr_map (pr_job ~project:id) prs)
     );
   ]
 
@@ -646,7 +645,7 @@ let job_row ~csrf_token ~page_url ~best_log job =
 
 let target_title = function
   | `PR pr -> Printf.sprintf "PR %d" (CI_github_hooks.PR.id pr)
-  | `Ref r -> Fmt.strf "Ref %a" Datakit_path.pp (CI_github_hooks.Ref.name r)
+  | `Ref r -> Fmt.strf "Ref %a" CI_github_hooks.Ref.pp_name (CI_github_hooks.Ref.name r)
 
 let target_commit = function
   | `PR pr -> CI_github_hooks.Commit.hash (CI_github_hooks.PR.head pr)
@@ -680,7 +679,7 @@ let target_page ~csrf_token ~target jobs t =
     match target with
     | `PR _ -> Nav.PRs
     | `Ref r ->
-      match CI_github_hooks.Ref.name r |> Datakit_path.unwrap with
+      match CI_github_hooks.Ref.name r with
       | "heads" :: _ -> Nav.Branches
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false

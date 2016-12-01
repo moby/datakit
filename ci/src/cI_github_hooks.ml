@@ -1,3 +1,4 @@
+open Asetmap
 open Datakit_github
 
 let refs_dir = Datakit_path.of_string_exn "ref"
@@ -100,25 +101,34 @@ module PR = struct
     match compare a.id b.id with
     | 0 -> Commit.compare a.commit b.commit
     | r -> r
+
+  module Index = Map.Make(struct
+      type t = int
+      let compare (a:int) (b:int) = Pervasives.compare a b
+    end)
 end
 
 module Ref = struct
   type t = {
-    name : Datakit_path.t;              (* Relative to refs_dir *)
+    name : string list;              (* Relative to refs_dir *)
     head : Commit.t;
   }
 
   let repo t = Commit.repo t.head
   let name t = t.name
   let head t = t.head
-  let dump f t = Fmt.pf f "ref/%a (head=%a)"
-      Datakit_path.pp t.name
-      Commit.pp t.head
+  let pp_name ppf t = Fmt.string ppf (String.concat ~sep:"/" t)
+  let dump f t = Fmt.pf f "ref/%a (head=%a)" pp_name t.name Commit.pp t.head
 
   let compare a b =
-    match Datakit_path.compare a.name b.name with
+    match Pervasives.compare a.name b.name with
     | 0 -> Commit.compare a.head b.head
     | r -> r
+
+  module Index = Map.Make(struct
+      type t = string list
+      let compare = Pervasives.compare
+    end)
 end
 
 let connect gh = gh
@@ -180,19 +190,20 @@ let prs snapshot =
       | None -> Log.warn (fun f -> f "Invalid PR ID %S" id); Lwt.return acc
       | Some id -> pr snapshot id >|= function
         | None -> acc
-        | Some value -> IntMap.add id value acc
-    ) IntMap.empty
+        | Some value -> PR.Index.add id value acc
+    ) PR.Index.empty
 
 let refs snapshot =
   let open! Datakit_path.Infix in
-  let results = ref Datakit_path.Map.empty in
+  let results = ref Ref.Index.empty in
   let rec scan ~context leaf =
     let context = context / leaf in
     read_opt_file snapshot (refs_dir /@ context / "head") >>= function
     | Some head ->
       let hash = String.trim (Cstruct.to_string head) in
       let head = { Commit.snapshot; hash } in
-      results := Datakit_path.Map.add context { Ref.head; name = context } !results;
+      let name = Datakit_path.unwrap context in
+      results := Ref.Index.add name { Ref.head; name } !results;
       Lwt.return ()
     | None ->
       read_opt_dir snapshot (refs_dir /@ context) >>=
@@ -219,8 +230,7 @@ end
 module Snapshot = struct
   type t = {
     commit : DK.Commit.t;
-    mutable projects :
-      (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t Repo.Map.t;
+    mutable projects:  (PR.t PR.Index.t * Ref.t Ref.Index.t) Lwt.t Repo.Map.t;
   }
 
   let repo t r =
@@ -245,11 +255,11 @@ module Snapshot = struct
   let find id t =
     repo t (CI_target.Full.repo id) >|= fun (prs, refs) ->
     match CI_target.Full.id id with
-    | `PR pr -> IntMap.find pr prs >|?= fun x -> `PR x
+    | `PR pr -> PR.Index.find pr prs >|?= fun x -> `PR x
     | `Ref x ->
-      match Datakit_path.Map.find x refs with
-      | x -> Some (`Ref x)
-      | exception Not_found -> None
+      match Ref.Index.find x refs with
+      | Some x -> Some (`Ref x)
+      | None   -> None
 end
 
 let snapshot t =

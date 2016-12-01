@@ -78,7 +78,7 @@ module Builder = struct
 
     let branch = function
       | `PR pr -> Printf.sprintf "pull/%d/head" (Github_hooks.PR.id pr)
-      | `Ref r -> Github_hooks.Ref.name r |> Datakit_path.to_hum
+      | `Ref r -> Fmt.to_to_string CI_github_hooks.Ref.pp_name (Github_hooks.Ref.name r)
 
   end
 

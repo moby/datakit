@@ -3,16 +3,12 @@ module Conv = Datakit_github_conv.Make(CI_utils.DK)
 
 let metadata_branch = "github-metadata"
 
-open! Datakit_path.Infix
-
 open CI_utils
 open Result
 open! Astring
 open Lwt.Infix
 
 type t = DK.t
-
-let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)
 
 module CI = struct
   type t = string list
@@ -65,30 +61,18 @@ let snapshot t =
   | None   -> failf "Metadata branch does not exist!"
   | Some c -> DK.Commit.tree c
 
-let enable_monitoring t projects =
+let enable_monitoring t repos =
   DK.branch t metadata_branch >>*= fun metadata_branch ->
-  DK.Branch.with_transaction metadata_branch (fun tr ->
-      let changes = ref false in
-      projects |> Lwt_list.iter_s (fun p ->
-          let dir = repo_root p in
-          let path = dir / ".monitor" in
-          DK.Transaction.exists_file tr path >>*= function
-          | true -> Lwt.return ()
-          | false ->
-            Log.info (fun f -> f "Adding monitor file for %a" Datakit_path.pp path);
-            changes := true;
-            DK.Transaction.make_dirs tr dir >>*= fun () ->
-            DK.Transaction.create_file tr path (Cstruct.of_string "") >|*= fun () -> ()
-        )
-      >>= fun () ->
-      if !changes then (
-        DK.Transaction.commit tr ~message:"Add .monitor files"
-      ) else (
-        DK.Transaction.abort tr >|= fun () -> Ok ()
-      )
-    )
-  >>*= fun () ->
-  Lwt.return ()
+  DK.Branch.with_transaction metadata_branch (fun t ->
+      Lwt_list.iter_s (fun r -> Conv.update_elt t (`Repo r)) repos >>= fun () ->
+      let commit () = DK.Transaction.commit t ~message:"Add .monitor files" in
+      DK.Transaction.parents t >>*= function
+      | []   -> commit ()
+      | h::_ ->
+        DK.Transaction.diff t h >>*= fun diff ->
+        if diff <> [] then commit ()
+        else DK.Transaction.abort t >|= fun () -> Ok ()
+    ) >>*= Lwt.return
 
 let monitor t ?switch fn =
   DK.branch t metadata_branch >>*= fun metadata ->

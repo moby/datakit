@@ -1,4 +1,4 @@
-open DataKitCI
+open DKCI
 
 open! Astring
 open Lwt.Infix
@@ -185,7 +185,7 @@ module Shell_builder = struct
 
   module Key = Commit
 
-  type context = DataKitCI.job_id
+  type context = DKCI.job_id
 
   type value = unit
 

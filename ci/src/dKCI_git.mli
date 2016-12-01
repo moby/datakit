@@ -1,4 +1,4 @@
-open DataKitCI
+open DKCI
 
 type t
 (** A local non-bare git working directory (with a .git sub-directory). *)

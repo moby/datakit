@@ -1,4 +1,5 @@
-DataKitCI
+DKCI
+DKCI_git
 CI_ACL
 CI_cache
 CI_config
@@ -21,4 +22,3 @@ CI_utils
 CI_web
 CI_web_templates
 CI_web_utils
-DKCI_git

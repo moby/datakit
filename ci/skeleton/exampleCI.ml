@@ -1,4 +1,4 @@
-open DataKitCI
+open DKCI
 
 (* An example test that just always returns success. *)
 let my_test =
@@ -41,4 +41,4 @@ let web_config =
 
 (* The main entry-point *)
 let () =
-  DataKitCI.Main.run (Cmdliner.Term.pure (Config.ci ~web_config ~projects))
+  DKCI.Main.run (Cmdliner.Term.pure (Config.ci ~web_config ~projects))

@@ -1,5 +1,5 @@
 open Datakit_github
-open DataKitCI
+open DKCI
 open! Astring
 open Utils
 
@@ -9,7 +9,7 @@ let src = Logs.Src.create "datakit-ci.tests" ~doc:"CI Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Workflows = struct
-  module T = DataKitCI.Term
+  module T = Term
   open T.Infix
 
   let circle_success_url = T.ci_success_target_url ["ci"; "circleci"]

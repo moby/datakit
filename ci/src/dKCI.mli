@@ -5,8 +5,6 @@ open Datakit_github
     DatakitCI is a library to build CI systems. FIXME.
 *)
 
-open Astring
-
 type job_id
 
 module DK : Datakit_S.CLIENT with type error = Protocol_9p_error.error
@@ -488,7 +486,7 @@ module Private: sig
   val connect: Client9p.t -> DK.t
 
   val test_engine: web_ui:Uri.t -> (unit -> DK.t Lwt.t) ->
-    (Target.t -> string Term.t String.Map.t) Repo.Map.t ->
+    (Target.t -> string Term.t Astring.String.Map.t) Repo.Map.t ->
     engine
 
   val listen: ?switch:Lwt_switch.t -> engine -> [`Abort] Lwt.t

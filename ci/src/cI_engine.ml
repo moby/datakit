@@ -292,7 +292,7 @@ let rec recalculate t ~snapshot job =
 let make_job snapshot ~parent name term =
   let head_commit = commit parent.head in
   let id = head_commit, CI_github_hooks.CI.datakit_ci name in
-  CI_github_hooks.Snapshot.status snapshot id >|= fun status ->
+  Conv.status snapshot id >|= fun status ->
   let state = match status with None -> None | Some s -> Some (Status.state s) in
   let descr = match status with None -> None | Some s -> Status.description s in
   let state =
@@ -375,8 +375,16 @@ let listen ?switch t =
   monitor ?switch t (fun snapshot ->
       CI_prometheus.Counter.inc_one Metrics.update_notifications;
       t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (repo, project) ->
-          CI_github_hooks.Snapshot.prs snapshot repo >>= fun prs ->
-          CI_github_hooks.Snapshot.refs snapshot repo >>= fun refs ->
+          Conv.prs snapshot ~repos:(Repo.Set.singleton repo) >>= fun prs ->
+          Conv.refs snapshot ~repos:(Repo.Set.singleton repo) >>= fun refs ->
+          let prs = match Repo.Map.find repo (PR.index prs) with
+            | None   -> PR.Index.empty
+            | Some i -> i
+          in
+          let refs = match Repo.Map.find repo (Ref.index refs) with
+            | None   ->  Ref.Index.empty
+            | Some i -> i
+              in
           Log.debug (fun f -> f "Monitor iter");
           let prs, refs = apply_canaries project.canaries prs refs in
           (* PRs *)

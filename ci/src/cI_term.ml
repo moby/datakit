@@ -1,4 +1,5 @@
 open Datakit_github
+module Conv = Datakit_github_conv.Make(CI_utils.DK)
 
 module Metrics = struct
   let namespace = "DataKitCI"
@@ -13,7 +14,7 @@ module Context = struct
   (* The context in which a term is evaluated. We create a fresh context each time
      the term is evaluated. *)
   type t = {
-    github : CI_github_hooks.Snapshot.t;
+    github : CI_utils.DK.Tree.t;
     job_id : CI_s.job_id;
     mutable recalc : unit -> unit;              (* Call this to schedule a recalculation. *)
     dk : unit -> CI_utils.DK.t Lwt.t;
@@ -43,9 +44,15 @@ let pp_target f = function
   | `PR pr -> PR.pp f pr
   | `Ref r -> Ref.pp f r
 
+let (>?=) x f = Lwt.map (function None -> None | Some x -> Some (f x)) x
+
+let target t = function
+  | `PR x  -> Conv.pr t x >?= fun x -> `PR x
+  | `Ref x -> Conv.ref t x >?= fun x -> `Ref x
+
 let github_target id =
   github >>= fun gh ->
-  of_lwt_quick (CI_github_hooks.Snapshot.target gh id) >>= function
+  of_lwt_quick (target gh id) >>= function
   | None -> fail "Target %a does not exist" CI_target.pp id
   | Some x -> return x
 
@@ -64,7 +71,7 @@ let tag repo tag = ref_head repo ("tags/" ^ tag)
 let ci_state fn ci t =
   head t >>= fun c ->
   github >>= fun s ->
-  of_lwt_quick (CI_github_hooks.Snapshot.status s (c, ci)) >|= function
+  of_lwt_quick (Conv.status s (c, ci)) >|= function
   | Some s -> fn s
   | None   -> None
 

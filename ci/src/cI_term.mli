@@ -3,7 +3,7 @@ include CI_s.TERM
 
 val pp_target : [`PR of PR.t | `Ref of Ref.t] Fmt.t
 
-val github : CI_github_hooks.Snapshot.t t
+val github : CI_utils.DK.Tree.t t
 (** [github t] evaluates to the state of the GitHub metadata. *)
 
 val github_target : CI_target.t -> CI_target.v t
@@ -38,7 +38,7 @@ val ci_success_target_url : string list -> CI_target.t -> Uri.t t
     It is pending until a successful URL is available. *)
 
 val run :
-  snapshot:CI_github_hooks.Snapshot.t ->
+  snapshot:CI_utils.DK.Tree.t ->
   job_id:CI_s.job_id ->
   recalc:(unit -> unit) ->
   dk:(unit -> CI_utils.DK.t Lwt.t) ->

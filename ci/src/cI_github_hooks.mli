@@ -52,12 +52,14 @@ val connect : DK.t -> t
 
 val pr : t -> project_id:CI_projectID.t -> int -> PR.t option Lwt.t
 
-val set_state : t -> CI.t -> status:Datakit_S.status_state -> descr:string -> ?target_url:Uri.t -> Commit.t -> unit Lwt.t
+val set_state : t -> CI.t -> status:Datakit_S.status_state -> descr:string ->
+  ?target_url:Uri.t -> message:string -> Commit.t -> unit Lwt.t
 
 module Target : sig
   type t = [ `PR of PR.t | `Ref of Ref.t ]
 
   val head : t -> Commit.t
+  val dump : t Fmt.t
 end
 
 module Snapshot : sig

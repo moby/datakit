@@ -116,6 +116,8 @@ module Status_state = struct
     | "success" -> Some `Success
     | _         -> None
 
+  let compare (x:t) (y:t) = Pervasives.compare x y
+
 end
 
 let compare_fold fs x y =
@@ -276,6 +278,14 @@ module Status = struct
   let compare_commit_hash x y =
     Pervasives.compare (commit_hash x) (commit_hash y)
   let compare_context x y = Pervasives.compare x.context y.context
+  let compare_descr x y = Pervasives.compare x.description y.description
+  let compare_state x y = Status_state.compare x.state y.state
+
+  let compare_uri x y = match x.url, y.url with
+    | None  , None   -> 0
+    | Some x, Some y -> Uri.compare x y
+    | Some _, None   -> 1
+    | None  , Some _ -> -1
 
   (* To avoid:
      Github: GitHub API error: 422 Unprocessable Entity (WebDAV) (RFC 4918)
@@ -300,7 +310,9 @@ module Status = struct
       compare_repo;
       compare_commit_hash;
       compare_context;
-      Pervasives.compare;
+      compare_uri;
+      compare_descr;
+      compare_state;
     ]
 
   let pp_opt k ppf v = match v with

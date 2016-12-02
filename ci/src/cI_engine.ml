@@ -3,6 +3,7 @@ open CI_utils
 open Result
 open! Astring
 open Lwt.Infix
+module Conv = Datakit_github_conv.Make(DK)
 
 module Metrics = struct
   let namespace = "DataKitCI"
@@ -25,17 +26,13 @@ module Metrics = struct
     CI_prometheus.Counter.v ~help ~namespace ~subsystem "update_notifications_total"
 end
 
-type database = {
-  dk : DK.t;
-  gh_hooks : CI_github_hooks.t;
-}
-
 type job = {
   name : string;
   parent : target;
   mutable term : string CI_term.t;
-  mutable cancel : unit -> unit;        (* Cancel the previous evaluation, if any *)
-  mutable state : string * CI_state.t;                 (* The last result of evaluating [term] (commit, state) *)
+  mutable cancel : unit -> unit;    (* Cancel the previous evaluation, if any *)
+  mutable state : string * CI_state.t;  (* The last result of evaluating [term]
+                                           (commit, state) *)
 }
 and target = {
   mutable head : [`PR of PR.t | `Ref of Ref.t];
@@ -90,19 +87,16 @@ type t = {
   connect_dk : unit -> DK.t Lwt.t;
   projects : project Repo.Map.t;
   term_lock : Lwt_mutex.t;              (* Held while evaluating terms *)
-  mutable db : database Lwt.t;
+  mutable dk : DK.t Lwt.t;
 }
+
+let dk t = t.dk
 
 let rec connect connect_dk =
   Lwt.catch
     (fun () ->
        CI_prometheus.Counter.inc_one Metrics.connection_attempts;
-       connect_dk () >|= fun dk ->
-       let gh_hooks = CI_github_hooks.connect dk in
-       {
-         dk;
-         gh_hooks;
-       }
+       connect_dk ()
     )
     (fun ex ->
        CI_prometheus.Counter.inc_one Metrics.connection_failures;
@@ -139,18 +133,59 @@ let create ~web_ui ?canaries connect_dk projects =
   {
     web_ui;
     connect_dk;
-    db = connect connect_dk;
+    dk = connect connect_dk;
     projects;
     term_lock = Lwt_mutex.create ();
   }
-
-let dk t       = t.db >|= fun db -> db.dk
-let gh_hooks t = t.db >|= fun db -> db.gh_hooks
 
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
 let refs t = t.projects |> Repo.Map.map (fun project -> project.refs)
 
 let escape_ref path = List.map (fun p -> Uri.pct_encode ~scheme:"http" p) path
+
+let metadata_branch = "github-metadata"
+
+let take_snapshot t =
+  t.dk >>= fun t ->
+  DK.branch t metadata_branch >>*= fun metadata ->
+  DK.Branch.head metadata >|*= function
+  | None   -> failf "Metadata branch does not exist!"
+  | Some c -> DK.Commit.tree c
+
+
+let update_status t ~message s =
+  t.dk >>= fun t ->
+  DK.branch t metadata_branch >>*= fun metadata ->
+  DK.Branch.with_transaction metadata (fun t ->
+      Conv.update_elt t (`Status s) >>= fun () ->
+      Log.debug (fun f -> f "set_state: %s" message);
+      DK.Transaction.commit t ~message
+    ) >>*= Lwt.return
+
+let enable_monitoring t repos =
+  t.dk >>= fun t ->
+  DK.branch t metadata_branch >>*= fun metadata_branch ->
+  DK.Branch.with_transaction metadata_branch (fun t ->
+      Lwt_list.iter_s (fun r -> Conv.update_elt t (`Repo r)) repos >>= fun () ->
+      let commit () = DK.Transaction.commit t ~message:"Add .monitor files" in
+      DK.Transaction.parents t >>*= function
+      | []   -> commit ()
+      | h::_ ->
+        DK.Transaction.diff t h >>*= fun diff ->
+        if diff <> [] then commit ()
+        else DK.Transaction.abort t >|= fun () -> Ok ()
+    ) >>*= Lwt.return
+
+let monitor t ?switch fn =
+  t.dk >>= fun t ->
+  DK.branch t metadata_branch >>*= fun metadata ->
+  DK.Branch.wait_for_head metadata ?switch (function
+      | None   -> ok `Again
+      | Some c -> fn (DK.Commit.tree c) >>= fun () -> ok `Again
+    )
+  >|*= function
+  | `Abort -> `Abort
+  | `Finish `Never -> assert false
 
 let set_status t target name ~status ~descr =
   let { Repo.user; repo } = match target with
@@ -176,27 +211,26 @@ let set_status t target name ~status ~descr =
       let commit = Ref.commit r in
       (commit, url)
   in
-  gh_hooks t >>= fun gh_hooks ->
   let message =
     Fmt.strf "Set state of %a: %s = %a"
-      Commit.pp_hash (Commit.hash @@ CI_github_hooks.Target.head target)
+      Commit.pp_hash (Commit.hash @@ CI_target.head target)
       name Status_state.pp status
   in
   let status =
     let ci = CI_github_hooks.CI.datakit_ci name in
     Status.v ~description:descr ~url commit ci status
   in
-  CI_github_hooks.update_status gh_hooks ~message status
+  update_status t ~message status
 
 let reconnect t =
-  match Lwt.state t.db with
+  match Lwt.state t.dk with
   | Lwt.Sleep -> ()     (* Already reconnecting *)
   | Lwt.Fail _ | Lwt.Return _ ->
     Log.info (fun f -> f "Reconnecting to DataKit...");
-    t.db <- connect t.connect_dk
+    t.dk <- connect t.connect_dk
 
 let rec auto_restart t ?switch label fn =
-  dk t >>= fun dk ->
+  t.dk >>= fun dk ->
   Lwt.catch fn
     (fun ex ->
        match switch with
@@ -218,8 +252,7 @@ let rec recalculate t ~snapshot job =
   let recalc () =
     Lwt.async (fun () ->
         Lwt_mutex.with_lock t.term_lock (fun () ->
-            gh_hooks t >>= fun gh_hooks ->
-            CI_github_hooks.snapshot gh_hooks >>= fun snapshot ->
+            take_snapshot t >>= fun snapshot ->
             recalculate t ~snapshot job
           )
       )
@@ -228,7 +261,10 @@ let rec recalculate t ~snapshot job =
   let head = job.parent.head in
   Lwt.catch
     (fun () ->
-       let r, cancel = CI_term.run ~snapshot ~job_id:(job_id job) ~recalc ~dk:(fun () -> dk t) job.term in
+       let r, cancel =
+         CI_term.run ~snapshot ~job_id:(job_id job) ~recalc ~dk:(fun () -> t.dk)
+           job.term
+       in
        job.cancel <- cancel;
        r
     )
@@ -298,7 +334,6 @@ let listen ?switch t =
   let open !CI_github_hooks in
   auto_restart t ?switch "monitor" @@ fun () ->
   Log.info (fun f -> f "Starting monitor loop");
-  gh_hooks t >>= fun gh_hooks ->
   let check_pr ~snapshot project (id, pr) =
     Log.debug (fun f -> f "Checking for work on %a" PR.pp_id id);
     begin match PR.Index.find id project.open_prs with
@@ -341,8 +376,8 @@ let listen ?switch t =
     end >>= fun target ->
     Lwt_list.iter_s (recalculate t ~snapshot) target.jobs
   in
-  CI_github_hooks.enable_monitoring gh_hooks (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
-  CI_github_hooks.monitor ?switch gh_hooks (fun snapshot ->
+  enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
+  monitor ?switch t (fun snapshot ->
       CI_prometheus.Counter.inc_one Metrics.update_notifications;
       t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (repo, project) ->
           CI_github_hooks.Snapshot.prs snapshot repo >>= fun prs ->
@@ -412,7 +447,6 @@ let rebuild t ~branch_name =
   | triggers, jobs_needing_recalc ->
     Lwt.join triggers >>= fun () ->
     Lwt_mutex.with_lock t.term_lock (fun () ->
-        gh_hooks t >>= fun gh_hooks ->
-        CI_github_hooks.snapshot gh_hooks >>= fun snapshot ->
+        take_snapshot t >>= fun snapshot ->
         Lwt_list.iter_s (recalculate t ~snapshot) jobs_needing_recalc
       )

@@ -18,12 +18,11 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "datakit-server" {>= "0.7.0"}
   "cmdliner"
   "rresult" "astring" "fmt"
   "git"         {>= "1.9.3"}
   "mirage-tc" "uri"
-  "mirage-types"
+  "mirage-types" {< "3.0.0"}
   "irmin"       {>= "0.12.0"}
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
@@ -37,9 +36,9 @@ depends: [
   "asl"         {>= "0.10"}
   "mtime"
   "irmin-watcher" {>= "0.2.0"}
-  "datakit-client" {test}
-  "datakit-server"
-  "datakit-github" {test}
+  "datakit-server" {>= "0.8.0"}
+  "datakit-client" {test & >= "0.8.0"}
+  "datakit-github" {test & >= "0.8.0"}
   "alcotest"       {test & >= "0.7.0"}
 ]
 available: [ocaml-version >= "4.02.0"]

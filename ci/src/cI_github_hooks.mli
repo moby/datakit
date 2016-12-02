@@ -14,8 +14,7 @@ module Commit_state : sig
 end
 
 module CI : sig
-  type t
-  val of_string : string -> t
+  type t = string list
   val circle_ci : t
   val datakit_ci : string -> t
 end
@@ -25,7 +24,7 @@ module Commit : sig
 
   val hash : t -> string
   val pp : t Fmt.t
-  val state : CI.t -> t -> Commit_state.t
+  val state : string list -> t -> Commit_state.t
   val repo : t -> Repo.t
 end
 
@@ -57,7 +56,7 @@ val connect : DK.t -> t
 
 val pr : t -> repo:Repo.t -> int -> PR.t option Lwt.t
 
-val set_state : t -> CI.t -> status:Status_state.t -> descr:string ->
+val set_state : t -> string list -> status:Status_state.t -> descr:string ->
   ?target_url:Uri.t -> message:string -> Commit.t -> unit Lwt.t
 
 module Target : sig

@@ -74,8 +74,7 @@ module Github_hooks: sig
   end
 
   module CI: sig
-    type t
-    val of_string: string -> t
+    type t = string list
     val circle_ci: t
     val datakit_ci: string -> t
   end
@@ -263,18 +262,18 @@ module Term: sig
   (** [dk] is a function for getting the current DataKit
       connection. *)
 
-  val ci_status: string -> Target.t ->
+  val ci_status: string list -> Target.t ->
     [`Pending | `Success | `Failure | `Error] option t
   (** [ci_status ci target] is the status reported by CI [ci] for
       [target].  Note that even if the CI is e.g. pending, this
       returns a successful result with the value [`Pending], not a
       pending result. *)
 
-  val ci_target_url: string -> Target.t -> Uri.t option t
+  val ci_target_url: string list -> Target.t -> Uri.t option t
   (** [ci_target_url ci target] is the target URL reported by CI
       [ci]. *)
 
-  val ci_success_target_url: string -> Target.t -> Uri.t t
+  val ci_success_target_url: string list -> Target.t -> Uri.t t
   (** [ci_success_target_url ci target] is the URL of the *successful*
       build [ci].  It is pending until a successful URL is
       available. *)

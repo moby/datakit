@@ -12,7 +12,7 @@ module Workflows = struct
   module T = DataKitCI.Term
   open T.Infix
 
-  let circle_success_url = T.ci_success_target_url "ci/circleci"
+  let circle_success_url = T.ci_success_target_url ["ci"; "circleci"]
 
   let test_circleci_artifact check_build target =
     circle_success_url target >>= fun url ->

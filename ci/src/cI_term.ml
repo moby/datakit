@@ -1,3 +1,5 @@
+open Datakit_github
+
 module Metrics = struct
   let namespace = "DataKitCI"
   let subsystem = "term"
@@ -61,8 +63,7 @@ let tag repo tag = ref_head repo ("tags/" ^ tag)
 
 let ci_state fn ci t =
   head t >>= fun commit ->
-  let gh_ci = CI_github_hooks.CI.of_string ci in
-  let state = CI_github_hooks.Commit.state gh_ci commit in
+  let state = CI_github_hooks.Commit.state ci commit in
   of_lwt_quick (fn state)
 
 let ci_status     = ci_state CI_github_hooks.Commit_state.status
@@ -75,13 +76,13 @@ let pp_opt_descr f = function
 
 let ci_success_target_url ci target =
   ci_status ci target >>= function
-  | None -> pending "Waiting for %s status to appear" ci
-  | Some `Pending -> ci_descr ci target >>= pending "Waiting for %s to complete%a" ci pp_opt_descr
-  | Some `Failure -> ci_descr ci target >>= fail "%s failed%a" ci pp_opt_descr
-  | Some `Error   -> ci_descr ci target >>= fail "%s errored%a" ci pp_opt_descr
+  | None -> pending "Waiting for %a status to appear" Ref.pp_name ci
+  | Some `Pending -> ci_descr ci target >>= pending "Waiting for %a to complete%a" Ref.pp_name ci pp_opt_descr
+  | Some `Failure -> ci_descr ci target >>= fail "%a failed%a" Ref.pp_name ci pp_opt_descr
+  | Some `Error   -> ci_descr ci target >>= fail "%a errored%a" Ref.pp_name ci pp_opt_descr
   | Some `Success ->
     ci_state CI_github_hooks.Commit_state.target_url ci target >>= function
-    | None -> fail "%s succeeded, but has no URL!" ci
+    | None -> fail "%a succeeded, but has no URL!" Ref.pp_name ci
     | Some url -> return url
 
 let run ~snapshot ~job_id ~recalc ~dk term =

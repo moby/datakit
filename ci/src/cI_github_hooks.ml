@@ -64,11 +64,9 @@ module Commit_state = struct
 end
 
 module CI = struct
-  type t = Datakit_path.t
-
-  let of_string = Datakit_path.of_string_exn
-  let circle_ci = Datakit_path.of_string_exn "ci/circleci"
-  let datakit_ci x = Datakit_path.of_string_exn "ci/datakit" / x
+  type t = string list
+  let circle_ci = ["ci"; "circleci"]
+  let datakit_ci x = ["ci"; "datakit"; x]
 end
 
 module Commit = struct
@@ -82,7 +80,10 @@ module Commit = struct
   let hash t = t.hash
 
   let state ci t =
-    { Commit_state.snapshot = t.snapshot; path = commits_dir / t.hash / "status" /@ ci }
+    let path =
+      commits_dir / t.hash / "status" /@ Datakit_path.of_steps_exn ci
+    in
+    { Commit_state.snapshot = t.snapshot; path }
 
   let pp f t = Fmt.string f (String.with_range ~len:6 t.hash)
 
@@ -146,7 +147,7 @@ let set_state t ci ~status ~descr ?target_url ~message commit =
       let snapshot = commit.Commit.snapshot in
       let dir =
         repo_root snapshot.repo
-        /@ commits_dir / commit.Commit.hash / "status" /@ ci
+        /@ commits_dir / commit.Commit.hash / "status" /@ Datakit_path.of_steps_exn ci
       in
       DK.Transaction.make_dirs t dir >>*= fun () ->
       let update leaf data =

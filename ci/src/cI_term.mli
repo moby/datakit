@@ -25,15 +25,15 @@ val tag : Repo.t -> string -> CI_github_hooks.Commit.t t
 val dk : (unit -> CI_utils.DK.t Lwt.t) t
 (** [dk] is a function for getting the current DataKit connection. *)
 
-val ci_status : string -> CI_target.t -> Status_state.t option t
+val ci_status : string list -> CI_target.t -> Status_state.t option t
 (** [ci_status ci target] is the status reported by CI [ci] for [target].
     Note that even if the CI is e.g. pending, this returns a successful result with
     the value [`Pending], not a pending result. *)
 
-val ci_target_url : string -> CI_target.t -> Uri.t option t
+val ci_target_url : string list -> CI_target.t -> Uri.t option t
 (** [ci_target_url ci target] is the target URL reported by CI [ci]. *)
 
-val ci_success_target_url : string -> CI_target.t -> Uri.t t
+val ci_success_target_url : string list -> CI_target.t -> Uri.t t
 (** [ci_success_target_url ci target] is the URL of the *successful* build [ci].
     It is pending until a successful URL is available. *)
 

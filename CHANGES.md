@@ -1,10 +1,14 @@
 ### 0.8.0 (2016-12-02)
 
+#### datakit-ci
+
 - ci: add Prometheus metric reporting (#352, #353, @talex5)
 - ci: allow hiding some arguments when logging commands (#369, @talex5)
 - ci: add Term.wait_for, wait_for_all and without_logs (#370, @talex5)
 - ci: report GC and system metrics (#379, @talex5)
 - ci: better commit messages when updating the state (#385, @talex5
+
+#### datakit-github
 
 - github: set user-agents (#362, @samoht)
 - github: Add a `--resync-interval` option to resync the database regularly
@@ -23,9 +27,13 @@
   (#383, @samoht)
 - github: github: expose Conv.{pr,ref,status} (#386, @samoht)
 
+#### datakit-client
+
 - client: more consistent handling of urls arguments. `tcp:foo`
   becomes `tcp://foo` and `fd:42` becomes `fd://42` (#358, @samoht)
 - client: client: add Datakit_path.{basename,dirname} (#373, @samoht)
+
+#### datakit-server
 
 - server: remove the `--sandbox` argument (#357, @samoht)
 - server: more consistent handling of urls arguments. `tcp:foo`
@@ -36,6 +44,8 @@
 
 The highlight of that release is `datakit-ci`: a new library to help
 creating new CI pipelines built on top of DataKit.
+
+#### datakit-ci
 
 - ci: improve UI for viewing logs (#341, #342, @talex5)
 - ci: specify a metadata store default that matches datakit (#330, @avsm)
@@ -49,17 +59,25 @@ creating new CI pipelines built on top of DataKit.
 - ci: Add library for writing DataKit-based Continuous Integration systems
   (#302, @talex5)
 
+#### datakit-github
+
 - github: add a more specific error when there is no datakit-github token
   (#323, @avsm)
 - github: major refactoring to use only one branch in datakit to persist
   the data and keep the rest in memory otherwise. Also use a stronger model
   of ownership to decide whether datakit or GitHub is right (#311, @samoht)
 
+#### datakit
+
 - datakit: update to irmin.0.12.0 to use faster native watch notifications
   instead of file-system polling and full scanning (#347, @samoht)
 
+#### datakit-client
+
 - client: simplify path handling: when creating things, pass the full
   path as one argument rather than a directory and a name. (#306, @talex5)
+
+#### datakit-server
 
 - server: Fix log-destination command-line arguments (#340, @samoht)
 - server: improve named-pipe support (#333, by @simonferquel and @samoht)
@@ -70,10 +88,14 @@ creating new CI pipelines built on top of DataKit.
 
 ### 0.6.0 (2016-10-03)
 
+#### All
+
 - fix META files (#278, @dsj55)
 - fix CI scripts (#262, @dave-tucker)
 - create a new `datakit-server` library, to help adding runtime instrospection
   mechanism to servers without having to depend on irmin (#280)
+
+#### datakit-github
 
 - github: add documentation (#258, @talex5)
 - github: add API resources capabilities (#279, @samoht)
@@ -86,7 +108,11 @@ creating new CI pipelines built on top of DataKit.
 - github: use ocaml-github 2.0.0 and ocaml-github-hooks (#264, @samoht)
 - github: fix event loop (#259, #260, @talex5)
 
+#### datakit-client
+
 - client: speed-up 9p walks (#271, @samoht)
+
+#### datakit-server
 
 - server: revert back to active polling due to an bug in irmin-watcher's
   inotify support (#269, @samoht)
@@ -97,49 +123,60 @@ creating new CI pipelines built on top of DataKit.
 
 ### 0.5.0 (2016-09-02)
 
-- Split the package in 3: server-side, client-side and GitHub bridge
-  (#232, @samoht)
-- [server] Add `/debug` directory to control log levels (#239, @talex5)
+Split the package in 3: server-side, client-side and GitHub bridge
+(#232, @samoht)
 
-- [github] Lots of stability improvement and bug fixes for the GitHub bridge,
+#### datakit-github
+
+- github: add Dockerfiles (@talex5 and @samoht)
+- github: Lots of stability improvement and bug fixes for the GitHub bridge,
   including:
   - Integrate the GH webhooks directly with the bridge process (#243, @samoht)
   - Track Git References in the GitHub bridge (#234, @samoht)
   - Be more rebust when GitHub API calls fail (#241, @samoht)
   - Fuzz testing of GitHub state and user requests (TODO)
 
-- [server] Use platform-specific filesystem notification (fsevents, inotify)
-  instead of polling for branch update notifications (#216, @samoht)
-- [server, client] Expose diffs in the Datakit API (#219, @samoht)
-- [client] Golang bindings: expose Watch outside the package (#208, @djs55)
-- [client] Golang bindings: add SetMultiple method to set more than one field in
-  a transaction (#208, @dave-tucker)
-- [client] Golang bindings: add a function to delete key in a transaction
-  (#208, ebriney)
-- [client] Golang bindings: add a nil-able StringRefField (aka
-  "the billion dollar mistake") (#208, @djs55)
-- [server] Use latest hvsok >= 0.8.1 (#204, @samoht)
-- [server] Support inheriting a listening socket (#199, @djs55)
-- [client, server] Use maximum_write_payload funtion in recent ocaml-9p
-  (#192, @talex5)
-- [server] Allow to auto-push datakit state to GitHub (#189, @samoht)
-- [server] Make `--bare` the default behavior (#185, @samoht)
-- [server] Fix races in stream handling (#170, @talex5)
-- [client] Fix leak warning in Go client (#159, @talex5)
-- [client, server] Support large writes (#151, @talex5)
-- [clent] Add OCaml client bindings (#148, @talex5)
-- [server] Improve speed of appending to large files (#143, @talex5)
-- [client] Add Minimal Go API (#135, @djs55 and @samoht)
-- [client, server] Add a way to trigger remote fetches within the API
-  (#132, @samoht)
-- [server] Generalise the `--eventlog` command-line argument into
-  `--log-destination=(stderr|asl|eventlog)` (#115, @djs55)
-- [client] Improve mount options of datakit-mount (#105, @samoht)
-- [client, server, github] add Dockerfiles (@talex5 and @samoht)
-- [server] add support for Hyper-V socket connections (#94, @djs55)
-- [server] Add support for Windows named pipes (#92, @djs55)
-- [server] Backport mirage/ocaml-git#147: Less unefficient
+#### datakit-server
+
+- server: Add support for Windows named pipes (#92, @djs55)
+- server: add support for Hyper-V socket connections (#94, @djs55)
+- server: Backport mirage/ocaml-git#147: Less unefficient
   `Git_unix.read_file_with_read` (#88, @chambart)
+- server: add Dockerfiles (@talex5 and @samoht)
+- server: Generalise the `--eventlog` command-line argument into
+  `--log-destination=(stderr|asl|eventlog)` (#115, @djs55)
+- server: Improve speed of appending to large files (#143, @talex5)
+- server: Fix races in stream handling (#170, @talex5)
+- server: Make `--bare` the default behavior (#185, @samoht)
+- server: Allow to auto-push datakit state to GitHub (#189, @samoht)
+- client, server: Use maximum_write_payload funtion in recent ocaml-9p
+  (#192, @talex5)
+- server: Support inheriting a listening socket (#199, @djs55)
+- server: Use latest hvsok >= 0.8.1 (#204, @samoht)
+- server: Use platform-specific filesystem notification (fsevents, inotify)
+  instead of polling for branch update notifications (#216, @samoht)
+- server: Expose diffs in the Datakit API (#219, @samoht)
+- server: Add `/debug` directory to control log levels (#239, @talex5)
+
+#### datakit-client
+
+- client: add Dockerfiles (@talex5 and @samoht)
+- client: Improve mount options of datakit-mount (#105, @samoht)
+- client, server, github: add Dockerfiles (@talex5 and @samoht)
+- client, server: Add a way to trigger remote fetches within the API
+  (#132, @samoht)
+- client: Add Minimal Go API (#135, @djs55 and @samoht)
+- client: Add OCaml client bindings (#148, @talex5)
+- client, server: Support large writes (#151, @talex5)
+- client: Fix leak warning in Go client (#159, @talex5)
+- client: Golang bindings: expose Watch outside the package (#208, @djs55)
+- client: Golang bindings: add SetMultiple method to set more than one field in
+  a transaction (#208, @dave-tucker)
+- client: Golang bindings: add a function to delete key in a transaction
+  (#208, ebriney)
+- client: Golang bindings: add a nil-able StringRefField (aka
+  "the billion dollar mistake") (#208, @djs55)
+- client: Expose diffs in the Datakit API (#219, @samoht)
 
 ### 0.4.0 (2016-04-25)
 

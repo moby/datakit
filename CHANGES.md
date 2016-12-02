@@ -1,3 +1,37 @@
+### 0.8.0 (2016-12-02)
+
+- ci: add Prometheus metric reporting (#352, #353, @talex5)
+- ci: allow hiding some arguments when logging commands (#369, @talex5)
+- ci: add Term.wait_for, wait_for_all and without_logs (#370, @talex5)
+- ci: report GC and system metrics (#379, @talex5)
+- ci: better commit messages when updating the state (#385, @talex5
+
+- github: set user-agents (#362, @samoht)
+- github: Add a `--resync-interval` option to resync the database regularly
+  (#368, @samoht)
+- github: Add `.dirty` files to tell the bridge to resync on repo/prs
+  (#368, @samoht)
+- github: split the package into `datakit-github.client`,
+  `datakit-github.server` and `datakit-github` (#375, @samoht)
+- github: add `Snapshot.find` (#376, @samoht)
+- github: add `Repo.Map`, `Repo.of_string` (#376, @samoht)
+- github: add `Satus.compare_id` (#376, @samoht)
+- github: replace `create` functions by `v` to be consistent (#376, @samoht)
+- github: add `Index` modules for PRs, refs and build status (#377, @samoht)
+- github: rename Commit.id into Commit.has (#378, @samoht)
+- github: make Status.url an Uri.t option instead of string option
+  (#383, @samoht)
+- github: github: expose Conv.{pr,ref,status} (#386, @samoht)
+
+- client: more consistent handling of urls arguments. `tcp:foo`
+  becomes `tcp://foo` and `fd:42` becomes `fd://42` (#358, @samoht)
+- client: client: add Datakit_path.{basename,dirname} (#373, @samoht)
+
+- server: remove the `--sandbox` argument (#357, @samoht)
+- server: more consistent handling of urls arguments. `tcp:foo`
+  becomes `tcp://foo` and `fd:42` becomes `fd://42` (#358, @samoht)
+- server: use hvsock 0.11.1 (#356, @djs55)
+
 ### 0.7.0 (2016-11-17)
 
 The highlight of that release is `datakit-ci`: a new library to help

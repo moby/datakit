@@ -35,10 +35,10 @@ The type for the webhook server state.<br>
 </div>
 
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -> Uri.t -> <a href="Datakit_github.API.Webhook.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create tok uri</code> is the webhook server state configured to
-        listen for incoming webhook events to the public address <code class="code">uri</code>
-        and using the token <code class="code">tok</code> to perform GitHub API calls. The
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -> Uri.t -> <a href="Datakit_github.API.Webhook.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v tok uri</code> is the webhook server state configured to listen
+        for incoming webhook events to the public address <code class="code">uri</code> and
+        using the token <code class="code">tok</code> to perform GitHub API calls. The
         function <code class="code">f</code> will be called everytime a new event is
         received.<br>
 </div>

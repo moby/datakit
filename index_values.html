@@ -68,7 +68,7 @@
 </td></tr>
 <tr><td><a href="Datakit_github.State.html#VALapply">apply</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
 <td><div class="info">
-<code class="code">apply ~token d</code> applies the snapshot diff <code class="code">d</code> as a series of
+<code class="code">apply token d</code> applies the snapshot diff <code class="code">d</code> as a series of
       GitHub API calls, using the token <code class="code">token</code>.
 </div>
 </td></tr>
@@ -78,6 +78,11 @@
 </div>
 </td></tr>
 <tr><td align="left"><br>B</td></tr>
+<tr><td><a href="Datakit_path.html#VALbasename">basename</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+<code class="code">basename t</code> is <code class="code">t</code>'s basename.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Inode.html#VALbasename">basename</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
 <code class="code">basenane t</code> is <code class="code">t</code>'s basename.
@@ -159,19 +164,19 @@
 <code class="code">commit t hash</code> is the commit with ID <code class="code">hash</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.Ref.html#VALcommit_id">commit_id</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<tr><td><a href="Datakit_github.Ref.html#VALcommit_hash">commit_hash</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
 <td><div class="info">
-<code class="code">commit_id t</code> is <code class="code">t</code>'s commit ID.
+<code class="code">commit_hash t</code> is <code class="code">t</code>'s commit SHA1.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.Status.html#VALcommit_id">commit_id</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<tr><td><a href="Datakit_github.Status.html#VALcommit_hash">commit_hash</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
 <td><div class="info">
-<code class="code">commit_id t</code> is <code class="code">t</code>'s commit ID.
+<code class="code">commit_hash t</code> is <code class="code">t</code>'s commit SHA1.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.PR.html#VALcommit_id">commit_id</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
+<tr><td><a href="Datakit_github.PR.html#VALcommit_hash">commit_hash</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
 <td><div class="info">
-<code class="code">commit_id t</code> is the SHA1 of <code class="code">t</code>'s commit.
+<code class="code">commit_hash t</code> is the SHA1 of <code class="code">t</code>'s commit.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Diff.html#VALcommit_message">commit_message</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
@@ -250,6 +255,21 @@
 </td></tr>
 <tr><td><a href="Datakit_github.Elt.html#VALcompare_id">compare_id</a> [<a href="Datakit_github.Elt.html">Datakit_github.Elt</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.Ref.html#VALcompare_id">compare_id</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<td><div class="info">
+<code class="code">compare_id x y</code> compares the Git reference IDs <code class="code">x</code> and <code class="code">y</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status.html#VALcompare_id">compare_id</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+<code class="code">compare_id</code> compares build status IDs.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.PR.html#VALcompare_id">compare_id</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
+<td><div class="info">
+<code class="code">compare_id x y</code> compare the pull-request IDs <code class="code">x</code> and <code class="code">y</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALconflicts">conflicts</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">conflicts t</code> returns the current list of paths that had merge
@@ -269,40 +289,6 @@
 <tr><td><a href="Datakit_github.Status.html#VALcontext">context</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
 <td><div class="info">
 <code class="code">context t</code> is <code class="code">t</code>'s context.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.API.Webhook.html#VALcreate">create</a> [<a href="Datakit_github.API.Webhook.html">Datakit_github.API.Webhook</a>]</td>
-<td><div class="info">
-<code class="code">create tok uri</code> is the webhook server state configured to
-        listen for incoming webhook events to the public address <code class="code">uri</code>
-        and using the token <code class="code">tok</code> to perform GitHub API calls.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.Snapshot.html#VALcreate">create</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
-<td><div class="info">
-<code class="code">create ~repos ~commits ~status ~prs ~refs</code> is a new snapshot
-      <code class="code">t</code> with repositories <code class="code">reps</code>, commits <code class="code">commits</code>, pull-requests
-      <code class="code">prs</code>, build statuses <code class="code">status</code> and Git references <code class="code">refs</code>.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.Ref.html#VALcreate">create</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
-<td><div class="info">
-<code class="code">create head name</code> is a fresh <a href="Datakit_github.Ref.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t</code></a> with the <code class="code">head</code> commit and <code class="code">name</code>.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.Status.html#VALcreate">create</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
-<td><div class="info">
-<code class="code">create</code> is a new status.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.Commit.html#VALcreate">create</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
-<td><div class="info">
-<code class="code">create repo id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.Repo.html#VALcreate">create</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
-<td><div class="info">
-<code class="code">create user string</code> will create a fresh <a href="Datakit_github.Repo.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t</code></a>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_remote.Make.html#VALcreate">create</a> [<a href="Ivfs_remote.Make.html">Ivfs_remote.Make</a>]</td>
@@ -403,6 +389,11 @@ Create an open file object.
 <td><div class="info">
 <code class="code">dir_only</code> is a directory which contains only
       directories.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_path.html#VALdirname">dirname</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
+<td><div class="info">
+<code class="code">dirname t</code> is <code class="code">t</code>'s dirname.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Capabilities.html#VALdisallow">disallow</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
@@ -539,6 +530,11 @@ Errors
       <code class="code">t</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALfind">find</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">find id t</code> finds the element with ID <code class="code">id</code> in <code class="code">t</code>.
+</div>
+</td></tr>
 <tr><td align="left"><br>G</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALget">get</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
@@ -546,6 +542,11 @@ Look up a sub-directory node.
 </div>
 </td></tr>
 <tr><td align="left"><br>H</td></tr>
+<tr><td><a href="Datakit_github.Commit.html#VALhash">hash</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
+<td><div class="info">
+<code class="code">hash t</code> is <code class="code">t</code>'s SHA1.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALhash">hash</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 <code class="code">hash dir</code> is <code class="code">dir</code>'s hash.
@@ -578,11 +579,6 @@ Look up a sub-directory node.
 <code class="code">id t</code> is <code class="code">t</code>'s ID.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.Commit.html#VALid">id</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
-<td><div class="info">
-<code class="code">id t</code> is <code class="code">t</code>'s SHA1.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Commit.html#VALid">id</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
 <td><div class="info">
 <code class="code">id t</code> is the unique ID of this commit.
@@ -590,14 +586,29 @@ Look up a sub-directory node.
 </td></tr>
 <tr><td><a href="Datakit_github.State.html#VALimport">import</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
 <td><div class="info">
-<code class="code">import ~token t r</code> imports the state of GitHub for the
-      repositories <code class="code">r</code> into <code class="code">t</code>.
+<code class="code">import token t r</code> imports the state of GitHub for the elements
+      in <code class="code">r</code> into <code class="code">t</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.State.html#VALimport_webhook_events">import_webhook_events</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
 <td><div class="info">
 <code class="code">import_webhook_events t ~events s</code> applies <code class="code">events ()</code> on top
       of <code class="code">s</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Ref.html#VALindex">index</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<td><div class="info">
+<code class="code">index s</code> indexes <code class="code">s</code> by Git reference IDs.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status.html#VALindex">index</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+<code class="code">index s</code> indexes <code class="code">s</code> by build status IDs.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.PR.html#VALindex">index</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
+<td><div class="info">
+<code class="code">index s</code> indexes <code class="code">s</code> by pull-request IDs.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Inode.html#VALino">ino</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
@@ -770,9 +781,15 @@ The <code class="code">mkfile</code> command.
 <td></td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALof_pr">of_pr</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.Elt.IdSet.html#VALof_prs">of_prs</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALof_ref">of_ref</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.Elt.IdSet.html#VALof_refs">of_refs</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALof_repo">of_repo</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Elt.IdSet.html#VALof_repos">of_repos</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
 <td></td></tr>
 <tr><td><a href="Ivfs_blob.html#VALof_ro_cstruct">of_ro_cstruct</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
@@ -795,6 +812,11 @@ Converts a list of the form <code class="code"><span class="string">"a"</span>; 
 <td><div class="info">
 <code class="code">of_stream s</code> is the file which will be, once opened, similar to
     the stream <code class="code">s ()</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Repo.html#VALof_string">of_string</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
+<td><div class="info">
+<code class="code">of_string s</code> parses strings of the form <code class="code"><span class="string">":user/:repo"</span></code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Status_state.html#VALof_string">of_string</a> [<a href="Datakit_github.Status_state.html">Datakit_github.Status_state</a>]</td>
@@ -908,6 +930,8 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <code class="code">pp</code> is the pretty-printer for commits.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.MAP.html#VALpp">pp</a> [<a href="Datakit_github.MAP.html">Datakit_github.MAP</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Repo.html#VALpp">pp</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
 <td><div class="info">
 <code class="code">pp</code> is the pretty-printer for Github repositories.
@@ -957,6 +981,11 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 </td></tr>
 <tr><td><a href="Vfs.Error.html#VALpp">pp</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_github.Status.html#VALpp_context">pp_context</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+<code class="code">pp_context</code> pretty-prints build status' contexts.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#VALpp_error">pp_error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
 <td><div class="info">
 <code class="code">pp_error</code> pretty-prints error values.
@@ -965,6 +994,12 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <tr><td><a href="Datakit_github.Ref.html#VALpp_event">pp_event</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
 <td><div class="info">
 <code class="code">pp_event</code> is the pretty-printer for reference events' state.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Commit.html#VALpp_hash">pp_hash</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
+<td><div class="info">
+<code class="code">pp_hash</code> is the pretty-printer for commit hashes which just
+      show the first 8 characters of the hash.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_tree.S.File.html#VALpp_hash">pp_hash</a> [<a href="Ivfs_tree.S.File.html">Ivfs_tree.S.File</a>]</td>
@@ -989,6 +1024,11 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <code class="code">pp_id</code> is the pretty-printer for PR ids.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Ref.html#VALpp_name">pp_name</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<td><div class="info">
+<code class="code">pp_name [<span class="string">"a"</span>;<span class="string">"b"</span>;<span class="string">"c"</span>]</code> is <code class="code"><span class="string">"a/b/c"</span></code>
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Capabilities.html#VALpp_op">pp_op</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
 <td><div class="info">
 <code class="code">pp_op</code> is the pretty-printer for resource operations.
@@ -1002,6 +1042,12 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <tr><td><a href="Datakit_github.Repo.html#VALpp_state">pp_state</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
 <td><div class="info">
 <code class="code">pp_state</code> is the pretty-printer for repository state.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.API.html#VALpr">pr</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">pr t id</code> is the contents of the pull request whose ID Is
+      <code class="code">id</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.API.html#VALprs">prs</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
@@ -1068,6 +1114,11 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <tr><td><a href="Vfs.Error.html#VALread_only_file">read_only_file</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">read_only_file</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Read_only_file</span></code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.API.html#VALref">ref</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
+<td><div class="info">
+<code class="code">ref t id</code> is the Git reference whose ID is <code class="code">id</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.API.html#VALrefs">refs</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
@@ -1372,6 +1423,8 @@ Convert to a string, in the same format as <code class="code">pp</code>.
 <code class="code">to_string t</code> is a string containing the same data as <code class="code">t</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github_api.html#VALtoken">token</a> [<a href="Datakit_github_api.html">Datakit_github_api</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.State.html#VALtoken">token</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
 <td><div class="info">
 <code class="code">token t c</code> is the token using the GitHub API token <code class="code">t</code> limited
@@ -1440,6 +1493,48 @@ Cast to a list of strings
 <tr><td><a href="Datakit_github.API.html#VALuser_exists">user_exists</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 <code class="code">exist_user t ~user</code> is true iff <code class="code">user</code> exists.
+</div>
+</td></tr>
+<tr><td align="left"><br>V</td></tr>
+<tr><td><a href="Datakit_github.API.Webhook.html#VALv">v</a> [<a href="Datakit_github.API.Webhook.html">Datakit_github.API.Webhook</a>]</td>
+<td><div class="info">
+<code class="code">v tok uri</code> is the webhook server state configured to listen
+        for incoming webhook events to the public address <code class="code">uri</code> and
+        using the token <code class="code">tok</code> to perform GitHub API calls.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALv">v</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td><div class="info">
+<code class="code">v ~repos ~commits ~status ~prs ~refs</code> is a new snapshot <code class="code">t</code>
+      with repositories <code class="code">reps</code>, commits <code class="code">commits</code>, pull-requests
+      <code class="code">prs</code>, build statuses <code class="code">status</code> and Git references <code class="code">refs</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Ref.html#VALv">v</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<td><div class="info">
+<code class="code">v head name</code> is a fresh <a href="Datakit_github.Ref.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t</code></a> with the <code class="code">head</code> commit and
+      <code class="code">name</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Status.html#VALv">v</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
+<td><div class="info">
+<code class="code">v c n</code> is the status with commit <code class="code">c</code> and name <code class="code">n</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.PR.html#VALv">v</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
+<td><div class="info">
+<code class="code">v c n ~title</code> is the pull-request <code class="code">n</code> with head commit <code class="code">c</code> and
+      title <code class="code">title</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Commit.html#VALv">v</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
+<td><div class="info">
+<code class="code">v repo id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_github.Repo.html#VALv">v</a> [<a href="Datakit_github.Repo.html">Datakit_github.Repo</a>]</td>
+<td><div class="info">
+<code class="code">v user string</code> will create a fresh <a href="Datakit_github.Repo.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t</code></a>.
 </div>
 </td></tr>
 <tr><td align="left"><br>W</td></tr>

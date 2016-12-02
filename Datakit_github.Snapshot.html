@@ -56,9 +56,9 @@ The empty snapshot.<br>
 <code class="code">is_empty t</code> is true if <code class="code">t</code> is <a href="Datakit_github.Snapshot.html#VALempty"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.empty</code></a>.<br>
 </div>
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">repos:Datakit_github.Repo.Set.t -><br>       commits:Datakit_github.Commit.Set.t -><br>       status:Datakit_github.Status.Set.t -><br>       prs:Datakit_github.PR.Set.t -><br>       refs:Datakit_github.Ref.Set.t -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create ~repos ~commits ~status ~prs ~refs</code> is a new snapshot
-      <code class="code">t</code> with repositories <code class="code">reps</code>, commits <code class="code">commits</code>, pull-requests
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">repos:Datakit_github.Repo.Set.t -><br>       commits:Datakit_github.Commit.Set.t -><br>       status:Datakit_github.Status.Set.t -><br>       prs:Datakit_github.PR.Set.t -><br>       refs:Datakit_github.Ref.Set.t -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v ~repos ~commits ~status ~prs ~refs</code> is a new snapshot <code class="code">t</code>
+      with repositories <code class="code">reps</code>, commits <code class="code">commits</code>, pull-requests
       <code class="code">prs</code>, build statuses <code class="code">status</code> and Git references <code class="code">refs</code>.<br>
 </div>
 
@@ -120,5 +120,9 @@ The type for snapshot diffs.<br>
 <pre><span id="VALwith_elts"><span class="keyword">val</span> with_elts</span> : <code class="type">Datakit_github.Elt.Set.t -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">with_elts</code> is like <a href="Datakit_github.Snapshot.html#VALwith_elt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.with_elt</code></a> but for a collection of
       elements.<br>
+</div>
+
+<pre><span id="VALfind"><span class="keyword">val</span> find</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEid">Datakit_github.Elt.id</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> <a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> option</code></pre><div class="info ">
+<code class="code">find id t</code> finds the element with ID <code class="code">id</code> in <code class="code">t</code>.<br>
 </div>
 </body></html>

@@ -32,6 +32,8 @@
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;<span class="constructor">Datakit_path</span>.t&nbsp;<span class="constructor">Fmt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;<span class="constructor">Datakit_path</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_path</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;int
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_hum&nbsp;:&nbsp;<span class="constructor">Datakit_path</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;basename&nbsp;:&nbsp;<span class="constructor">Datakit_path</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;option
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;dirname&nbsp;:&nbsp;<span class="constructor">Datakit_path</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_path</span>.t
 &nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Set</span>&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;elt&nbsp;=&nbsp;t

@@ -45,7 +45,7 @@
 <td align="left" valign="top" >
 <code>&nbsp;&nbsp;</code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.id">id</span>&nbsp;: <code class="type">string</code>;</code></td>
+<code><span id="TYPEELTt.hash">hash</span>&nbsp;: <code class="type">string</code>;</code></td>
 
 </tr></table>
 }
@@ -55,12 +55,17 @@ The type for commits.<br>
 </div>
 
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> string -> <a href="Datakit_github.Commit.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create repo id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.<br>
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> string -> <a href="Datakit_github.Commit.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v repo id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for commits.<br>
+</div>
+
+<pre><span id="VALpp_hash"><span class="keyword">val</span> pp_hash</span> : <code class="type">string Fmt.t</code></pre><div class="info ">
+<code class="code">pp_hash</code> is the pretty-printer for commit hashes which just
+      show the first 8 characters of the hash.<br>
 </div>
 
 <pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">t</a> -> int</code></pre><div class="info ">
@@ -71,8 +76,8 @@ The type for commits.<br>
 <code class="code">repo t</code> is <code class="code">t</code>'s repository.<br>
 </div>
 
-<pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">id t</code> is <code class="code">t</code>'s SHA1.<br>
+<pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">hash t</code> is <code class="code">t</code>'s SHA1.<br>
 </div>
 
 <pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">t</a> -> bool</code></pre><div class="info ">

@@ -82,6 +82,14 @@ Cast to a list of strings<br>
 Convert to a string, in the same format as <code class="code">pp</code>.<br>
 </div>
 
+<pre><span id="VALbasename"><span class="keyword">val</span> basename</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> string option</code></pre><div class="info ">
+<code class="code">basename t</code> is <code class="code">t</code>'s basename.<br>
+</div>
+
+<pre><span id="VALdirname"><span class="keyword">val</span> dirname</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> <a href="Datakit_path.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">dirname t</code> is <code class="code">t</code>'s dirname.<br>
+</div>
+
 <pre><span class="keyword">module</span> <a href="Datakit_path.Set.html">Set</a>: <code class="type">Set.S</code><code class="type">  with type elt = t</code></pre><div class="info">
 Sets of paths.
 </div>

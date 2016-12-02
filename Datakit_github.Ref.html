@@ -33,6 +33,13 @@
 
 <pre><span class="keyword">module</span> Ref: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Ref.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
+<pre><span id="TYPEname"><span class="keyword">type</span> <code class="type"></code>name</span> = <code class="type">string list</code> </pre>
+<div class="info ">
+The type for reference names. <code class="code"><span class="string">"heads/master"</span></code> is represented as
+      <code class="code"><span class="string">"heads"</span>;<span class="string">"master"</span></code>.<br>
+</div>
+
+
 <pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = private {</code></pre><table class="typetable">
 <tr>
 <td align="left" valign="top" >
@@ -55,19 +62,25 @@ The type for Git references.<br>
 </div>
 
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -> string list -> <a href="Datakit_github.Ref.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create head name</code> is a fresh <a href="Datakit_github.Ref.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t</code></a> with the <code class="code">head</code> commit and <code class="code">name</code>.<br>
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -> <a href="Datakit_github.Ref.html#TYPEname">name</a> -> <a href="Datakit_github.Ref.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v head name</code> is a fresh <a href="Datakit_github.Ref.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t</code></a> with the <code class="code">head</code> commit and
+      <code class="code">name</code>. <code class="code">name</code> should only contain alpha-numeric character,
+      <code class="code"><span class="string">'_'</span></code> and <code class="code"><span class="string">'-'</span></code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for references.<br>
 </div>
 
+<pre><span id="VALpp_name"><span class="keyword">val</span> pp_name</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEname">name</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp_name [<span class="string">"a"</span>;<span class="string">"b"</span>;<span class="string">"c"</span>]</code> is <code class="code"><span class="string">"a/b/c"</span></code><br>
+</div>
+
 <pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEt">t</a> -> int</code></pre><div class="info ">
 <code class="code">compare</code> compares Git references.<br>
 </div>
 
-<pre><span id="TYPEid"><span class="keyword">type</span> <code class="type"></code>id</span> = <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> * string list</code> </pre>
+<pre><span id="TYPEid"><span class="keyword">type</span> <code class="type"></code>id</span> = <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> * <a href="Datakit_github.Ref.html#TYPEname">name</a></code> </pre>
 <div class="info ">
 The type for Git reference IDs.<br>
 </div>
@@ -81,7 +94,7 @@ The type for Git reference IDs.<br>
 <code class="code">id t</code> is <code class="code">t</code>'s ID.<br>
 </div>
 
-<pre><span id="VALname"><span class="keyword">val</span> name</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> string list</code></pre><div class="info ">
+<pre><span id="VALname"><span class="keyword">val</span> name</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEname">name</a></code></pre><div class="info ">
 <code class="code">name t</code> is <code class="code">t</code>'s name.<br>
 </div>
 
@@ -93,12 +106,16 @@ The type for Git reference IDs.<br>
 <code class="code">commit t</code> is <code class="code">t</code>'s commit.<br>
 </div>
 
-<pre><span id="VALcommit_id"><span class="keyword">val</span> commit_id</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">commit_id t</code> is <code class="code">t</code>'s commit ID.<br>
+<pre><span id="VALcommit_hash"><span class="keyword">val</span> commit_hash</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">commit_hash t</code> is <code class="code">t</code>'s commit SHA1.<br>
 </div>
 
 <pre><span id="VALsame_id"><span class="keyword">val</span> same_id</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
 <code class="code">same_id x y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
+</div>
+
+<pre><span id="VALcompare_id"><span class="keyword">val</span> compare_id</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEid">id</a> -> <a href="Datakit_github.Ref.html#TYPEid">id</a> -> int</code></pre><div class="info ">
+<code class="code">compare_id x y</code> compares the Git reference IDs <code class="code">x</code> and <code class="code">y</code>.<br>
 </div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.Ref.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Ref.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
@@ -113,5 +130,13 @@ The type for reference events' state.<br>
 
 <pre><span id="VALpp_event"><span class="keyword">val</span> pp_event</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEevent">event</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp_event</code> is the pretty-printer for reference events' state.<br>
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.Ref.Index.html">Index</a>: <code class="type"><a href="Datakit_github.MAP.html">Datakit_github.MAP</a></code><code class="type">  with type key = id</code></pre><div class="info">
+Maps indexed by Git reference IDs.
+</div>
+
+<pre><span id="VALindex"><span class="keyword">val</span> index</span> : <code class="type">Set.t -><br>       <a href="Datakit_github.Ref.html#TYPEt">t</a> Index.t Datakit_github.Repo.Map.t</code></pre><div class="info ">
+<code class="code">index s</code> indexes <code class="code">s</code> by Git reference IDs.<br>
 </div>
 </body></html>

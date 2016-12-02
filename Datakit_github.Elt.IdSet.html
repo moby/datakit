@@ -29,8 +29,10 @@
 &nbsp;</div>
 <h1>Module <a href="type_Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a></h1>
 
-<pre><span class="keyword">module</span> IdSet: <code class="type"><a href="Datakit_github.SET.html">Datakit_github.SET</a></code><code class="type">  with type elt = id</code></pre><hr width="100%">
+<pre><span class="keyword">module</span> IdSet: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Elt.IdSet.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
-<pre><span class="keyword">include</span> Set.S</pre>
+<pre><span class="keyword">include</span> <a href="Datakit_github.SET.html">Datakit_github.SET</a></pre>
 
-<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type">t Fmt.t</code></pre></body></html>
+<pre><span id="VALof_repos"><span class="keyword">val</span> of_repos</span> : <code class="type">Datakit_github.Repo.Set.t -> <a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a></code></pre>
+<pre><span id="VALof_prs"><span class="keyword">val</span> of_prs</span> : <code class="type">Datakit_github.PR.Set.t -> <a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a></code></pre>
+<pre><span id="VALof_refs"><span class="keyword">val</span> of_refs</span> : <code class="type">Datakit_github.Ref.Set.t -> <a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a></code></pre></body></html>

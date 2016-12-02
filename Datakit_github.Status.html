@@ -33,21 +33,69 @@
 
 <pre><span class="keyword">module</span> Status: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Status.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
-<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<pre><span id="TYPEcontext"><span class="keyword">type</span> <code class="type"></code>context</span> = <code class="type">string list</code> </pre>
+<div class="info ">
+The type build build status contexts. <code class="code"><span class="string">"ci/datakit"</span></code> is stored
+      as <code class="code"><span class="string">"ci"</span>; <span class="string">"datakit"</span></code>.<br>
+</div>
+
+
+<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = private {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.commit">commit</span>&nbsp;: <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.context">context</span>&nbsp;: <code class="type"><a href="Datakit_github.Status.html#TYPEcontext">context</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.url">url</span>&nbsp;: <code class="type">Uri.t option</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.description">description</span>&nbsp;: <code class="type">string option</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTt.state">state</span>&nbsp;: <code class="type"><a href="Datakit_github.Status_state.html#TYPEt">Datakit_github.Status_state.t</a></code>;</code></td>
+
+</tr></table>
+}
+
 <div class="info ">
 The type for status values.<br>
 </div>
 
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">?description:string -><br>       ?url:string -><br>       <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -><br>       string list -> <a href="Datakit_github.Status_state.html#TYPEt">Datakit_github.Status_state.t</a> -> <a href="Datakit_github.Status.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create</code> is a new status.<br>
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">?description:string -><br>       ?url:Uri.t -><br>       <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -><br>       string list -> <a href="Datakit_github.Status_state.html#TYPEt">Datakit_github.Status_state.t</a> -> <a href="Datakit_github.Status.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v c n</code> is the status with commit <code class="code">c</code> and name <code class="code">n</code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
 <code class="code">pp</code> is the pretty-printer for status values.<br>
 </div>
 
-<pre><span id="TYPEid"><span class="keyword">type</span> <code class="type"></code>id</span> = <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> * string list</code> </pre>
+<pre><span id="VALpp_context"><span class="keyword">val</span> pp_context</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEcontext">context</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp_context</code> pretty-prints build status' contexts.<br>
+</div>
+
+<pre><span id="TYPEid"><span class="keyword">type</span> <code class="type"></code>id</span> = <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> * <a href="Datakit_github.Status.html#TYPEcontext">context</a></code> </pre>
 <div class="info ">
 The type for build-status IDs.<br>
 </div>
@@ -61,7 +109,11 @@ The type for build-status IDs.<br>
 <code class="code">id t</code> is <code class="code">t</code>'s ID.<br>
 </div>
 
-<pre><span id="VALcontext"><span class="keyword">val</span> context</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> string list</code></pre><div class="info ">
+<pre><span id="VALcompare_id"><span class="keyword">val</span> compare_id</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEid">id</a> -> <a href="Datakit_github.Status.html#TYPEid">id</a> -> int</code></pre><div class="info ">
+<code class="code">compare_id</code> compares build status IDs.<br>
+</div>
+
+<pre><span id="VALcontext"><span class="keyword">val</span> context</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status.html#TYPEcontext">context</a></code></pre><div class="info ">
 <code class="code">context t</code> is <code class="code">t</code>'s context.<br>
 </div>
 
@@ -73,7 +125,7 @@ The type for build-status IDs.<br>
 <code class="code">description t</code> is <code class="code">t</code>'s description.<br>
 </div>
 
-<pre><span id="VALurl"><span class="keyword">val</span> url</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> string option</code></pre><div class="info ">
+<pre><span id="VALurl"><span class="keyword">val</span> url</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> Uri.t option</code></pre><div class="info ">
 <code class="code">url t</code> is <code class="code">t</code>'s target URL.<br>
 </div>
 
@@ -85,8 +137,8 @@ The type for build-status IDs.<br>
 <code class="code">commit t</code> is <code class="code">t</code>'s commit.<br>
 </div>
 
-<pre><span id="VALcommit_id"><span class="keyword">val</span> commit_id</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">commit_id t</code> is <code class="code">t</code>'s commit ID.<br>
+<pre><span id="VALcommit_hash"><span class="keyword">val</span> commit_hash</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">commit_hash t</code> is <code class="code">t</code>'s commit SHA1.<br>
 </div>
 
 <pre><span id="VALsame_id"><span class="keyword">val</span> same_id</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
@@ -99,5 +151,13 @@ The type for build-status IDs.<br>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.Status.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Status.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
 Sets of build status.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.Status.Index.html">Index</a>: <code class="type"><a href="Datakit_github.MAP.html">Datakit_github.MAP</a></code><code class="type">  with type key = id</code></pre><div class="info">
+Maps indexed by build status IDs.
+</div>
+
+<pre><span id="VALindex"><span class="keyword">val</span> index</span> : <code class="type">Set.t -><br>       <a href="Datakit_github.Status.html#TYPEt">t</a> Index.t<br>       Datakit_github.Repo.Map.t</code></pre><div class="info ">
+<code class="code">index s</code> indexes <code class="code">s</code> by build status IDs.<br>
 </div>
 </body></html>

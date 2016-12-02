@@ -74,13 +74,13 @@ The type for state token.<br>
 <br>
 <h1 id="1_Synchronisation">Synchronisation</h1><br>
 
-<pre><span id="VALimport"><span class="keyword">val</span> import</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> -><br>       Datakit_github.Repo.Set.t -> <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> Lwt.t</code></pre><div class="info ">
-<code class="code">import ~token t r</code> imports the state of GitHub for the
-      repositories <code class="code">r</code> into <code class="code">t</code>. API calls use the token <code class="code">token</code>.<br>
+<pre><span id="VALimport"><span class="keyword">val</span> import</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> -><br>       Datakit_github.Elt.IdSet.t -> <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> Lwt.t</code></pre><div class="info ">
+<code class="code">import token t r</code> imports the state of GitHub for the elements
+      in <code class="code">r</code> into <code class="code">t</code>. API calls use the token <code class="code">token</code>.<br>
 </div>
 
 <pre><span id="VALapply"><span class="keyword">val</span> apply</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -> <a href="Datakit_github.Diff.html#TYPEt">Datakit_github.Diff.t</a> -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">apply ~token d</code> applies the snapshot diff <code class="code">d</code> as a series of
+<code class="code">apply token d</code> applies the snapshot diff <code class="code">d</code> as a series of
       GitHub API calls, using the token <code class="code">token</code>.<br>
 </div>
 <br>

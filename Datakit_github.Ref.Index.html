@@ -4,9 +4,8 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Datakit_github.ELT.html">
-<link rel="next" href="Datakit_github.MAP.html">
-<link rel="Up" href="Datakit_github.html">
+<link rel="previous" href="Datakit_github.Ref.Set.html">
+<link rel="Up" href="Datakit_github.Ref.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
 <link title="Index of modules" rel=Appendix href="index_modules.html">
@@ -22,20 +21,19 @@
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.SET</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Datakit_github.Ref.Index</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Datakit_github.ELT.html" title="Datakit_github.ELT">Previous</a>
-&nbsp;<a class="up" href="Datakit_github.html" title="Datakit_github">Up</a>
-&nbsp;<a class="post" href="Datakit_github.MAP.html" title="Datakit_github.MAP">Next</a>
-</div>
-<h1>Module type <a href="type_Datakit_github.SET.html">Datakit_github.SET</a></h1>
+<div class="navbar"><a class="pre" href="Datakit_github.Ref.Set.html" title="Datakit_github.Ref.Set">Previous</a>
+&nbsp;<a class="up" href="Datakit_github.Ref.html" title="Datakit_github.Ref">Up</a>
+&nbsp;</div>
+<h1>Module <a href="type_Datakit_github.Ref.Index.html">Datakit_github.Ref.Index</a></h1>
 
-<pre><span class="keyword">module type</span> SET = <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.SET.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info modtype top">
-Pretty-printable <code class="code"><span class="constructor">Set</span>.<span class="constructor">S</span></code>.<br>
+<pre><span class="keyword">module</span> Index: <code class="type"><a href="Datakit_github.MAP.html">Datakit_github.MAP</a></code><code class="type">  with type key = id</code></pre><div class="info module top">
+Maps indexed by Git reference IDs.<br>
 </div>
 <hr width="100%">
 
-<pre><span class="keyword">include</span> Asetmap.Set.S</pre>
+<pre><span class="keyword">include</span> Asetmap.Map.S</pre>
 
-<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type">t Fmt.t</code></pre></body></html>
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type">'a Fmt.t -> 'a t Fmt.t</code></pre></body></html>

@@ -61,8 +61,12 @@ The type for repository state.<br>
 </div>
 
 
-<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">user:string -> repo:string -> <a href="Datakit_github.Repo.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create user string</code> will create a fresh <a href="Datakit_github.Repo.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t</code></a>.<br>
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">user:string -> repo:string -> <a href="Datakit_github.Repo.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v user string</code> will create a fresh <a href="Datakit_github.Repo.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t</code></a>.<br>
+</div>
+
+<pre><span id="VALof_string"><span class="keyword">val</span> of_string</span> : <code class="type">string -> <a href="Datakit_github.Repo.html#TYPEt">t</a> option</code></pre><div class="info ">
+<code class="code">of_string s</code> parses strings of the form <code class="code"><span class="string">":user/:repo"</span></code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
@@ -79,5 +83,9 @@ The type for repository state.<br>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.Repo.Set.html">Set</a>: <code class="type"><a href="Datakit_github.SET.html">Datakit_github.SET</a></code><code class="type">  with type elt = t</code></pre><div class="info">
 Sets of repositories.
+</div>
+
+<pre><span class="keyword">module</span> <a href="Datakit_github.Repo.Map.html">Map</a>: <code class="type"><a href="Datakit_github.MAP.html">Datakit_github.MAP</a></code><code class="type">  with type key = t</code></pre><div class="info">
+Maps of repositories.
 </div>
 </body></html>

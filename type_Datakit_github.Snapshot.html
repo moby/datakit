@@ -25,7 +25,7 @@
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="constructor">Fmt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;empty&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_empty&nbsp;:&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;v&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;repos:<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;commits:<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;status:<span class="constructor">Datakit_github</span>.<span class="constructor">Status</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
@@ -52,4 +52,7 @@
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;with_elts&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Elt</span>.<span class="constructor">Set</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;find&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Elt</span>.id&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Snapshot</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Elt</span>.t&nbsp;option
 <span class="keyword">end</span></code></body></html>

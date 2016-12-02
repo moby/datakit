@@ -170,7 +170,7 @@ let set_status t { Repo.user; repo } target name ~status ~descr =
       (commit, url)
   in
   gh_hooks t >>= fun gh_hooks ->
-  let message = Fmt.strf "Set state of %a: %s = %a" CI_github_hooks.Target.dump target name CI_state.pp_status status in
+  let message = Fmt.strf "Set state of %a: %s = %a" CI_github_hooks.Target.dump target name Status_state.pp status in
   CI_github_hooks.set_state gh_hooks (CI_github_hooks.CI.datakit_ci name) ~status ~descr ~target_url ~message commit
 
 let reconnect t =

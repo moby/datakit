@@ -68,7 +68,7 @@ module Github_hooks: sig
   module Commit_state: sig
     type t
 
-    val status: t -> Datakit_S.status_state option Lwt.t
+    val status: t -> Status_state.t option Lwt.t
     val descr: t -> string option Lwt.t
     val target_url: t -> Uri.t option Lwt.t
   end

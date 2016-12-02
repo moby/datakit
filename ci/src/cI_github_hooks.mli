@@ -8,7 +8,7 @@ type t
 module Commit_state : sig
   type t
 
-  val status : t -> Datakit_S.status_state option Lwt.t
+  val status : t -> Status_state.t option Lwt.t
   val descr : t -> string option Lwt.t
   val target_url : t -> Uri.t option Lwt.t
 end
@@ -57,7 +57,7 @@ val connect : DK.t -> t
 
 val pr : t -> repo:Repo.t -> int -> PR.t option Lwt.t
 
-val set_state : t -> CI.t -> status:Datakit_S.status_state -> descr:string ->
+val set_state : t -> CI.t -> status:Status_state.t -> descr:string ->
   ?target_url:Uri.t -> message:string -> Commit.t -> unit Lwt.t
 
 module Target : sig

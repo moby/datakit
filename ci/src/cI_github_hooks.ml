@@ -51,7 +51,14 @@ module Commit_state = struct
     | Error (`Msg "No such file or directory") -> None
     | Error (`Msg msg) -> failf "Reading %a: %s" Datakit_path.pp path msg
 
-  let status t = read t "state" CI_state.status_of_string
+  let read_opt t leaf fn =
+    let path = t.path / leaf in
+    read_file t.snapshot path >|= function
+    | Ok data -> fn (String.trim (Cstruct.to_string data))
+    | Error (`Msg "No such file or directory") -> None
+    | Error (`Msg msg) -> failf "Reading %a: %s" Datakit_path.pp path msg
+
+  let status t = read_opt t "state" Status_state.of_string
   let descr t = read t "description" (fun x -> x)
   let target_url t = read t "target_url" Uri.of_string
 end
@@ -145,7 +152,7 @@ let set_state t ci ~status ~descr ?target_url ~message commit =
       let update leaf data =
         DK.Transaction.create_or_replace_file t (dir / leaf) (Cstruct.of_string (data ^ "\n"))
         >>*= Lwt.return in
-      update "state" (Fmt.to_to_string CI_state.pp_status status) >>= fun () ->
+      update "state" (Fmt.to_to_string Status_state.pp status) >>= fun () ->
       update "description" descr >>= fun () ->
       begin match target_url with
         | None -> ensure_removed t (dir / "target_url")

@@ -40,12 +40,12 @@ let github = value Context.github
 let job_id = value Context.job_id
 
 let pp_target f = function
-  | `PR pr -> CI_github_hooks.PR.dump f pr
-  | `Ref r -> CI_github_hooks.Ref.dump f r
+  | `PR pr -> PR.pp f pr
+  | `Ref r -> Ref.pp f r
 
 let github_target id =
   github >>= fun gh ->
-  of_lwt_quick (CI_github_hooks.Snapshot.find id gh) >>= function
+  of_lwt_quick (CI_github_hooks.Snapshot.target gh id) >>= function
   | None -> fail "Target %a does not exist" CI_target.pp id
   | Some x -> return x
 
@@ -62,13 +62,15 @@ let branch_head repo branch = ref_head repo ("heads/" ^ branch)
 let tag repo tag = ref_head repo ("tags/" ^ tag)
 
 let ci_state fn ci t =
-  head t >>= fun commit ->
-  let state = CI_github_hooks.Commit.state ci commit in
-  of_lwt_quick (fn state)
+  head t >>= fun c ->
+  github >>= fun s ->
+  of_lwt_quick (CI_github_hooks.Snapshot.status s (c, ci)) >|= function
+  | Some s -> fn s
+  | None   -> None
 
-let ci_status     = ci_state CI_github_hooks.Commit_state.status
-let ci_descr      = ci_state CI_github_hooks.Commit_state.descr
-let ci_target_url = ci_state CI_github_hooks.Commit_state.target_url
+let ci_status     = ci_state (fun s -> Some (Status.state s))
+let ci_descr      = ci_state Status.description
+let ci_target_url = ci_state Status.url
 
 let pp_opt_descr f = function
   | None -> ()
@@ -81,7 +83,7 @@ let ci_success_target_url ci target =
   | Some `Failure -> ci_descr ci target >>= fail "%a failed%a" Ref.pp_name ci pp_opt_descr
   | Some `Error   -> ci_descr ci target >>= fail "%a errored%a" Ref.pp_name ci pp_opt_descr
   | Some `Success ->
-    ci_state CI_github_hooks.Commit_state.target_url ci target >>= function
+    ci_state Status.url ci target >>= function
     | None -> fail "%a succeeded, but has no URL!" Ref.pp_name ci
     | Some url -> return url
 

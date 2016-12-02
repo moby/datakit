@@ -65,48 +65,11 @@ module Live_log: sig
 end
 
 module Github_hooks: sig
-  module Commit_state: sig
-    type t
-
-    val status: t -> Status_state.t option Lwt.t
-    val descr: t -> string option Lwt.t
-    val target_url: t -> Uri.t option Lwt.t
-  end
 
   module CI: sig
     type t = string list
     val circle_ci: t
     val datakit_ci: string -> t
-  end
-
-  module Commit: sig
-    type t
-
-    val hash: t -> string
-    val pp: t Fmt.t
-    val state: CI.t -> t -> Commit_state.t
-    val repo: t -> Repo.t
-  end
-
-  module PR: sig
-    type t
-
-    val id: t -> int
-    val head: t -> Commit.t
-    val title: t -> string
-    val repo: t -> Repo.t
-    val dump: t Fmt.t
-    val compare: t -> t -> int
-  end
-
-  module Ref: sig
-    type t
-
-    val repo: t -> Repo.t
-    val name: t -> string list
-    val head: t -> Commit.t
-    val dump: t Fmt.t
-    val compare: t -> t -> int
   end
 
   module Target: sig
@@ -247,14 +210,14 @@ module Term: sig
   (** [github_target id] evaluates to the GitHub metadata of the named
       target. Note that this is a snapshot. *)
 
-  val head: Target.t -> Github_hooks.Commit.t t
+  val head: Target.t -> Commit.t t
   (** [head target] evaluates to the commit at the head [target]. *)
 
-  val branch_head: Repo.t -> string -> Github_hooks.Commit.t t
+  val branch_head: Repo.t -> string -> Commit.t t
   (** [branch_head repo b] evaluates to the commit at the head of
       branch [b] in the repository [repo]. *)
 
-  val tag: Repo.t -> string -> Github_hooks.Commit.t t
+  val tag: Repo.t -> string -> Commit.t t
   (** [tag repo t] evaluates to the commit of tag [t] in the
       repository [repo]. *)
 

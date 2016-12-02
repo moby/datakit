@@ -147,11 +147,11 @@ class pr_page t = object(self)
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = int_of_string id in
     let repo = Repo.v ~user ~repo in
-    let projects = CI_engine.targets t.ci in
-    match Repo.Map.find repo projects with
-    | None -> Wm.respond 404 rd ~body:(`String "No such project")
-    | Some (prs, _) ->
-      match CI_github_hooks.PR.Index.find (repo, id) prs with
+    let prs = CI_engine.prs t.ci in
+    match Repo.Map.find repo prs with
+    | None  -> Wm.respond 404 rd ~body:(`String "No such project")
+    | Some prs ->
+      match PR.Index.find (repo, id) prs with
       | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
       | Some target ->
         let jobs = CI_engine.jobs target in
@@ -171,11 +171,11 @@ class ref_page t = object(self)
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = CI_web_templates.unescape_ref id in
     let repo = Repo.v ~user ~repo in
-    let projects = CI_engine.targets t.ci in
-    match Repo.Map.find repo projects with
+    let refs = CI_engine.refs t.ci in
+    match Repo.Map.find repo refs with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
-    | Some (_, refs) ->
-      match CI_github_hooks.Ref.Index.find (repo, id) refs with
+    | Some refs ->
+      match Ref.Index.find (repo, id) refs with
       | None        -> Wm.respond 404 rd ~body:(`String "No such ref")
       | Some target ->
         let jobs = CI_engine.jobs target in

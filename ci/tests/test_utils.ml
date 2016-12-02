@@ -54,6 +54,7 @@ let () =
   Logs.Src.list () |> List.iter (fun src ->
       match Logs.Src.name src with
       | "datakit-ci" -> Logs.Src.set_level src (Some Logs.Debug)
+      | "dkt-github" -> Logs.Src.set_level src (Some Logs.Debug)
       | "Client9p" -> Logs.Src.set_level src (Some Logs.Info)
       | "datakit.client" -> Logs.Src.set_level src (Some Logs.Info)
       | "git.memory"
@@ -175,6 +176,7 @@ let assert_file branch path value =
 let update_pr hooks ~id ~head ~states ~message =
   update hooks ~message (
     (Printf.sprintf "user/project/pr/%d/head" id, head) ::
+    (Printf.sprintf "user/project/pr/%d/state" id, "open") ::
     List.map (fun (path, data) -> Printf.sprintf "user/project/commit/%s/status/%s" head path, data) states
   )
 

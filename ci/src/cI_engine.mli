@@ -31,10 +31,11 @@ val dk : t -> DK.t Lwt.t
 (** [dk t] is the connection to DataKit. If not currently connected, this will be a sleeping
     thread that will resolve to the next successful connection. *)
 
-val targets : t ->
-  (target CI_github_hooks.PR.Index.t * target CI_github_hooks.Ref.Index.t)
-    Repo.Map.t
-(** [targets t] is a snapshot of the current state of all known PRs and branches. *)
+val prs: t -> target PR.Index.t Repo.Map.t
+(** [prs t] is a snapshot of the current state of all known PRs. *)
+
+val refs: t -> target Ref.Index.t Repo.Map.t
+(** [targets t] is a snapshot of the current state of all branches. *)
 
 val jobs : target -> job list
 (** [jobs t] is the list of jobs for a target. *)
@@ -45,7 +46,7 @@ val job_name : job -> string
 val state : job -> CI_state.t
 (** [state job] is the current state of [job]. *)
 
-val git_target : target -> [`PR of CI_github_hooks.PR.t | `Ref of CI_github_hooks.Ref.t]
+val git_target : target -> [`PR of PR.t | `Ref of Ref.t]
 (** [git_target target] is the GitHub metadata about this target. *)
 
 val repo : target -> Repo.t

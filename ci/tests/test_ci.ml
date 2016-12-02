@@ -25,8 +25,8 @@ module Workflows = struct
 
   let test_cross_project _check_build target =
     let other = Repo.v ~user:"bob" ~repo:"bproj" in
-    let pr = T.head target >|= Github_hooks.Commit.hash in
-    let other_master = T.branch_head other "master" >|= Github_hooks.Commit.hash in
+    let pr = T.head target >|= Commit.hash in
+    let other_master = T.branch_head other "master" >|= Commit.hash in
     T.return (Fmt.strf "Compile %s with %s") $ pr $ other_master
 
   let ls = DKCI_git.command ~timeout:60.0 ~label:"ls" ~clone:false [[| "ls" |]]

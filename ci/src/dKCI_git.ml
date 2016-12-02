@@ -57,28 +57,30 @@ end
 
 module Builder = struct
   module Key = struct
-    type t = [`PR of Github_hooks.PR.t | `Ref of Github_hooks.Ref.t]
+    open !Datakit_github
+
+    type t = [`PR of PR.t | `Ref of Ref.t]
 
     let pp f = function
-      | `PR pr -> Github_hooks.PR.dump f pr
-      | `Ref r -> Github_hooks.Ref.dump f r
+      | `PR pr -> PR.pp f pr
+      | `Ref r -> Ref.pp f r
 
     let compare a b =
       match a, b with
-      | `PR a, `PR b -> Github_hooks.PR.compare a b
-      | `Ref a, `Ref b -> Github_hooks.Ref.compare a b
+      | `PR a, `PR b   -> PR.compare a b
+      | `Ref a, `Ref b -> Ref.compare a b
       | `Ref _, `PR _ -> -1
       | `PR _, `Ref _ -> 1
 
     let head = function
-      | `PR pr -> Github_hooks.PR.head pr
-      | `Ref r -> Github_hooks.Ref.head r
+      | `PR pr -> PR.commit pr
+      | `Ref r -> Ref.commit r
 
-    let hash t = Github_hooks.Commit.hash (head t)
+    let hash t = Commit.hash (head t)
 
     let branch = function
-      | `PR pr -> Printf.sprintf "pull/%d/head" (Github_hooks.PR.id pr)
-      | `Ref r -> Fmt.to_to_string CI_github_hooks.Ref.pp_name (Github_hooks.Ref.name r)
+      | `PR pr -> Printf.sprintf "pull/%d/head" (PR.number pr)
+      | `Ref r -> Fmt.to_to_string Ref.pp_name (Ref.name r)
 
   end
 

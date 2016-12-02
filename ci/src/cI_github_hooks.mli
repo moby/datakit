@@ -1,17 +1,8 @@
-open Asetmap
 open Datakit_github
 open CI_utils
 open! Result
 
 type t
-
-module Commit_state : sig
-  type t
-
-  val status : t -> Status_state.t option Lwt.t
-  val descr : t -> string option Lwt.t
-  val target_url : t -> Uri.t option Lwt.t
-end
 
 module CI : sig
   type t = string list
@@ -19,61 +10,22 @@ module CI : sig
   val datakit_ci : string -> t
 end
 
-module Commit : sig
-  type t
-
-  val hash : t -> string
-  val pp : t Fmt.t
-  val state : string list -> t -> Commit_state.t
-  val repo : t -> Repo.t
-end
-
-module PR : sig
-  type t
-
-  val id : t -> int
-  val head : t -> Commit.t
-  val title : t -> string
-  val repo : t -> Repo.t
-  val dump : t Fmt.t
-  val compare : t -> t -> int
-  module Index: Map.S with type key = Repo.t * int
-end
-
-module Ref : sig
-  type t
-
-  val repo : t -> Repo.t
-  val name : t -> string list
-  val head : t -> Commit.t
-  val dump : t Fmt.t
-  val compare : t -> t -> int
-  val pp_name: string list Fmt.t
-  module Index: Map.S with type key = Repo.t * string list
-end
-
 val connect : DK.t -> t
-
-val pr : t -> repo:Repo.t -> int -> PR.t option Lwt.t
-
-val set_state : t -> string list -> status:Status_state.t -> descr:string ->
-  ?target_url:Uri.t -> message:string -> Commit.t -> unit Lwt.t
+val update_status: t -> message:string -> Status.t -> unit Lwt.t
 
 module Target : sig
   type t = [ `PR of PR.t | `Ref of Ref.t ]
-
   val head : t -> Commit.t
-  val dump : t Fmt.t
 end
 
 module Snapshot : sig
   type t
-
-  val repo: t -> Repo.t -> (PR.t PR.Index.t * Ref.t Ref.Index.t) Lwt.t
-  (** [repo snapshot r] is the state of the open PRs, branches and
-      tags in [snapshot] for repository [r]. *)
-
-  val find : CI_target.t -> t -> Target.t option Lwt.t
+  val prs: t -> Repo.t -> PR.t PR.Index.t Lwt.t
+  val refs: t -> Repo.t -> Ref.t Ref.Index.t Lwt.t
+  val pr: t -> PR.id -> PR.t option Lwt.t
+  val ref: t -> Ref.id -> Ref.t option Lwt.t
+  val status: t -> Status.id -> Status.t option Lwt.t
+  val target: t -> CI_target.t -> Target.t option Lwt.t
 end
 
 val snapshot : t -> Snapshot.t Lwt.t

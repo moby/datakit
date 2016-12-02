@@ -38,49 +38,51 @@ type job = {
   mutable state : string * CI_state.t;                 (* The last result of evaluating [term] (commit, state) *)
 }
 and target = {
-  repo : Repo.t;
-  mutable head : [`PR of CI_github_hooks.PR.t | `Ref of CI_github_hooks.Ref.t];
+  mutable head : [`PR of PR.t | `Ref of Ref.t];
   mutable jobs : job list;      (* (only mutable for init) *)
 }
 
 let job_id job =
   let target = match job.parent.head with
-    | `PR pr -> `PR (job.parent.repo, CI_github_hooks.PR.id pr)
-    | `Ref r -> `Ref (job.parent.repo, CI_github_hooks.Ref.name r)
+    | `PR pr -> `PR (PR.id pr)
+    | `Ref r -> `Ref (Ref.id r)
   in
   target, job.name
 
 let pp_target f target =
   match target.head with
-  | `PR pr -> CI_github_hooks.PR.dump f pr
-  | `Ref r -> CI_github_hooks.Ref.dump f r
+  | `PR pr -> Fmt.pf f "%a/pr/%d" Repo.pp (PR.repo pr) (PR.number pr)
+  | `Ref r -> Fmt.pf f "%a/ref/%a" Repo.pp (Ref.repo r) Ref.pp_name (Ref.name r)
 
 let commit = function
-  | `PR pr -> CI_github_hooks.PR.head pr
-  | `Ref r -> CI_github_hooks.Ref.head r
+  | `PR pr -> PR.commit pr
+  | `Ref r -> Ref.commit r
+
+let repo t = match t.head with
+  | `PR r  -> PR.repo r
+  | `Ref r -> Ref.repo r
 
 let pp_job f j =
-  Fmt.pf f "%a/%s" pp_target j.parent j.name
+  Fmt.pf f "%a:%s" pp_target j.parent j.name
 
 let state job = snd job.state
 let git_target job = job.head
 
 let title pr =
   match pr.head with
-  | `PR pr -> CI_github_hooks.PR.title pr
+  | `PR pr -> PR.title pr
   | `Ref r ->
     let open !CI_github_hooks in
     Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
 
 let jobs pr = pr.jobs
 let job_name j = j.name
-let repo target = target.repo
 
 type project = {
   make_terms : CI_target.t -> string CI_term.t String.Map.t;
   canaries : CI_target.Set.t option;
-  mutable open_prs : target CI_github_hooks.PR.Index.t;
-  mutable refs : target CI_github_hooks.Ref.Index.t;
+  mutable open_prs : target PR.Index.t;
+  mutable refs : target Ref.Index.t;
 }
 
 type t = {
@@ -129,8 +131,8 @@ let create ~web_ui ?canaries connect_dk projects =
                   |> CI_utils.default CI_target.Set.empty)
         in
         { make_terms;
-          open_prs = CI_github_hooks.PR.Index.empty;
-          refs = CI_github_hooks.Ref.Index.empty;
+          open_prs = PR.Index.empty;
+          refs = Ref.Index.empty;
           canaries }
       ) projects
   in
@@ -145,33 +147,46 @@ let create ~web_ui ?canaries connect_dk projects =
 let dk t       = t.db >|= fun db -> db.dk
 let gh_hooks t = t.db >|= fun db -> db.gh_hooks
 
-let targets t =
-  t.projects |> Repo.Map.map (fun project -> project.open_prs, project.refs)
+let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
+let refs t = t.projects |> Repo.Map.map (fun project -> project.refs)
 
 let escape_ref path = List.map (fun p -> Uri.pct_encode ~scheme:"http" p) path
 
-let set_status t { Repo.user; repo } target name ~status ~descr =
+let set_status t target name ~status ~descr =
+  let { Repo.user; repo } = match target with
+    | `PR x -> PR.repo x | `Ref x -> Ref.repo x
+  in
   CI_prometheus.Counter.inc_one Metrics.status_updates;
-  let commit, target_url =
+  let commit, url =
     match target with
     | `PR pr ->
-      Log.info (fun f -> f "Job %a:%s -> %s" CI_github_hooks.PR.dump pr name descr);
-      let url = Uri.with_path t.web_ui (Printf.sprintf "pr/%s/%s/%d" user repo (CI_github_hooks.PR.id pr)) in
-      let commit = CI_github_hooks.PR.head pr in
+      Log.info (fun f -> f "Job %a:%s -> %s" PR.pp_id (PR.id pr) name descr);
+      let url =
+        Uri.with_path t.web_ui (Printf.sprintf "pr/%s/%s/%d" user repo (PR.number pr))
+      in
+      let commit = PR.commit pr in
       (commit, url)
     | `Ref r ->
-      Log.info (fun f -> f "Job ref %a:%s -> %s" CI_github_hooks.Ref.dump r name descr);
+      Log.info (fun f -> f "Job ref %a:%s -> %s" Ref.pp_id (Ref.id r) name descr);
       let url =
         let open !CI_github_hooks in
         Uri.with_path t.web_ui
           (Fmt.strf "ref/%s/%s/%a" user repo Ref.pp_name (escape_ref (Ref.name r)))
       in
-      let commit = CI_github_hooks.Ref.head r in
+      let commit = Ref.commit r in
       (commit, url)
   in
   gh_hooks t >>= fun gh_hooks ->
-  let message = Fmt.strf "Set state of %a: %s = %a" CI_github_hooks.Target.dump target name Status_state.pp status in
-  CI_github_hooks.set_state gh_hooks (CI_github_hooks.CI.datakit_ci name) ~status ~descr ~target_url ~message commit
+  let message =
+    Fmt.strf "Set state of %a: %s = %a"
+      Commit.pp_hash (Commit.hash @@ CI_github_hooks.Target.head target)
+      name Status_state.pp status
+  in
+  let status =
+    let ci = CI_github_hooks.CI.datakit_ci name in
+    Status.v ~description:descr ~url commit ci status
+  in
+  CI_github_hooks.update_status gh_hooks ~message status
 
 let reconnect t =
   match Lwt.state t.db with
@@ -231,9 +246,9 @@ let rec recalculate t ~snapshot job =
     | Error (`Failure descr) -> `Failure, descr
   in
   let (old_head, old_state) = job.state in
-  let new_hash = CI_github_hooks.Commit.hash (commit head) in
+  let new_hash = Commit.hash (commit head) in
   begin if (old_head, old_state.CI_state.status, old_state.CI_state.descr) <> (new_hash, status, descr) then (
-      set_status t job.parent.repo head job.name ~status ~descr
+      set_status t head job.name ~status ~descr
     ) else (
       Lwt.return ()
     )
@@ -241,24 +256,26 @@ let rec recalculate t ~snapshot job =
   let state = (new_hash, { CI_state.status; descr; logs }) in
   job.state <- state
 
-let make_job ~parent name term =
+let make_job snapshot ~parent name term =
   let head_commit = commit parent.head in
-  let dk_state = CI_github_hooks.Commit.state (CI_github_hooks.CI.datakit_ci name) head_commit in
-  CI_github_hooks.Commit_state.status dk_state >>= fun status ->
-  CI_github_hooks.Commit_state.descr dk_state >>= fun descr ->
+  let id = head_commit, CI_github_hooks.CI.datakit_ci name in
+  CI_github_hooks.Snapshot.status snapshot id >|= fun status ->
+  let state = match status with None -> None | Some s -> Some (Status.state s) in
+  let descr = match status with None -> None | Some s -> Status.description s in
   let state =
-    match status, descr with
-    | Some status, Some descr -> { CI_state.status; descr; logs = CI_result.Step_log.Empty }
-    | _ -> { CI_state.status = `Pending; descr = "(new)"; logs = CI_result.Step_log.Empty }
+    match state, descr with
+    | Some status, Some descr ->
+      { CI_state.status; descr; logs = CI_result.Step_log.Empty }
+    | _ ->
+      { CI_state.status = `Pending; descr = "(new)";
+        logs = CI_result.Step_log.Empty }
   in
-  let hash = CI_github_hooks.Commit.hash head_commit in
-  Lwt.return {
-    name;
+  let hash = Commit.hash head_commit in
+  { name;
     parent;
     term;
     cancel = ignore;
-    state = (hash, state);
-  }
+    state = (hash, state); }
 
 let apply_canaries canaries prs refs =
   let open !CI_github_hooks in
@@ -282,18 +299,15 @@ let listen ?switch t =
   auto_restart t ?switch "monitor" @@ fun () ->
   Log.info (fun f -> f "Starting monitor loop");
   gh_hooks t >>= fun gh_hooks ->
-  let check_pr ~snapshot ~repo project (id, pr) =
-    Log.debug (fun f -> f "Checking for work on %a" CI_github_hooks.PR.dump pr);
+  let check_pr ~snapshot project (id, pr) =
+    Log.debug (fun f -> f "Checking for work on %a" PR.pp_id id);
     begin match PR.Index.find id project.open_prs with
       | None ->
-        let open_pr = {
-          repo;
-          head = `PR pr;
-          jobs = [];
-        } in
-        let terms = project.make_terms @@ `PR id in
+        let open_pr = { head = `PR pr; jobs = [] } in
+        let terms = project.make_terms (`PR id) in
         String.Map.bindings terms
-        |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:open_pr name term)
+        |> Lwt_list.map_s (fun (name, term) ->
+            make_job snapshot ~parent:open_pr name term)
         >>= fun jobs ->
         open_pr.jobs <- jobs;
         project.open_prs <- PR.Index.add id open_pr project.open_prs;
@@ -305,18 +319,18 @@ let listen ?switch t =
     end >>= fun open_pr ->
     Lwt_list.iter_s (recalculate t ~snapshot) open_pr.jobs
   in
-  let check_ref ~snapshot ~repo project (id, r) =
-    Log.debug (fun f -> f "Checking for work on %a" CI_github_hooks.Ref.dump r);
+  let check_ref ~snapshot project (id, r) =
+    Log.debug (fun f -> f "Checking for work on %a" Ref.pp_id id);
     begin match Ref.Index.find id project.refs with
       | None ->
         let target = {
-          repo;
           head = `Ref r;
           jobs = [];
         } in
         let terms = project.make_terms @@ `Ref id in
         String.Map.bindings terms
-        |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:target name term)
+        |> Lwt_list.map_s (fun (name, term) ->
+            make_job snapshot ~parent:target name term)
         >>= fun jobs ->
         target.jobs <- jobs;
         project.refs <- Ref.Index.add id target project.refs;
@@ -331,7 +345,8 @@ let listen ?switch t =
   CI_github_hooks.monitor ?switch gh_hooks (fun snapshot ->
       CI_prometheus.Counter.inc_one Metrics.update_notifications;
       t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (repo, project) ->
-          CI_github_hooks.Snapshot.repo snapshot repo >>= fun (prs, refs) ->
+          CI_github_hooks.Snapshot.prs snapshot repo >>= fun prs ->
+          CI_github_hooks.Snapshot.refs snapshot repo >>= fun refs ->
           Log.debug (fun f -> f "Monitor iter");
           let prs, refs = apply_canaries project.canaries prs refs in
           (* PRs *)
@@ -345,7 +360,7 @@ let listen ?switch t =
           in
           project.open_prs <- PR.Index.filter is_current project.open_prs;
           Lwt_mutex.with_lock t.term_lock (fun () ->
-              PR.Index.bindings prs |> Lwt_list.iter_s (check_pr ~snapshot ~repo project)
+              PR.Index.bindings prs |> Lwt_list.iter_s (check_pr ~snapshot project)
             )
           >>= fun () ->
           (* Refs *)
@@ -359,7 +374,7 @@ let listen ?switch t =
           in
           project.refs <- Ref.Index.filter is_current project.refs;
           Lwt_mutex.with_lock t.term_lock (fun () ->
-              Ref.Index.bindings refs |> Lwt_list.iter_s (check_ref ~snapshot ~repo project)
+              Ref.Index.bindings refs |> Lwt_list.iter_s (check_ref ~snapshot project)
             )
         )
     )

@@ -1,3 +1,9 @@
+### 0.8.1 (2016-12-02)
+
+#### diatakit-github
+
+- fix regression in comparison between build status (#388, @samoht @avsm)
+
 ### 0.8.0 (2016-12-02)
 
 #### datakit-ci

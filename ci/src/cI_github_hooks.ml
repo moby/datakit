@@ -119,7 +119,7 @@ end
 
 let connect gh = gh
 
-let set_state t ci ~status ~descr ?target_url commit =
+let set_state t ci ~status ~descr ?target_url ~message commit =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.with_transaction metadata (fun t ->
       let snapshot = commit.Commit.snapshot in
@@ -134,7 +134,6 @@ let set_state t ci ~status ~descr ?target_url commit =
         | None -> ensure_removed t (dir / "target_url")
         | Some url -> update "target_url" (Uri.to_string url)
       end >>= fun () ->
-      let message = Fmt.strf "Set state of %a to %a" Commit.pp commit CI_state.pp_status status in
       Log.debug (fun f -> f "set_state: %s" message);
       DK.Transaction.commit t ~message
     ) >>*= Lwt.return
@@ -204,6 +203,10 @@ module Target = struct
     | `Ref x -> r x
 
   let head = dispatch PR.head Ref.head
+
+  let dump f = function
+    | `PR x -> PR.dump f x
+    | `Ref x -> Ref.dump f x
 end
 
 module Snapshot = struct

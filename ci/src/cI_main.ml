@@ -16,7 +16,11 @@ let connect protocol address =
          protocol address (Printexc.to_string ex)
     )
 
-let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config =
+let make_session_backend = function
+  | `Memory -> `Memory
+  | `Redis addr -> `Redis (Lwt_pool.create 4 (fun () -> Redis_lwt.Client.connect addr))
+
+let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend =
   let { CI_config.web_config; projects } = config in
   let dashboards = CI_projectID.Map.map (fun p -> p.CI_config.dashboards) projects in
   let projects = CI_projectID.Map.map (fun p -> p.CI_config.tests) projects in
@@ -40,16 +44,18 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config =
       `Port 8443
     )
   in
-  let routes = CI_web.routes ~config:web_config ~logs ~auth ~ci ~dashboards in
+  let session_backend = make_session_backend session_backend in
+  let server = CI_web_utils.server ~web_config ~auth ~session_backend in
+  let routes = CI_web.routes ~server ~logs ~ci ~dashboards in
   Lwt.pick [
     main_thread;
     CI_web_utils.serve ~routes ~mode
   ]
 
-let start () pr_store web_ui secrets_dir config canaries =
+let start () pr_store web_ui secrets_dir config canaries session_backend =
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
   try
-    Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config)
+    Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend)
   with Failure msg ->
     Fmt.epr "Failure:@,%s@." msg;
     exit 1
@@ -92,6 +98,30 @@ let canaries =
   in
   Arg.(value (opt_all CI_target.Full.arg [] doc))
 
+let session_backend =
+  let parse s =
+    let uri = Uri.of_string s in
+    match Uri.scheme uri with
+    | Some "memory" -> `Ok (`Memory)
+    | Some "redis" ->
+      let host = Uri.host uri |> CI_utils.default "127.0.0.1" in
+      let port = Uri.port uri |> CI_utils.default 6379 in
+      `Ok (`Redis {Redis_lwt.Client.host; port})
+    | _ -> `Error (Fmt.strf "Bad scheme in %a" Uri.pp_hum uri)
+  in
+  let print f = function
+    | `Memory -> Fmt.pf f "memory://"
+    | `Redis {Redis_lwt.Client.host; port} ->
+      let uri = Uri.make ~scheme:"redis" ~host ~port () in
+      Uri.pp_hum f uri
+  in
+  let conv = (parse, print) in
+  let doc =
+    Arg.info ~doc:"Where to store web UI session data (e.g. redis://host:port)"
+      ~docv:"URL" ["sessions-backend"]
+  in
+  Arg.(value (opt conv `Memory doc))
+
 let default_info = Term.info "DataKitCI"
 
 let run ?(info=default_info) config =
@@ -102,6 +132,7 @@ let run ?(info=default_info) config =
                    $ secrets_dir
                    $ config
                    $ canaries
+                   $ session_backend
                   ) in
   match Term.eval (spec, info) with
   | `Error _ -> exit 1

@@ -1,9 +1,11 @@
 version: '2'
+volumes:
+  session_data:
 services:
   ci:
     restart: always
     build: .
-    command: --metadata-store tcp:datakit:5640 --web-ui=https://datakit.ci:8446/
+    command: --metadata-store tcp:datakit:5640 --web-ui=https://datakit.ci:8446/ --sessions-backend=redis://redis
     ports:
      - "8446:8443"
     volumes:
@@ -12,6 +14,7 @@ services:
      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
      - datakit
+     - redis
   datakit:
     restart: always
     image: docker/datakit
@@ -30,3 +33,9 @@ services:
       - ./data/bridge/_github:/root/.github
     depends_on:
      - datakit
+  redis:
+    restart: always
+    image: redis
+    command: redis-server --save 60 1
+    volumes:
+      - session_data:/data

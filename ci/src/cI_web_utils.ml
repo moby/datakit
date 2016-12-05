@@ -55,11 +55,44 @@ module Wm = struct
   include Webmachine.Make(Cohttp_lwt_unix_io)
 end
 module Session = struct
+  module Memory = Session.Lift.IO(Lwt)(Session.Memory)
   module Backend = struct
-    include Session.Lift.IO(Lwt)(Session.Memory)        (* TODO: Disk *)
+    type t =
+      [ `Memory of Memory.t
+      | `Redis of Session_redis_lwt.t ]
+
+    type 'a io = 'a Lwt.t
+    type key = string
+    type value = string
+    type period = int64
+
+    let default_period = function
+      | `Memory t -> Memory.default_period t
+      | `Redis t -> Session_redis_lwt.default_period t
+
+    let generate ?expiry ?value = function
+      | `Memory t -> Memory.generate ?expiry ?value t
+      | `Redis t -> Session_redis_lwt.generate ?expiry ?value t
+
+    let clear t key =
+      match t with
+      | `Memory t -> Memory.clear t key
+      | `Redis t -> Session_redis_lwt.clear t key
+
+    let get t key =
+      match t with
+      | `Memory t -> Memory.get t key
+      | `Redis t -> Session_redis_lwt.get t key
+
+    let set ?expiry t key value =
+      match t with
+      | `Memory t -> Memory.set ?expiry t key value
+      | `Redis t -> Session_redis_lwt.set ?expiry t key value
   end
   include Session_webmachine.Make(Lwt)(Backend)
-  let create () = Session.Memory.create ()
+  let connect = function
+    | `Memory -> `Memory (Session.Memory.create ())
+    | `Redis pool -> `Redis (Session_redis_lwt.of_connection_pool pool)
 end
 
 let () =
@@ -254,8 +287,23 @@ type server = {
 let cookie_key t =
   "__ci_session:" ^ t.web_config.CI_web_templates.name
 
-let server ~auth ~web_config ~has_role =
-  let session_backend = Session.create () in
+let rec matches_acl ~auth ~user acl =
+  match acl, user with
+  | `Everyone, _ -> Lwt.return true
+  | `Username required, Some actual -> Lwt.return (required = actual)
+  | `Github_org org, Some user -> Auth.github_orgs auth ~user >|= List.mem org
+  | `Can_read project, Some user -> Auth.can_read_github auth ~user project
+  | `Any xs, _ -> Lwt_list.exists_s (matches_acl ~auth ~user) xs
+  | (`Username _ | `Github_org _ | `Can_read _), None -> Lwt.return false
+
+let server ~auth ~web_config ~session_backend =
+  let has_role r ~user =
+    match r with
+    | `Reader -> matches_acl web_config.CI_web_templates.can_read ~auth ~user
+    | `Builder -> matches_acl web_config.CI_web_templates.can_build ~auth ~user
+    | `LoggedIn -> Lwt.return (user <> None)
+  in
+  let session_backend = Session.connect session_backend in
   { auth; session_backend; web_config; has_role }
 
 let web_config t = t.web_config

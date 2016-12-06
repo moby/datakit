@@ -644,6 +644,7 @@ let diff: Diff.t Alcotest.testable =
 let dirty = Alcotest.testable Elt.IdSet.pp Elt.IdSet.equal
 let counter: Counter.t Alcotest.testable = (module Counter)
 let capabilities: Capabilities.t Alcotest.testable = (module Capabilities)
+let ref_t = Alcotest.testable Ref.pp (fun x y -> Ref.compare x y = 0)
 
 let mk_snapshot ?(repos=[]) ?(commits=[]) ?(status=[]) ?(prs=[]) ?(refs=[]) () =
   Snapshot.v
@@ -1274,6 +1275,63 @@ let find_pr t repo =
   try List.find (fun pr -> pr.PR.number = 2) repo.R.prs
   with Not_found -> Alcotest.fail "foo not found"
 
+let find_ref t repo n =
+  let repo = API.lookup t repo in
+  try List.find (fun r -> r.Ref.name = n) repo.R.refs
+  with Not_found -> Alcotest.fail "foo not found"
+
+let test_cleanup dk =
+  let cap = match Capabilities.parse "*:r" with `Ok c -> Some c | _ -> None in
+  let b = Bridge.empty in
+  DK.branch dk branch >>*= fun branch ->
+
+  let ref1 = Ref.v (Commit.v repo "bar") ["heho"] in
+  let gh = init_github [] [ref1] [] in
+  Alcotest.(check counter) "counter: 0"
+    { events = 0; prs = 0; status = 0; refs = 0;
+      set_pr = 0; set_status = 0; set_ref = 0  }
+    gh.API.ctx;
+
+  Bridge.sync ?cap ~policy:`Once ~token:gh branch b >>= fun b ->
+  expect_head branch >>*= fun head ->
+  let tree = DK.Commit.tree head in
+  DK.Tree.read_file tree (root repo / "ref" / "heho" / "head")
+  >>*= fun v ->
+  Alcotest.(check string) "bar" "bar\n" (Cstruct.to_string v);
+  DK.Tree.exists_dir tree (root repo / "commit" / "bar" ) >>*= fun c ->
+  Alcotest.(check bool) "exists commit bar" false c;
+  Alcotest.(check ref_t) "heho is bar" ref1 (find_ref gh repo ["heho"]);
+  Alcotest.(check counter) "counter: 1"
+    { events = 0; prs = 1; status = 1; refs = 1;
+      set_pr = 0; set_status = 0; set_ref = 0  }
+    gh.API.ctx;
+
+  let ref2 = Ref.v (Commit.v repo "foo") ["heho"] in
+  let gh = init_github [] [] [Event.Ref (`Updated ref2)] in
+  let w = API.Webhook.create gh in
+  Bridge.sync ?cap ~policy:`Once ~token:gh ~webhook:w branch b >>= fun b ->
+  expect_head branch >>*= fun head ->
+  let tree = DK.Commit.tree head in
+  DK.Tree.read_file tree (root repo / "ref" / "heho" / "head")
+  >>*= fun v ->
+  Alcotest.(check string) "foo" "foo\n" (Cstruct.to_string v);
+  DK.Tree.exists_dir tree (root repo / "commit" / "foo" ) >>*= fun c ->
+  Alcotest.(check bool) "exists commit foo" false c;
+  Alcotest.(check ref_t) "heho is foo" ref2 (find_ref gh repo ["heho"]);
+
+  expect_head branch >>*= fun head1 ->
+  Bridge.sync ?cap ~policy:`Once ~token:gh branch b >>= fun b ->
+  expect_head branch >>*= fun head2 ->
+  Alcotest.(check commit) "same head" head1 head2;
+  Bridge.sync ?cap ~policy:`Once ~token:gh branch b >>= fun b ->
+  expect_head branch >>*= fun head2 ->
+  Alcotest.(check commit) "same head" head1 head2;
+  Bridge.sync ?cap ~policy:`Once ~token:gh branch b >>= fun _b ->
+  expect_head branch >>*= fun head2 ->
+  Alcotest.(check commit) "same head" head1 head2;
+
+  Lwt.return_unit
+
 let test_updates dk =
   let gh = init_github status0 refs0 events1 in
   let b = Bridge.empty in
@@ -1724,6 +1782,7 @@ let test_set = [
   "basic-snapshot", `Quick, test_basic_snapshot;
   "snapshot"      , `Quick, test_snapshot;
   "capabilities"  , `Quick, test_capabilities;
+  "cleanup", `Quick, run_with_test_test test_cleanup;
   "events" , `Quick, run_with_test_test test_events;
   "updates", `Quick, run_with_test_test test_updates;
   "startup", `Quick, run_with_test_test test_startup;

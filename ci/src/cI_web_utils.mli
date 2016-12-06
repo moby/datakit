@@ -43,8 +43,9 @@ type server
 val server :
   auth:Auth.t ->
   web_config:CI_web_templates.t ->
-  has_role:(role -> user:string option -> bool Lwt.t) ->
+  session_backend:[< `Memory | `Redis of Redis_lwt.Client.connection Lwt_pool.t] ->
   server
+
 val web_config : server -> CI_web_templates.t
 
 module Session_data : sig

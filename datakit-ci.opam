@@ -30,6 +30,7 @@ depends: [
   "pbkdf"
   "webmachine"
   "session"
+  "redis"
   "asetmap"
   "github"
   "ppx_sexp_conv" {build}

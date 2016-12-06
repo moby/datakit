@@ -68,8 +68,6 @@ let run_with_exit_status ?switch ?log ?cwd ?env ~output ?log_cmd cmd =
               | "" ->
                 Lwt.return `Eof
               | data ->
-                output_string stdout data;
-                flush stdout;
                 output data;
                 (* Hack because child#terminate may not kill sub-children.
                    Hopefully closing stdout will encourage them to exit. *)

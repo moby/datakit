@@ -397,22 +397,87 @@ module Make(P9p : Protocol_9p_client.S) = struct
   end
 
   module Tree = struct
-    type t = { fs : FS.t; path : string list; }
-    let of_id fs id = { fs; path = ["trees"; id] }
-    let read t path = FS.read_node t.fs (t.path /@ path)
-    let stat t path = FS.stat t.fs (t.path /@ path)
-    let exists t path = FS.exists t.fs (t.path /@ path)
-    let exists_dir t path = FS.exists_dir t.fs (t.path /@ path)
-    let exists_file t path = FS.exists_file t.fs (t.path /@ path)
-    let read_file t path = FS.read_file t.fs (t.path /@ path)
-    let read_dir t path = FS.read_dir t.fs (t.path /@ path)
-    let read_link t path = FS.read_link t.fs (t.path /@ path)
+
+    type value = [ `Dir of string list | `File of Cstruct.t | `Link of string ]
+    type 'a cache = 'a Protocol_9p.Error.t Datakit_path.Map.t ref
+
+    type t = {
+      fs   : FS.t;
+      path : string list;
+      reads: value cache;
+      stats: Datakit_S.stat option cache;
+    }
+
+    let find_cache c p =
+      try Some (Datakit_path.Map.find p !c) with Not_found -> None
+
+    let empty () = ref Datakit_path.Map.empty
+    let add_cache c p v = c := Datakit_path.Map.add p v !c
+    let v fs path = { fs; reads = empty () ; stats = empty (); path }
+    let of_id fs id = v fs ["trees"; id]
+
+    let read t path =
+      match find_cache t.reads path with
+      | Some x -> Lwt.return x
+      | None   ->
+        FS.read_node t.fs (t.path /@ path) >|= fun v ->
+        add_cache t.reads path v;
+        v
+
+    let stat t path =
+      match find_cache t.stats path with
+      | Some x -> Lwt.return x
+      | None   ->
+        FS.stat t.fs (t.path /@ path) >|= fun v ->
+        add_cache t.stats path v;
+        v
+
+    let exists t path =
+      match find_cache t.reads path with
+      | Some _ -> Lwt.return (Ok true)
+      | None   ->
+        stat t path >|= function
+        | Ok None      -> Ok false
+        | Ok (Some _)  -> Ok true
+        | Error _ as e -> e
+
+    let exists_dir t path =
+      stat t path >|= function
+      | Ok (Some { Datakit_S.kind = `Dir; _ }) -> Ok true
+      | Ok Some _    -> Ok false
+      | Ok None      -> Ok false
+      | Error _ as e -> e
+
+    let exists_file t path =
+      stat t path >|= function
+      | Ok (Some { Datakit_S.kind = `File; _ }) -> Ok true
+      | Ok Some _    -> Ok false
+      | Ok None      -> Ok false
+      | Error _ as e -> e
+
+    let read_file t path =
+      read t path >|= function
+      | Ok (`File f) -> Ok f
+      | Error _ as e -> e
+      | Ok _         -> Error (`Msg "not a file")
+
+    let read_dir t path =
+      read t path >|= function
+      | Ok (`Dir d)  -> Ok d
+      | Error _ as e -> e
+      | Ok _         -> Error (`Msg "not a dir")
+
+    let read_link t path =
+      read t path >|= function
+      | Ok (`Link l) -> Ok l
+      | Error _ as e -> e
+      | Ok _         -> Error (`Msg "not a symlink")
   end
 
   module Commit = struct
     type t = { fs : FS.t; id : string }
     let path t = ["snapshots"; t.id]
-    let tree t = { Tree.fs = t.fs; path = path t / "ro" }
+    let tree t = Tree.v t.fs (path t / "ro")
     let message t = FS.read_all t.fs (path t / "msg") >|*= Cstruct.to_string
     let id t = t.id
     let pp ppf t = Fmt.string ppf t.id
@@ -517,9 +582,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
       FS.write_stream t.fs
         (t.path / "merge") (Cstruct.of_string commit.Commit.id) >>*= fun () ->
       conflicts t >>*= fun confl ->
-      let ours = { Tree.fs = t.fs; path = t.path / "ours" } in
-      let theirs = { Tree.fs = t.fs; path = t.path / "theirs" } in
-      let base = { Tree.fs = t.fs; path = t.path / "base" } in
+      let ours = Tree.v t.fs (t.path / "ours") in
+      let theirs = Tree.v t.fs (t.path / "theirs") in
+      let base = Tree.v (t.fs) (t.path / "base") in
       ok ({ ours; theirs; base }, confl)
 
     let commit t ~message =

@@ -107,10 +107,12 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     else if not (Elt.IdSet.is_empty dirty) then
       let message = "Cleaning up .dirty files" in
       safe_commit tr ~message
-    else
+    else (
       let message = Diff.commit_message diff in
-      Conv.apply ~debug:"commit" diff tr >>= fun () ->
-      safe_commit tr ~message
+      Conv.apply ~debug:"commit" diff tr >>= fun updated ->
+      if updated then safe_commit tr ~message
+      else safe_abort tr >|= fun () -> true
+    )
 
   let process_webhooks ~token ~webhook t repos = match webhook with
     | None                   -> Lwt.return t.bridge

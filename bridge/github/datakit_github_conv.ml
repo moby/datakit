@@ -62,6 +62,11 @@ module Make (DK: Datakit_S.CLIENT) = struct
             l "Got %a while creating %a, skipping."
               DK.pp_error e Datakit_path.pp file)
 
+  let safe_tr_diff tr c =
+    DK.Transaction.diff tr c >|= function
+    | Ok d    -> d
+    | Error _ -> []
+
   let lift_errors name f = f >>= function
     | Error e -> Lwt.fail_with @@ Fmt.strf "%s: %a" name DK.pp_error e
     | Ok x    -> Lwt.return x
@@ -679,7 +684,10 @@ module Make (DK: Datakit_S.CLIENT) = struct
       | None   -> Lwt.return_unit
       | Some f -> f tr
     in
+    tr_head tr >>= fun head ->
     clean () >>= fun () ->
-    update ()
+    update () >>= fun () ->
+    safe_tr_diff tr head >|= fun diff ->
+    diff <> []
 
 end

@@ -104,8 +104,9 @@ module Make (DK: Datakit_S.CLIENT): sig
   (** Same as {!of_branch} but does not allow to update the underlying
       store. *)
 
-  val apply: debug:string -> Diff.t -> DK.Transaction.t -> unit Lwt.t
+  val apply: debug:string -> Diff.t -> DK.Transaction.t -> bool Lwt.t
   (** [apply d t] applies the snapshot diff [d] into the datakit
-      transaction [t]. *)
+      transaction [t]. Returns [true] iff the undelying datakit state
+      has changed. *)
 
 end

@@ -35,6 +35,7 @@ module Error : sig
   type t
 
   val permission_denied : t
+  val logout_needed : t
 
   val uri_path : t -> string
   (** Path to redirect users to to see this error. *)

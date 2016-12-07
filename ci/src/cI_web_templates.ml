@@ -15,6 +15,7 @@ module Error = struct
   type t = string
   let no_state_repo = "no-state-repo"
   let permission_denied = "permission-denied"
+  let logout_needed = "logout-needed"
 
   let uri_path id = "/error/" ^ id
   let uri id = Uri.of_string (uri_path id)
@@ -775,6 +776,12 @@ let error_page id =
     else if id = Error.permission_denied then
       [
         p [pcdata "Permission denied"];
+      ]
+    else if id = Error.logout_needed then
+      [
+        p [pcdata
+             "Access policy has changed - please log out and log back in so we can \
+              check your credentials against the new policy."];
       ]
     else
       [

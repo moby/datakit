@@ -9,6 +9,6 @@ true: package(pbkdf, sexplib)
 true: package(asetmap)
 true: package(github.unix)
 
-<src/cI_web_utils.*>: package(ppx_sexp_conv)
+<src/cI_web_utils.*> or <src/cI_projectID.*>: package(ppx_sexp_conv)
 
 <src>: include

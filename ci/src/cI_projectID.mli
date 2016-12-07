@@ -3,7 +3,7 @@ open Asetmap
 type t = private {
   user : string;
   project : string;
-}
+} [@@deriving sexp]
 (** A project on GitHub *)
 
 val v : user:string -> project:string -> t
@@ -16,3 +16,4 @@ val of_string_exn : string -> t
 (** [of_string_exn s] parses a string of the form "user/project". *)
 
 module Map : Map.S with type key = t
+module Set : Set.S with type elt = t

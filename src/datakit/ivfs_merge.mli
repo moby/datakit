@@ -1,9 +1,13 @@
-module PathSet : Set.S with type elt = Irmin.Path.String_list.t
+type path = Ivfs_tree.path
+type step = Ivfs_tree.step
+
+module PathSet : Set.S with type elt = path
+
 
 module type RW = sig
   type t
-  val update_force : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
-  val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
+  val update_force : t -> path -> step -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
+  val remove_force : t -> path -> step -> unit Lwt.t
 end
 
 module Make (Store : Ivfs_tree.STORE) (RW : RW) : sig

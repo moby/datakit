@@ -1,7 +1,11 @@
-open Astring
 open Lwt.Infix
 
-module PathSet = Set.Make(Irmin.Path.String_list)
+module Path = Ivfs_tree.Path
+module PathSet = Set.Make(Path)
+module StepMap = Asetmap.Map.Make(Path.Step)
+
+type path = Path.t
+type step = Path.Step.t
 
 let blob = Tc.biject (module Tc.Cstruct)
     Ivfs_blob.of_ro_cstruct
@@ -11,8 +15,8 @@ module Blob = (val blob : Tc.S0 with type t = Ivfs_blob.t)
 
 module type RW = sig
   type t
-  val update_force : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
-  val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
+  val update_force : t -> path -> step -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
+  val remove_force : t -> path -> step -> unit Lwt.t
 end
 
 module Make
@@ -36,7 +40,7 @@ module Make
   let merge ~ours ~theirs ~base result =
     let conflicts = ref PathSet.empty in
     let note_conflict path leaf msg =
-      conflicts := !conflicts |> PathSet.add (Irmin.Path.String_list.rcons path leaf);
+      conflicts := !conflicts |> PathSet.add (Path.rcons path leaf);
       let f = Ivfs_blob.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
       RW.update_force result path leaf (f, `Normal) in
     let repo = Store.repo ours in
@@ -45,13 +49,13 @@ module Make
       | `Directory x -> x
       | `File _ -> empty
       | `None -> empty in
-    let rec merge_dir ~ours ~theirs ~base (path : string list) =
+    let rec merge_dir ~ours ~theirs ~base (path : Path.t) =
       Tree.Dir.map ours >>= fun our_files ->
       Tree.Dir.map theirs >>= fun their_files ->
       (* Types tells us the type the result will have, if successful, or [`Conflict] if we
          know it won't work. *)
       let types =
-        String.Map.merge (fun _leaf ours theirs ->
+        StepMap.merge (fun _leaf ours theirs ->
             match ours, theirs with
             | Some (`Directory _), Some (`Directory _) -> Some `Directory
             | Some (`File _), Some (`File _) -> Some `File
@@ -60,8 +64,8 @@ module Make
             | Some (`Directory _), None | None, Some (`Directory _) -> Some `Directory
             | None, None -> assert false
           ) our_files their_files in
-      String.Map.bindings types |> Lwt_list.iter_s (fun (leaf, ty) ->
-          let sub_path = Irmin.Path.String_list.rcons path leaf in
+      StepMap.bindings types |> Lwt_list.iter_s (fun (leaf, ty) ->
+          let sub_path = Path.rcons path leaf in
           match ty with
           | `Conflict -> note_conflict path leaf "File vs dir"
           | `Directory ->
@@ -88,6 +92,6 @@ module Make
       | None -> Lwt.return (Tree.Dir.empty repo)
       | Some base -> Tree.snapshot base
     end >>= fun base ->
-    merge_dir ~ours ~theirs ~base [] >>= fun () ->
+    merge_dir ~ours ~theirs ~base Path.empty >>= fun () ->
     Lwt.return !conflicts
 end

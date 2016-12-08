@@ -2,6 +2,8 @@ open Lwt.Infix
 open Test_utils
 open Result
 
+let p l = Ivfs_tree.Path.of_hum (String.concat "/" l)
+
 let root_entries = ["branch"; "debug"; "snapshots"; "trees"; "remotes"]
 
 let test_transaction repo conn =
@@ -347,7 +349,7 @@ let test_watch repo conn =
   @@ fun doc ->
   read_line_exn doc >>= fun doc_init ->
   Alcotest.(check string) "Doc tree hash initially empty" "" doc_init;
-  Store.update master ["src"; "Makefile"] "all: build" >>= fun () ->
+  Store.update master (p ["src"; "Makefile"]) "all: build" >>= fun () ->
   with_stream conn
     ["branch"; "master"; "watch"; "src.node"; "Makefile.node"; "tree.live"]
   @@ fun makefile ->
@@ -356,7 +358,7 @@ let test_watch repo conn =
     "F-d81e367f87ee314bcd3e449b1c6641efda5bc269" makefile_init;
   (* Modify file under doc *)
   let next_make = makefile () in
-  Store.update master ["doc"; "README"] "Instructions" >>= fun () ->
+  Store.update master (p ["doc"; "README"]) "Instructions" >>= fun () ->
   read_line_exn doc >>= fun doc_new ->
   Alcotest.(check string) "Doc update"
     "D-a3e8adf6d194bfbdec2ca73aebe0990edee2ddbf" doc_new;
@@ -372,7 +374,7 @@ let test_watch repo conn =
 let test_rename_branch repo conn =
   Store.of_branch_id Irmin.Task.none "old" repo >>= fun old ->
   let old = old () in
-  Store.update old ["key"] "value" >>= fun () ->
+  Store.update old (p ["key"]) "value" >>= fun () ->
   Client.mkdir conn ["branch"] "old" rwxr_xr_x >>*= fun () ->
   Client.with_fid conn (fun newfid ->
       Client.walk_from_root conn newfid ["branch"; "old"] >>*= fun _ ->
@@ -572,32 +574,32 @@ let test_rw () =
     Store.Repo.create config >>= fun repo ->
     let rw = RW.of_dir (Tree.Dir.empty repo) in
 
-    RW.update rw [] "foo" (v "a")
+    RW.update rw (p []) "foo" (v "a")
     >|= Alcotest.(check (result unit err)) "Write /a" (Ok ()) >>= fun () ->
 
-    RW.update rw ["sub"; "bar"] "baz" (v "b")
+    RW.update rw (p ["sub"; "bar"]) "baz" (v "b")
     >|= Alcotest.(check (result unit err)) "Write /sub/bar/baz" (Ok ())
     >>= fun () ->
 
     (* /foo is a file *)
-    RW.update rw ["foo"; "bar"] "baz" (v "b")
+    RW.update rw (p ["foo"; "bar"]) "baz" (v "b")
     >|= Alcotest.(check (result unit err)) "Write /foo/bar/baz"
       (Error `Not_a_directory)
     >>= fun () ->
 
-    RW.remove rw ["foo"] "bar"
+    RW.remove rw (p ["foo"]) "bar"
     >|= Alcotest.(check (result unit err1)) "rm /foo/bar"
       (Error `Not_a_directory)
     >>= fun () ->
 
-    RW.update_force rw ["foo"; "bar"] "baz" (v "b") >>= fun () ->
+    RW.update_force rw (p ["foo"; "bar"]) "baz" (v "b") >>= fun () ->
 
-    RW.update rw ["foo"] "bar" (v "b")
+    RW.update rw (p ["foo"]) "bar" (v "b")
     >|= Alcotest.(check (result unit err)) "Write /foo/bar"
       (Error `Is_a_directory)
     >>= fun () ->
 
-    RW.remove rw ["foo"; "bar"] "baz"
+    RW.remove rw (p ["foo"; "bar"]) "baz"
     >|= Alcotest.(check (result unit err1)) "rm /foo/bar/baz" (Ok ())
     >>= fun () ->
 

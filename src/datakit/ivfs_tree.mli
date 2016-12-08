@@ -5,17 +5,17 @@
     that information.
 *)
 
-open Astring
+module Path: Irmin.Path.S with type step = string
 
 type step = string
-type path = string list
+type path = Path.t
 type perm = [ `Normal | `Exec | `Link ]
 
 module type STORE = Irmin.S
-  with type key = string list
+  with type key = path
    and type value = string
    and type branch_id = string
-   and module Key = Irmin.Path.String_list
+   and module Key = Path
    and type Private.Node.Val.step = string
    and type Private.Node.Val.Metadata.t = perm
 
@@ -85,7 +85,8 @@ module type S = sig
     val get: t -> path -> t option Lwt.t
     (** Look up a sub-directory node. *)
 
-    val map: t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
+    val map: t -> [`File of File.t * perm | `Directory of t]
+        Map.Make(Path.Step).t Lwt.t
     (** The contents of the directory. *)
 
     val ls: t -> ([`File | `Directory] * step) list Lwt.t

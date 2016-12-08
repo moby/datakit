@@ -138,22 +138,13 @@ module User = struct
   let name t = t.name
 end
 
-let memo generate =
-  let cached  = Hashtbl.create 5 in
-  fun k ->
-    try Hashtbl.find cached k
-    with Not_found ->
-      let v = generate k in
-      Hashtbl.add cached k v;
-      v
-
 module Auth = struct
   type password_file = (string * Hashed_password.t) list [@@deriving sexp]
 
   type user_attributes = {
-    github_orgs : string list Lwt.t Lazy.t;
-    can_read_github : CI_projectID.t -> bool Lwt.t;
-  }
+    github_orgs : string list;
+    can_read_github : (CI_projectID.t * bool) list;
+  } [@@deriving sexp]
 
   type github_auth = {
     client_id : string;
@@ -164,8 +155,9 @@ module Auth = struct
   type t = {
     github : github_auth option;
     local_users : User.t String.Map.t;
-    mutable attributes : user_attributes String.Map.t;
   }
+
+  let empty_attrs = { github_orgs = []; can_read_github = [] }
 
   let lookup t ~user ~password =
     match String.Map.find user t.local_users with
@@ -203,7 +195,7 @@ module Auth = struct
       |> String.Map.of_list
       |> String.Map.mapi (fun name password -> { User.name; password })
     in
-    { github; local_users; attributes = String.Map.empty }
+    { github; local_users }
 
   let scopes = [`Read_org; `Repo]
 
@@ -220,26 +212,24 @@ module Auth = struct
       in
       Some url
 
-  let handle_github_callback t ~code =
+  let handle_github_callback t ~code ~repos =
     match t.github with
     | None -> Lwt.return @@ Error "GitHub auth is not configured!"
     | Some github ->
       Github.Token.of_code ~client_id:github.client_id ~client_secret:github.client_secret ~code () >>= function
        | None -> Lwt.return @@ Error "Token.of_code failed (no further information available)"
        | Some token ->
-         Github.Monad.run (Github.User.current_info ~token ()) >|= fun resp ->
+         Github.Monad.run (Github.User.current_info ~token ()) >>= fun resp ->
          let user_info = Github.Response.value resp in
-         let github_orgs = lazy (
-           Github.Monad.run begin
-             let open! Github.Monad in
-             Github.User.current_info ~token () >|= Github.Response.value >>= fun user_info ->
-             let user = user_info.Github_t.user_info_login in
-             Github.Organization.user_orgs ~token ~user () |> Github.Stream.to_list >|= fun orgs ->
-             let orgs = List.map (fun org -> org.Github_t.org_login) orgs in
-             Log.info (fun f -> f "User %S belongs to %a" user (Fmt.Dump.list Fmt.string) orgs);
-             orgs
-           end
-         ) in
+         Github.Monad.run begin
+           let open! Github.Monad in
+           Github.User.current_info ~token () >|= Github.Response.value >>= fun user_info ->
+           let user = user_info.Github_t.user_info_login in
+           Github.Organization.user_orgs ~token ~user () |> Github.Stream.to_list >|= fun orgs ->
+           let orgs = List.map (fun org -> org.Github_t.org_login) orgs in
+           Log.info (fun f -> f "User %S belongs to %a" user (Fmt.Dump.list Fmt.string) orgs);
+           orgs
+         end >>= fun github_orgs ->
          let user = "github:" ^ user_info.Github_t.user_info_login in
          let can_read_github project =
            Lwt.try_bind (fun () ->
@@ -259,52 +249,73 @@ module Auth = struct
                 Lwt.return false
              )
          in
+         Lwt_list.map_s (fun p -> can_read_github p >|= fun flag -> (p, flag)) repos >>= fun can_read_github ->
          let attributes = {
            github_orgs;
-           can_read_github = memo can_read_github;
+           can_read_github;
          } in
-         t.attributes <- String.Map.add user attributes t.attributes;
-         Ok user
-
-  let github_orgs t ~user =
-    match String.Map.find user t.attributes with
-    | Some attrs -> Lazy.force attrs.github_orgs
-    | None -> Lwt.return []
-
-  let can_read_github t ~user project =
-    match String.Map.find user t.attributes with
-    | Some attrs -> attrs.can_read_github project
-    | None -> Lwt.return false
+         Lwt.return (Ok (user, attributes))
 end
 
 type server = {
   auth : Auth.t;
   session_backend : Session.Backend.t;
   web_config : CI_web_templates.t;
-  has_role : role -> user:string option -> bool Lwt.t;
+  has_role :
+    role -> user:string option -> attrs:Auth.user_attributes ->
+    (bool, CI_web_templates.Error.t) result;
+  acl_github_repos : CI_projectID.t list;       (* Repositories we need info about *)
 }
 
 let cookie_key t =
   "__ci_session:" ^ t.web_config.CI_web_templates.name
 
-let rec matches_acl ~auth ~user acl =
-  match acl, user with
-  | `Everyone, _ -> Lwt.return true
-  | `Username required, Some actual -> Lwt.return (required = actual)
-  | `Github_org org, Some user -> Auth.github_orgs auth ~user >|= List.mem org
-  | `Can_read project, Some user -> Auth.can_read_github auth ~user project
-  | `Any xs, _ -> Lwt_list.exists_s (matches_acl ~auth ~user) xs
-  | (`Username _ | `Github_org _ | `Can_read _), None -> Lwt.return false
+let can_read_github ~user p attrs =
+  try Ok (List.assoc p attrs.Auth.can_read_github)
+  with Not_found ->
+    match user with
+      | Some user when String.is_prefix ~affix:"github:" user ->
+        Error (CI_web_templates.Error.logout_needed)
+      | _ -> Ok false
+
+let rec matches_acl ~user ~attrs = function
+  | `Everyone -> Ok true
+  | `Username required -> Ok (Some required = user)
+  | `Github_org org -> Ok (List.mem org attrs.Auth.github_orgs)
+  | `Can_read project -> can_read_github ~user project attrs
+  | `Any xs ->
+    let rec aux = function
+      | [] -> Ok false
+      | x::xs ->
+        match matches_acl ~user ~attrs x with
+        | Ok false -> aux xs
+        | Ok true | Error _ as r -> r
+    in
+    aux xs
+
+let github_repos_in_policy acl =
+  let rec aux acc = function
+  | `Can_read project -> CI_projectID.Set.add project acc
+  | `Any xs -> List.fold_left aux acc xs
+  | `Everyone | `Username _ | `Github_org _ -> acc
+  in
+  aux CI_projectID.Set.empty acl
 
 let server ~auth ~web_config ~session_backend =
-  let has_role r ~user =
+  let has_role r ~user ~attrs =
     match r with
-    | `Reader -> matches_acl web_config.CI_web_templates.can_read ~auth ~user
-    | `Builder -> matches_acl web_config.CI_web_templates.can_build ~auth ~user
-    | `LoggedIn -> Lwt.return (user <> None)
+    | `Reader -> matches_acl web_config.CI_web_templates.can_read ~user ~attrs
+    | `Builder -> matches_acl web_config.CI_web_templates.can_build ~user ~attrs
+    | `LoggedIn -> Ok (user <> None)
+  in
+  let acl_github_repos =
+    CI_projectID.Set.union
+      (github_repos_in_policy web_config.CI_web_templates.can_read)
+      (github_repos_in_policy web_config.CI_web_templates.can_build)
+    |> CI_projectID.Set.elements
   in
   let session_backend = Session.connect session_backend in
-  { auth; session_backend; web_config; has_role }
+  { auth; session_backend; web_config; has_role; acl_github_repos }
 
 let web_config t = t.web_config
 
@@ -373,6 +384,7 @@ module Session_data = struct
     csrf_token : string;
     login_redirect : string option;     (* Redirect here when login succeeeds. *)
     username : string option;
+    attrs : Auth.user_attributes [@default Auth.empty_attrs];
   } [@@deriving sexp]
 
   let csrf_token t = t.csrf_token
@@ -391,7 +403,7 @@ class virtual resource_with_session t =
       | Ok None | Error _ ->
         Log.info (fun f -> f "Generating new session");
         let csrf_token = B64.encode (Nocrypto.Rng.generate 16 |> Cstruct.to_string) in
-        let value = { Session_data.csrf_token; username = None; login_redirect = None } in
+        let value = { Session_data.csrf_token; username = None; login_redirect = None; attrs = Auth.empty_attrs } in
         self#session_set (Session_data.to_string value) rd >>= fun () ->
         Lwt.return value
 
@@ -399,6 +411,16 @@ class virtual resource_with_session t =
       let rd = self#session_set_hdrs ~path:"/" ~secure:true rd in
       Wm.continue () rd
   end
+
+let all_roles t ~user ~attrs roles =
+  let rec aux = function
+    | [] -> Ok true
+    | x::xs ->
+      match t.has_role ~user ~attrs x with
+      | Ok true -> aux xs
+      | Ok false | Error _ as r -> r
+  in
+  aux roles
 
 class virtual protected_page t =
   object(self)
@@ -415,14 +437,16 @@ class virtual protected_page t =
       match session.Session_data.username with
       | Some _ as username ->
         authenticated_user <- username;
-        begin Lwt_list.for_all_s (t.has_role ~user:username) roles_needed >>= function
-          | true -> Wm.continue `Authorized rd
-          | false -> Wm.continue (`Redirect (CI_web_templates.Error.(uri permission_denied))) rd
+        let attrs = session.Session_data.attrs in
+        begin match all_roles t ~user:username ~attrs roles_needed with
+        | Ok true -> Wm.continue `Authorized rd
+        | Ok false -> Wm.continue (`Redirect (CI_web_templates.Error.(uri permission_denied))) rd
+        | Error err -> Wm.continue (`Redirect (CI_web_templates.Error.(uri err))) rd
         end
       | None ->
-        Lwt_list.for_all_s (t.has_role ~user:None) roles_needed >>= function
-        | true -> Wm.continue `Authorized rd
-        | false ->
+        match all_roles t ~user:None ~attrs:Auth.empty_attrs roles_needed with
+        | Ok true -> Wm.continue `Authorized rd
+        | Ok false ->
           let login_redirect =
             match Uri.path rd.Wm.Rd.uri with
             | "/auth/logout" -> None
@@ -431,6 +455,7 @@ class virtual protected_page t =
           let value = {session with Session_data.login_redirect} in
           self#session_set (Session_data.to_string value) rd >>= fun () ->
           Wm.continue (`Redirect (Uri.of_string "/auth/login")) rd
+        | Error err -> Wm.continue (`Redirect (CI_web_templates.Error.(uri err))) rd
   end
 
 class virtual post_page t = object(self)
@@ -568,10 +593,10 @@ class github_callback t = object(self)
       match Uri.get_query_param rd.Wm.Rd.uri "code" with
       | None -> reject "Missing code"
       | Some code ->
-        Auth.handle_github_callback t.auth ~code >>= function
+        Auth.handle_github_callback t.auth ~code ~repos:t.acl_github_repos >>= function
         | Error err -> reject err
-        | Ok user ->
-            let session = {session_data with Session_data.username = Some user} in
+        | Ok (user, attrs) ->
+            let session = {session_data with Session_data.username = Some user; attrs} in
             self#session_set (Session_data.to_string session) rd >>= fun () ->
             begin match session.Session_data.login_redirect with
               | None -> Lwt.return "/"

@@ -28,14 +28,6 @@ module Auth : sig
   val lookup : t -> user:string -> password:string -> User.t option
   (** [lookup t (username, password)] returns the user with name [username] if the user exists and
       the password is correct. *)
-
-  val github_orgs : t -> user:string -> string list Lwt.t
-  (** [github_orgs t ~user] is the list of GitHub organisations to which the user belongs.
-      Results are cached (and therefore may not be completely up-to-date until the user logs out and back in again). *)
-
-  val can_read_github : t -> user:string -> CI_projectID.t -> bool Lwt.t
-  (** [can_read_github t ~user project] checks whether the user can read the details of the given repository.
-      Results are cached (and therefore may not be completely up-to-date until the user logs out and back in again). *)
 end
 
 type server

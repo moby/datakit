@@ -130,7 +130,7 @@ let start () no_listen listen_urls datakit cap webhook resync_interval =
           failwith "connect to datakit"
       in
       Lwt.catch
-        (fun () -> Client9p.connect proto address ())
+        (fun () -> Client9p.connect proto address ~max_fids:Int32.max_int ())
         (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
       >>= function
       | Error (`Msg e) ->

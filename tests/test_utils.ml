@@ -179,7 +179,7 @@ let run fn =
       Server.accept ~root ~msg:"test" for_server >>*= Lwt.return
     in
     Lwt.finalize
-      (fun () -> Client.connect for_client () >>*= fn repo)
+      (fun () -> Client.connect for_client ~max_fids:Int32.max_int () >>*= fn repo)
       (fun () -> Lwt.cancel server_thread; Lwt.return ())
   end
 

@@ -253,8 +253,8 @@ module Snapshot = struct
     | Some y -> Some (f y)
 
   let find id t =
-    repo t (CI_target.Full.repo id) >|= fun (prs, refs) ->
-    match CI_target.Full.id id with
+    repo t (CI_target.repo id) >|= fun (prs, refs) ->
+    match CI_target.id id with
     | `PR pr -> PR.Index.find pr prs >|?= fun x -> `PR x
     | `Ref x ->
       match Ref.Index.find x refs with

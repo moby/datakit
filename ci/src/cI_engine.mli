@@ -13,9 +13,9 @@ type job
 
 val create :
   web_ui:Uri.t ->
-  ?canaries:CI_target.ID_Set.t Repo.Map.t ->
+  ?canaries:CI_target.Set.t Repo.Map.t ->
   (unit -> DK.t Lwt.t) ->
-  (CI_target.Full.t -> string CI_term.t String.Map.t) Repo.Map.t ->
+  (CI_target.t -> string CI_term.t String.Map.t) Repo.Map.t ->
   t
 (** [create ~web_ui connect projects] is a new DataKit CI that calls [connect] to connect to the database.
     Once [listen] has been called, it will handle CI for [projects].

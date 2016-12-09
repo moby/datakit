@@ -39,7 +39,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   let canaries =
     match canaries with
     | [] -> None
-    | canaries -> Some (CI_target.Full.map_of_list canaries)
+    | canaries -> Some (CI_target.map_of_list canaries)
   in
   let ci = CI_engine.create ~web_ui ?canaries connect_dk projects in
   let main_thread = CI_engine.listen ci >|= fun `Abort -> assert false in
@@ -103,7 +103,7 @@ let canaries =
     Arg.info ~doc:"Only test these refs (e.g user/project/heads/master)"
       ~docv:"TARGET" ["canary"]
   in
-  Arg.(value (opt_all CI_target.Full.arg [] doc))
+  Arg.(value (opt_all CI_target.arg [] doc))
 
 let session_backend =
   let parse s =

@@ -134,20 +134,11 @@ type 'a lwt_status =
     pending state also indicates when it should be checked again. *)
 
 module Target: sig
-  module ID: sig
-    type t = [ `PR of int | `Ref of string list ]
-    val pp: t Fmt.t
-    val compare: t -> t -> int
-  end
-
-  module Full: sig
-    type t = Repo.t * ID.t
-
-    val repo: t -> Repo.t
-    val id: t -> ID.t
-
-    val pp: t Fmt.t
-  end
+  type t = [ `PR of PR.id | `Ref of Ref.id ]
+  val compare: t -> t -> int
+  val repo: t -> Repo.t
+  val id: t -> [`PR of int | `Ref of string list]
+  val pp: t Fmt.t
 end
 
 module Term: sig
@@ -253,11 +244,11 @@ module Term: sig
   (** [job_id] evaluates to the job that evaluates the term.  This is
       useful for logging. *)
 
-  val github_target: Target.Full.t -> Github_hooks.Target.t t
+  val github_target: Target.t -> Github_hooks.Target.t t
   (** [github_target id] evaluates to the GitHub metadata of the named
       target. Note that this is a snapshot. *)
 
-  val head: Target.Full.t -> Github_hooks.Commit.t t
+  val head: Target.t -> Github_hooks.Commit.t t
   (** [head target] evaluates to the commit at the head [target]. *)
 
   val branch_head: Repo.t -> string -> Github_hooks.Commit.t t
@@ -272,18 +263,18 @@ module Term: sig
   (** [dk] is a function for getting the current DataKit
       connection. *)
 
-  val ci_status: string -> Target.Full.t ->
+  val ci_status: string -> Target.t ->
     [`Pending | `Success | `Failure | `Error] option t
   (** [ci_status ci target] is the status reported by CI [ci] for
       [target].  Note that even if the CI is e.g. pending, this
       returns a successful result with the value [`Pending], not a
       pending result. *)
 
-  val ci_target_url: string -> Target.Full.t -> Uri.t option t
+  val ci_target_url: string -> Target.t -> Uri.t option t
   (** [ci_target_url ci target] is the target URL reported by CI
       [ci]. *)
 
-  val ci_success_target_url: string -> Target.Full.t -> Uri.t t
+  val ci_success_target_url: string -> Target.t -> Uri.t t
   (** [ci_success_target_url ci target] is the URL of the *successful*
       build [ci].  It is pending until a successful URL is
       available. *)
@@ -337,7 +328,7 @@ module Config: sig
   val project:
     id:string ->
     ?dashboards:string list ->
-    (Target.Full.t -> (string * test) list) ->
+    (Target.t -> (string * test) list) ->
     project
   (** [project ~id tests] is the configuration for a single GitHub
       project. [tests] is a list tests to apply to branches, tags and
@@ -540,7 +531,7 @@ module Private: sig
   val connect: Client9p.t -> DK.t
 
   val test_engine: web_ui:Uri.t -> (unit -> DK.t Lwt.t) ->
-    (Target.Full.t -> string Term.t String.Map.t) Repo.Map.t ->
+    (Target.t -> string Term.t String.Map.t) Repo.Map.t ->
     engine
 
   val listen: ?switch:Lwt_switch.t -> engine -> [`Abort] Lwt.t

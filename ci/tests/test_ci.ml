@@ -426,7 +426,7 @@ let test_roles conn =
     let can_build = CI_ACL.username "admin" in
     let web_config = CI_web_templates.config ~name:"test-ci" ~can_read ~can_build () in
     let server = CI_web_utils.server ~web_config ~auth ~session_backend:`Memory in
-    let routes = CI_web.routes ~server ~logs ~ci ~dashboards:(CI_target.Full.map_of_list []) in
+    let routes = CI_web.routes ~server ~logs ~ci ~dashboards:(CI_target.map_of_list []) in
     fun ~expect path ->
       let request = Cohttp.Request.make (Uri.make ~path ()) in
       CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >|= function

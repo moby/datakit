@@ -114,7 +114,7 @@ let pr_map f map =
 
 let dash_map f map targets =
   CI_github_hooks.Ref.Index.fold (fun key value acc ->
-      match CI_target.ID_Set.mem (`Ref key) targets with
+      match CI_target.Set.mem (`Ref (CI_engine.repo value, key)) targets with
       | true -> [f key value] @ acc
       | false -> acc
     ) map []
@@ -390,10 +390,10 @@ let html_of_user ~csrf_token ((job, label), log) =
   let target, job_name = job in
   let link =
     match target with
-    | project, `Ref id -> ref_url project id
-    | project, `PR id -> pr_url project id
+    | `Ref (repo, id) -> ref_url repo id
+    | `PR (repo, id)  -> pr_url repo id
   in
-  let reason = Fmt.strf "%a:%s%a" CI_target.Full.pp target job_name pp_opt_label label in
+  let reason = Fmt.strf "%a:%s%a" CI_target.pp target job_name pp_opt_label label in
   [
     br ();
     form ~a:[a_class ["cancel"]; a_action action; a_method `Post] [

@@ -74,7 +74,7 @@ module Snapshot : sig
   (** [repo snapshot r] is the state of the open PRs, branches and
       tags in [snapshot] for repository [r]. *)
 
-  val find : CI_target.Full.t -> t -> Target.t option Lwt.t
+  val find : CI_target.t -> t -> Target.t option Lwt.t
 end
 
 val snapshot : t -> Snapshot.t Lwt.t

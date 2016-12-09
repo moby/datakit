@@ -61,7 +61,7 @@ val user_page :
 val main_page :
   csrf_token:string ->
   ci:CI_engine.t ->
-  dashboards:CI_target.ID_Set.t Repo.Map.t ->
+  dashboards:CI_target.Set.t Repo.Map.t ->
   t ->
   page
 

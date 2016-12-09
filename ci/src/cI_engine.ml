@@ -45,10 +45,10 @@ and target = {
 
 let job_id job =
   let target = match job.parent.head with
-    | `PR pr -> `PR (CI_github_hooks.PR.id pr)
-    | `Ref r -> `Ref (CI_github_hooks.Ref.name r)
+    | `PR pr -> `PR (job.parent.repo, CI_github_hooks.PR.id pr)
+    | `Ref r -> `Ref (job.parent.repo, CI_github_hooks.Ref.name r)
   in
-  ((job.parent.repo, target), job.name)
+  target, job.name
 
 let pp_target f target =
   match target.head with
@@ -77,8 +77,8 @@ let job_name j = j.name
 let repo target = target.repo
 
 type project = {
-  make_terms : CI_target.Full.t -> string CI_term.t String.Map.t;
-  canaries : CI_target.ID_Set.t option;
+  make_terms : CI_target.t -> string CI_term.t String.Map.t;
+  canaries : CI_target.Set.t option;
   mutable open_prs : target CI_github_hooks.PR.Index.t;
   mutable refs : target CI_github_hooks.Ref.Index.t;
 }
@@ -126,7 +126,7 @@ let create ~web_ui ?canaries connect_dk projects =
           | None -> None
           | Some canaries ->
             Some (Repo.Map.find id canaries
-                 |> CI_utils.default CI_target.ID_Set.empty)
+                  |> CI_utils.default CI_target.Set.empty)
         in
         { make_terms;
           open_prs = CI_github_hooks.PR.Index.empty;
@@ -265,8 +265,16 @@ let apply_canaries canaries prs refs =
   match canaries with
   | None -> (prs, refs)
   | Some canaries ->
-    let prs = prs |> PR.Index.filter (fun id _ -> CI_target.ID_Set.mem (`PR id) canaries) in
-    let refs = refs |> Ref.Index.filter (fun id _ -> CI_target.ID_Set.mem (`Ref id) canaries) in
+    let prs =
+      PR.Index.filter (fun id t ->
+          CI_target.Set.mem (`PR (PR.repo t, id)) canaries
+        ) prs
+    in
+    let refs =
+      Ref.Index.filter (fun id t ->
+          CI_target.Set.mem (`Ref (Ref.repo t, id)) canaries
+        ) refs
+    in
     (prs, refs)
 
 let listen ?switch t =
@@ -283,7 +291,7 @@ let listen ?switch t =
           head = `PR pr;
           jobs = [];
         } in
-        let terms = project.make_terms (repo, `PR id) in
+        let terms = project.make_terms @@ `PR (repo, id) in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:open_pr name term)
         >>= fun jobs ->
@@ -306,7 +314,7 @@ let listen ?switch t =
           head = `Ref r;
           jobs = [];
         } in
-        let terms = project.make_terms (repo, `Ref id) in
+        let terms = project.make_terms @@ `Ref (repo, id) in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) -> make_job ~parent:target name term)
         >>= fun jobs ->

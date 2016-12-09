@@ -44,22 +44,20 @@ let pp_target f = function
 let github_target id =
   github >>= fun gh ->
   of_lwt_quick (CI_github_hooks.Snapshot.find id gh) >>= function
-  | None -> fail "Target %a does not exist" CI_target.Full.pp id
+  | None -> fail "Target %a does not exist" CI_target.pp id
   | Some x -> return x
 
 let head id =
   github_target id >|= CI_github_hooks.Target.head
 
-let ref_head project_id ref_name =
+let ref_head repo ref_name =
   match Datakit_path.of_string ref_name with
   | Error msg -> fail "Invalid ref name %S: %s" ref_name msg
-  | Ok ref_path -> head (project_id, `Ref (Datakit_path.unwrap ref_path))
+  | Ok ref_path -> head @@ `Ref (repo, Datakit_path.unwrap ref_path)
 
-let branch_head project_id branch =
-  ref_head project_id ("heads/" ^ branch)
+let branch_head repo branch = ref_head repo ("heads/" ^ branch)
 
-let tag project_id tag =
-  ref_head project_id ("tags/" ^ tag)
+let tag repo tag = ref_head repo ("tags/" ^ tag)
 
 let ci_state fn ci t =
   head t >>= fun commit ->

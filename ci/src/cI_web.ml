@@ -10,7 +10,7 @@ type t = {
   ci : CI_engine.t;
   logs : CI_live_log.manager;
   server : CI_web_utils.server;
-  dashboards : CI_target.ID_Set.t Repo.Map.t;
+  dashboards : CI_target.Set.t Repo.Map.t;
 }
 
 class virtual http_page t = object(self)

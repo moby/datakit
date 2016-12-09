@@ -20,7 +20,7 @@ end
 val connect : logs:Live_log.manager -> dir:string -> t
 (** [connect ~logs ~dir] is the local Git repository at [dir]. *)
 
-val fetch_head : t -> Target.Full.t -> Commit.t Term.t
+val fetch_head : t -> Target.t -> Commit.t Term.t
 (** [fetch_head t target] evaluates to a local branch in [t] with a copy of [target]'s head commit (downloading it first if needed). *)
 
 val with_checkout : log:Live_log.t -> job_id:job_id -> Commit.t -> (string -> 'a Lwt.t) -> 'a Lwt.t
@@ -43,4 +43,3 @@ val command : logs:Live_log.manager -> timeout:float -> label:string -> clone:bo
 
 val run : command -> Commit.t -> unit Term.t
 (** [run cmd commit] succeeds if running [cmd] in a checkout of [commit] returns an exit status of zero. *)
-

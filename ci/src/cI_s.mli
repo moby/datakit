@@ -4,7 +4,7 @@ type 'a lwt_status = ('a, [`Pending of string * unit Lwt.t | `Failure of string]
 (** ['a lwt_status] is similar to ['a or_error], except that the pending state also indicates when
     it should be checked again. *)
 
-type job_id = CI_target.Full.t * string
+type job_id = CI_target.t * string
 (** Used in logging and monitoring to identify the owning job. *)
 
 module type CONTEXT = sig

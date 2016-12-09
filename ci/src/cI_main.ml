@@ -18,7 +18,12 @@ let connect protocol address =
 
 let make_session_backend = function
   | `Memory -> `Memory
-  | `Redis addr -> `Redis (Lwt_pool.create 4 (fun () -> Redis_lwt.Client.connect addr))
+  | `Redis addr ->
+    (* Can't see a way to check whether a connection is still valid, so
+       just throw away any connection that fails.
+       See: https://github.com/0xffea/ocaml-redis/issues/44 *)
+    let check _ set_valid = set_valid false in
+    `Redis (Lwt_pool.create 4 ~check (fun () -> Redis_lwt.Client.connect addr))
 
 let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend =
   let { CI_config.web_config; projects } = config in

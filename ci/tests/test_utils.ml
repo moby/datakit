@@ -14,7 +14,23 @@ let ( >>*= ) x f =
 let ( >|*= ) x f =
   x >>*= fun x -> Lwt.return (f x)
 
-module Store = Irmin_unix.Irmin_git.Memory(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+(* FIXME: this is a bit ridiculous *)
+module Contents_string = struct
+  open !Irmin.Contents.String
+  type t = string
+  let equal = equal
+  let compare = compare
+  let hash = hash
+  let to_json = to_json
+  let of_json = of_json
+  let size_of = size_of
+  let write = write
+  let read = read
+  let merge _ = merge []
+  module Path = Ivfs_tree.Path
+end
+
+module Store = Irmin_unix.Irmin_git.Memory(Contents_string)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 let config = Irmin_mem.config ()
 
 (*

@@ -71,18 +71,18 @@ let check_metrics_token server provided =
   match String.cut ~sep:" " provided with
   | Some (typ, provided) when String.Ascii.lowercase typ = "bearer" ->
     begin match (CI_web_utils.web_config server).CI_web_templates.metrics_token with
-    | None -> false
-    | Some (`SHA256 expected_hash) ->
-      let user_hash = (Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)) in
-      if Cstruct.equal expected_hash user_hash then true
-      else (
-        Log.info (fun f ->
-            f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
-              Cstruct.hexdump_pp expected_hash
-              Cstruct.hexdump_pp user_hash
-          );
-        false
-      )
+      | None -> false
+      | Some (`SHA256 expected_hash) ->
+        let user_hash = (Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)) in
+        if Cstruct.equal expected_hash user_hash then true
+        else (
+          Log.info (fun f ->
+              f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
+                Cstruct.hexdump_pp expected_hash
+                Cstruct.hexdump_pp user_hash
+            );
+          false
+        )
     end
   | _ ->
     Log.info (fun f -> f "Bad token %S" provided);

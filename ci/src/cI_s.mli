@@ -85,7 +85,7 @@ module type TERM = sig
 
   val list_map_p : ('a -> 'b t) -> 'a list -> 'b list t
   (** [list_map_p fn l] will map the [l] list of terms to [fn] in parallel and
-     return the result list when all of them have completed. *)
+      return the result list when all of them have completed. *)
 
   val wait_for : 'a t -> while_pending:string -> on_failure:string -> unit t
   (** [wait_for t ~while_pending ~on_failure] evaluates successfully to unit if

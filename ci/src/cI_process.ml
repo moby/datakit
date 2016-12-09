@@ -44,8 +44,8 @@ let run_with_exit_status ?switch ?log ?cwd ?env ~output ?log_cmd cmd =
     fmt |> Format.kasprintf @@ fun msg ->
     Log.info (fun f -> f "%s" msg);
     match log with
-      | None -> ()
-      | Some log -> CI_live_log.log log "%s" msg
+    | None -> ()
+    | Some log -> CI_live_log.log log "%s" msg
   in
   info "Running %a" pp_cmd log_cmd;
   let is_running = ref true in

@@ -84,13 +84,13 @@ let ensure_dir ~mode path =
   let rec loop path =
     match Unix.stat path with
     | info ->
-        if info.Unix.st_kind = Unix.S_DIR then ()
-        else failf "Not a directory: %s" path
+      if info.Unix.st_kind = Unix.S_DIR then ()
+      else failf "Not a directory: %s" path
     | exception _ ->
-        let parent = Filename.dirname path in
-        assert (path <> parent);
-        loop parent;
-        Unix.mkdir path mode
+      let parent = Filename.dirname path in
+      assert (path <> parent);
+      loop parent;
+      Unix.mkdir path mode
   in
   loop path
 

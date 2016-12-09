@@ -12,5 +12,5 @@ val everyone : t
 val username : string -> t
 val github_org : string -> t
 val can_read_github : string -> t
- 
+
 val any : t list -> t

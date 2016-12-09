@@ -38,7 +38,7 @@ module Path = struct
      - /failure (if present) indicates that the build failed and contains the error
      - /value may contain extra artifacts/data (depending on the builder)
      - /rebuild-requested (if present) indicates that the current results are not acceptable
-   *)
+  *)
   let v = Datakit_path.of_string_exn
   let log     = v "log"
   let failure = v "failure"
@@ -234,18 +234,18 @@ module Make(B : CI_s.BUILDER) = struct
       Lwt_mutex.with_lock t.mutex @@ fun () ->
       conn () >>= fun dk ->
       match rebuild with
-        | true ->
-          mark_branch_for_rebuild t.builder conn k >|= fun () ->
-          do_build t ~rebuild:do_rebuild dk ctx k
-        | false ->
-          (* Check cache in DB *)
-          load_from_db t.builder ~rebuild:do_rebuild conn k >>= function
-          | None ->
-            Lwt.return (do_build t ~rebuild:do_rebuild dk ctx k)
-          | Some v ->
-            Log.info (fun f -> f "Loaded cached result from %s" (B.branch t.builder k));
-            t.cache <- M.add k v t.cache;
-            Lwt.return v
+      | true ->
+        mark_branch_for_rebuild t.builder conn k >|= fun () ->
+        do_build t ~rebuild:do_rebuild dk ctx k
+      | false ->
+        (* Check cache in DB *)
+        load_from_db t.builder ~rebuild:do_rebuild conn k >>= function
+        | None ->
+          Lwt.return (do_build t ~rebuild:do_rebuild dk ctx k)
+        | Some v ->
+          Log.info (fun f -> f "Loaded cached result from %s" (B.branch t.builder k));
+          t.cache <- M.add k v t.cache;
+          Lwt.return v
 
   let term t ctx k =
     let open! CI_term.Infix in

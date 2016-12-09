@@ -546,7 +546,7 @@ class login_page t = object(self)
         | Ok _, Error msg -> Wm.respond 403 ~body:(`String msg) rd
         | Ok user, Ok password ->
           match Auth.lookup t.auth ~user ~password with
-          | Some _ -> 
+          | Some _ ->
             CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
             let session = {session_data with Session_data.username = Some user} in
             self#session_set (Session_data.to_string session) rd >>= fun () ->

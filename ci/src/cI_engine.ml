@@ -219,10 +219,10 @@ let rec recalculate t ~snapshot job =
   let (old_head, old_state) = job.state in
   let new_hash = CI_github_hooks.Commit.hash (commit head) in
   begin if (old_head, old_state.CI_state.status, old_state.CI_state.descr) <> (new_hash, status, descr) then (
-    set_status t job.parent.project_id head job.name ~status ~descr
-  ) else (
-    Lwt.return ()
-  )
+      set_status t job.parent.project_id head job.name ~status ~descr
+    ) else (
+      Lwt.return ()
+    )
   end >|= fun () ->
   let state = (new_hash, { CI_state.status; descr; logs }) in
   job.state <- state

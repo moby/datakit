@@ -205,7 +205,7 @@ module Term : sig
 
   val list_map_p : ('a -> 'b t) -> 'a list -> 'b list t
   (** [list_map_p fn l] will map the [l] list of terms to [fn] in parallel and
-     return the result list when all of them have completed. *)
+      return the result list when all of them have completed. *)
 
   val wait_for : 'a t -> while_pending:string -> on_failure:string -> unit t
   (** [wait_for t ~while_pending ~on_failure] evaluates successfully to unit if
@@ -281,14 +281,14 @@ module Web : sig
     can_read:ACL.t ->
     can_build:ACL.t ->
     unit -> config
-  (** [config ~name ~state_repo ~can_read ~can_build ()] is a web configuration.
-      If [name] is given, it is used as the main heading, and also as the name of the session cookie
-      (useful if you run multiple CIs on the same host, on different ports).
-      If [state_repo] is given, it is used to construct links to the state repository on GitHub.
-      If [metrics_token] is [Some (`SHA256 expected)] given then doing an HTTP
-      GET on [/metrics] with an Authorization header containing "Bearer TTT"
-      will return Prometheus-format metrics if sha256(TTT) = expected. There is
-      no rate limiting, so pick a long [token]. *)
+    (** [config ~name ~state_repo ~can_read ~can_build ()] is a web configuration.
+        If [name] is given, it is used as the main heading, and also as the name of the session cookie
+        (useful if you run multiple CIs on the same host, on different ports).
+        If [state_repo] is given, it is used to construct links to the state repository on GitHub.
+        If [metrics_token] is [Some (`SHA256 expected)] given then doing an HTTP
+        GET on [/metrics] with an Authorization header containing "Bearer TTT"
+        will return Prometheus-format metrics if sha256(TTT) = expected. There is
+        no rate limiting, so pick a long [token]. *)
 end
 
 module Config : sig

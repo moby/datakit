@@ -12,8 +12,7 @@ type t = {
   projects : project CI_projectID.Map.t;
 }
 
-let id_of_branch name =
-  `Ref (Datakit_path.of_string_exn ("heads/" ^ name))
+let id_of_branch name = `Ref ("heads/" ^ name)
 
 let project ~id ?(dashboards=["master"]) tests =
   let id = CI_projectID.of_string_exn id in

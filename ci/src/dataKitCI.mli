@@ -101,7 +101,7 @@ module Github_hooks : sig
     type t
 
     val project : t -> ProjectID.t
-    val name : t -> Datakit_path.t
+    val name : t -> string
     val head : t -> Commit.t
     val dump : t Fmt.t
     val compare : t -> t -> int
@@ -130,7 +130,7 @@ type 'a lwt_status = ('a, [`Pending of string * unit Lwt.t | `Failure of string]
 
 module Target : sig
   module ID : sig
-    type t = [ `PR of int | `Ref of Datakit_path.t ]
+    type t = [ `PR of int | `Ref of string ]
     val pp : t Fmt.t
     val compare : t -> t -> int
   end

@@ -1,3 +1,4 @@
+open Astring
 open CI_utils
 open! Result
 
@@ -42,7 +43,7 @@ module Ref : sig
   type t
 
   val project : t -> CI_projectID.t
-  val name : t -> Datakit_path.t
+  val name : t -> string
   val head : t -> Commit.t
   val dump : t Fmt.t
   val compare : t -> t -> int
@@ -65,8 +66,9 @@ end
 module Snapshot : sig
   type t
 
-  val project : t -> CI_projectID.t -> (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t
-  (** [project snapshot p] is the state of the open PRs, branches and tags in [snapshot] for project [p]. *)
+  val project : t -> CI_projectID.t -> (PR.t CI_utils.IntMap.t * Ref.t String.Map.t) Lwt.t
+  (** [project snapshot p] is the state of the open PRs, branches and
+      tags in [snapshot] for project [p]. *)
 
   val find : CI_target.Full.t -> t -> Target.t option Lwt.t
 end
@@ -75,8 +77,10 @@ val snapshot : t -> Snapshot.t Lwt.t
 (** [snapshot t] is a snapshot of the current head of the metadata branch. *)
 
 val enable_monitoring : t -> CI_projectID.t list -> unit Lwt.t
-(** [enable_monitoring t projects] ensures that a [".monitor"] file exists for each project in [projects], creating them as needed. *)
+(** [enable_monitoring t projects] ensures that a [".monitor"] file
+    exists for each project in [projects], creating them as needed. *)
 
 val monitor : t -> ?switch:Lwt_switch.t -> (Snapshot.t -> unit Lwt.t) -> [`Abort] Lwt.t
-(** [monitor t fn] is a thread that watches the "github-metadata" branch and calls [fn snapshot] on each update.
-    Returns [`Abort] when the switch is turned off. *)
+(** [monitor t fn] is a thread that watches the "github-metadata"
+    branch and calls [fn snapshot] on each update.  Returns [`Abort]
+    when the switch is turned off. *)

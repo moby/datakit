@@ -20,7 +20,7 @@ depends: [
   "topkg"      {build}
   "datakit-server" {>= "0.7.0"}
   "cmdliner"
-  "rresult" "astring" "fmt"
+  "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.9.3"}
   "mirage-tc" "uri"
   "mirage-types"

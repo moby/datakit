@@ -16,12 +16,12 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 ### datakit
 
 <src/datakit>: include
-<src/datakit/ivfs*>: package(irmin tc datakit-server.vfs)
+<src/datakit/ivfs*>: package(irmin tc datakit-server.vfs asetmap)
 
 #### irmin-io
 <src/datakit/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
 
-<src/datakit/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
+<src/datakit/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt asetmap)
 <src/datakit/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
 <src/datakit/main.*>: package(irmin.http cohttp.lwt irmin-watcher), thread
 <src/datakit/main.*>: package(datakit-server.vfs datakit-server.fs9p)

@@ -1,6 +1,11 @@
 open Lwt.Infix
 open Result
 
+module Path = Ivfs_tree.Path
+
+type path = Path.t
+type step = Path.Step.t
+
 let ( >>*= ) x f =
   x >>= function
   | Ok y -> f y
@@ -31,7 +36,7 @@ module Make (Tree : Ivfs_tree.S) = struct
   let update_dir ~file_on_path t path fn =
     Lwt_mutex.with_lock t.mutex @@ fun () ->
     let rec aux base path =
-      match Irmin.Path.String_list.decons path with
+      match Path.decons path with
       | None -> fn base
       | Some (p, ps) ->
         begin Tree.Dir.lookup base p >>= function

@@ -3,22 +3,66 @@
 open Astring
 open Lwt.Infix
 
-type step = string
-type path = string list
 type perm = [ `Normal | `Exec | `Link ]
 
-module Path = Irmin.Path.String_list
+module Path: Irmin.Path.S with type step = string = struct
+
+  type step = string
+
+  module Step = struct
+    include Tc.String
+    let to_hum s = s
+    let of_hum = function
+      | "" -> invalid_arg "Empty step!"
+      | s  -> s
+  end
+
+  include Tc.List(Step)
+  let to_json t = to_json (List.rev t)
+  let of_json j = List.rev (of_json j)
+
+  let empty = []
+  let is_empty l = (l = [])
+  let cons s t = t @ [s]
+  let rcons t s = s :: t
+
+  let rdecons = function
+    | []   -> None
+    | h::t -> Some (t, h)
+
+  let decons l =
+    match List.rev l with
+    | []   -> None
+    | h::t -> Some (h, List.rev t)
+
+  let map l f = List.map f l
+  let create x = x
+  let to_hum t = String.concat ~sep:"/" (List.rev t)
+
+  (* XXX: slow *)
+  let of_hum s =
+    List.filter ((<>)"") (String.cuts s ~sep:"/")
+    |> List.map Step.of_hum
+    |> List.rev
+
+end
+
+type path = Path.t
+type step = Path.Step.t
+
 module PathMap = struct
   include Map.Make(Path)
   let of_list l = List.fold_left (fun m (k, v) -> add k v m) empty l
 end
 module PathSet = Set.Make(Path)
 
+module StepMap = Asetmap.Map.Make(Path.Step)
+
 module type STORE = Irmin.S
-  with type key = string list
+  with type key = path
    and type value = string
    and type branch_id = string
-   and module Key = Irmin.Path.String_list
+   and module Key = Path
    and type Private.Node.Val.step = string
    and type Private.Node.Val.Metadata.t = perm
 
@@ -46,7 +90,7 @@ module type S = sig
     val lookup_path:
       t -> path -> [`File of File.t * perm | `Directory of t | `None ] Lwt.t
     val get: t -> path -> t option Lwt.t
-    val map: t -> [`File of File.t * perm | `Directory of t] String.Map.t Lwt.t
+    val map: t -> [`File of File.t * perm | `Directory of t] StepMap.t Lwt.t
     val ls: t -> ([`File | `Directory] * step) list Lwt.t
     val iter: t -> (path -> File.t * perm  -> unit Lwt.t) -> unit Lwt.t
     val of_hash: repo -> hash -> t
@@ -121,8 +165,7 @@ module Make (Store: STORE) = struct
 
   module Dir = struct
     type hash = Store.Private.Node.Key.t
-
-    type map = [`File of File.t * perm | `Directory of t] String.Map.t
+    type map = [`File of File.t * perm | `Directory of t] StepMap.t
 
     and value =
       | Hash of hash * map Lwt.t Lazy.t
@@ -133,7 +176,7 @@ module Make (Store: STORE) = struct
       mutable value: value;
     }
 
-    let empty repo = {repo; value = Map_only String.Map.empty}
+    let empty repo = {repo; value = Map_only StepMap.empty}
 
     let map dir =
       match dir.value with
@@ -146,34 +189,34 @@ module Make (Store: STORE) = struct
         Store.Private.Node.read_exn node_t hash >|= fun node ->
         Store.Private.Node.Val.alist node
         |> List.fold_left (fun acc (name, item) ->
-            acc |> String.Map.add name (
+            acc |> StepMap.add (Path.Step.of_hum name) (
               match item with
               | `Contents (h, perm) -> `File (File.of_hash repo h, perm)
               | `Node h -> `Directory (of_hash repo h)
             )
-          ) String.Map.empty
+          ) StepMap.empty
       ) in
       { repo; value = Hash (hash, map) }
 
     let ty dir step =
       map dir >|= fun m ->
-      match String.Map.find step m with
+      match StepMap.find step m with
       | None -> `None
       | Some (`File _) -> `File
       | Some (`Directory _) -> `Directory
 
     let lookup dir step =
       map dir >|= fun m ->
-      match String.Map.find step m with
+      match StepMap.find step m with
       | Some (`Directory _ | `File _ as r) -> r
       | None -> `None
 
-    let rec lookup_path dir = function
-      | [] -> Lwt.return (`Directory dir)
-      | p::ps ->
+    let rec lookup_path dir path = match Path.decons path with
+      | None         -> Lwt.return (`Directory dir)
+      | Some (p, ps) ->
         lookup dir p >>= function
         | `Directory d -> lookup_path d ps
-        | `File _ as x when ps = [] -> Lwt.return x
+        | `File _ as x when Path.is_empty ps -> Lwt.return x
         | `None | `File _ -> Lwt.return `None
 
     let get dir path =
@@ -184,7 +227,7 @@ module Make (Store: STORE) = struct
     (* TODO: just return the full map, now that we load it anyway *)
     let ls dir =
       map dir >|= fun m ->
-      String.Map.bindings m
+      StepMap.bindings m
       |> List.map (fun (name, value) ->
           match value with
           | `File _ -> `File, name
@@ -195,19 +238,20 @@ module Make (Store: STORE) = struct
       match t.value with
       | Hash (h, _) -> Lwt.return h
       | Map_only m ->
-        String.Map.bindings m
+        StepMap.bindings m
         |> Lwt_list.fold_left_s (fun acc item ->
             match item with
             | name, `File (f, perm) ->
-              File.hash f >|= fun h -> (name, `Contents (h, perm)) :: acc
+              File.hash f >|= fun h ->
+              (Path.Step.to_hum name, `Contents (h, perm)) :: acc
             | name, `Directory d ->
               map d >>= fun map ->
-              if String.Map.is_empty map then (
+              if StepMap.is_empty map then (
                 (* Ignore empty directories *)
                 Lwt.return acc
               ) else (
                 hash d >|= fun h ->
-                (name, `Node h) :: acc
+                (Path.Step.to_hum name, `Node h) :: acc
               )
           ) []
         >|= Store.Private.Node.Val.create
@@ -217,12 +261,12 @@ module Make (Store: STORE) = struct
 
     let with_child t step child =
       map t >|= fun m ->
-      let m = String.Map.add step child m in
+      let m = StepMap.add step child m in
       { repo = t.repo; value = Map_only m }
 
     let without_child t step =
       map t >|= fun m ->
-      let m = String.Map.remove step m in
+      let m = StepMap.remove step m in
       { repo = t.repo; value = Map_only m }
 
     module KV = struct
@@ -243,17 +287,17 @@ module Make (Store: STORE) = struct
         | []            -> Lwt.return_unit
         | (t, path)::tl ->
           map t >>= fun childs ->
-          let childs = String.Map.bindings childs in
+          let childs = StepMap.bindings childs in
           Lwt_list.fold_left_s (fun acc (k, v) ->
               match v with
-              | `Directory  t -> Lwt.return ((t, path @ [k]) :: acc)
-              | `File f       -> fn (path @ [k]) f >|= fun () -> acc
+              | `Directory  t -> Lwt.return ((t, Path.rcons path k) :: acc)
+              | `File f       -> fn (Path.rcons path k) f >|= fun () -> acc
             ) [] childs
           >>= fun dirs ->
           let todo = dirs @ tl in
           aux todo
       in
-      aux [t, []]
+      aux [t, Path.empty]
 
     let diff x y =
       let set t =
@@ -306,7 +350,7 @@ module Make (Store: STORE) = struct
 
   let snapshot store =
     let repo = Store.repo store in
-    Store.Private.read_node store [] >|= function
+    Store.Private.read_node store Path.empty >|= function
     | None -> Dir.empty repo
     | Some hash -> Dir.of_hash repo hash
 

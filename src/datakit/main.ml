@@ -45,11 +45,26 @@ let make_task msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
   Irmin.Task.create ~date ~owner:"datakit <datakit@docker.com>" msg
 
+(* FIXME: this is a bit ridiculous *)
+module Contents_string = struct
+  open Irmin.Contents.String
+  type t = string
+  let equal = equal
+  let compare = compare
+  let hash = hash
+  let to_json = to_json
+  let of_json = of_json
+  let size_of = size_of
+  let write = write
+  let read = read
+  let merge _ = merge []
+  module Path = Ivfs_tree.Path
+end
 module Git_fs_store = struct
   open Irmin
   module Store =
     Irmin_git.FS(Ir_io.Sync)(Ir_io.Zlib)(Ir_io.Lock)(Ir_io.FS)
-      (Contents.String)(Ref.String)(Hash.SHA1)
+      (Contents_string)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
   let listener = lazy (
@@ -70,7 +85,7 @@ end
 module In_memory_store = struct
   open Irmin
   module Store = Irmin_git.Memory
-      (Ir_io.Sync)(Ir_io.Zlib)(Contents.String)(Ref.String) (Hash.SHA1)
+      (Ir_io.Sync)(Ir_io.Zlib)(Contents_string)(Ref.String) (Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
 

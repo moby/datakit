@@ -98,8 +98,24 @@ let () =
   Logs.set_reporter (reporter ());
   ()
 
+(* FIXME: this is a bit ridiculous *)
+module Contents_string = struct
+  open Irmin.Contents.String
+  type t = string
+  let equal = equal
+  let compare = compare
+  let hash = hash
+  let to_json = to_json
+  let of_json = of_json
+  let size_of = size_of
+  let write = write
+  let read = read
+  let merge _ = merge []
+  module Path = Ivfs_tree.Path
+end
+
 module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)
-    (Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+    (Contents_string)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 
 module Tree = Ivfs_tree.Make(Store)
 module RW = Ivfs_rw.Make(Tree)

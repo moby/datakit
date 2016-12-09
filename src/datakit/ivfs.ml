@@ -31,7 +31,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
   type repo = Store.Repo.t
   let empty_inode_map: Vfs.Inode.t String.Map.t = String.Map.empty
 
-  module Path = Irmin.Path.String_list
+  module Path = Ivfs_tree.Path
   module Tree = Ivfs_tree.Make(Store)
   module RW = Ivfs_rw.Make(Tree)
   module Merge = Ivfs_merge.Make(Store)(RW)
@@ -65,7 +65,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     Vfs.File.of_kvro ~read ~stat
 
   let irmin_rw_file ~remove_conflict ~view path =
-    match Irmin.Path.String_list.rdecons path with
+    match Path.rdecons path with
     | None -> assert false
     | Some (dir, leaf) ->
       let blob () =
@@ -169,7 +169,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       let remove () = Vfs.Dir.err_read_only in
       Vfs.Dir.read_only ~ls ~lookup ~remove |> Vfs.Inode.dir name
     in
-    irmin_ro_dir []
+    irmin_ro_dir Path.empty
 
   let read_only store = ro_tree ~get_root:(fun () -> Tree.snapshot store)
 
@@ -179,12 +179,12 @@ module Make (Store : Ivfs_tree.STORE) = struct
       ) map items
 
   let rec has_prefix ~prefix p =
-    match prefix, p with
-    | [], _ -> true
-    | pre::pres, p::ps ->
+    match Path.decons prefix, Path.decons p with
+    | None, _ -> true
+    | Some (pre, pres), Some (p, ps) ->
       if pre = p then has_prefix ~prefix:pres ps
       else false
-    | _, [] -> false
+    | _ -> false
 
   (* Note: writing to a path removes it from [conflicts], if present *)
   let rw ~conflicts view =
@@ -261,11 +261,11 @@ module Make (Store : Ivfs_tree.STORE) = struct
         | Error _ ->
           let new_dir = get ~dir:path (`Directory, name) in
           extra_dirs := String.Map.add name new_dir !extra_dirs;
-          remove_conflict (Irmin.Path.String_list.rcons path name);
+          remove_conflict (Path.rcons path name);
           ok new_dir
       in
       let remove () =
-        match Irmin.Path.String_list.rdecons path with
+        match Path.rdecons path with
         | None -> err_read_only
         | Some (dir, leaf) ->
           (* FIXME: is this correct? *)
@@ -296,7 +296,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename |>
       Vfs.Inode.dir name
     in
-    irmin_rw_dir []
+    irmin_rw_dir Path.empty
 
   let transactions_ctl ~merge ~remover = function
     | "close" -> Lazy.force remover >|= fun () -> Ok ""
@@ -317,7 +317,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let lines =
       conflicts
       |> PathSet.elements
-      |> List.map (fun n -> String.concat ~sep:"/" n ^ "\n")
+      |> List.map (fun p -> Path.to_hum p ^ "\n")
     in
     Cstruct.of_string (String.concat ~sep:"" lines)
 
@@ -356,7 +356,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
 
   let make_instance store ~remover _name =
-    let path = [] in
+    let path = Path.empty in
     let msg_file, get_msg = Vfs.File.rw_of_string "" in
     let store1 = store "snapshot" in
     let repo = Store.repo store1 in
@@ -662,7 +662,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       [
         read_only ~name:"ro" (store "ro");
         Vfs.Inode.dir  "transactions" (transactions store);
-        Vfs.Inode.dir  "watch"        (watch_dir ~path:[] @@ store "watch");
+        Vfs.Inode.dir  "watch"        (watch_dir ~path:Path.empty @@ store "watch");
         Vfs.Inode.file "head.live"    (head_live @@ store "watch");
         Vfs.Inode.file "fast-forward" (fast_forward_merge store);
         Vfs.Inode.file "reflog"       (reflog @@ store "watch");

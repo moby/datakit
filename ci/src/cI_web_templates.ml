@@ -1,3 +1,4 @@
+open Datakit_github
 open! Astring
 open! Tyxml.Html
 
@@ -46,42 +47,42 @@ let log_branch_results_url t branch =
 
 let gh_target_url = function
   | `PR pr ->
-    let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
+    let { Repo.user; repo } = CI_github_hooks.PR.repo pr in
     let id = CI_github_hooks.PR.id pr in
-    Printf.sprintf "https://github.com/%s/%s/pull/%d" user project id
+    Printf.sprintf "https://github.com/%s/%s/pull/%d" user repo id
   | `Ref r ->
-    let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
+    let { Repo.user; repo } = CI_github_hooks.Ref.repo r in
     let id = CI_github_hooks.Ref.name r in
     match Datakit_path.unwrap id with
-    | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project (String.concat ~sep:"/" id)
-    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user project Datakit_path.pp id
+    | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user repo (String.concat ~sep:"/" id)
+    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user repo Datakit_path.pp id
 
 let metadata_url t = function
   | `PR pr ->
-    let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
+    let { Repo.user; repo } = CI_github_hooks.PR.repo pr in
     let id = CI_github_hooks.PR.id pr in
-    state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user project id
+    state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user repo id
   | `Ref r ->
-    let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
+    let { Repo.user; repo } = CI_github_hooks.Ref.repo r in
     let id = CI_github_hooks.Ref.name r in
-    state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user project
+    state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user repo
       Datakit_path.pp id
 
 let commit_history_url t target =
-  let { CI_projectID.user; project }, commit =
+  let { Repo.user; repo }, commit =
     match target with
-    | `PR pr -> CI_github_hooks.PR.project pr, CI_github_hooks.PR.head pr
-    | `Ref r -> CI_github_hooks.Ref.project r, CI_github_hooks.Ref.head r
+    | `PR pr -> CI_github_hooks.PR.repo pr, CI_github_hooks.PR.head pr
+    | `Ref r -> CI_github_hooks.Ref.repo r, CI_github_hooks.Ref.head r
   in
   let hash = CI_github_hooks.Commit.hash commit in
-  state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user project hash
+  state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user repo hash
 
-let commit_url ~project commit =
-  let { CI_projectID.user; project } = project in
-  Printf.sprintf "https://github.com/%s/%s/commit/%s" user project commit
+let commit_url ~repo commit =
+  let { Repo.user; repo } = repo in
+  Printf.sprintf "https://github.com/%s/%s/commit/%s" user repo commit
 
-let pr_url { CI_projectID.user; project} pr =
-  Printf.sprintf "/pr/%s/%s/%d" user project pr
+let pr_url { Repo.user; repo} pr =
+  Printf.sprintf "/pr/%s/%s/%d" user repo pr
 
 let escape_ref path =
   Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" (Datakit_path.unwrap path))
@@ -89,8 +90,8 @@ let escape_ref path =
 let unescape_ref s =
   Uri.pct_decode s |> Datakit_path.of_string_exn
 
-let ref_url { CI_projectID.user; project} r =
-  Printf.sprintf "/ref/%s/%s/%s" user project (escape_ref r)
+let ref_url { Repo.user; repo} r =
+  Printf.sprintf "/ref/%s/%s/%s" user repo (escape_ref r)
 
 let tag_map f map =
   Datakit_path.Map.fold (fun key value acc ->
@@ -317,7 +318,7 @@ let opt_warning ci =
 
 let pr_table (id, (prs, _)) =
   div [
-    h2 [pcdata (Fmt.strf "PR status for %a" CI_projectID.pp id)];
+    h2 [pcdata (Fmt.strf "PR status for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "PR"; heading "Title"; heading "State"; heading "Details"] ::
       (int_map (pr_job ~project:id) prs)
@@ -326,7 +327,7 @@ let pr_table (id, (prs, _)) =
 
 let branch_table (id, (_, refs)) =
   div [
-    h2 [pcdata (Fmt.strf "Branches for %a" CI_projectID.pp id)];
+    h2 [pcdata (Fmt.strf "Branches for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
       (branch_map (ref_job ~project:id) refs)
@@ -335,7 +336,7 @@ let branch_table (id, (_, refs)) =
 
 let tag_table (id, (_, refs)) =
   div [
-    h2 [pcdata (Fmt.strf "Tags for %a" CI_projectID.pp id)];
+    h2 [pcdata (Fmt.strf "Tags for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
       (tag_map (ref_job ~project:id) refs)
@@ -464,17 +465,17 @@ let user_page ~csrf_token =
 
 let main_page ~csrf_token ~ci ~dashboards =
   let projects = CI_engine.targets ci in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
-  let title = "CI: " ^ (CI_projectID.Map.bindings projects |> List.map title_of_project |> String.concat ~sep:" / ") in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
+  let title = "CI: " ^ (Repo.Map.bindings projects |> List.map title_of_project |> String.concat ~sep:" / ") in
   let dashboard_widgets =
     let combined =
-      CI_projectID.Map.merge (fun _ project_state dash_config ->
+      Repo.Map.merge (fun _ project_state dash_config ->
           match project_state, dash_config with
           | Some (_prs, refs), Some y -> Some (refs, y)
           | _ -> None
         ) projects dashboards
     in
-    CI_projectID.Map.fold dashboard_table combined []
+    Repo.Map.fold dashboard_table combined []
   in
   page title Nav.Home @@ opt_warning ci @ dashboard_widgets @ [
       h2 [pcdata "Resource pools"];
@@ -482,23 +483,23 @@ let main_page ~csrf_token ~ci ~dashboards =
     ]
 
 let prs_page ~ci =
-  let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
+  let projects = CI_engine.targets ci |> Repo.Map.bindings in
   let sections = List.map pr_table projects in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
   page title Nav.PRs @@ opt_warning ci @ sections
 
 let branches_page ~ci =
-  let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
+  let projects = CI_engine.targets ci |> Repo.Map.bindings in
   let sections = List.map branch_table projects in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
   page title Nav.Branches @@ opt_warning ci @ sections
 
 let tags_page ~ci =
-  let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
+  let projects = CI_engine.targets ci |> Repo.Map.bindings in
   let sections = List.map tag_table projects in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
   let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
   page title Nav.Tags @@ opt_warning ci @ sections
 
@@ -651,20 +652,20 @@ let target_commit = function
   | `PR pr -> CI_github_hooks.Commit.hash (CI_github_hooks.PR.head pr)
   | `Ref r -> CI_github_hooks.Commit.hash (CI_github_hooks.Ref.head r)
 
-let target_project = function
-  | `PR pr -> CI_github_hooks.PR.project pr
-  | `Ref r -> CI_github_hooks.Ref.project r
+let target_repo = function
+  | `PR pr -> CI_github_hooks.PR.repo pr
+  | `Ref r -> CI_github_hooks.Ref.repo r
 
 let target_page_url target =
-  let project = target_project target in
+  let repo = target_repo target in
   match target with
-  | `PR pr -> pr_url project (CI_github_hooks.PR.id pr)
-  | `Ref r -> ref_url project (CI_github_hooks.Ref.name r)
+  | `PR pr -> pr_url repo (CI_github_hooks.PR.id pr)
+  | `Ref r -> ref_url repo (CI_github_hooks.Ref.name r)
 
 let target_page ~csrf_token ~target jobs t =
   let target = CI_engine.git_target target in
   let title = target_title target in
-  let project = target_project target in
+  let repo = target_repo target in
   let commit = target_commit target in
   let page_url = target_page_url target in
   let best_log =
@@ -693,7 +694,7 @@ let target_page ~csrf_token ~target jobs t =
     p [
       a ~a:[a_href (gh_target_url target)] [pcdata title];
       pcdata " has head commit ";
-      a ~a:[a_href (commit_url ~project commit)] [pcdata commit];
+      a ~a:[a_href (commit_url ~repo commit)] [pcdata commit];
       pcdata " [ ";
       a ~a:[a_href (metadata_url t target)] [pcdata "head history"];
       pcdata " ]";

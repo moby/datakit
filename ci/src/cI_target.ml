@@ -1,5 +1,6 @@
+open Datakit_github
 open Astring
-open Asetmap
+open !Asetmap
 
 module ID = struct
   type t = [ `PR of int | `Ref of Datakit_path.t ]
@@ -18,9 +19,9 @@ end
 module ID_Set = Set.Make(ID)
 
 module Full = struct
-  type t = CI_projectID.t * ID.t
+  type t = Repo.t * ID.t
 
-  let project = fst
+  let repo = fst
   let id = snd
 
   let parse s =
@@ -50,21 +51,22 @@ module Full = struct
       | ty, _ -> `Error (Fmt.strf "Bad target type %S (should be heads/tags/prs)" ty)
     in
     slash "user" s >>= fun (user, s) ->
-    slash "project" s >>= fun (project, s) ->
+    slash "project" s >>= fun (repo, s) ->
+    let repo = Repo.v ~user ~repo in
     slash "ref_type" s >>= fun (ref_type, ref) ->
     parse_target (ref_type, ref) >>= fun target ->
-    `Ok (CI_projectID.v ~user ~project, target)
+    `Ok (repo, target)
 
   let pp f (project, target) =
-    Fmt.pf f "%a/%a" CI_projectID.pp project ID.pp target
+    Fmt.pf f "%a/%a" Repo.pp project ID.pp target
 
   let arg = parse, pp
 
   let map_of_list xs =
-    let map = ref CI_projectID.Map.empty in
-    xs |> List.iter (fun (p, target) ->
-        let old_targets = CI_projectID.Map.find p !map |> CI_utils.default ID_Set.empty in
-        map := !map |> CI_projectID.Map.add p (ID_Set.add target old_targets)
-      );
+    let map = ref Repo.Map.empty in
+    List.iter (fun (p, target) ->
+        let old_targets = Repo.Map.find p !map |> CI_utils.default ID_Set.empty in
+        map := !map |> Repo.Map.add p (ID_Set.add target old_targets)
+      ) xs;
     !map
 end

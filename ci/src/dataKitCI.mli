@@ -1,3 +1,5 @@
+open Datakit_github
+
 (** Datakit/CI
 
     DatakitCI is a library to build CI systems. FIXME.
@@ -62,25 +64,6 @@ module Live_log: sig
   (** [contents t] is the current contents of the buffer. *)
 end
 
-module ProjectID: sig
-  type t = private {
-    user: string;
-    project: string;
-  }
-  (** A project on GitHub *)
-
-  val v: user:string -> project:string -> t
-
-  val pp: t Fmt.t
-
-  val path: t -> Datakit_path.t
-
-  val of_string_exn: string -> t
-  (** [of_string_exn s] parses a string of the form "user/project". *)
-
-  module Map: Asetmap.Map.S with type key = t
-end
-
 module Github_hooks: sig
   module Commit_state: sig
     type t
@@ -103,7 +86,7 @@ module Github_hooks: sig
     val hash: t -> string
     val pp: t Fmt.t
     val state: CI.t -> t -> Commit_state.t
-    val project: t -> ProjectID.t
+    val repo: t -> Repo.t
   end
 
   module PR: sig
@@ -112,7 +95,7 @@ module Github_hooks: sig
     val id: t -> int
     val head: t -> Commit.t
     val title: t -> string
-    val project: t -> ProjectID.t
+    val repo: t -> Repo.t
     val dump: t Fmt.t
     val compare: t -> t -> int
   end
@@ -120,7 +103,7 @@ module Github_hooks: sig
   module Ref: sig
     type t
 
-    val project: t -> ProjectID.t
+    val repo: t -> Repo.t
     val name: t -> Datakit_path.t
     val head: t -> Commit.t
     val dump: t Fmt.t
@@ -158,9 +141,9 @@ module Target: sig
   end
 
   module Full: sig
-    type t = ProjectID.t * ID.t
+    type t = Repo.t * ID.t
 
-    val project: t -> ProjectID.t
+    val repo: t -> Repo.t
     val id: t -> ID.t
 
     val pp: t Fmt.t
@@ -277,13 +260,13 @@ module Term: sig
   val head: Target.Full.t -> Github_hooks.Commit.t t
   (** [head target] evaluates to the commit at the head [target]. *)
 
-  val branch_head: ProjectID.t -> string -> Github_hooks.Commit.t t
-  (** [branch_head project b] evaluates to the commit at the head of
-      branch [b] in [project]. *)
+  val branch_head: Repo.t -> string -> Github_hooks.Commit.t t
+  (** [branch_head repo b] evaluates to the commit at the head of
+      branch [b] in the repository [repo]. *)
 
-  val tag: ProjectID.t -> string -> Github_hooks.Commit.t t
-  (** [tag project t] evaluates to the commit of tag [t] in
-      [project]. *)
+  val tag: Repo.t -> string -> Github_hooks.Commit.t t
+  (** [tag repo t] evaluates to the commit of tag [t] in the
+      repository [repo]. *)
 
   val dk: (unit -> DK.t Lwt.t) t
   (** [dk] is a function for getting the current DataKit
@@ -557,7 +540,7 @@ module Private: sig
   val connect: Client9p.t -> DK.t
 
   val test_engine: web_ui:Uri.t -> (unit -> DK.t Lwt.t) ->
-    (Target.Full.t -> string Term.t String.Map.t) ProjectID.Map.t ->
+    (Target.Full.t -> string Term.t String.Map.t) Repo.Map.t ->
     engine
 
   val listen: ?switch:Lwt_switch.t -> engine -> [`Abort] Lwt.t

@@ -1,10 +1,12 @@
+open Datakit_github
+
 (** Access control lists. *)
 
 type t =
   [ `Everyone
   | `Username of string
   | `Github_org of string
-  | `Can_read of CI_projectID.t
+  | `Can_read of Repo.t
   | `Any of t list
   ]
 

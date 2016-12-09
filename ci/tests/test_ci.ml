@@ -1,3 +1,4 @@
+open Datakit_github
 open DataKitCI
 open! Astring
 open Utils
@@ -11,7 +12,7 @@ module Workflows = struct
   module T = DataKitCI.Term
   open T.Infix
 
-  let circle_success_url = T.ci_success_target_url "ci/circleci" 
+  let circle_success_url = T.ci_success_target_url "ci/circleci"
 
   let test_circleci_artifact check_build target =
     circle_success_url target >>= fun url ->
@@ -23,7 +24,7 @@ module Workflows = struct
     T.return (^) $ a $ b
 
   let test_cross_project _check_build target =
-    let other = ProjectID.v ~user:"bob" ~project:"bproj" in
+    let other = Repo.v ~user:"bob" ~repo:"bproj" in
     let pr = T.head target >|= Github_hooks.Commit.hash in
     let other_master = T.branch_head other "master" >|= Github_hooks.Commit.hash in
     T.return (Fmt.strf "Compile %s with %s") $ pr $ other_master
@@ -414,7 +415,7 @@ let test_auth () =
 let status_code = Alcotest.of_pp (Fmt.of_to_string Cohttp.Code.string_of_status)
 
 let test_roles conn =
-  let tests = CI_projectID.Map.of_list [
+  let tests = Repo.Map.of_list [
   ] in
   let dk = CI_utils.DK.connect conn in
   let ci = CI_engine.create ~web_ui:(Uri.of_string "http://localhost/") (fun () -> Lwt.return dk) tests in

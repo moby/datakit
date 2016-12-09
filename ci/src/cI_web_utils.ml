@@ -1,3 +1,4 @@
+open Datakit_github
 open! Astring
 open Sexplib.Std
 open Lwt.Infix
@@ -140,10 +141,21 @@ end
 
 module Auth = struct
   type password_file = (string * Hashed_password.t) list [@@deriving sexp]
-
+  module Repo = struct
+    include Repo
+    let t_of_sexp s =
+      let user, repo =
+        let open !Sexplib.Conv in
+        pair_of_sexp string_of_sexp string_of_sexp s
+      in
+      Repo.v ~user ~repo
+    let sexp_of_t t =
+      let open !Sexplib.Conv in
+      sexp_of_pair sexp_of_string sexp_of_string (t.Repo.user, t.Repo.repo)
+  end
   type user_attributes = {
     github_orgs : string list;
-    can_read_github : (CI_projectID.t * bool) list;
+    can_read_github : (Repo.t * bool) list;
   } [@@deriving sexp]
 
   type github_auth = {
@@ -235,17 +247,17 @@ module Auth = struct
            Lwt.try_bind (fun () ->
                Github.Monad.run begin
                  let open! Github.Monad in
-                 let {CI_projectID.user; project = repo} = project in
+                 let {Repo.user; repo} = project in
                  Github.Repo.info ~token ~user ~repo () >|= Github.Response.value
                end
              )
              (fun (_:Github_t.repository) ->
-                 Log.info (fun f -> f "%S can read %a" user CI_projectID.pp project);
+                 Log.info (fun f -> f "%S can read %a" user Repo.pp project);
                  Lwt.return true
              )
              (fun ex ->
-                Log.info (fun f -> f "%S can't read %a" user CI_projectID.pp project);
-                Log.debug (fun f -> f "%S can't read %a: %a" user CI_projectID.pp project Fmt.exn ex);
+                Log.info (fun f -> f "%S can't read %a" user Repo.pp project);
+                Log.debug (fun f -> f "%S can't read %a: %a" user Repo.pp project Fmt.exn ex);
                 Lwt.return false
              )
          in
@@ -264,7 +276,7 @@ type server = {
   has_role :
     role -> user:string option -> attrs:Auth.user_attributes ->
     (bool, CI_web_templates.Error.t) result;
-  acl_github_repos : CI_projectID.t list;       (* Repositories we need info about *)
+  acl_github_repos : Repo.t list;       (* Repositories we need info about *)
 }
 
 let cookie_key t =
@@ -295,11 +307,11 @@ let rec matches_acl ~user ~attrs = function
 
 let github_repos_in_policy acl =
   let rec aux acc = function
-  | `Can_read project -> CI_projectID.Set.add project acc
+  | `Can_read project -> Repo.Set.add project acc
   | `Any xs -> List.fold_left aux acc xs
   | `Everyone | `Username _ | `Github_org _ -> acc
   in
-  aux CI_projectID.Set.empty acl
+  aux Repo.Set.empty acl
 
 let server ~auth ~web_config ~session_backend =
   let has_role r ~user ~attrs =
@@ -309,10 +321,10 @@ let server ~auth ~web_config ~session_backend =
     | `LoggedIn -> Ok (user <> None)
   in
   let acl_github_repos =
-    CI_projectID.Set.union
+    Repo.Set.union
       (github_repos_in_policy web_config.CI_web_templates.can_read)
       (github_repos_in_policy web_config.CI_web_templates.can_build)
-    |> CI_projectID.Set.elements
+    |> Repo.Set.elements
   in
   let session_backend = Session.connect session_backend in
   { auth; session_backend; web_config; has_role; acl_github_repos }

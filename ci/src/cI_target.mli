@@ -1,4 +1,5 @@
-open Asetmap
+open Datakit_github
+open !Asetmap
 
 module ID : sig
   type t = [ `PR of int | `Ref of Datakit_path.t ]
@@ -9,10 +10,10 @@ end
 module ID_Set : Set.S with type elt = ID.t
 
 module Full : sig
-  type t = CI_projectID.t * ID.t
+  type t = Repo.t * ID.t
   val pp : t Fmt.t
   val arg : t Cmdliner.Arg.converter
-  val project : t -> CI_projectID.t
+  val repo : t -> Repo.t
   val id : t -> ID.t
-  val map_of_list : t list -> ID_Set.t CI_projectID.Map.t
+  val map_of_list : t list -> ID_Set.t Repo.Map.t
 end

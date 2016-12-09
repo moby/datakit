@@ -1,3 +1,4 @@
+open Datakit_github
 open Result
 open Lwt.Infix
 open! Astring
@@ -193,12 +194,14 @@ let with_handler set_handler ~logs ?pending key fn =
   set_handler key (result, DataKitCI.Step_log.Live log);
   Lwt.wakeup waker ()
 
+let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)
+
 (* [with_ci conn workflow fn] is [fn ~logs ~switch dk with_handler], where:
    - switch is turned off when [fn] ends and will stop the CI
    - dk is a DataKit connection which never fails
    - with_handler can be used to register handlers for jobs the CI receives
  *)
-let with_ci ?(project=ProjectID.v ~user:"user" ~project:"project") conn workflow fn =
+let with_ci ?(repo=Repo.v ~user:"user" ~repo:"project") conn workflow fn =
   let logs = Private.create_logs () in
   let handlers = ref String.Map.empty in
   let check_build key () =
@@ -209,13 +212,13 @@ let with_ci ?(project=ProjectID.v ~user:"user" ~project:"project") conn workflow
   let web_ui = Uri.of_string "https://localhost/" in
   let dk = Private.connect conn in
   let ci = Private.test_engine ~web_ui (fun () -> Lwt.return dk)
-      (ProjectID.Map.singleton project (fun t -> String.Map.singleton "test" (workflow check_build t)))
+      (Repo.Map.singleton repo (fun t -> String.Map.singleton "test" (workflow check_build t)))
   in
   Utils.with_switch @@ fun switch ->
   Lwt.async (fun () -> Private.listen ci ~switch);
   DK.branch dk "github-metadata" >>*= fun hooks ->
   (* Work-around for https://github.com/mirage/irmin/issues/373 *)
-  DK.Branch.wait_for_path hooks (ProjectID.path project / ".monitor") (function
+  DK.Branch.wait_for_path hooks (repo_root repo / ".monitor") (function
       | None -> Lwt.return (Ok `Again)
       | Some _ -> Lwt.return (Ok (`Finish ()))
     )

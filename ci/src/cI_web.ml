@@ -1,3 +1,4 @@
+open Datakit_github
 open! Astring
 open Lwt.Infix
 open CI_utils
@@ -9,7 +10,7 @@ type t = {
   ci : CI_engine.t;
   logs : CI_live_log.manager;
   server : CI_web_utils.server;
-  dashboards : CI_target.ID_Set.t CI_projectID.Map.t;
+  dashboards : CI_target.ID_Set.t Repo.Map.t;
 }
 
 class virtual http_page t = object(self)
@@ -142,12 +143,12 @@ class pr_page t = object(self)
 
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
-    let project = Rd.lookup_path_info_exn "project" rd in
+    let repo = Rd.lookup_path_info_exn "repo" rd in
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = int_of_string id in
-    let project = CI_projectID.v ~user ~project in
+    let project = Repo.v ~user ~repo in
     let projects = CI_engine.targets t.ci in
-    match CI_projectID.Map.find project projects with
+    match Repo.Map.find project projects with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (prs, _) ->
       match IntMap.find id prs with
@@ -166,12 +167,12 @@ class ref_page t = object(self)
 
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
-    let project = Rd.lookup_path_info_exn "project" rd in
+    let repo = Rd.lookup_path_info_exn "repo" rd in
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = CI_web_templates.unescape_ref id in
-    let project = CI_projectID.v ~user ~project in
+    let repo = Repo.v ~user ~repo in
     let projects = CI_engine.targets t.ci in
-    match CI_projectID.Map.find project projects with
+    match Repo.Map.find repo projects with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some (_, refs) ->
       match Datakit_path.Map.find id refs with
@@ -275,8 +276,8 @@ let routes ~logs ~ci ~server ~dashboards =
     ("branch",          fun () -> new branch_list t);
     ("tag",             fun () -> new tag_list t);
     (* Individual targets *)
-    ("pr/:user/:project/:id",                   fun () -> new pr_page t);
-    ("ref/:user/:project/:id",                  fun () -> new ref_page t);
+    ("pr/:user/:repo/:id",                   fun () -> new pr_page t);
+    ("ref/:user/:repo/:id",                  fun () -> new ref_page t);
     (* Logs *)
     ("log/live/:branch",                        fun () -> new live_log_page t);
     ("log/saved/:branch/:commit",               fun () -> new saved_log_page t);

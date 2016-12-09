@@ -1,3 +1,4 @@
+open Datakit_github
 include CI_s.TERM
 
 val pp_target : [`PR of CI_github_hooks.PR.t | `Ref of CI_github_hooks.Ref.t] Fmt.t
@@ -15,10 +16,10 @@ val job_id : CI_s.job_id t
 val head : CI_target.Full.t -> CI_github_hooks.Commit.t t
 (** [head target] evaluates to the commit at the head [target]. *)
 
-val branch_head : CI_projectID.t -> string -> CI_github_hooks.Commit.t t
+val branch_head : Repo.t -> string -> CI_github_hooks.Commit.t t
 (** [branch_head project b] evaluates to the commit at the head of branch [b] in [project]. *)
 
-val tag : CI_projectID.t -> string -> CI_github_hooks.Commit.t t
+val tag : Repo.t -> string -> CI_github_hooks.Commit.t t
 (** [tag project t] evaluates to the commit of tag [t] in [project]. *)
 
 val dk : (unit -> CI_utils.DK.t Lwt.t) t

@@ -1,3 +1,4 @@
+open Datakit_github
 open CI_utils
 open! Result
 
@@ -24,7 +25,7 @@ module Commit : sig
   val hash : t -> string
   val pp : t Fmt.t
   val state : CI.t -> t -> Commit_state.t
-  val project : t -> CI_projectID.t
+  val repo : t -> Repo.t
 end
 
 module PR : sig
@@ -33,7 +34,7 @@ module PR : sig
   val id : t -> int
   val head : t -> Commit.t
   val title : t -> string
-  val project : t -> CI_projectID.t
+  val repo : t -> Repo.t
   val dump : t Fmt.t
   val compare : t -> t -> int
 end
@@ -41,7 +42,7 @@ end
 module Ref : sig
   type t
 
-  val project : t -> CI_projectID.t
+  val repo : t -> Repo.t
   val name : t -> Datakit_path.t
   val head : t -> Commit.t
   val dump : t Fmt.t
@@ -50,7 +51,7 @@ end
 
 val connect : DK.t -> t
 
-val pr : t -> project_id:CI_projectID.t -> int -> PR.t option Lwt.t
+val pr : t -> repo:Repo.t -> int -> PR.t option Lwt.t
 
 val set_state : t -> CI.t -> status:Datakit_S.status_state -> descr:string ->
   ?target_url:Uri.t -> message:string -> Commit.t -> unit Lwt.t
@@ -65,8 +66,10 @@ end
 module Snapshot : sig
   type t
 
-  val project : t -> CI_projectID.t -> (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t
-  (** [project snapshot p] is the state of the open PRs, branches and tags in [snapshot] for project [p]. *)
+  val repo :
+    t -> Repo.t -> (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t
+  (** [repo snapshot r] is the state of the open PRs, branches and
+      tags in [snapshot] for repository [r]. *)
 
   val find : CI_target.Full.t -> t -> Target.t option Lwt.t
 end
@@ -74,7 +77,7 @@ end
 val snapshot : t -> Snapshot.t Lwt.t
 (** [snapshot t] is a snapshot of the current head of the metadata branch. *)
 
-val enable_monitoring : t -> CI_projectID.t list -> unit Lwt.t
+val enable_monitoring : t -> Repo.t list -> unit Lwt.t
 (** [enable_monitoring t projects] ensures that a [".monitor"] file exists for each project in [projects], creating them as needed. *)
 
 val monitor : t -> ?switch:Lwt_switch.t -> (Snapshot.t -> unit Lwt.t) -> [`Abort] Lwt.t

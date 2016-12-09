@@ -1,3 +1,5 @@
+open Datakit_github
+
 let key_bits = 4096
 
 open CI_utils
@@ -27,8 +29,8 @@ let make_session_backend = function
 
 let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend =
   let { CI_config.web_config; projects } = config in
-  let dashboards = CI_projectID.Map.map (fun p -> p.CI_config.dashboards) projects in
-  let projects = CI_projectID.Map.map (fun p -> p.CI_config.tests) projects in
+  let dashboards = Repo.Map.map (fun p -> p.CI_config.dashboards) projects in
+  let projects = Repo.Map.map (fun p -> p.CI_config.tests) projects in
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
   let github = CI_secrets.github_auth secrets in
   CI_web_utils.Auth.create ?github (CI_secrets.passwords_path secrets) >>= fun auth ->

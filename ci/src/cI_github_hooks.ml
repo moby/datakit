@@ -1,3 +1,5 @@
+open Datakit_github
+
 let refs_dir = Datakit_path.of_string_exn "ref"
 let prs_dir = Datakit_path.of_string_exn "pr"
 let commits_dir = Datakit_path.of_string_exn "commit"
@@ -14,12 +16,14 @@ open Lwt.Infix
 type t = DK.t
 
 type project_snapshot = {
-  project_id : CI_projectID.t;
+  repo : Repo.t;
   root : DK.Tree.t;
 }
 
-let read_file { project_id; root } path =
-  let path = CI_projectID.path project_id /@ path in
+let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)
+
+let read_file { repo; root } path =
+  let path = repo_root repo /@ path in
   DK.Tree.read_file root path
 
 let ensure_removed t path =
@@ -65,7 +69,7 @@ module Commit = struct
     hash : string;
   }
 
-  let project t = t.snapshot.project_id
+  let repo t = t.snapshot.repo
 
   let hash t = t.hash
 
@@ -88,7 +92,7 @@ module PR = struct
   let id t = t.id
   let head t = t.commit
   let title t = t.title
-  let project t = Commit.project t.commit
+  let repo t = Commit.repo t.commit
 
   let dump f t = Fmt.pf f "PR#%d (commit=%a;title=%s)" t.id Commit.pp t.commit t.title
 
@@ -104,7 +108,7 @@ module Ref = struct
     head : Commit.t;
   }
 
-  let project t = Commit.project t.head
+  let repo t = Commit.repo t.head
   let name t = t.name
   let head t = t.head
   let dump f t = Fmt.pf f "ref/%a (head=%a)"
@@ -123,7 +127,10 @@ let set_state t ci ~status ~descr ?target_url ~message commit =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.with_transaction metadata (fun t ->
       let snapshot = commit.Commit.snapshot in
-      let dir = CI_projectID.path snapshot.project_id /@ commits_dir / commit.Commit.hash / "status" /@ ci in
+      let dir =
+        repo_root snapshot.repo
+        /@ commits_dir / commit.Commit.hash / "status" /@ ci
+      in
       DK.Transaction.make_dirs t dir >>*= fun () ->
       let update leaf data =
         DK.Transaction.create_or_replace_file t (dir / leaf) (Cstruct.of_string (data ^ "\n"))
@@ -159,8 +166,8 @@ let read_opt_file snapshot path =
   | Error (`Msg "No such file or directory") -> None
   | Error e -> failf "Error reading %a: %a" Datakit_path.pp path DK.pp_error e
 
-let read_opt_dir {project_id; root} path =
-  let path = CI_projectID.path project_id /@ path in
+let read_opt_dir {repo; root} path =
+  let path = repo_root repo /@ path in
   DK.Tree.read_dir root path >|= function
   | Ok items -> items
   | Error (`Msg "No such file or directory") -> []
@@ -212,21 +219,22 @@ end
 module Snapshot = struct
   type t = {
     commit : DK.Commit.t;
-    mutable projects : (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t CI_projectID.Map.t;
+    mutable projects :
+      (PR.t CI_utils.IntMap.t * Ref.t Datakit_path.Map.t) Lwt.t Repo.Map.t;
   }
 
-  let project t project_id =
-    match CI_projectID.Map.find project_id t.projects with
+  let repo t r =
+    match Repo.Map.find r t.projects with
     | Some p -> p
     | None ->
       let p =
         let root = DK.Commit.tree t.commit in
-        let p_snapshot = { project_id; root } in
+        let p_snapshot = { repo = r; root } in
         prs p_snapshot >>= fun prs ->
         refs p_snapshot >>= fun refs ->
         Lwt.return (prs, refs)
       in
-      t.projects <- CI_projectID.Map.add project_id p t.projects;
+      t.projects <- Repo.Map.add r p t.projects;
       p
 
   let ( >|?= ) x f =
@@ -235,7 +243,7 @@ module Snapshot = struct
     | Some y -> Some (f y)
 
   let find id t =
-    project t (CI_target.Full.project id) >|= fun (prs, refs) ->
+    repo t (CI_target.Full.repo id) >|= fun (prs, refs) ->
     match CI_target.Full.id id with
     | `PR pr -> IntMap.find pr prs >|?= fun x -> `PR x
     | `Ref x ->
@@ -248,14 +256,14 @@ let snapshot t =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.head metadata >|*= function
   | None -> failf "Metadata branch does not exist!"
-  | Some commit -> { Snapshot.commit; projects = CI_projectID.Map.empty }
+  | Some commit -> { Snapshot.commit; projects = Repo.Map.empty }
 
 let enable_monitoring t projects =
   DK.branch t metadata_branch >>*= fun metadata_branch ->
   DK.Branch.with_transaction metadata_branch (fun tr ->
       let changes = ref false in
       projects |> Lwt_list.iter_s (fun p ->
-          let dir = CI_projectID.path p in
+          let dir = repo_root p in
           let path = dir / ".monitor" in
           DK.Transaction.exists_file tr path >>*= function
           | true -> Lwt.return ()
@@ -280,17 +288,17 @@ let monitor t ?switch fn =
   DK.Branch.wait_for_head metadata ?switch (function
       | None -> ok `Again
       | Some commit ->
-        let snapshot = { Snapshot.commit; projects = CI_projectID.Map.empty } in
+        let snapshot = { Snapshot.commit; projects = Repo.Map.empty } in
         fn snapshot >>= fun () -> ok `Again
     )
   >|*= function
   | `Abort -> `Abort
   | `Finish `Never -> assert false
 
-let pr t ~project_id id =
+let pr t ~repo id =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.head metadata >>*= function
   | None -> Lwt.return None
   | Some head ->
     let root = DK.Commit.tree head in
-    pr { project_id; root } id
+    pr { repo; root } id

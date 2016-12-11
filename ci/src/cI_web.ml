@@ -2,6 +2,7 @@ open Datakit_github
 open! Astring
 open Lwt.Infix
 open CI_utils
+open CI_utils.Infix
 
 module Wm = CI_web_utils.Wm
 module Rd = Webmachine.Rd

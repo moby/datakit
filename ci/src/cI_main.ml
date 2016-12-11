@@ -3,6 +3,7 @@ open Datakit_github
 let key_bits = 4096
 
 open CI_utils
+open CI_utils.Infix
 open! Astring
 open Lwt.Infix
 

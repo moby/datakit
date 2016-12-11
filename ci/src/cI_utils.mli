@@ -15,13 +15,14 @@ module DK: sig
   val connect: Client9p.t -> t
 end
 
+module Infix: sig
+  val ( >>*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+  val ( >|*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+end
+
 val chdir_lock: Lwt_mutex.t
 
 val ok: 'a -> ('a, 'b) result Lwt.t
-
-val ( >>*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-val ( >|*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
 val return_error:
   ('a, Format.formatter, unit, ('b, string) result Lwt.t) format4 -> 'a

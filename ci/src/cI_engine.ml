@@ -1,5 +1,6 @@
 open Datakit_github
 open CI_utils
+open CI_utils.Infix
 open Result
 open! Astring
 open Lwt.Infix

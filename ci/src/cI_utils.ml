@@ -14,14 +14,16 @@ let chdir_lock = Lwt_mutex.create ()
 
 let ok x = Lwt.return (Ok x)
 
-(* Chain operations together, returning early if we get an error *)
-let ( >>*= ) x f =
-  x >>= function
-  | Ok x -> f x
-  | Error (`Msg msg) -> Lwt.fail (Failure msg)
+module Infix = struct
+  (* Chain operations together, returning early if we get an error *)
+  let ( >>*= ) x f =
+    x >>= function
+    | Ok x -> f x
+    | Error (`Msg msg) -> Lwt.fail (Failure msg)
 
-let ( >|*= ) x f =
-  x >>*= fun x -> Lwt.return (f x)
+  let ( >|*= ) x f =
+    x >>*= fun x -> Lwt.return (f x)
+end
 
 let return_error fmt =
   fmt |> Fmt.kstrf @@ fun msg -> Lwt.return (Error msg)

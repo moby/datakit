@@ -1,4 +1,5 @@
 open CI_utils
+open CI_utils.Infix
 open Lwt.Infix
 
 module Metrics = struct
@@ -255,4 +256,3 @@ module Make(B : CI_s.BUILDER) = struct
       )
 
 end
-

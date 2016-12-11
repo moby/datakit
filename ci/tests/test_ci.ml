@@ -1,7 +1,7 @@
 open Datakit_github
 open DKCI
 open! Astring
-open Utils
+open DKCI.Utils.Infix
 
 let ( / ) = Datakit_path.Infix.( / )
 

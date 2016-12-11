@@ -62,15 +62,6 @@ module Live_log: sig
   (** [contents t] is the current contents of the buffer. *)
 end
 
-module Github_hooks: sig
-
-  module CI: sig
-    type t = string list
-    val circle_ci: t
-    val datakit_ci: string -> t
-  end
-end
-
 module Step_log: sig
   type saved
 

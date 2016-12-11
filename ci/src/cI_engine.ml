@@ -185,6 +185,8 @@ let monitor t ?switch fn =
   | `Abort -> `Abort
   | `Finish `Never -> assert false
 
+let datakit_ci x = ["ci"; "datakit"; x]
+
 let set_status t target name ~status ~descr =
   let { Repo.user; repo } = match target with
     | `PR x -> PR.repo x | `Ref x -> Ref.repo x
@@ -214,7 +216,7 @@ let set_status t target name ~status ~descr =
       name Status_state.pp status
   in
   let status =
-    let ci = CI_github_hooks.CI.datakit_ci name in
+    let ci = datakit_ci name in
     Status.v ~description:descr ~url commit ci status
   in
   update_status t ~message status
@@ -291,7 +293,7 @@ let rec recalculate t ~snapshot job =
 
 let make_job snapshot ~parent name term =
   let head_commit = commit parent.head in
-  let id = head_commit, CI_github_hooks.CI.datakit_ci name in
+  let id = head_commit, datakit_ci name in
   Conv.status snapshot id >|= fun status ->
   let state = match status with None -> None | Some s -> Some (Status.state s) in
   let descr = match status with None -> None | Some s -> Status.description s in

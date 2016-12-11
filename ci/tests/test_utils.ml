@@ -2,7 +2,7 @@ open Datakit_github
 open Result
 open Lwt.Infix
 open! Astring
-open DKCI
+open Datakit_ci
 
 let ( / ) = Datakit_path.Infix.( / )
 

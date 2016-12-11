@@ -1,7 +1,7 @@
 open Datakit_github
-open DKCI
+open Datakit_ci
 open! Astring
-open DKCI.Utils.Infix
+open Utils.Infix
 
 let ( / ) = Datakit_path.Infix.( / )
 
@@ -29,10 +29,10 @@ module Workflows = struct
     let other_master = T.branch_head other "master" >|= Commit.hash in
     T.return (Fmt.strf "Compile %s with %s") $ pr $ other_master
 
-  let ls = DKCI.Git.command ~timeout:60.0 ~label:"ls" ~clone:false [[| "ls" |]]
-  let ls_clone = DKCI.Git.command ~timeout:60.0 ~label:"ls" ~clone:true [[| "ls" |]]
+  let ls = Git.command ~timeout:60.0 ~label:"ls" ~clone:false [[| "ls" |]]
+  let ls_clone = Git.command ~timeout:60.0 ~label:"ls" ~clone:true [[| "ls" |]]
   let pull_and_run local_repo ~cmd check_build target =
-    DKCI.Git.fetch_head local_repo target >>= DKCI.Git.run cmd >>= fun () ->
+    Git.fetch_head local_repo target >>= Git.run cmd >>= fun () ->
     T.of_lwt_slow (check_build "a")
 
   let pass check_build _target =
@@ -329,7 +329,7 @@ let test_git_dir conn ~clone =
            Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
            (* Clone a "local" copy *)
            run ["git"; "clone"; tmpdir / "my-repo"; tmpdir / "clone"] >>= fun () ->
-           let local_repo = DKCI.Git.v ~logs ~dir:(tmpdir / "clone") in
+           let local_repo = Git.v ~logs ~dir:(tmpdir / "clone") in
            (* Start the CI *)
            Test_utils.with_ci conn (Workflows.pull_and_run local_repo ~cmd) @@ fun ~logs ~switch dk with_handler ->
            DK.branch dk "github-metadata" >>*= fun hooks ->

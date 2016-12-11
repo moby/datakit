@@ -13,3 +13,5 @@ src/datakit/Ivfs_blob
 bridge/github/Datakit_github
 bridge/github/Datakit_github_api
 bridge/github/Datakit_github_vfs
+
+ci/src/Datakit_ci

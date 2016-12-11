@@ -6,7 +6,7 @@ type job_id = CI_s.job_id
 type 'a lwt_status = 'a CI_s.lwt_status
 
 module Term = CI_term
-module Main = CI_main
+include CI_main
 module Utils = CI_utils
 module Process = CI_process
 module Live_log = CI_live_log

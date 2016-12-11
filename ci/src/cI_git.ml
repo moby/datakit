@@ -1,5 +1,4 @@
-open DKCI
-
+open CI_s
 open! Astring
 open Lwt.Infix
 
@@ -8,7 +7,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 type repo = {
   dir : string;
-  dir_lock : Monitored_pool.t;
+  dir_lock : CI_monitored_pool.t;
   is_ancestor : (string * string, bool Lwt.t) Hashtbl.t;    (* (ancestor, desc) *)
 }
 
@@ -83,7 +82,7 @@ module Builder = struct
     Printf.sprintf "git-pull-of-%s" hash
 
   let generate t ~switch ~log _trans NoContext pr =
-    let output = Live_log.write log in
+    let output = CI_live_log.write log in
     let hash = Key.hash pr in
     let tmp_branch = branch t pr in
     let env = Unix.environment () |> with_gitdir (Filename.concat t.dir ".git") in
@@ -91,27 +90,27 @@ module Builder = struct
     Lwt.try_bind
       (fun () ->
          Lwt_mutex.with_lock git_lock @@ fun () ->
-         Process.run ~env ~output ("", [| "git"; "branch"; "-f"; tmp_branch; hash |])
+         CI_process.run ~env ~output ("", [| "git"; "branch"; "-f"; tmp_branch; hash |])
       )
       (fun () ->
-         Live_log.log log "Commit %s is available locally, so not fetching" hash;
+         CI_live_log.log log "Commit %s is available locally, so not fetching" hash;
          Lwt.return @@ Ok { Commit.repo = t; hash }
       )
       (fun ex ->
          Log.info (fun f -> f "Commit %S did not resolve (%s); fetching..." hash (Printexc.to_string ex));
-         Live_log.log log "Fetching PR branch";
+         CI_live_log.log log "Fetching PR branch";
          (* We can't be sure the PR's head still exists, but we can fetch the current
             head and then try to switch to the one we want. *)
          (* Three step process to ensure we don't end up pointing at the wrong commit *)
-         Process.run ~switch ~env ~output ("", [| "git"; "fetch"; "origin"; Printf.sprintf "%s:%s.new" (Key.branch pr) tmp_branch |]) >>= fun () ->
+         CI_process.run ~switch ~env ~output ("", [| "git"; "fetch"; "origin"; Printf.sprintf "%s:%s.new" (Key.branch pr) tmp_branch |]) >>= fun () ->
          Lwt_mutex.with_lock git_lock @@ fun () -> (* (hopefully fetch can handle parallel uses) *)
-         Process.run ~env ~output ("", [| "git"; "branch"; "-f"; tmp_branch; hash |]) >>= fun () ->
-         Process.run ~env ~output ("", [| "git"; "branch"; "-D"; tmp_branch ^ ".new" |]) >>= fun () ->
+         CI_process.run ~env ~output ("", [| "git"; "branch"; "-f"; tmp_branch; hash |]) >>= fun () ->
+         CI_process.run ~env ~output ("", [| "git"; "branch"; "-D"; tmp_branch ^ ".new" |]) >>= fun () ->
          Lwt.return @@ Ok { Commit.repo = t; hash }
       )
 end
 
-module PR_Cache = Cache.Make(Builder)
+module PR_Cache = CI_cache.Make(Builder)
 
 type t = {
   repo : repo;
@@ -121,7 +120,7 @@ type t = {
 let v ~logs ~dir =
   let repo = {
     dir;
-    dir_lock = Monitored_pool.create dir 1;
+    dir_lock = CI_monitored_pool.create dir 1;
     is_ancestor = Hashtbl.create 11;
   } in
   {
@@ -130,27 +129,27 @@ let v ~logs ~dir =
   }
 
 let fetch_head t target =
-  let ( >>~= ) = Term.Infix.( >>= ) in
-  Term.github_target target >>~= PR_Cache.term t.fetches Builder.NoContext
+  let ( >>~= ) = CI_term.Infix.( >>= ) in
+  CI_term.github_target target >>~= PR_Cache.term t.fetches Builder.NoContext
 
 let with_checkout ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
-  Live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (Monitored_pool.use ~log dir_lock job_id) @@ fun () ->
-  let output = Live_log.write log in
+  CI_live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (CI_monitored_pool.use ~log dir_lock job_id) @@ fun () ->
+  let output = CI_live_log.write log in
   Lwt_mutex.with_lock git_lock (fun () ->
-      Process.run ~cwd:dir ~output ("", [| "git"; "reset"; "--hard"; hash |]) >>= fun () ->
-      Process.run ~cwd:dir ~output ("", [| "git"; "clean"; "-xdf" |])
+      CI_process.run ~cwd:dir ~output ("", [| "git"; "reset"; "--hard"; hash |]) >>= fun () ->
+      CI_process.run ~cwd:dir ~output ("", [| "git"; "clean"; "-xdf" |])
     )
   >>= fun () ->
   fn dir
 
 let with_clone ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
-  let output = Live_log.write log in
-  Utils.with_tmpdir ~prefix:"with_clone" ~mode:0o700 @@ fun tmpdir ->
-  Live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (Monitored_pool.use ~log dir_lock job_id) (fun () ->
-      Process.run ~output ("", [| "git"; "clone"; dir; tmpdir |])
+  let output = CI_live_log.write log in
+  CI_utils.with_tmpdir ~prefix:"with_clone" ~mode:0o700 @@ fun tmpdir ->
+  CI_live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (CI_monitored_pool.use ~log dir_lock job_id) (fun () ->
+      CI_process.run ~output ("", [| "git"; "clone"; dir; tmpdir |])
     )
   >>= fun () ->
-  Process.run ~cwd:tmpdir ~output ("", [| "git"; "reset"; "--hard"; hash |]) >>= fun () ->
+  CI_process.run ~cwd:tmpdir ~output ("", [| "git"; "reset"; "--hard"; hash |]) >>= fun () ->
   fn tmpdir
 
 module Shell_builder = struct
@@ -163,7 +162,7 @@ module Shell_builder = struct
 
   module Key = Commit
 
-  type context = DKCI.job_id
+  type context = job_id
 
   type value = unit
 
@@ -175,12 +174,12 @@ module Shell_builder = struct
 
   let generate t ~switch ~log _trans job_id git_dir =
     let build working_dir =
-      Utils.with_timeout ~switch t.timeout (fun switch ->
-          let output = Live_log.write log in
+      CI_utils.with_timeout ~switch t.timeout (fun switch ->
+          let output = CI_live_log.write log in
           let sep = Fmt.(const string) " " in
           t.cmds |> Lwt_list.iter_s (fun cmd ->
-              Live_log.log log "Running @[<h>%a@]..." (Fmt.array ~sep String.dump) cmd;
-              Process.run ~cwd:working_dir ~switch ~output ("", cmd)
+              CI_live_log.log log "Running @[<h>%a@]..." (Fmt.array ~sep String.dump) cmd;
+              CI_process.run ~cwd:working_dir ~switch ~output ("", cmd)
             )
           >|= fun () ->
           Ok ()
@@ -198,7 +197,7 @@ module Shell_builder = struct
 
 end
 
-module Shell_cache = Cache.Make(Shell_builder)
+module Shell_cache = CI_cache.Make(Shell_builder)
 
 type command = Shell_cache.t
 
@@ -206,6 +205,6 @@ let command ~logs ~timeout ~label ~clone cmds =
   Shell_cache.create ~logs { Shell_builder.label; cmds; clone; timeout }
 
 let run command git_dir =
-  let open! Term.Infix in
-  Term.job_id >>= fun job ->
+  let open! CI_term.Infix in
+  CI_term.job_id >>= fun job ->
   Shell_cache.term command job git_dir

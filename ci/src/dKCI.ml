@@ -16,6 +16,7 @@ module type BUILDER = CI_s.BUILDER
 module DK = Utils.DK
 module ACL = CI_ACL
 module Target = CI_target
+module Git = CI_git
 
 module Web = struct
   type config = CI_web_templates.t

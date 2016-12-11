@@ -21,7 +21,8 @@
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Ivfs_tree.S.Dir</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs_tree.S.Dir</title>
 </head>
 <body>
 <div class="navbar"><a class="pre" href="Ivfs_tree.S.File.html" title="Ivfs_tree.S.File">Previous</a>
@@ -61,7 +62,7 @@ Look up an item by path.<br>
 Look up a sub-directory node.<br>
 </div>
 
-<pre><span id="VALmap"><span class="keyword">val</span> map</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -><br>       [ `Directory of <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a><br>       | `File of <a href="Ivfs_tree.S.File.html#TYPEt">Ivfs_tree.S.File.t</a> * <a href="Ivfs_tree.html#TYPEperm">Ivfs_tree.perm</a> ] Astring.String.Map.t Lwt.t</code></pre><div class="info ">
+<pre><span id="VALmap"><span class="keyword">val</span> map</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -><br>       [ `Directory of <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a><br>       | `File of <a href="Ivfs_tree.S.File.html#TYPEt">Ivfs_tree.S.File.t</a> * <a href="Ivfs_tree.html#TYPEperm">Ivfs_tree.perm</a> ] Map.Make(Path.Step).t Lwt.t</code></pre><div class="info ">
 The contents of the directory.<br>
 </div>
 

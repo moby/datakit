@@ -18,7 +18,8 @@
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Index of values</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Index of values</title>
 </head>
 <body>
 <div class="navbar">&nbsp;<a class="up" href="index.html" title="Index">Up</a>
@@ -26,6 +27,12 @@
 <h1>Index of values</h1>
 <table>
 <tr><td align="left"><br></td></tr>
+<tr><td><a href="Datakit_ci.Job.Infix.html#VAL($)">($)</a> [<a href="Datakit_ci.Job.Infix.html">Datakit_ci.Job.Infix</a>]</td>
+<td><div class="info">
+<code class="code">fn $ x</code> is the result of applying the evaluation of the job
+        <code class="code">fn</code> to the evaluation of the job <code class="code">x</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_path.Infix.html#VAL(/)">(/)</a> [<a href="Datakit_path.Infix.html">Datakit_path.Infix</a>]</td>
 <td><div class="info">
 <code class="code">a / b</code> is the path <code class="code">a</code> with step <code class="code">b</code> appended.
@@ -36,14 +43,33 @@
 <code class="code">a /@ b</code> is the concatenation of paths <code class="code">a</code> and <code class="code">b</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Utils.Infix.html#VAL(>>*=)">(&gt;&gt;*=)</a> [<a href="Datakit_ci.Utils.Infix.html">Datakit_ci.Utils.Infix</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.Error.Infix.html#VAL(>>*=)">(&gt;&gt;*=)</a> [<a href="Vfs.Error.Infix.html">Vfs.Error.Infix</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_ci.Job.Infix.html#VAL(>>=)">(&gt;&gt;=)</a> [<a href="Datakit_ci.Job.Infix.html">Datakit_ci.Job.Infix</a>]</td>
+<td><div class="info">
+<code class="code">x &gt;&gt;= fn</code> (bind) is <code class="code">fn y</code> where <code class="code">y</code> is the successful result
+        of evaluating <code class="code">x</code>, or simply <code class="code">x</code> if <code class="code">x</code> is not successful.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Utils.Infix.html#VAL(>|*=)">(&gt;|*=)</a> [<a href="Datakit_ci.Utils.Infix.html">Datakit_ci.Utils.Infix</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Job.Infix.html#VAL(>|=)">(&gt;|=)</a> [<a href="Datakit_ci.Job.Infix.html">Datakit_ci.Job.Infix</a>]</td>
+<td><div class="info">
+<code class="code">x &gt;|= fn</code> (map) is <code class="code">return (fn y)</code> where <code class="code">y</code> is the
+        successful result of evaluating <code class="code">x</code>, or simply <code class="code">x</code> if <code class="code">x</code> is
+        not successful.
+</div>
+</td></tr>
 <tr><td align="left"><br>A</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALabort">abort</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">abort t</code> aborts the transaction without committing it.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALabs_path">abs_path</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Fs9p.S.html#VALaccept">accept</a> [<a href="Fs9p.S.html">Fs9p.S</a>]</td>
 <td><div class="info">
 <code class="code">accept ~root f</code> accepts connection on <code class="code">f</code>, processs requests
@@ -64,6 +90,12 @@
 <td><div class="info">
 <code class="code">allow t o r</code> is <code class="code">t</code> with the capability to do API calls of type
       <code class="code">o</code> to the kind of resource <code class="code">r</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.ACL.html#VALany">any</a> [<a href="Datakit_ci.ACL.html">Datakit_ci.ACL</a>]</td>
+<td><div class="info">
+<code class="code">any l</code> is the ACL granting access to an user iff there is at
+      least one ACL in <code class="code">l</code> granting access to that user.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.State.html#VALapply">apply</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
@@ -88,9 +120,21 @@
 <code class="code">basenane t</code> is <code class="code">t</code>'s basename.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.BUILDER.html#VALbranch">branch</a> [<a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a>]</td>
+<td><div class="info">
+The name of the DataKit branch on which to store the result for
+      this key.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#VALbranch">branch</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
 <td><div class="info">
 <code class="code">branch t name</code> is the branch named <code class="code">name</code> (which might not exist yet).
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALbranch_head">branch_head</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">branch_head repo b</code> evaluates to the commit at the head of
+      branch <code class="code">b</code> in the repository <code class="code">repo</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#VALbranches">branches</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
@@ -99,20 +143,62 @@
 </div>
 </td></tr>
 <tr><td align="left"><br>C</td></tr>
+<tr><td><a href="Datakit_ci.ACL.html#VALcan_read_github">can_read_github</a> [<a href="Datakit_ci.ACL.html">Datakit_ci.ACL</a>]</td>
+<td><div class="info">
+<code class="code">can_read <span class="string">"org/repo"</span></code> is the ACL granting access to users who
+      can see the <code class="code">org/repo</code> GitHub repository.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALcancel">cancel</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALcancel_when_off">cancel_when_off</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.State.html#VALcapabilities">capabilities</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
 <td><div class="info">
 <code class="code">capabilities t</code> is the token <code class="code">t</code>'s capabilities.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALcatch">catch</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">catch x</code> successfully returns a result showing whether <code class="code">x</code>
+      succeeded or failed.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALchdir_lock">chdir_lock</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Capabilities.html#VALcheck">check</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
 <td><div class="info">
 <code class="code">check t o r</code> is true if <code class="code">t</code> is allowed to to <code class="code">o</code> on the kind of
       resource <code class="code">r</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Process.html#VALcheck_status">check_status</a> [<a href="Datakit_ci.Process.html">Datakit_ci.Process</a>]</td>
+<td><div class="info">
+<code class="code">check_status cmd status</code> checks that <code class="code">status</code> is a successful
+      exit status.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.File.html#VALchmod">chmod</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">chmod t mode</code> changes the mode of <code class="code">t</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALci_status">ci_status</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">ci_status ci target</code> is the status reported by CI <code class="code">ci</code> for
+      <code class="code">target</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALci_success_target_url">ci_success_target_url</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">ci_success_target_url ci target</code> is the URL of the *successful*
+      build <code class="code">ci</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALci_target_url">ci_target_url</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">ci_target_url ci target</code> is the target URL reported by CI
+      <code class="code">ci</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.API.Webhook.html#VALclear">clear</a> [<a href="Datakit_github.API.Webhook.html">Datakit_github.API.Webhook</a>]</td>
@@ -129,6 +215,13 @@
 <td><div class="info">
 <code class="code">closed t</code> is true if <code class="code">t</code> is closed and thus it is not valid
         to read/write on it anymore.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALcommand">command</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">command ~logs ~timeout ~label ~clone cmds</code> is a caching executor
+      of <code class="code">cmds</code>, which caches results in a branch whose name includes
+      <code class="code">label</code>.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALcommand">command</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
@@ -196,6 +289,11 @@
 <td></td></tr>
 <tr><td><a href="Datakit_github.PR.Set.html#VALcommits">commits</a> [<a href="Datakit_github.PR.Set.html">Datakit_github.PR.Set</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_ci.Target.html#VALcompare">compare</a> [<a href="Datakit_ci.Target.html">Datakit_ci.Target</a>]</td>
+<td><div class="info">
+<code class="code">compare</code> is the comparison function for GitHub targets.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Diff.html#VALcompare">compare</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
 <td><div class="info">
 <code class="code">compare_diff</code> is the comparison function for diffs.
@@ -270,12 +368,22 @@
 <code class="code">compare_id x y</code> compare the pull-request IDs <code class="code">x</code> and <code class="code">y</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Web.html#VALconfig">config</a> [<a href="Datakit_ci.Web.html">Datakit_ci.Web</a>]</td>
+<td><div class="info">
+<code class="code">config ~name ~state_repo ~can_read ~can_build ()</code> is a web
+      configuration.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALconflicts">conflicts</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">conflicts t</code> returns the current list of paths that had merge
         conflicts and have not been written to since.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Private.Client9p.html#VALconnect">connect</a> [<a href="Datakit_ci.Private.Client9p.html">Datakit_ci.Private.Client9p</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALconnect">connect</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_client_9p.Make.html#VALconnect">connect</a> [<a href="Datakit_client_9p.Make.html">Datakit_client_9p.Make</a>]</td>
 <td><div class="info">
 <code class="code">connect c</code> is a Datakit connection using the 9p connection <code class="code">c</code>.
@@ -286,9 +394,31 @@
 <code class="code">content t</code> is <code class="code">t</code>'s contents.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALcontents">contents</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">contents t</code> is the current contents of the buffer.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Status.html#VALcontext">context</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
 <td><div class="info">
 <code class="code">context t</code> is <code class="code">t</code>'s context.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Cache.Make.html#VALcreate">create</a> [<a href="Datakit_ci.Cache.Make.html">Datakit_ci.Cache.Make</a>]</td>
+<td><div class="info">
+<code class="code">create ~logs b</code> is a fresh cache that maps keys of type
+        <code class="code"><span class="constructor">B</span>.<span class="constructor">Key</span>.t</code> to values of type <code class="code"><span class="constructor">B</span>.value</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Monitored_pool.html#VALcreate">create</a> [<a href="Datakit_ci.Monitored_pool.html">Datakit_ci.Monitored_pool</a>]</td>
+<td><div class="info">
+<code class="code">create s n</code> create a new pool with <code class="code">n</code> workers.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALcreate">create</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">create ~pending ~branch ~title manager</code> is a fresh, empty log
+      with pending reason <code class="code">pending</code>.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_remote.Make.html#VALcreate">create</a> [<a href="Ivfs_remote.Make.html">Ivfs_remote.Make</a>]</td>
@@ -333,6 +463,8 @@ Create an open file object.
         <code class="code">path</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALcreate_logs">create_logs</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALcreate_or_replace_file">create_or_replace_file</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">create_or_replace_file t path content</code> uses either <code class="code">create_file</code>
@@ -345,6 +477,8 @@ Create an open file object.
 </div>
 </td></tr>
 <tr><td align="left"><br>D</td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALdefault">default</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Status.html#VALdescription">description</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
 <td><div class="info">
 <code class="code">description t</code> is <code class="code">t</code>'s description.
@@ -407,6 +541,12 @@ Create an open file object.
 <code class="code">disconnect t</code> closes the connection.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALdk">dk</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">dk</code> is a function for getting the current DataKit
+      connection.
+</div>
+</td></tr>
 <tr><td align="left"><br>E</td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html#VALelts">elts</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
 <td><div class="info">
@@ -438,6 +578,15 @@ The empty path.
 <tr><td><a href="Vfs.Dir.html#VALempty">empty</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
 <td><div class="info">
 <code class="code">empty</code> is the empty directory.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALensure_dir">ensure_dir</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALenter_with_pending_reason">enter_with_pending_reason</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">enter_with_pending_reason t msg use fn</code> is like <code class="code">use fn</code>, but
+      posts <code class="code">msg</code> as the pending reason until <code class="code">fn</code> is called (or <code class="code">use</code>
+      fails).
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Capabilities.html#VALequal">equal</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
@@ -486,6 +635,11 @@ Errors
       <code class="code">r</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.ACL.html#VALeveryone">everyone</a> [<a href="Datakit_ci.ACL.html">Datakit_ci.ACL</a>]</td>
+<td><div class="info">
+<code class="code">everyone</code> is the ACL granting access to everyone
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.READABLE_TREE.html#VALexists">exists</a> [<a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a>]</td>
 <td><div class="info">
 <code class="code">exists t path</code> is <code class="code"><span class="keyword">true</span></code> if <code class="code">stat t path</code> isn't <code class="code"><span class="constructor">None</span></code>.
@@ -504,6 +658,13 @@ Errors
 </div>
 </td></tr>
 <tr><td align="left"><br>F</td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALfailf">failf</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALfailure">failure</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">failure fmt</code> is a job that fails with message <code class="code">fmt</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALfast_forward">fast_forward</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
 <td><div class="info">
 <code class="code">fast_forward t commit</code> changes <code class="code">t</code> to point to <code class="code">commit</code> if
@@ -515,6 +676,13 @@ Errors
 <td><div class="info">
 <code class="code">fetch t ~url ~branch</code> fetches the given remote branch and
       returns its head commit.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALfetch_head">fetch_head</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">fetch_head t target</code> evaluates to a local branch in <code class="code">t</code> with a
+      copy of <code class="code">target</code>'s head commit (downloading it first if
+      needed).
 </div>
 </td></tr>
 <tr><td><a href="Vfs.Inode.html#VALfile">file</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
@@ -530,18 +698,47 @@ Errors
       <code class="code">t</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Cache.Make.html#VALfind">find</a> [<a href="Datakit_ci.Cache.Make.html">Datakit_ci.Cache.Make</a>]</td>
+<td><div class="info">
+<code class="code">find t key</code> is the jobs which evaluates to the result of
+        looking up <code class="code">key</code> in the cache (using <code class="code">lookup</code>).
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html#VALfind">find</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
 <td><div class="info">
 <code class="code">find id t</code> finds the element with ID <code class="code">id</code> in <code class="code">t</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALfinish">finish</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">finish t</code> prevents any further changes and notifies anyone
+      waiting on <code class="code">pending</code>.
+</div>
+</td></tr>
 <tr><td align="left"><br>G</td></tr>
+<tr><td><a href="Datakit_ci.BUILDER.html#VALgenerate">generate</a> [<a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a>]</td>
+<td><div class="info">
+<code class="code">generate t ~log trans ctx key</code> generates the value for <code class="code">key</code>
+      and stores it in <code class="code">trans</code> under the "value" directory.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALget">get</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 Look up a sub-directory node.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.ACL.html#VALgithub_org">github_org</a> [<a href="Datakit_ci.ACL.html">Datakit_ci.ACL</a>]</td>
+<td><div class="info">
+<code class="code">github_org o</code> is the ACL granting access to all the users of
+      the <code class="code">o</code> GitHub organisation.
+</div>
+</td></tr>
 <tr><td align="left"><br>H</td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALhash">hash</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">hash c</code> is <code class="code">c</code>'s hash.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Commit.html#VALhash">hash</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
 <td><div class="info">
 <code class="code">hash t</code> is <code class="code">t</code>'s SHA1.
@@ -557,13 +754,36 @@ Look up a sub-directory node.
 <code class="code">hash f</code> is the hash of the contents of <code class="code">f</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALhead">head</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">head target</code> evaluates to the commit at the head <code class="code">target</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALhead">head</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
 <td><div class="info">
 <code class="code">head t</code> is the current head of the branch, or <code class="code"><span class="constructor">None</span></code> if it
         doesn't currently exist.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALheading">heading</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">heading t fmt</code> appends a formatted message to the log as a
+      heading.
+</div>
+</td></tr>
 <tr><td align="left"><br>I</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALid">id</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">job_id</code> evaluates to the ID of the worker that evaluates the
+      job.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Target.html#VALid">id</a> [<a href="Datakit_ci.Target.html">Datakit_ci.Target</a>]</td>
+<td><div class="info">
+<code class="code">id t</code> is <code class="code">t</code>'s ID, e.g either a pull-request number or a
+      reference name split on <code class="code"><span class="string">'/'</span></code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Ref.html#VALid">id</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
 <td><div class="info">
 <code class="code">id t</code> is <code class="code">t</code>'s ID.
@@ -616,6 +836,12 @@ Look up a sub-directory node.
 <code class="code">ino t</code> is a unique "inode number" for the file.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALis_after">is_after</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">is_after ~old c</code> is true iff <code class="code">old</code> appears in the history of
+      <code class="code">c</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.html#VALis_dir">is_dir</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">is_dir</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Isdir</span></code>.
@@ -636,6 +862,12 @@ Look up a sub-directory node.
 <code class="code">iter t f</code> applies <code class="code">f</code> over all sub-files.
 </div>
 </td></tr>
+<tr><td align="left"><br>J</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALjoin">join</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">join tt</code> is the job to which <code class="code">tt</code> evaluates.
+</div>
+</td></tr>
 <tr><td align="left"><br>K</td></tr>
 <tr><td><a href="Vfs.Inode.html#VALkind">kind</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
@@ -645,6 +877,40 @@ Look up a sub-directory node.
 <tr><td align="left"><br>L</td></tr>
 <tr><td><a href="Ivfs_blob.html#VALlen">len</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALlist_map_p">list_map_p</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">list_map_p fn l</code> will map the <code class="code">l</code> list of jobs to <code class="code">fn</code> in
+      parallel and return the result list when all of them have
+      completed.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALlisten">listen</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.BUILDER.html#VALload">load</a> [<a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a>]</td>
+<td><div class="info">
+<code class="code">load t tr key</code> is the value <code class="code">v</code> previously saved by
+      <code class="code">generate</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALlog">log</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">log t fmt</code> appends a formatted message to the log, with a
+      newline added at the end.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.html#VALlogs">logs</a> [<a href="Datakit_ci.html">Datakit_ci</a>]</td>
+<td><div class="info">
+The singleton log manager.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Cache.Make.html#VALlookup">lookup</a> [<a href="Datakit_ci.Cache.Make.html">Datakit_ci.Cache.Make</a>]</td>
+<td><div class="info">
+<code class="code">lookup t conn ~rebuild ctx key</code> returns the cached value of
+        <code class="code">key</code>, or uses <code class="code"><span class="constructor">B</span>.generate ctx key</code> to start the process of
+        calculating the value if this is the first time <code class="code">key</code> has been
+        requested.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALlookup">lookup</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 Look up an immediate child by name.
@@ -655,11 +921,15 @@ Look up an immediate child by name.
 The <code class="code">lookup</code> command.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALlookup_log">lookup_log</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALlookup_path">lookup_path</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 Look up an item by path.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALls">ls</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALls">ls</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 List the contents of a directory with the type of each item.
@@ -706,6 +976,11 @@ The <code class="code">mkfile</code> command.
 </div>
 </td></tr>
 <tr><td align="left"><br>N</td></tr>
+<tr><td><a href="Datakit_ci.BUILDER.html#VALname">name</a> [<a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a>]</td>
+<td><div class="info">
+A unique name for this builder.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Ref.html#VALname">name</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
 <td><div class="info">
 <code class="code">name t</code> is <code class="code">t</code>'s name.
@@ -771,6 +1046,17 @@ The <code class="code">mkfile</code> command.
       inodes <code class="code">l</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALof_lwt_quick">of_lwt_quick</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">of_lwt_quick x</code> evaluates to the result of <code class="code">x</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALof_lwt_slow">of_lwt_slow</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">of_lwt_slow check</code> is a job that evaluates <code class="code">check ()</code> to get
+      the current status.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Dir.html#VALof_map_ref">of_map_ref</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
 <td><div class="info">
 <code class="code">of_map_ref m</code> is a read-only directory containing the inodes
@@ -794,6 +1080,11 @@ The <code class="code">mkfile</code> command.
 <tr><td><a href="Ivfs_blob.html#VALof_ro_cstruct">of_ro_cstruct</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
 <code class="code">of_ro_cstruct c</code> is a blob containing the data <code class="code">c</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALof_state">of_state</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">of_state x</code> is a job which evaluates to <code class="code">x</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALof_status">of_status</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
@@ -843,6 +1134,8 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
       is beyond the end of the file (<code class="code">len</code>).
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALok">ok</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.html#VALok">ok</a> [<a href="Vfs.html">Vfs</a>]</td>
 <td><div class="info">
 <code class="code">ok x</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Ok</span> x)</code>
@@ -859,6 +1152,12 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 </div>
 </td></tr>
 <tr><td align="left"><br>P</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALpair">pair</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">pair a b</code> evaluates to the pair of the results of successfully
+      evaluating <code class="code">a</code> and <code class="code">b</code> (in parallel).
+</div>
+</td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Transaction.html#VALparents">parents</a> [<a href="Datakit_S.CLIENT.Transaction.html">Datakit_S.CLIENT.Transaction</a>]</td>
 <td><div class="info">
 <code class="code">parents t</code> is the parents of the transaction (that is, the parents of
@@ -876,6 +1175,12 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
       (<span class="constructor">Fmt</span>.to_to_string pp x) = <span class="keywordsign">`</span><span class="constructor">Ok</span> x</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALpending">pending</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">pending fmt</code> is a job that reports it is waiting because of
+      reason <code class="code">fmt</code>.
+</div>
+</td></tr>
 <tr><td><a href="Vfs.Error.html#VALperm">perm</a> [<a href="Vfs.Error.html">Vfs.Error</a>]</td>
 <td><div class="info">
 <code class="code">perm</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Perm</span></code>.
@@ -884,6 +1189,11 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <tr><td><a href="Datakit_path.html#VALpop">pop</a> [<a href="Datakit_path.html">Datakit_path</a>]</td>
 <td><div class="info">
 <code class="code">pop (dir / leaf)</code> is <code class="code"><span class="constructor">Some</span> (dir, leaf)</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Target.html#VALpp">pp</a> [<a href="Datakit_ci.Target.html">Datakit_ci.Target</a>]</td>
+<td><div class="info">
+<code class="code">pp</code> is the pretty-printer for GitHub targets.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.ELT.html#VALpp">pp</a> [<a href="Datakit_github.ELT.html">Datakit_github.ELT</a>]</td>
@@ -996,6 +1306,8 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <code class="code">pp_event</code> is the pretty-printer for reference events' state.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALpp_exn">pp_exn</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Commit.html#VALpp_hash">pp_hash</a> [<a href="Datakit_github.Commit.html">Datakit_github.Commit</a>]</td>
 <td><div class="info">
 <code class="code">pp_hash</code> is the pretty-printer for commit hashes which just
@@ -1048,6 +1360,17 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <td><div class="info">
 <code class="code">pr t id</code> is the contents of the pull request whose ID Is
       <code class="code">id</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALprintf">printf</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">printf t fmt</code> appends a formatted message to the log.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Config.html#VALproject">project</a> [<a href="Datakit_ci.Config.html">Datakit_ci.Config</a>]</td>
+<td><div class="info">
+<code class="code">project ~id tests</code> is the configuration for a single GitHub
+      project.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.API.html#VALprs">prs</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
@@ -1106,6 +1429,8 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
       error if it isn't one.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALread_log">read_log</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.Dir.html#VALread_only">read_only</a> [<a href="Vfs.Dir.html">Vfs.Dir</a>]</td>
 <td><div class="info">
 <code class="code">read_only</code> is a read-only directory.
@@ -1190,6 +1515,11 @@ The <code class="code">rename</code> command.
         the existing file <code class="code">path</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Target.html#VALrepo">repo</a> [<a href="Datakit_ci.Target.html">Datakit_ci.Target</a>]</td>
+<td><div class="info">
+<code class="code">repo t</code> is <code class="code">t</code>'s repository.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALrepo">repo</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td><div class="info">
 <code class="code">repo t</code> is <code class="code">t</code>'s repository.
@@ -1249,6 +1579,8 @@ The list of watched repository.
 <td></td></tr>
 <tr><td><a href="Datakit_github.Commit.Set.html#VALrepos">repos</a> [<a href="Datakit_github.Commit.Set.html">Datakit_github.Commit.Set</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALreturn_error">return_error</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.File.html#VALro_of_string">ro_of_string</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">ro_of_string s</code> is the static file containing <code class="code">s</code>.
@@ -1260,10 +1592,33 @@ The list of watched repository.
       GitHub API calls are replaced by filesystem accesses.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALrun">run</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">run cmd commit</code> succeeds if running <code class="code">cmd</code> in a checkout of
+      <code class="code">commit</code> returns an exit status of zero.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Process.html#VALrun">run</a> [<a href="Datakit_ci.Process.html">Datakit_ci.Process</a>]</td>
+<td><div class="info">
+Run <code class="code">cmd</code>, passing each chunk of output it produces on stdout or
+      stderr to <code class="code">output</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.html#VALrun">run</a> [<a href="Datakit_ci.html">Datakit_ci</a>]</td>
+<td><div class="info">
+<code class="code">run ?info config</code> runs DataKitCI.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.API.Webhook.html#VALrun">run</a> [<a href="Datakit_github.API.Webhook.html">Datakit_github.API.Webhook</a>]</td>
 <td><div class="info">
 <code class="code">run t</code> is a blocking lwt thread which runs the webook
         listener.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Process.html#VALrun_with_exit_status">run_with_exit_status</a> [<a href="Datakit_ci.Process.html">Datakit_ci.Process</a>]</td>
+<td><div class="info">
+Run <code class="code">cmd</code>, passing each chunk of output it produces on stdout or
+      stderr to <code class="code">output</code>.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALrw_of_string">rw_of_string</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
@@ -1359,6 +1714,12 @@ Convert a branch, which may update while we read it, to a fixed
 <code class="code">stat_of ~read</code> makes a <code class="code">stat</code> function from <code class="code">read</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALstate">state</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">state x</code> immediately and successfully returns the current state
+      of <code class="code">x</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Status.html#VALstate">state</a> [<a href="Datakit_github.Status.html">Datakit_github.Status</a>]</td>
 <td><div class="info">
 <code class="code">state t</code> is <code class="code">t</code>'s state.
@@ -1396,7 +1757,32 @@ Convert a branch, which may update while we read it, to a fixed
 <code class="code">state_of_string s</code> is <code class="code">s</code>'s string representation.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALsuccess">success</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">success x</code> is a job that evaluates successfully to <code class="code">x</code>.
+</div>
+</td></tr>
 <tr><td align="left"><br>T</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALtag">tag</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">tag repo t</code> evaluates to the commit of tag <code class="code">t</code> in the
+      repository <code class="code">repo</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALtarget">target</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">target id</code> evaluates to the full metadata of the named
+      target.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Private.html#VALtest_engine">test_engine</a> [<a href="Datakit_ci.Private.html">Datakit_ci.Private</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.BUILDER.html#VALtitle">title</a> [<a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a>]</td>
+<td><div class="info">
+<code class="code">title t key</code> is a one-line summary of the operation that is
+      performed by <code class="code">generate</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.PR.html#VALtitle">title</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
 <td><div class="info">
 <code class="code">title t</code> is <code class="code">t</code>'s title.
@@ -1490,12 +1876,33 @@ Cast to a list of strings
 <code class="code">url t</code> is <code class="code">t</code>'s target URL.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Monitored_pool.html#VALuse">use</a> [<a href="Datakit_ci.Monitored_pool.html">Datakit_ci.Monitored_pool</a>]</td>
+<td><div class="info">
+<code class="code">use t job fn</code> evaluates <code class="code">fn ()</code> with one pool resource held.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.API.html#VALuser_exists">user_exists</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 <code class="code">exist_user t ~user</code> is true iff <code class="code">user</code> exists.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.ACL.html#VALusername">username</a> [<a href="Datakit_ci.ACL.html">Datakit_ci.ACL</a>]</td>
+<td><div class="info">
+<code class="code">username n</code> is the ACL granting access to the user <code class="code">n</code>.
+</div>
+</td></tr>
 <tr><td align="left"><br>V</td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALv">v</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">v ~logs ~dir</code> is the local Git repository at <code class="code">dir</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Config.html#VALv">v</a> [<a href="Datakit_ci.Config.html">Datakit_ci.Config</a>]</td>
+<td><div class="info">
+<code class="code">v ~web_config ~project</code> describe a complete project
+      configuration.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.API.Webhook.html#VALv">v</a> [<a href="Datakit_github.API.Webhook.html">Datakit_github.API.Webhook</a>]</td>
 <td><div class="info">
 <code class="code">v tok uri</code> is the webhook server state configured to listen
@@ -1537,10 +1944,27 @@ Cast to a list of strings
 <code class="code">v user string</code> will create a fresh <a href="Datakit_github.Repo.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.t</code></a>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Cache.Path.html#VALvalue">value</a> [<a href="Datakit_ci.Cache.Path.html">Datakit_ci.Cache.Path</a>]</td>
+<td><div class="info">
+Build results are stored in this directory
+</div>
+</td></tr>
 <tr><td align="left"><br>W</td></tr>
 <tr><td><a href="Datakit_github.API.Webhook.html#VALwait">wait</a> [<a href="Datakit_github.API.Webhook.html">Datakit_github.API.Webhook</a>]</td>
 <td><div class="info">
 <code class="code">wait t</code> waits for new events to be available.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALwait_for">wait_for</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">wait_for t ~while_pending ~on_failure</code> evaluates successfully
+      to unit if <code class="code">t</code> evaluates successfully.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALwait_for_all">wait_for_all</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">wait_for_all xs</code> evaluates successfully to unit if all jobs in
+      the assoc list <code class="code">xs</code> evaluate successfully.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwait_for_head">wait_for_head</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
@@ -1565,10 +1989,22 @@ Cast to a list of strings
 <code class="code">with_capabilities c t</code> is <code class="code">t</code> with the capabilities <code class="code">c</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALwith_checkout">with_checkout</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">with_checkout ~log ~job_id commit fn</code> is <code class="code">fn path</code>, where <code class="code">path</code>
+      is the path of a local checkout of <code class="code">commit</code>.
+</div>
+</td></tr>
 <tr><td><a href="Ivfs_tree.S.Dir.html#VALwith_child">with_child</a> [<a href="Ivfs_tree.S.Dir.html">Ivfs_tree.S.Dir</a>]</td>
 <td><div class="info">
 <code class="code">with_child dir name child</code> is a copy of <code class="code">dir</code> except that
         <code class="code">name</code> links to <code class="code">child</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Git.html#VALwith_clone">with_clone</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
+<td><div class="info">
+<code class="code">with_clone</code> is similar to <code class="code">with_checkout</code> but clones the
+      repository to a temporary directory first.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html#VALwith_elt">with_elt</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
@@ -1582,11 +2018,22 @@ Cast to a list of strings
       elements.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALwith_pending_reason">with_pending_reason</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">with_pending_reason t msg fn</code> calls <code class="code">fn ()</code>.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Diff.html#VALwith_remove">with_remove</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
 <td><div class="info">
 <code class="code">with_remove e d</code> is <code class="code">d</code> augmented with the removal of <code class="code">e</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALwith_switch">with_switch</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALwith_timeout">with_timeout</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_ci.Utils.html#VALwith_tmpdir">with_tmpdir</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALwith_transaction">with_transaction</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
 <td><div class="info">
 <code class="code">with_transaction t fn</code> is the result of applying <code class="code">fn</code> to a
@@ -1602,6 +2049,17 @@ Cast to a list of strings
 <td><div class="info">
 <code class="code">without_child dir name</code> is a copy of <code class="code">dir</code> except that it has
         no child called <code class="code">name</code>.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Job.html#VALwithout_logs">without_logs</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<td><div class="info">
+<code class="code">without_logs t</code> evaluates to the same result as <code class="code">t</code>, but does
+      not link to its logs.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Live_log.html#VALwrite">write</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
+<td><div class="info">
+<code class="code">write t msg</code> appends <code class="code">msg</code> to the log.
 </div>
 </td></tr>
 <tr><td><a href="Ivfs_blob.html#VALwrite">write</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>

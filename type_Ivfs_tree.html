@@ -17,12 +17,50 @@
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Ivfs_tree</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs_tree</title>
 </head>
 <body>
 <code class="code"><span class="keyword">sig</span>
+&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Path</span>&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;equal&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.equal
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.compare
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.hash
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_json&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.to_json
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_json&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.of_json
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;size_of&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.size_of
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;write&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.writer
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;read&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.reader
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_hum&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_hum&nbsp;:&nbsp;string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;step&nbsp;=&nbsp;string
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;empty&nbsp;:&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:&nbsp;step&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_empty&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cons&nbsp;:&nbsp;step&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;rcons&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;step&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;decons&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(step&nbsp;*&nbsp;t)&nbsp;option
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;rdecons&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(t&nbsp;*&nbsp;step)&nbsp;option
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;map&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(step&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;list
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Step</span>&nbsp;:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;step
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;equal&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.equal
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.compare
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.hash
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_json&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.to_json
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_json&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.of_json
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;size_of&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.size_of
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;write&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.writer
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;read&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.reader
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;to_hum&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;of_hum&nbsp;:&nbsp;string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span>
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;step&nbsp;=&nbsp;string
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;path&nbsp;=&nbsp;string&nbsp;list
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;path&nbsp;=&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">Path</span>.t
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;perm&nbsp;=&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Exec</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Link</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">Normal</span>&nbsp;]
 &nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="keyword">type</span>&nbsp;<span class="constructor">STORE</span>&nbsp;=
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
@@ -49,7 +87,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;task_of_commit_id&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;commit_id&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Irmin</span>.task&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;key&nbsp;=&nbsp;string&nbsp;list
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;key&nbsp;=&nbsp;path
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;value&nbsp;=&nbsp;string
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;read&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;key&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;value&nbsp;option&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;read_exn&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;key&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;value&nbsp;<span class="constructor">Lwt</span>.t
@@ -206,7 +244,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?min:commit_id&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;?max:commit_id&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">History</span>.t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">module</span>&nbsp;<span class="constructor">Key</span>&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">sig</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;string&nbsp;list
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=&nbsp;<span class="constructor">Path</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;equal&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.equal
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;compare&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.compare
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;hash&nbsp;:&nbsp;t&nbsp;<span class="constructor">Tc</span>.hash
@@ -984,7 +1022,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">Dir</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Directory</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">Dir</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">File</span>.t&nbsp;*&nbsp;<span class="constructor">Ivfs_tree</span>.perm&nbsp;]
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Astring</span>.<span class="constructor">String</span>.<span class="constructor">Map</span>.t&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Map</span>.<span class="constructor">Make</span>(<span class="constructor">Path</span>.<span class="constructor">Step</span>).t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;ls&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">Dir</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;([&nbsp;<span class="keywordsign">`</span><span class="constructor">Directory</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;]&nbsp;*&nbsp;<span class="constructor">Ivfs_tree</span>.step)&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t
@@ -1049,7 +1087,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;map&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Directory</span>&nbsp;<span class="keyword">of</span>&nbsp;t&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">File</span>.t&nbsp;*&nbsp;perm&nbsp;]
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Astring</span>.<span class="constructor">String</span>.<span class="constructor">Map</span>.t&nbsp;<span class="constructor">Lwt</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Map</span>.<span class="constructor">Make</span>(<span class="constructor">Path</span>.<span class="constructor">Step</span>).t&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;ls&nbsp;:&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;([&nbsp;<span class="keywordsign">`</span><span class="constructor">Directory</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;]&nbsp;*&nbsp;step)&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;iter&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(path&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">File</span>.t&nbsp;*&nbsp;perm&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t

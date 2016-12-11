@@ -1,0 +1,45 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Datakit_ci.Utils.html">
+<link rel="Up" href="Datakit_ci.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
+<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Private</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Datakit_ci.Utils.html" title="Datakit_ci.Utils">Previous</a>
+&nbsp;<a class="up" href="Datakit_ci.html" title="Datakit_ci">Up</a>
+&nbsp;</div>
+<h1>Module <a href="type_Datakit_ci.Private.html">Datakit_ci.Private</a></h1>
+
+<pre><span class="keyword">module</span> Private: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Private.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+
+<pre><span id="TYPEengine"><span class="keyword">type</span> <code class="type"></code>engine</span> </pre>
+
+
+<pre><span class="keyword">module</span> <a href="Datakit_ci.Private.Client9p.html">Client9p</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Private.Client9p.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span id="VALconnect"><span class="keyword">val</span> connect</span> : <code class="type">Client9p.t -> Datakit_ci.DK.t</code></pre>
+<pre><span id="VALtest_engine"><span class="keyword">val</span> test_engine</span> : <code class="type">web_ui:Uri.t -><br>       (unit -> Datakit_ci.DK.t Lwt.t) -><br>       (<a href="Datakit_ci.Target.html#TYPEt">Datakit_ci.Target.t</a> -> string <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a> Astring.String.Map.t)<br>       Datakit_github.Repo.Map.t -> <a href="Datakit_ci.Private.html#TYPEengine">engine</a></code></pre>
+<pre><span id="VALlisten"><span class="keyword">val</span> listen</span> : <code class="type">?switch:Lwt_switch.t -> <a href="Datakit_ci.Private.html#TYPEengine">engine</a> -> [ `Abort ] Lwt.t</code></pre>
+<pre><span id="VALcreate_logs"><span class="keyword">val</span> create_logs</span> : <code class="type">unit -> <a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a></code></pre>
+<pre><span id="VALlookup_log"><span class="keyword">val</span> lookup_log</span> : <code class="type">branch:string -> <a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a> -> <a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> option</code></pre>
+<pre><span id="VALcancel"><span class="keyword">val</span> cancel</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -> (unit, string) Pervasives.result Lwt.t</code></pre>
+<pre><span id="VALread_log"><span class="keyword">val</span> read_log</span> : <code class="type">Datakit_ci.DK.t -><br>       <a href="Datakit_ci.Output.html#TYPEsaved">Datakit_ci.Output.saved</a> -> string Datakit_ci.DK.or_error Lwt.t</code></pre></body></html>

@@ -22,7 +22,8 @@
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Ivfs_tree</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs_tree</title>
 </head>
 <body>
 <div class="navbar"><a class="pre" href="Ivfs.html" title="Ivfs">Previous</a>
@@ -41,20 +42,21 @@ Expose Irmin internal trees (to be upstreamed).
 </div>
 <hr width="100%">
 
+<pre><span class="keyword">module</span> <a href="Ivfs_tree.Path.html">Path</a>: <code class="type">Irmin.Path.S</code><code class="type">  with type step = string</code></pre>
 <pre><span id="TYPEstep"><span class="keyword">type</span> <code class="type"></code>step</span> = <code class="type">string</code> </pre>
 
 
-<pre><span id="TYPEpath"><span class="keyword">type</span> <code class="type"></code>path</span> = <code class="type">string list</code> </pre>
+<pre><span id="TYPEpath"><span class="keyword">type</span> <code class="type"></code>path</span> = <code class="type">Path.t</code> </pre>
 
 
 <pre><span id="TYPEperm"><span class="keyword">type</span> <code class="type"></code>perm</span> = <code class="type">[ `Exec | `Link | `Normal ]</code> </pre>
 
 
 <pre><span class="keyword">module type</span> <a href="Ivfs_tree.STORE.html">STORE</a> = <code class="type">Irmin.S</code><code class="type"> 
-  with type key = string list
+  with type key = path
    and type value = string
    and type branch_id = string
-   and module Key = Irmin.Path.String_list
+   and module Key = Path
    and type Private.Node.Val.step = string
    and type Private.Node.Val.Metadata.t = perm</code></pre>
 <pre><span class="keyword">module type</span> <a href="Ivfs_tree.S.html">S</a> = <code class="code"><span class="keyword">sig</span></code> <a href="Ivfs_tree.S.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>

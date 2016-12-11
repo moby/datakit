@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Datakit_ci.DK.html">
+<link rel="next" href="Datakit_ci.Output.html">
+<link rel="Up" href="Datakit_ci.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Vfs" rel="Chapter" href="Vfs.html">
+<link title="Fs9p" rel="Chapter" href="Fs9p.html">
+<link title="Datakit_path" rel="Chapter" href="Datakit_path.html">
+<link title="Datakit_S" rel="Chapter" href="Datakit_S.html">
+<link title="Datakit_client_9p" rel="Chapter" href="Datakit_client_9p.html">
+<link title="Ivfs" rel="Chapter" href="Ivfs.html">
+<link title="Ivfs_tree" rel="Chapter" href="Ivfs_tree.html">
+<link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
+<link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
+<link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
+<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="Live Logs" rel="Section" href="#livelogs">
+<title>Datakit_ci.Live_log</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Datakit_ci.DK.html" title="Datakit_ci.DK">Previous</a>
+&nbsp;<a class="up" href="Datakit_ci.html" title="Datakit_ci">Up</a>
+&nbsp;<a class="post" href="Datakit_ci.Output.html" title="Datakit_ci.Output">Next</a>
+</div>
+<h1>Module <a href="type_Datakit_ci.Live_log.html">Datakit_ci.Live_log</a></h1>
+
+<pre><span class="keyword">module</span> Live_log: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Live_log.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+<br>
+<h1 id="livelogs">Live Logs</h1><br>
+
+<pre><span id="TYPEmanager"><span class="keyword">type</span> <code class="type"></code>manager</span> </pre>
+<div class="info ">
+The type for live-log manager.<br>
+</div>
+
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+The type for live-logs.<br>
+</div>
+
+
+<pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">?switch:Lwt_switch.t -><br>       pending:string -><br>       branch:string -><br>       title:string -> <a href="Datakit_ci.Live_log.html#TYPEmanager">manager</a> -> <a href="Datakit_ci.Live_log.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">create ~pending ~branch ~title manager</code> is a fresh, empty log
+      with pending reason <code class="code">pending</code>. It is an error to have two live
+      logs on the same branch at the same time (finish the other one
+      first).<br>
+</div>
+
+<pre><span id="VALfinish"><span class="keyword">val</span> finish</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
+<code class="code">finish t</code> prevents any further changes and notifies anyone
+      waiting on <code class="code">pending</code>.<br>
+</div>
+
+<pre><span id="VALwrite"><span class="keyword">val</span> write</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> string -> unit</code></pre><div class="info ">
+<code class="code">write t msg</code> appends <code class="code">msg</code> to the log.<br>
+</div>
+
+<pre><span id="VALprintf"><span class="keyword">val</span> printf</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       ('a, Format.formatter, unit, unit) Pervasives.format4 -> 'a</code></pre><div class="info ">
+<code class="code">printf t fmt</code> appends a formatted message to the log.<br>
+</div>
+
+<pre><span id="VALlog"><span class="keyword">val</span> log</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       ('a, Format.formatter, unit, unit) Pervasives.format4 -> 'a</code></pre><div class="info ">
+<code class="code">log t fmt</code> appends a formatted message to the log, with a
+      newline added at the end.<br>
+</div>
+
+<pre><span id="VALheading"><span class="keyword">val</span> heading</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       ('a, Format.formatter, unit, unit) Pervasives.format4 -> 'a</code></pre><div class="info ">
+<code class="code">heading t fmt</code> appends a formatted message to the log as a
+      heading.<br>
+</div>
+
+<pre><span id="VALwith_pending_reason"><span class="keyword">val</span> with_pending_reason</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t</code></pre><div class="info ">
+<code class="code">with_pending_reason t msg fn</code> calls <code class="code">fn ()</code>. If it gets a
+      sleeping thread, then it pushes <code class="code">msg</code> onto the pending-reason
+      stack, waits for the thread to finish, and then removes the
+      pending message.<br>
+</div>
+
+<pre><span id="VALenter_with_pending_reason"><span class="keyword">val</span> enter_with_pending_reason</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       string -> (('a -> 'b Lwt.t) -> 'b Lwt.t) -> ('a -> 'b Lwt.t) -> 'b Lwt.t</code></pre><div class="info ">
+<code class="code">enter_with_pending_reason t msg use fn</code> is like <code class="code">use fn</code>, but
+      posts <code class="code">msg</code> as the pending reason until <code class="code">fn</code> is called (or <code class="code">use</code>
+      fails).  This is useful to give a pending reason while getting a
+      mutex or pool resource.<br>
+</div>
+
+<pre><span id="VALcontents"><span class="keyword">val</span> contents</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> string</code></pre><div class="info ">
+<code class="code">contents t</code> is the current contents of the buffer.<br>
+</div>
+</body></html>

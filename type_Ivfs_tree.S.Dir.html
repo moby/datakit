@@ -17,7 +17,8 @@
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html"><title>Ivfs_tree.S.Dir</title>
+<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs_tree.S.Dir</title>
 </head>
 <body>
 <code class="code"><span class="keyword">sig</span>
@@ -44,7 +45,7 @@
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;map&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">Dir</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Directory</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">Dir</span>.t
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">File</span>.t&nbsp;*&nbsp;<span class="constructor">Ivfs_tree</span>.perm&nbsp;]&nbsp;<span class="constructor">Astring</span>.<span class="constructor">String</span>.<span class="constructor">Map</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">File</span>.t&nbsp;*&nbsp;<span class="constructor">Ivfs_tree</span>.perm&nbsp;]&nbsp;<span class="constructor">Map</span>.<span class="constructor">Make</span>(<span class="constructor">Path</span>.<span class="constructor">Step</span>).t
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;ls&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">S</span>.<span class="constructor">Dir</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;([&nbsp;<span class="keywordsign">`</span><span class="constructor">Directory</span>&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="keywordsign">`</span><span class="constructor">File</span>&nbsp;]&nbsp;*&nbsp;<span class="constructor">Ivfs_tree</span>.step)&nbsp;list&nbsp;<span class="constructor">Lwt</span>.t

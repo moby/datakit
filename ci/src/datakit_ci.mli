@@ -1,17 +1,30 @@
-open Datakit_github
+(** Datakit CI
 
-(** Datakit/CI
+    [Datakit_ci] is a library to describe reproducible, cachable and
+    distributed computations. The library is specialiazed to handle
+    build pipelines, where computations can take time, and where
+    seeing the live outputs of the computation is as useful as the
+    final step (think of live-logs of long-running builds).
 
-    DatakitCI is a library to build CI systems. FIXME.
+    The {!core} of [Datakit_ci] are {{!Term}term}combinators to
+    describe the composition of long-running computation jobs, with an
+    attached, individual {{!Output}output} (which can be
+    {{!livelogs}live}). A project {{!config}configuration} tied
+    together a collection of job description and a simple description
+    for the {{!web}web} interface, whose access is granted using
+    {{!acl}ACLs}.
+
+    TODO.
 *)
 
-type job_id
+(** {1:core Core} *)
 
-module DK : Datakit_S.CLIENT with type error = Protocol_9p_error.error
+module DK: Datakit_S.CLIENT with type error = Protocol_9p_error.error
+(** Datakit client library. *)
 
 module Live_log: sig
 
-  (** {1 Live Logs} *)
+  (** {1:livelogs Live Logs} *)
 
   type manager
   (** The type for live-log manager. *)
@@ -62,38 +75,80 @@ module Live_log: sig
   (** [contents t] is the current contents of the buffer. *)
 end
 
-module Step_log: sig
+module Output: sig
+
+  (** {1:output Computation Output} *)
+
+  (** The type for {!term} output saved in Datakit. *)
   type saved
 
+  (** The type for {!term}'s output. *)
   type t =
     | Empty
     | Live of Live_log.t
     | Saved of saved
     | Pair of t * t
+
 end
 
-type 'a lwt_status =
-  ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result
-  * Step_log.t
-(** ['a lwt_status] is similar to ['a or_error], except that the
-    pending state also indicates when it should be checked again. *)
+type 'a status = {
+  result: ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result;
+  output: Output.t;
+}
+(** The type for term status. It is a mix between the usual error
+    monad, but where we also keep a local log for every
+    computation. Morever, computation can be long-running, so there is
+    a new [`Pending] state and a continuation to run when the term
+    complete. *)
+
+type job_id
+(** The type for job IDs. They are used to identfy the worker actually
+    doing the computation. *)
 
 module Target: sig
+
+  (** {1:target Job Targets} *)
+
+  open Datakit_github
+
   type t = [ `PR of PR.id | `Ref of Ref.id ]
+  (** The type for computation targets. A target can either be a
+      pull-request ID, e.g. a GitHub repository and a number; or a
+      reference ID, e.g. a GitHub repository and a reference name
+      (given as a list of string, e.g. ["heads/master"] should be
+      split into [["heads"]; ["master"]]). *)
+
   val compare: t -> t -> int
+  (** [compare] is the comparison function for GitHub targets. *)
+
   val repo: t -> Repo.t
+  (** [repo t] is [t]'s repository. *)
+
   val id: t -> [`PR of int | `Ref of string list]
+  (** [id t] is [t]'s ID, e.g either a pull-request number or a
+      reference name split on ['/']. *)
+
   val pp: t Fmt.t
+  (** [pp] is the pretty-printer for GitHub targets. *)
+
   type v = [ `PR of PR.t | `Ref of Ref.t ]
+  (** The type for resolved GitHub targets. Resolved pull-request and
+      references contains the head commit and other metadata (see
+      {!Datakit_github}'s documentation for more details). *)
+
 end
 
 module Term: sig
 
-  (** {1 Term} *)
+  (** {1:term Computation Terms}
+
+      A term is a unit of computation, which can have various state
+      and a log output. Terms can be short-lived or long-running.  *)
 
   type 'a t
-  (** An ['a t] is a term that evaluates to an ['a], fails, or
-      explains what it's waiting for. *)
+  (** The type for computation terms. A ['a t] is a term that
+      evaluates to an ['a], fails, or explains what it's waiting
+      for. *)
 
   val return: 'a -> 'a t
   (** [return x] is a term that evaluates successfully to [x]. *)
@@ -121,7 +176,7 @@ module Term: sig
       result is never pending, so this is only for quick
       operations. *)
 
-  val of_lwt_slow: (unit -> 'a lwt_status Lwt.t) -> 'a t
+  val of_lwt_slow: (unit -> 'a status Lwt.t) -> 'a t
   (** [of_lwt_slow check] is a term that evaluates [check ()] to get
       the current status.  If [Error (`Pending (message, ready))],
       another check is scheduled when [ready] terminates. *)
@@ -187,27 +242,31 @@ module Term: sig
       another job. *)
 
   val job_id: job_id t
-  (** [job_id] evaluates to the job that evaluates the term.  This is
-      useful for logging. *)
+  (** [job_id] evaluates to the ID of the worker that evaluates the
+      term. This is useful for logging. *)
 
-  val github_target: Target.t -> Target.v t
-  (** [github_target id] evaluates to the GitHub metadata of the named
-      target. Note that this is a snapshot. *)
-
-  val head: Target.t -> Commit.t t
-  (** [head target] evaluates to the commit at the head [target]. *)
-
-  val branch_head: Repo.t -> string -> Commit.t t
-  (** [branch_head repo b] evaluates to the commit at the head of
-      branch [b] in the repository [repo]. *)
-
-  val tag: Repo.t -> string -> Commit.t t
-  (** [tag repo t] evaluates to the commit of tag [t] in the
-      repository [repo]. *)
+  (** {1 Datakit Connection} *)
 
   val dk: (unit -> DK.t Lwt.t) t
   (** [dk] is a function for getting the current DataKit
       connection. *)
+
+  (** {1 GitHub Integration} *)
+
+  val target: Target.t -> Target.v t
+  (** [target id] evaluates to the full metadata of the named
+      target. *)
+
+  val head: Target.t -> Datakit_github.Commit.t t
+  (** [head target] evaluates to the commit at the head [target]. *)
+
+  val branch_head: Datakit_github.Repo.t -> string -> Datakit_github.Commit.t t
+  (** [branch_head repo b] evaluates to the commit at the head of
+      branch [b] in the repository [repo]. *)
+
+  val tag: Datakit_github.Repo.t -> string -> Datakit_github.Commit.t t
+  (** [tag repo t] evaluates to the commit of tag [t] in the
+      repository [repo]. *)
 
   val ci_status: string list -> Target.t ->
     [`Pending | `Success | `Failure | `Error] option t
@@ -227,25 +286,39 @@ module Term: sig
 end
 
 module ACL: sig
+
+  (** {1:acl Access Control List} *)
+
   type t
+  (** The type for GitHub ACLs. *)
 
   val everyone: t
+  (** [everyone] is the ACL granting access to everyone *)
+
   val username: string -> t
+  (** [username n] is the ACL granting access to the user [n]. *)
 
   val github_org: string -> t
-  (** [github_org user] matches users who are members of the [user]
-      GitHub organisation.  Note: currently, only public organisation
-      membership is used. *)
+  (** [github_org o] is the ACL granting access to all the users of
+      the [o] GitHub organisation. Note: currently, only public
+      organisation membership is used. *)
 
   val can_read_github: string -> t
-  (** [can_read "org/repo"] matches users who can see the [org/repo]
-      GitHub repository. *)
+  (** [can_read "org/repo"] is the ACL granting access to users who
+      can see the [org/repo] GitHub repository. *)
 
   val any: t list -> t
+  (** [any l] is the ACL granting access to an user iff there is at
+      least one ACL in [l] granting access to that user. *)
+
 end
 
 module Web: sig
+
+  (** {1:web Web Configuration} *)
+
   type config
+  (** The type for web configuration. *)
 
   (** [config ~name ~state_repo ~can_read ~can_build ()] is a web
       configuration. If [name] is given, it is used as the main
@@ -264,12 +337,21 @@ module Web: sig
     can_read:ACL.t ->
     can_build:ACL.t ->
     unit -> config
+
 end
 
 module Config: sig
+
+  (** {1:config Configuration} *)
+
   type t
+  (** The type for the project configuration. *)
+
   type project
+  (** The type for projects. *)
+
   type test = string Term.t
+  (** The type for individual tests. *)
 
   val project:
     id:string ->
@@ -282,10 +364,9 @@ module Config: sig
       [["master"]]) is a list of branches to display in the main
       dashboard area. *)
 
-  val ci:
-    web_config:Web.config ->
-    projects:project list ->
-    t
+  val v: web_config:Web.config -> projects:project list -> t
+  (** [v ~web_config ~project] describe a complete project
+      configuration. *)
 end
 
 val run: ?info:Cmdliner.Term.info -> Config.t Cmdliner.Term.t -> unit
@@ -298,45 +379,13 @@ val run: ?info:Cmdliner.Term.info -> Config.t Cmdliner.Term.t -> unit
 val logs: Live_log.manager
 (** The singleton log manager. *)
 
-module Utils: sig
-  module Infix: sig
-    val ( >>*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-    val ( >|*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
-  end
-
-  val chdir_lock: Lwt_mutex.t
-
-  val ok: 'a -> ('a, 'b) result Lwt.t
-
-  val return_error:
-    ('a, Format.formatter, unit, ('b, string) result Lwt.t) format4 -> 'a
-
-  val failf: ('a, Format.formatter, unit, 'b) format4 -> 'a
-
-  val pp_exn: exn Fmt.t
-
-  val with_timeout:
-    ?switch:Lwt_switch.t -> float -> (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
-
-  val abs_path: string -> string
-
-  val ensure_dir: mode:Unix.file_perm -> string -> unit
-
-  val default: 'a -> 'a option -> 'a
-
-  val with_tmpdir:
-    ?prefix:string -> ?mode:Unix.file_perm -> (string -> 'a Lwt.t) -> 'a Lwt.t
-
-  val ls: string -> string list Lwt.t
-
-  val with_switch: (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
-
-  val cancel_when_off: Lwt_switch.t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
-end
+(** {1:extensions Extensions} *)
 
 module Process: sig
 
-  (** Convenience wrappers around [Lwt_process]. *)
+  (** {1:process Extension of Lwt_process}
+
+      Convenience wrappers around [Lwt_process]. *)
 
   val run_with_exit_status:
     ?switch:Lwt_switch.t -> ?log:Live_log.t -> ?cwd:string ->
@@ -367,9 +416,14 @@ module Process: sig
 end
 
 module Monitored_pool: sig
+
+  (** {1:pool Monitored Pool of Workers} *)
+
   type t
+  (** The type for pools of workers. *)
 
   val create: string -> int -> t
+  (** [create s n] create a new pool with [n] workers. *)
 
   val use: t -> ?log:Live_log.t -> ?label:string -> job_id ->
     (unit -> 'a Lwt.t) -> 'a Lwt.t
@@ -380,93 +434,14 @@ module Monitored_pool: sig
       the user will be able to cancel the operation. *)
 end
 
-module type BUILDER = sig
-  type t
-  (** A builder generates values from inputs (keys). A builder is
-      typically used with a cache. *)
-
-  module Key: Map.OrderedType
-  (** Input describing what is to be built. *)
-
-  type context
-  (** For passing context parameters to the builder which aren't part
-      of the key (e.g. timeouts or resource pools). *)
-
-  type value
-  (** Output of the builder. *)
-
-  val name: t -> string
-  (** A unique name for this builder. This is used for metric
-      reporting. *)
-
-  val title: t -> Key.t -> string
-  (** [title t key] is a one-line summary of the operation that is
-      performed by [generate]. It is used as the reason string for
-      the pending state and as the title of the log. *)
-
-  val generate: t -> switch:Lwt_switch.t -> log:Live_log.t ->
-    DK.Transaction.t -> context -> Key.t ->
-    (value, [`Failure of string]) result Lwt.t
-  (** [generate t ~log trans ctx key] generates the value for [key]
-      and stores it in [trans] under the "value" directory. It is
-      called when the value is not in the cache, or when a rebuild has
-      been requested. The value returned must be the same as the value
-      that would be loaded by [load]. If the build is cancelled,
-      [switch] will be turned off. If [generate] throws an exception
-      then it is caught and treated as an error result. *)
-
-  val load: t -> DK.Tree.t -> Key.t -> value Lwt.t
-  (** [load t tr key] is the value [v] previously saved by
-      [generate]. *)
-
-  val branch: t -> Key.t -> string
-  (** The name of the DataKit branch on which to store the result for
-      this key.  If the branch exists and is up-to-date then we use
-      that. *)
-end
-
-module Cache: sig
-
-  (** A cache for values computed (slowly) by terms. *)
-
-  module Path: sig
-    val value: Datakit_path.t
-    (** Build results are stored in this directory *)
-  end
-
-  module Make(B: BUILDER): sig
-    type t
-    (** A [t] is a cache of values created by [B]. *)
-
-    val create: logs:Live_log.manager -> B.t -> t
-    (** [create ~logs b] is a fresh cache that maps keys of type
-        [B.Key.t] to values of type [B.value]. *)
-
-    val lookup:
-      t -> (unit -> DK.t Lwt.t) -> rebuild:bool -> B.context -> B.Key.t ->
-      B.value lwt_status Lwt.t
-    (** [lookup t conn ~rebuild ctx key] returns the cached value of
-        [key], or uses [B.generate ctx key] to start the process of
-        calculating the value if this is the first time [key] has been
-        requested.  If [rebuild] is [true] then any complete cached
-        result is ignored (we mark the result branch as needing a
-        rebuild and build again anyway). *)
-
-    val term: t -> B.context -> B.Key.t -> B.value Term.t
-    (** [term t key] evaluates to the result of looking up [key] in
-        the cache (using [lookup]). *)
-  end
-end
-
 module Git: sig
 
-  (** Manipulating Git repositories with DataKit CI.
+  (** {1:git Git Manipulation}
 
-      [DKCI_git] extends [DKCI] with Git-related terms. It defines types
-      for {{!t}local Git repositories}, {{!commit}Git commits} inside
-      these repositories and {{!command}shell command} to run on a given
-      checkout.
-  *)
+      [Git] extends {{!term}Term} with Git-related combinators.It
+      defines types for {{!t}local Git repositories}, {{!commit}Git
+      commits} inside these repositories and {{!command}shell command}
+      to run on a given checkout.  *)
 
   type t
   (** The type for local non-bare git working directory (with a .git
@@ -515,6 +490,141 @@ module Git: sig
 
 end
 
+(** {1:cache Cache} *)
+
+module type BUILDER = sig
+
+  (** {1 Builder} *)
+
+  type t
+  (** The type for builder values. A builder generates values from
+      inputs (keys). A builder is typically used with a
+      {{!Cache}cache}. *)
+
+  module Key: Map.OrderedType
+  (** Input describing what is to be built. *)
+
+  type context
+  (** For passing context parameters to the builder which aren't part
+      of the key (e.g. timeouts or resource pools). *)
+
+  type value
+  (** Output of the builder. *)
+
+  val name: t -> string
+  (** A unique name for this builder. This is used for metric
+      reporting. *)
+
+  val title: t -> Key.t -> string
+  (** [title t key] is a one-line summary of the operation that is
+      performed by [generate]. It is used as the reason string for
+      the pending state and as the title of the log. *)
+
+  val generate: t -> switch:Lwt_switch.t -> log:Live_log.t ->
+    DK.Transaction.t -> context -> Key.t ->
+    (value, [`Failure of string]) result Lwt.t
+  (** [generate t ~log trans ctx key] generates the value for [key]
+      and stores it in [trans] under the "value" directory. It is
+      called when the value is not in the cache, or when a rebuild has
+      been requested. The value returned must be the same as the value
+      that would be loaded by [load]. If the build is cancelled,
+      [switch] will be turned off. If [generate] throws an exception
+      then it is caught and treated as an error result. *)
+
+  val load: t -> DK.Tree.t -> Key.t -> value Lwt.t
+  (** [load t tr key] is the value [v] previously saved by
+      [generate]. *)
+
+  val branch: t -> Key.t -> string
+  (** The name of the DataKit branch on which to store the result for
+      this key.  If the branch exists and is up-to-date then we use
+      that. *)
+end
+
+module Cache: sig
+
+  (** {1:cache Cache}
+
+      A cache for values computed (slowly) by terms. *)
+
+  module Path: sig
+    val value: Datakit_path.t
+    (** Build results are stored in this directory *)
+  end
+
+  module Make(B: BUILDER): sig
+    type t
+    (** A [t] is a cache of values created by [B]. *)
+
+    val create: logs:Live_log.manager -> B.t -> t
+    (** [create ~logs b] is a fresh cache that maps keys of type
+        [B.Key.t] to values of type [B.value]. *)
+
+    val lookup:
+      t -> (unit -> DK.t Lwt.t) -> rebuild:bool -> B.context -> B.Key.t ->
+      B.value status Lwt.t
+    (** [lookup t conn ~rebuild ctx key] returns the cached value of
+        [key], or uses [B.generate ctx key] to start the process of
+        calculating the value if this is the first time [key] has been
+        requested. If [rebuild] is [true] then any complete cached
+        result is ignored (we mark the result branch as needing a
+        rebuild and build again anyway). *)
+
+    val find: t -> B.context -> B.Key.t -> B.value Term.t
+    (** [find t key] is the terms which evaluates to the result of
+        looking up [key] in the cache (using [lookup]). *)
+  end
+end
+
+
+(** {1 Utils}
+
+    This should probably be replaced by something else or not be
+    exposed at all. *)
+
+module Utils: sig
+
+
+  module Infix: sig
+
+    val ( >>*= ):
+      ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+    val ( >|*= ):
+      ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+
+  end
+
+  val chdir_lock: Lwt_mutex.t
+
+  val ok: 'a -> ('a, 'b) result Lwt.t
+
+  val return_error:
+    ('a, Format.formatter, unit, ('b, string) result Lwt.t) format4 -> 'a
+
+  val failf: ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+  val pp_exn: exn Fmt.t
+
+  val with_timeout:
+    ?switch:Lwt_switch.t -> float -> (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
+
+  val abs_path: string -> string
+
+  val ensure_dir: mode:Unix.file_perm -> string -> unit
+
+  val default: 'a -> 'a option -> 'a
+
+  val with_tmpdir:
+    ?prefix:string -> ?mode:Unix.file_perm -> (string -> 'a Lwt.t) -> 'a Lwt.t
+
+  val ls: string -> string list Lwt.t
+
+  val with_switch: (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
+
+  val cancel_when_off: Lwt_switch.t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+end
+
 (** / **)
 
 module Private: sig
@@ -533,7 +643,8 @@ module Private: sig
   val connect: Client9p.t -> DK.t
 
   val test_engine: web_ui:Uri.t -> (unit -> DK.t Lwt.t) ->
-    (Target.t -> string Term.t Astring.String.Map.t) Repo.Map.t ->
+    (Target.t -> string Term.t Astring.String.Map.t)
+      Datakit_github.Repo.Map.t ->
     engine
 
   val listen: ?switch:Lwt_switch.t -> engine -> [`Abort] Lwt.t
@@ -541,6 +652,6 @@ module Private: sig
   val create_logs: unit -> Live_log.manager
   val lookup_log: branch:string -> Live_log.manager -> Live_log.t option
   val cancel: Live_log.t -> (unit, string) result Lwt.t
-  val read_log: DK.t -> Step_log.saved -> string DK.or_error Lwt.t
+  val read_log: DK.t -> Output.saved -> string DK.or_error Lwt.t
 
 end

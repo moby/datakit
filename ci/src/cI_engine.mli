@@ -1,6 +1,7 @@
 open Datakit_github
 open Astring
 open CI_utils
+open CI_s
 
 type t
 (** A DataKit CI instance. *)
@@ -43,7 +44,7 @@ val jobs : target -> job list
 val job_name : job -> string
 (** [job_name j] is the name of the GitHub status that this job computes. *)
 
-val state : job -> CI_state.t
+val state : job -> state
 (** [state job] is the current state of [job]. *)
 
 val git_target : target -> [`PR of PR.t | `Ref of Ref.t]

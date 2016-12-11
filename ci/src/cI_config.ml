@@ -24,6 +24,6 @@ let project ~id ?(dashboards=["master"]) tests =
   let dashboards = CI_target.Set.of_list (List.map (id_of_branch id) dashboards) in
   id, {tests; dashboards}
 
-let ci ~web_config ~projects =
+let v ~web_config ~projects =
   let projects = Repo.Map.of_list projects in
   { web_config; projects }

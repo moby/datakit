@@ -1,10 +1,14 @@
 open Datakit_github
-module Step_log = CI_result.Step_log
+
+module Output = CI_output
+
+(* FIXME: we should probably make that type abstract *)
+type 'a status = 'a CI_s.status = {
+  result: ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result;
+  output: Output.t
+}
 
 type job_id = CI_s.job_id
-
-type 'a lwt_status = 'a CI_s.lwt_status
-
 module Term = CI_term
 include CI_main
 module Utils = CI_utils
@@ -41,5 +45,5 @@ module Config = struct
   type project = Repo.t * CI_config.project
   type test = CI_config.test
   let project = CI_config.project
-  let ci = CI_config.ci
+  let v = CI_config.v
 end

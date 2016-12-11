@@ -190,10 +190,11 @@ let with_handler set_handler ~logs ?pending key fn =
   let branch = "log-branch-for-" ^ key in
   let switch = Lwt_switch.create () in
   let log = Live_log.create ~switch ~pending ~branch ~title:"Title" logs in
-  set_handler key (Error (`Pending (pending, finished)), Step_log.Live log);
+  set_handler key { result = Error (`Pending (pending, finished)) ;
+                    output = Output.Live log };
   fn ~switch log >|= fun result ->
   Live_log.finish log;
-  set_handler key (result, Step_log.Live log);
+  set_handler key { result; output = Output.Live log };
   Lwt.wakeup waker ()
 
 let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)

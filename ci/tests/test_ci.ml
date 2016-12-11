@@ -219,10 +219,10 @@ end
 module Test_cache = Cache.Make(Builder)
 
 let rec read_logs dk = function
-  | Step_log.Empty -> Lwt.return ""
-  | Step_log.Live l -> Lwt.return (Live_log.contents l)
-  | Step_log.Saved saved -> Private.read_log dk saved >>*= Lwt.return
-  | Step_log.Pair (a, b) ->
+  | Output.Empty -> Lwt.return ""
+  | Output.Live l -> Lwt.return (Live_log.contents l)
+  | Output.Saved saved -> Private.read_log dk saved >>*= Lwt.return
+  | Output.Pair (a, b) ->
     read_logs dk a >>= fun a ->
     read_logs dk b >>= fun b ->
     Lwt.return (Printf.sprintf "(%s,%s)" a b)
@@ -247,11 +247,11 @@ let test_cache ~regen =
     let c = get_cache () in
     let rec aux ~rebuild =
       Test_cache.lookup c conn ~rebuild Builder.NoContext key >>= function
-      | Ok x, logs ->
-        read_logs dk logs >>= fun logs ->
+      | { result = Ok x; output } ->
+        read_logs dk output >>= fun logs ->
         Lwt.return (x, Test_utils.strip_times logs)
-      | Error (`Failure msg), _logs -> Alcotest.fail msg
-      | Error (`Pending (msg, ready)), _logs ->
+      | { result = Error (`Failure msg); _ } -> Alcotest.fail msg
+      | { result = Error (`Pending (msg, ready)); _ } ->
         Log.debug (fun f -> f "Waiting for result to be returned: %s" msg);
         ready >>= fun () ->
         aux ~rebuild:false
@@ -289,8 +289,8 @@ let test_pending_updates conn =
   let b = { Builder.time = 0; step = Some step } in
   let c = Test_cache.create ~logs b in
   let check_pending expected =
-    Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= fun (status, _log) ->
-    let (reason, update) = expect_pending status in
+    Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= fun s ->
+    let (reason, update) = expect_pending s.result in
     Alcotest.(check string) expected expected reason;
     assert (Lwt.state update = Lwt.Sleep);
     advance (Some ());
@@ -300,7 +300,7 @@ let test_pending_updates conn =
   check_pending "Paused" >>= fun () ->
   check_pending "Get key" >>= fun () ->
   Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= function
-  | Ok 1, _ -> Lwt.return ()
+  | { result = Ok 1; _ } -> Lwt.return ()
   | _ -> Alcotest.fail "Expected success"
 
 let test_git_dir conn ~clone =

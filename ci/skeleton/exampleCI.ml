@@ -1,8 +1,7 @@
 open Datakit_ci
 
 (* An example test that just always returns success. *)
-let my_test =
-  Term.return "Success!"
+let my_test = Term.return "Success!"
 
 let tests _target =
   [
@@ -40,5 +39,4 @@ let web_config =
     ()
 
 (* The main entry-point *)
-let () =
-  run (Cmdliner.Term.pure (Config.ci ~web_config ~projects))
+let () = run (Cmdliner.Term.pure (Config.v ~web_config ~projects))

@@ -1,6 +1,7 @@
 open Datakit_github
 open! Astring
 open! Tyxml.Html
+open CI_s
 
 type t = {
   name : string;
@@ -121,7 +122,7 @@ let dash_map f map targets =
 
 let status state =
   let colour, icon, status =
-    match state.CI_state.status with
+    match state.status with
     | `Pending -> "label-warning", "glyphicon-hourglass", "Pending"
     | `Success -> "label-success", "glyphicon-ok","Success"
     | `Error -> "label-danger", "glyphicon-warning-sign", "Error"
@@ -150,7 +151,7 @@ let status_list jobs =
       jobs |> List.map (fun job ->
           let state = CI_engine.state job in
           let label = CI_engine.job_name job in
-          td [status_flag ~label state.CI_state.status];
+          td [status_flag ~label state.status];
         )
     )
   ]
@@ -160,19 +161,19 @@ let summarise jobs =
   let combine status states =
     let results = ref String.Map.empty in
     states |> List.iter (fun (name, state) ->
-        let descr = state.CI_state.descr in
+        let descr = state.descr in
         let old_names = String.Map.find descr !results |> CI_utils.default [] in
         results := String.Map.add descr (name :: old_names) !results
       );
     let results = String.Map.bindings !results in
     let pp_group f (descr, g) = Fmt.pf f "%s (%a)" descr (Fmt.(list ~sep:(const string ", ") Fmt.string)) (List.rev g) in
     let descr = Fmt.strf "%a" Fmt.(list ~sep:(const string "; ") pp_group) results in
-    { CI_state.status; descr; logs = CI_result.Step_log.Empty }
+    { status; descr; logs = CI_output.Empty }
   in
-  let pending, states = List.partition (fun (_, x) -> x.CI_state.status = `Pending) states in
+  let pending, states = List.partition (fun (_, x) -> x.status = `Pending) states in
   if pending <> [] then combine `Pending pending
   else (
-    let failed, states = List.partition (fun (_, x) -> x.CI_state.status = `Failure) states in
+    let failed, states = List.partition (fun (_, x) -> x.status = `Failure) states in
     if failed <> [] then combine `Failure failed
     else combine `Success states
   )
@@ -180,7 +181,7 @@ let summarise jobs =
 let dashboard_widget (_repo, id) ref =
   let state = CI_engine.jobs ref |> summarise in
   let cls, icon, status, comment =
-    match state.CI_state.status with
+    match state.status with
     | `Pending -> "dashboard-pending", "glyphicon-hourglass", "Pending", "... WAITING ..."
     | `Success -> "dashboard-success", "glyphicon-ok", "Succeeding", "YAY! The build is fine... Nothing to see here..."
     | `Error -> "dashboard-error", "glyphicon-warning-sign", "Erroring", "OH NO! Something has gone terribly wrong"
@@ -203,7 +204,7 @@ let ref_job (project, id) ref =
   tr [
     td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
     td [status_list jobs];
-    td [pcdata summary.CI_state.descr];
+    td [pcdata summary.descr];
   ]
 
 let pr_job (repo, id) open_pr =
@@ -213,7 +214,7 @@ let pr_job (repo, id) open_pr =
     td [a ~a:[a_href (pr_url repo id)] [pcdata (string_of_int id)]];
     td [pcdata (CI_engine.title open_pr)];
     td [status_list jobs];
-    td [pcdata summary.CI_state.descr];
+    td [pcdata summary.descr];
   ]
 
 let heading x = th [pcdata x]
@@ -520,14 +521,14 @@ let encode = Uri.pct_encode ~scheme:"http"
 
 module LogScore : sig
   type t
-  type log = [`Live of CI_live_log.t | `Saved of CI_result.Step_log.saved]
+  type log = [`Live of CI_live_log.t | `Saved of CI_output.saved]
 
   val create : unit -> t
   val update : t -> log -> unit
   val best : t -> log option
 end = struct
   type score = int
-  type log = [`Live of CI_live_log.t | `Saved of CI_result.Step_log.saved]
+  type log = [`Live of CI_live_log.t | `Saved of CI_output.saved]
   type t = (score * log) option ref
 
   let ok = 1
@@ -540,7 +541,7 @@ end = struct
     let new_score =
       match x with
       | `Live _ -> pending
-      | `Saved {CI_result.Step_log.failed = true; _} -> failed
+      | `Saved {CI_output.failed = true; _} -> failed
       | `Saved _ -> ok
     in
     match !best with
@@ -556,27 +557,27 @@ end
 
 let logs_frame_link = function
   | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
-  | `Saved {CI_result.Step_log.branch; commit; _} -> Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
+  | `Saved {CI_output.branch; commit; _} -> Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
 
 let score_logs ~best job =
-  let open CI_result.Step_log in
+  let open CI_output in
   let rec aux = function
     | Empty -> ()
     | Live live_log -> LogScore.update best (`Live live_log);
     | Saved saved -> LogScore.update best (`Saved saved);
     | Pair (a, b) -> aux a; aux b
   in
-  aux (CI_engine.state job).CI_state.logs
+  aux (CI_engine.state job).logs
 
 let logs ~csrf_token ~page_url ~selected state =
-  let open CI_result.Step_log in
-  let logs = state.CI_state.logs in
+  let open CI_output in
+  let logs = state.logs in
   let last_title = ref None in
   let seen = ref String.Set.empty in
   let selected_branch =
     match selected with
     | Some (`Live x) -> Some (CI_live_log.branch x)
-    | Some (`Saved x) -> Some x.CI_result.Step_log.branch
+    | Some (`Saved x) -> Some x.branch
     | None -> None
   in
   let log_link ~branch ~title log =
@@ -609,7 +610,7 @@ let logs ~csrf_token ~page_url ~selected state =
           log_link ~branch ~title (`Live live_log);
         ];
       ]
-    | Saved ({CI_result.Step_log.commit = _; branch; title; rebuild = _; failed} as saved) ->
+    | Saved ({commit = _; branch; title; rebuild = _; failed} as saved) ->
       seen := String.Set.add branch !seen;
       let query = [
         "CSRFToken", [csrf_token];
@@ -634,8 +635,8 @@ let logs ~csrf_token ~page_url ~selected state =
   let items = aux logs in
   (* Don't show the overall status if it's the same as the last log title. *)
   match !last_title with
-  | Some shown when shown = state.CI_state.descr -> items
-  | _ -> items @ [p [status_flag state.CI_state.status; pcdata state.CI_state.descr]]
+  | Some shown when shown = state.descr -> items
+  | _ -> items @ [p [status_flag state.status; pcdata state.descr]]
 
 let job_row ~csrf_token ~page_url ~best_log job =
   let state = CI_engine.state job in

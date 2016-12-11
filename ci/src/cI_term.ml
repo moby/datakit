@@ -50,18 +50,17 @@ let target t = function
   | `PR x  -> Conv.pr t x >?= fun x -> `PR x
   | `Ref x -> Conv.ref t x >?= fun x -> `Ref x
 
-let github_target id =
+let target id =
   github >>= fun gh ->
   of_lwt_quick (target gh id) >>= function
-  | None -> fail "Target %a does not exist" CI_target.pp id
+  | None   -> fail "Target %a does not exist" CI_target.pp id
   | Some x -> return x
 
-let head id =
-  github_target id >|= CI_target.head
+let head id = target id >|= CI_target.head
 
 let ref_head repo ref_name =
   match Datakit_path.of_string ref_name with
-  | Error msg -> fail "Invalid ref name %S: %s" ref_name msg
+  | Error msg   -> fail "Invalid ref name %S: %s" ref_name msg
   | Ok ref_path -> head @@ `Ref (repo, Datakit_path.unwrap ref_path)
 
 let branch_head repo branch = ref_head repo ("heads/" ^ branch)
@@ -91,7 +90,7 @@ let ci_success_target_url ci target =
   | Some `Error   -> ci_descr ci target >>= fail "%a errored%a" Ref.pp_name ci pp_opt_descr
   | Some `Success ->
     ci_state Status.url ci target >>= function
-    | None -> fail "%a succeeded, but has no URL!" Ref.pp_name ci
+    | None     -> fail "%a succeeded, but has no URL!" Ref.pp_name ci
     | Some url -> return url
 
 let run ~snapshot ~job_id ~recalc ~dk term =

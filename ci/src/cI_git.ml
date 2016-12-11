@@ -129,8 +129,9 @@ let v ~logs ~dir =
   }
 
 let fetch_head t target =
-  let ( >>~= ) = CI_term.Infix.( >>= ) in
-  CI_term.github_target target >>~= PR_Cache.term t.fetches Builder.NoContext
+  let open !CI_term.Infix in
+  CI_term.target target >>=
+  PR_Cache.find t.fetches Builder.NoContext
 
 let with_checkout ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
   CI_live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (CI_monitored_pool.use ~log dir_lock job_id) @@ fun () ->
@@ -145,9 +146,11 @@ let with_checkout ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
 let with_clone ~log ~job_id {Commit.repo = {dir; dir_lock; _}; hash} fn =
   let output = CI_live_log.write log in
   CI_utils.with_tmpdir ~prefix:"with_clone" ~mode:0o700 @@ fun tmpdir ->
-  CI_live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir) (CI_monitored_pool.use ~log dir_lock job_id) (fun () ->
-      CI_process.run ~output ("", [| "git"; "clone"; dir; tmpdir |])
-    )
+  CI_live_log.enter_with_pending_reason log
+    ("Waiting for lock on " ^ dir)
+    (CI_monitored_pool.use ~log dir_lock job_id) (fun () ->
+        CI_process.run ~output ("", [| "git"; "clone"; dir; tmpdir |])
+      )
   >>= fun () ->
   CI_process.run ~cwd:tmpdir ~output ("", [| "git"; "reset"; "--hard"; hash |]) >>= fun () ->
   fn tmpdir
@@ -206,5 +209,5 @@ let command ~logs ~timeout ~label ~clone cmds =
 
 let run command git_dir =
   let open! CI_term.Infix in
-  CI_term.job_id >>= fun job ->
-  Shell_cache.term command job git_dir
+  CI_term.job_id >>= fun job_id ->
+  Shell_cache.find command job_id git_dir

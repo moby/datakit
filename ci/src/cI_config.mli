@@ -15,7 +15,7 @@ type t = private {
 
 val project : id:string -> ?dashboards:string list -> (CI_target.t -> (string * test) list) -> Repo.t * project
 
-val ci :
+val v:
   web_config:CI_web_templates.t ->
   projects:(Repo.t * project) list ->
   t

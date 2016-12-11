@@ -1,3 +1,4 @@
+open CI_s
 open CI_utils
 open CI_utils.Infix
 open Lwt.Infix
@@ -47,7 +48,7 @@ module Path = struct
   let value   = v "value"
 end
 
-let read_log dk { CI_result.Step_log.commit; branch; _} =
+let read_log dk { CI_output.commit; branch; _} =
   Log.debug (fun f -> f "Loading log from commit %s (branch %s)" commit branch);
   let tree = DK.Commit.tree (DK.commit dk commit) in
   DK.Tree.read_file tree Path.log >|= function
@@ -60,7 +61,7 @@ module Make(B : CI_s.BUILDER) = struct
   type t = {
     logs : CI_live_log.manager;
     mutex : Lwt_mutex.t;                        (* Held while updating [cache] *)
-    mutable cache: B.value CI_s.lwt_status M.t;    (* In-memory cache, including pending items *)
+    mutable cache: B.value status M.t;    (* In-memory cache, including pending items *)
     builder : B.t;                              (* The underlying builder *)
   }
 
@@ -91,15 +92,20 @@ module Make(B : CI_s.BUILDER) = struct
       | true -> Lwt.return None (* Results exist, but are flagged for rebuild *)
       | false ->
         let title = B.title builder key in
-        let logs ~failed = CI_result.Step_log.(Saved { title; commit = DK.Commit.id commit; branch = branch_name; rebuild; failed }) in
+        let logs ~failed = CI_output.(Saved { title; commit = DK.Commit.id commit; branch = branch_name; rebuild; failed }) in
         DK.Tree.read_file tree Path.failure >>= function
-        | Ok failure -> Lwt.return (Some (Error (`Failure (Cstruct.to_string failure)), logs ~failed:true))
+        | Ok failure ->
+          let r = {
+            result = Error (`Failure (Cstruct.to_string failure));
+            output = logs ~failed:true;
+          } in
+          Lwt.return (Some r)
         | Error (`Msg "No such file or directory") ->
           (* If we failed to load the failure, this result must be successful. *)
           Lwt.catch
             (fun () ->
                B.load builder tree key >|= fun v ->
-               Some (Ok v, logs ~failed:false)
+               Some { result = Ok v; output = logs ~failed:false }
             )
             (fun ex ->
                Log.err (fun f -> f "Failed to load value from previously cached result %s: %s"
@@ -117,9 +123,12 @@ module Make(B : CI_s.BUILDER) = struct
 
   let lookup_mem t ~rebuild k =
     match M.find k t.cache with
-    | (Ok _ | Error (`Failure _)), _ when rebuild -> None (* If pending, ignore rebuild request *)
-    | v -> Some v
     | exception Not_found -> None
+    | v ->
+      match v.result with
+      | Ok _ | Error (`Failure _) when rebuild ->
+        None (* If pending, ignore rebuild request *)
+      | _ -> Some v
 
   let mark_branch_for_rebuild builder conn key =
     conn () >>= fun dk ->
@@ -143,7 +152,7 @@ module Make(B : CI_s.BUILDER) = struct
      Finishing the log will cause this to finish too. It will then return a function to call
      to notify the user that the final result is cached (once you've added it). *)
   let monitor_pending t k log =
-    let pending_log = CI_result.Step_log.Live log in
+    let pending_log = CI_output.Live log in
     (* Note: MUST initially set state to pending without sleeping *)
     let rec loop wake =
       let reason, update = CI_live_log.pending log in
@@ -153,7 +162,11 @@ module Make(B : CI_s.BUILDER) = struct
         (* Note: we give the user a separate [user_update] (not [update]) to ensure we
            update the cache before they check for the new status. *)
         let user_update, waker = Lwt.wait () in
-        t.cache <- M.add k (Error (`Pending (reason, user_update)), pending_log) t.cache;
+        let r = {
+          result = Error (`Pending (reason, user_update));
+          output = pending_log;
+        } in
+        t.cache <- M.add k r t.cache;
         wake ();
         update >>= fun () ->
         loop (fun () -> Lwt.wakeup waker ())
@@ -212,15 +225,15 @@ module Make(B : CI_s.BUILDER) = struct
               | None -> failf "Branch deleted as we saved it!"
               | Some commit ->
                 let failed = match result with Ok _ -> false | Error _ -> true in
-                let saved = { CI_result.Step_log.commit = DK.Commit.id commit; branch = branch_name; title; rebuild; failed } in
-                finish ((result, CI_result.Step_log.Saved saved) :> B.value CI_s.lwt_status)
+                let saved = { CI_output.commit = DK.Commit.id commit; branch = branch_name; title; rebuild; failed } in
+                finish { result; output = CI_output.Saved saved }
                 (* At this point, the entry is no longer pending and other people can update it. *)
            )
            (fun ex ->
               let msg = Printexc.to_string ex in
               Log.err (fun f -> f "Uncaught exception in do_build: %s" msg);
               CI_prometheus.Counter.inc_one @@ Metrics.build_exceptions_total (B.name t.builder);
-              finish (Error (`Failure msg), CI_result.Step_log.Empty)
+              finish { result = Error (`Failure msg); output = CI_output.Empty }
            )
       );
     M.find k t.cache
@@ -230,7 +243,7 @@ module Make(B : CI_s.BUILDER) = struct
     | Some v -> Lwt.return v
     | None ->
       let do_rebuild = lazy (
-        lookup t conn ~rebuild:true ctx k >|= fun (_:B.value CI_s.lwt_status) -> ()
+        lookup t conn ~rebuild:true ctx k >|= fun (_:B.value CI_s.status) -> ()
       ) in
       Lwt_mutex.with_lock t.mutex @@ fun () ->
       conn () >>= fun dk ->
@@ -248,7 +261,7 @@ module Make(B : CI_s.BUILDER) = struct
           t.cache <- M.add k v t.cache;
           Lwt.return v
 
-  let term t ctx k =
+  let find t ctx k =
     let open! CI_term.Infix in
     CI_term.dk >>= fun dk ->
     CI_term.of_lwt_slow (fun () ->

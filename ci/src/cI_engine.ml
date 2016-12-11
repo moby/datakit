@@ -1,4 +1,5 @@
 open Datakit_github
+open CI_s
 open CI_utils
 open CI_utils.Infix
 open Result
@@ -32,7 +33,7 @@ type job = {
   parent : target;
   mutable term : string CI_term.t;
   mutable cancel : unit -> unit;    (* Cancel the previous evaluation, if any *)
-  mutable state : string * CI_state.t;  (* The last result of evaluating [term]
+  mutable state : string * state;  (* The last result of evaluating [term]
                                            (commit, state) *)
 }
 and target = {
@@ -270,9 +271,9 @@ let rec recalculate t ~snapshot job =
     )
     (function
       | Failure msg ->
-        Lwt.return (Error (`Failure msg), CI_result.Step_log.Empty)
+        Lwt.return (Error (`Failure msg), CI_output.Empty)
       | ex ->
-        Lwt.return (Error (`Failure (Printexc.to_string ex)), CI_result.Step_log.Empty)
+        Lwt.return (Error (`Failure (Printexc.to_string ex)), CI_output.Empty)
     )
   >>= fun (result, logs) ->
   let status, descr =
@@ -283,13 +284,14 @@ let rec recalculate t ~snapshot job =
   in
   let (old_head, old_state) = job.state in
   let new_hash = Commit.hash (commit head) in
-  begin if (old_head, old_state.CI_state.status, old_state.CI_state.descr) <> (new_hash, status, descr) then (
+  begin if (old_head, old_state.status, old_state.descr) <>
+           (new_hash, status, descr) then (
       set_status t head job.name ~status ~descr
     ) else (
       Lwt.return ()
     )
   end >|= fun () ->
-  let state = (new_hash, { CI_state.status; descr; logs }) in
+  let state = (new_hash, { status; descr; logs }) in
   job.state <- state
 
 let make_job snapshot ~parent name term =
@@ -300,11 +302,8 @@ let make_job snapshot ~parent name term =
   let descr = match status with None -> None | Some s -> Status.description s in
   let state =
     match state, descr with
-    | Some status, Some descr ->
-      { CI_state.status; descr; logs = CI_result.Step_log.Empty }
-    | _ ->
-      { CI_state.status = `Pending; descr = "(new)";
-        logs = CI_result.Step_log.Empty }
+    | Some status, Some descr -> { status; descr; logs = CI_output.Empty }
+    | _ -> { status = `Pending; descr = "(new)"; logs = CI_output.Empty }
   in
   let hash = Commit.hash head_commit in
   { name;
@@ -424,7 +423,7 @@ let rebuild t ~branch_name =
   let jobs_needing_recalc = ref [] in
   let triggers = ref [] in
   let rec check_logs =
-    let open CI_result.Step_log in
+    let open CI_output in
     function
     | Saved {branch; rebuild; _} when branch = branch_name ->
       if not (Lazy.is_val rebuild) then triggers := Lazy.force rebuild :: !triggers;
@@ -439,7 +438,7 @@ let rebuild t ~branch_name =
   in
   let check_job job =
     let _, state = job.state in
-    if check_logs state.CI_state.logs then
+    if check_logs state.logs then
       jobs_needing_recalc := job :: !jobs_needing_recalc
   in
   let check_target target = List.iter check_job target.jobs in

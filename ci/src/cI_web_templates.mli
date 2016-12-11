@@ -10,7 +10,7 @@ type t = private {
   can_build : CI_ACL.t;
 }
 
-val config :
+val config:
   ?name:string ->
   ?state_repo:Uri.t ->
   ?metrics_token:[`SHA256 of string] ->

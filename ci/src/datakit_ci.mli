@@ -649,8 +649,8 @@ module Private: sig
     include Protocol_9p_client.S
     val connect:
       string -> string ->
-      ?msize:int32 -> ?username:string -> ?aname:string -> unit ->
-      t Protocol_9p_error.t Lwt.t
+      ?msize:int32 -> ?username:string -> ?aname:string -> ?max_fids:int32 ->
+      unit -> t Protocol_9p_error.t Lwt.t
   end
 
   val connect: Client9p.t -> DK.t

@@ -7,7 +7,7 @@ module Client9p: sig
   include Protocol_9p_client.S
   val connect:
     string -> string ->
-    ?msize:int32 -> ?username:string -> ?aname:string -> unit ->
+    ?msize:int32 -> ?username:string -> ?aname:string -> ?max_fids:int32 -> unit ->
     t Protocol_9p_error.t Lwt.t
 end
 module DK: sig

@@ -72,3 +72,5 @@ type v = [ `PR of PR.t | `Ref of Ref.t ]
 let head = function
   | `PR x  -> PR.commit x
   | `Ref x -> Ref.commit x
+
+let compare_v (x:v) (y:v) = Elt.compare (x :> Elt.t) (y :> Elt.t)

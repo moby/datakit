@@ -136,6 +136,9 @@ module Target: sig
       references contains the head commit and other metadata (see
       {!Datakit_github}'s documentation for more details). *)
 
+  val head: v -> Commit.t
+  (** [head v] is the head commit of [v]. *)
+
 end
 
 module Term: sig

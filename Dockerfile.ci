@@ -7,7 +7,6 @@ RUN cd /home/opam/opam-repository && git pull && opam update -y
 RUN opam depext -ui cohttp yojson ssl tyxml fmt rresult logs lwt conf-libev react camlp4 \
     tls pbkdf ppx_sexp_conv webmachine session asetmap
 
-RUN opam pin add multipart-form-data https://github.com/cryptosense/multipart-form-data.git
 RUN opam pin add datakit-client https://github.com/docker/datakit.git
 RUN opam pin add session "https://github.com/talex5/ocaml-session.git#redis"
 

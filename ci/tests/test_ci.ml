@@ -457,8 +457,8 @@ let test_metrics () =
   Alcotest.(check string) "Text output"
     "#HELP dkci_tests_requests Requests\n\
      #TYPE dkci_tests_requests counter\n\
-     dkci_tests_requests{method=\"GET\" path=\"\\\"\\\\-\\n\"} 5\n\
-     dkci_tests_requests{method=\"POST\" path=\"/login\"} 3\n\
+     dkci_tests_requests{method=\"GET\", path=\"\\\"\\\\-\\n\"} 5\n\
+     dkci_tests_requests{method=\"POST\", path=\"/login\"} 3\n\
      #HELP tests Test \\\\counter:\\n1\n\
      #TYPE tests counter\n\
      tests 1\n\

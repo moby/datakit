@@ -26,6 +26,18 @@ module Metrics = struct
   let update_notifications =
     let help = "Number of notifications from DataKit" in
     CI_prometheus.Counter.v ~help ~namespace ~subsystem "update_notifications_total"
+
+  let set_active_targets =
+    let help = "Number of branches, tags and PRs currently being monitored" in
+    let g = CI_prometheus.Gauge.v_label ~label_name:"type" ~help ~namespace ~subsystem "active_targets" in
+    let tags = g "tag" in
+    let branches = g "branch" in
+    let prs = g "pr" in
+    let set guage v = CI_prometheus.Gauge.set guage (float_of_int v) in
+    function
+    | `Tag    -> set tags
+    | `Branch -> set branches
+    | `PR     -> set prs
 end
 
 type job = {
@@ -328,6 +340,10 @@ let apply_canaries canaries prs refs =
     in
     (prs, refs)
 
+let is_tag = function
+  | _, "tags" :: _ ->  true
+  | _ -> false
+
 let listen ?switch t =
   auto_restart t ?switch "monitor" @@ fun () ->
   Log.info (fun f -> f "Starting monitor loop");
@@ -376,6 +392,10 @@ let listen ?switch t =
   enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
   monitor ?switch t (fun snapshot ->
       CI_prometheus.Counter.inc_one Metrics.update_notifications;
+      let active_tags = ref 0 in
+      let active_braches = ref 0 in
+      let active_prs = ref 0 in
+
       t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (repo, project) ->
           Conv.prs snapshot ~repos:(Repo.Set.singleton repo) >>= fun prs ->
           Conv.refs snapshot ~repos:(Repo.Set.singleton repo) >>= fun refs ->
@@ -400,7 +420,10 @@ let listen ?switch t =
           in
           project.open_prs <- PR.Index.filter is_current project.open_prs;
           Lwt_mutex.with_lock t.term_lock (fun () ->
-              PR.Index.bindings prs |> Lwt_list.iter_s (check_pr ~snapshot project)
+              PR.Index.bindings prs |> Lwt_list.iter_s (fun pr ->
+                  incr active_prs;
+                  check_pr ~snapshot project pr
+                )
             )
           >>= fun () ->
           (* Refs *)
@@ -414,9 +437,16 @@ let listen ?switch t =
           in
           project.refs <- Ref.Index.filter is_current project.refs;
           Lwt_mutex.with_lock t.term_lock (fun () ->
-              Ref.Index.bindings refs |> Lwt_list.iter_s (check_ref ~snapshot project)
+              Ref.Index.bindings refs |> Lwt_list.iter_s (fun r ->
+                  if is_tag (fst r) then incr active_tags else incr active_braches;
+                  check_ref ~snapshot project r
+                )
             )
         )
+      >|= fun () ->
+      Metrics.set_active_targets `Tag !active_tags;
+      Metrics.set_active_targets `Branch !active_braches;
+      Metrics.set_active_targets `PR !active_prs;
     )
 
 let rebuild t ~branch_name =

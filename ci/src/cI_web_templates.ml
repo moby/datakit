@@ -1,5 +1,7 @@
+open Datakit_github
 open! Astring
 open! Tyxml.Html
+open CI_s
 
 type t = {
   name : string;
@@ -46,81 +48,81 @@ let log_branch_results_url t branch =
 
 let gh_target_url = function
   | `PR pr ->
-    let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
-    let id = CI_github_hooks.PR.id pr in
-    Printf.sprintf "https://github.com/%s/%s/pull/%d" user project id
+    let { Repo.user; repo } = PR.repo pr in
+    let id = PR.number pr in
+    Printf.sprintf "https://github.com/%s/%s/pull/%d" user repo id
   | `Ref r ->
-    let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
-    let id = CI_github_hooks.Ref.name r in
-    match Datakit_path.unwrap id with
-    | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user project (String.concat ~sep:"/" id)
-    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user project Datakit_path.pp id
+    let { Repo.user; repo } = Ref.repo r in
+    let id = Ref.name r in
+    match id with
+    | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user repo (String.concat ~sep:"/" id)
+    | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user repo Ref.pp_name id
 
 let metadata_url t = function
   | `PR pr ->
-    let { CI_projectID.user; project } = CI_github_hooks.PR.project pr in
-    let id = CI_github_hooks.PR.id pr in
-    state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user project id
+    let { Repo.user; repo } = PR.repo pr in
+    let id = PR.number pr in
+    state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user repo id
   | `Ref r ->
-    let { CI_projectID.user; project } = CI_github_hooks.Ref.project r in
-    let id = CI_github_hooks.Ref.name r in
-    state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user project
-      Datakit_path.pp id
+    let { Repo.user; repo } = Ref.repo r in
+    let id = Ref.name r in
+    state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user repo
+      Ref.pp_name id
 
 let commit_history_url t target =
-  let { CI_projectID.user; project }, commit =
+  let { Repo.user; repo }, commit =
     match target with
-    | `PR pr -> CI_github_hooks.PR.project pr, CI_github_hooks.PR.head pr
-    | `Ref r -> CI_github_hooks.Ref.project r, CI_github_hooks.Ref.head r
+    | `PR pr -> PR.repo pr, PR.commit pr
+    | `Ref r -> Ref.repo r, Ref.commit r
   in
-  let hash = CI_github_hooks.Commit.hash commit in
-  state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user project hash
+  let hash = Commit.hash commit in
+  state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user repo hash
 
-let commit_url ~project commit =
-  let { CI_projectID.user; project } = project in
-  Printf.sprintf "https://github.com/%s/%s/commit/%s" user project commit
+let commit_url ~repo commit =
+  let { Repo.user; repo } = repo in
+  Printf.sprintf "https://github.com/%s/%s/commit/%s" user repo commit
 
-let pr_url { CI_projectID.user; project} pr =
-  Printf.sprintf "/pr/%s/%s/%d" user project pr
+let pr_url { Repo.user; repo} pr =
+  Printf.sprintf "/pr/%s/%s/%d" user repo pr
 
 let escape_ref path =
-  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" (Datakit_path.unwrap path))
+  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" path)
 
 let unescape_ref s =
-  Uri.pct_decode s |> Datakit_path.of_string_exn
+  Uri.pct_encode ~scheme:"http" s |> (fun s -> String.cuts ~sep:"/" s)
 
-let ref_url { CI_projectID.user; project} r =
-  Printf.sprintf "/ref/%s/%s/%s" user project (escape_ref r)
+let ref_url { Repo.user; repo} r =
+  Fmt.strf "/ref/%s/%s/%s" user repo (escape_ref r)
 
 let tag_map f map =
-  Datakit_path.Map.fold (fun key value acc ->
-      match Datakit_path.unwrap key with
+  Ref.Index.fold (fun key value acc ->
+      match snd key with
       | "tags" :: _ -> [f key value] @ acc
       | _ -> acc
     ) map []
 
 let branch_map f map =
-  Datakit_path.Map.fold (fun key value acc ->
-      match Datakit_path.unwrap key with
+  Ref.Index.fold (fun key value acc ->
+      match snd key with
       | "heads" :: _ -> [f key value] @ acc
       | _ -> acc
     ) map []
 
-let int_map f map =
-  CI_utils.IntMap.fold (fun key value acc ->
+let pr_map f map =
+  PR.Index.fold (fun key value acc ->
       [f key value] @ acc
     ) map []
 
 let dash_map f map targets =
-  Datakit_path.Map.fold (fun key value acc ->
-      match CI_target.ID_Set.mem (`Ref key) targets with
+  Ref.Index.fold (fun key value acc ->
+      match CI_target.Set.mem (`Ref key) targets with
       | true -> [f key value] @ acc
       | false -> acc
     ) map []
 
 let status state =
   let colour, icon, status =
-    match state.CI_state.status with
+    match state.status with
     | `Pending -> "label-warning", "glyphicon-hourglass", "Pending"
     | `Success -> "label-success", "glyphicon-ok","Success"
     | `Error -> "label-danger", "glyphicon-warning-sign", "Error"
@@ -149,7 +151,7 @@ let status_list jobs =
       jobs |> List.map (fun job ->
           let state = CI_engine.state job in
           let label = CI_engine.job_name job in
-          td [status_flag ~label state.CI_state.status];
+          td [status_flag ~label state.status];
         )
     )
   ]
@@ -159,34 +161,33 @@ let summarise jobs =
   let combine status states =
     let results = ref String.Map.empty in
     states |> List.iter (fun (name, state) ->
-        let descr = state.CI_state.descr in
+        let descr = state.descr in
         let old_names = String.Map.find descr !results |> CI_utils.default [] in
         results := String.Map.add descr (name :: old_names) !results
       );
     let results = String.Map.bindings !results in
     let pp_group f (descr, g) = Fmt.pf f "%s (%a)" descr (Fmt.(list ~sep:(const string ", ") Fmt.string)) (List.rev g) in
     let descr = Fmt.strf "%a" Fmt.(list ~sep:(const string "; ") pp_group) results in
-    { CI_state.status; descr; logs = CI_result.Step_log.Empty }
+    { status; descr; logs = CI_output.Empty }
   in
-  let pending, states = List.partition (fun (_, x) -> x.CI_state.status = `Pending) states in
+  let pending, states = List.partition (fun (_, x) -> x.status = `Pending) states in
   if pending <> [] then combine `Pending pending
   else (
-    let failed, states = List.partition (fun (_, x) -> x.CI_state.status = `Failure) states in
+    let failed, states = List.partition (fun (_, x) -> x.status = `Failure) states in
     if failed <> [] then combine `Failure failed
     else combine `Success states
   )
 
-let dashboard_widget id ref =
+let dashboard_widget (_repo, id) ref =
   let state = CI_engine.jobs ref |> summarise in
   let cls, icon, status, comment =
-    match state.CI_state.status with
+    match state.status with
     | `Pending -> "dashboard-pending", "glyphicon-hourglass", "Pending", "... WAITING ..."
     | `Success -> "dashboard-success", "glyphicon-ok", "Succeeding", "YAY! The build is fine... Nothing to see here..."
     | `Error -> "dashboard-error", "glyphicon-warning-sign", "Erroring", "OH NO! Something has gone terribly wrong"
     | `Failure -> "dashboard-failure", "glyphicon-remove", "Failing", "SOUND THE ALARM!!! The build has been broken!"
   in
-  let title =
-    match Datakit_path.unwrap id with
+  let title = match id with
     | ("heads" | "tags") :: tl -> tl
     | x -> x
   in
@@ -197,23 +198,23 @@ let dashboard_widget id ref =
     small [ pcdata comment ];
   ]
 
-let ref_job ~project id ref =
+let ref_job (project, id) ref =
   let jobs = CI_engine.jobs ref in
   let summary = summarise jobs in
   tr [
-    td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Datakit_path.pp id)]];
+    td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
     td [status_list jobs];
-    td [pcdata summary.CI_state.descr];
+    td [pcdata summary.descr];
   ]
 
-let pr_job ~project id open_pr =
+let pr_job (repo, id) open_pr =
   let jobs = CI_engine.jobs open_pr in
   let summary = summarise jobs in
   tr [
-    td [a ~a:[a_href (pr_url project id)] [pcdata (string_of_int id)]];
+    td [a ~a:[a_href (pr_url repo id)] [pcdata (string_of_int id)]];
     td [pcdata (CI_engine.title open_pr)];
     td [status_list jobs];
-    td [pcdata summary.CI_state.descr];
+    td [pcdata summary.descr];
   ]
 
 let heading x = th [pcdata x]
@@ -315,30 +316,30 @@ let opt_warning ci =
     let msg = Fmt.strf "DataKit connection is down: %s" (Printexc.to_string ex) in
     [div ~a:[a_class ["warning"]] [pcdata msg]]
 
-let pr_table (id, (prs, _)) =
+let pr_table (id, prs) =
   div [
-    h2 [pcdata (Fmt.strf "PR status for %a" CI_projectID.pp id)];
+    h2 [pcdata (Fmt.strf "PR status for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "PR"; heading "Title"; heading "State"; heading "Details"] ::
-      (int_map (pr_job ~project:id) prs)
+      (pr_map pr_job prs)
     );
   ]
 
-let branch_table (id, (_, refs)) =
+let branch_table (id, refs) =
   div [
-    h2 [pcdata (Fmt.strf "Branches for %a" CI_projectID.pp id)];
+    h2 [pcdata (Fmt.strf "Branches for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
-      (branch_map (ref_job ~project:id) refs)
+      (branch_map ref_job refs)
     );
   ]
 
-let tag_table (id, (_, refs)) =
+let tag_table (id, refs) =
   div [
-    h2 [pcdata (Fmt.strf "Tags for %a" CI_projectID.pp id)];
+    h2 [pcdata (Fmt.strf "Tags for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
-      (tag_map (ref_job ~project:id) refs)
+      (tag_map ref_job refs)
     );
   ]
 
@@ -390,10 +391,10 @@ let html_of_user ~csrf_token ((job, label), log) =
   let target, job_name = job in
   let link =
     match target with
-    | project, `Ref id -> ref_url project id
-    | project, `PR id -> pr_url project id
+    | `Ref (repo, id) -> ref_url repo id
+    | `PR (repo, id)  -> pr_url repo id
   in
-  let reason = Fmt.strf "%a:%s%a" CI_target.Full.pp target job_name pp_opt_label label in
+  let reason = Fmt.strf "%a:%s%a" CI_target.pp target job_name pp_opt_label label in
   [
     br ();
     form ~a:[a_class ["cancel"]; a_action action; a_method `Post] [
@@ -463,18 +464,23 @@ let user_page ~csrf_token =
   ]
 
 let main_page ~csrf_token ~ci ~dashboards =
-  let projects = CI_engine.targets ci in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
-  let title = "CI: " ^ (CI_projectID.Map.bindings projects |> List.map title_of_project |> String.concat ~sep:" / ") in
+  let prs = CI_engine.prs ci in
+  let refs = CI_engine.refs ci in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
+  let projects =
+    (Repo.Map.bindings prs |> List.map title_of_project)
+    @ (Repo.Map.bindings refs |> List.map title_of_project)
+  in
+  let title = "CI: " ^ (projects |> String.concat ~sep:" / ") in
   let dashboard_widgets =
     let combined =
-      CI_projectID.Map.merge (fun _ project_state dash_config ->
+      Repo.Map.merge (fun _ project_state dash_config ->
           match project_state, dash_config with
-          | Some (_prs, refs), Some y -> Some (refs, y)
+          | Some refs, Some y -> Some (refs, y)
           | _ -> None
-        ) projects dashboards
+        ) refs dashboards
     in
-    CI_projectID.Map.fold dashboard_table combined []
+    Repo.Map.fold dashboard_table combined []
   in
   page title Nav.Home @@ opt_warning ci @ dashboard_widgets @ [
       h2 [pcdata "Resource pools"];
@@ -482,24 +488,24 @@ let main_page ~csrf_token ~ci ~dashboards =
     ]
 
 let prs_page ~ci =
-  let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
-  let sections = List.map pr_table projects in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
-  let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
+  let prs = CI_engine.prs ci |> Repo.Map.bindings in
+  let sections = List.map pr_table prs in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
+  let title = "CI: " ^ (List.map title_of_project prs |> String.concat ~sep:" / ") in
   page title Nav.PRs @@ opt_warning ci @ sections
 
 let branches_page ~ci =
-  let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
-  let sections = List.map branch_table projects in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
-  let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
+  let refs = CI_engine.refs ci |> Repo.Map.bindings in
+  let sections = List.map branch_table refs in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
+  let title = "CI: " ^ (List.map title_of_project refs |> String.concat ~sep:" / ") in
   page title Nav.Branches @@ opt_warning ci @ sections
 
 let tags_page ~ci =
-  let projects = CI_engine.targets ci |> CI_projectID.Map.bindings in
-  let sections = List.map tag_table projects in
-  let title_of_project (id, _) = Fmt.to_to_string CI_projectID.pp id in
-  let title = "CI: " ^ (List.map title_of_project projects |> String.concat ~sep:" / ") in
+  let refs = CI_engine.refs ci |> Repo.Map.bindings in
+  let sections = List.map tag_table refs in
+  let title_of_project (id, _) = Fmt.to_to_string Repo.pp id in
+  let title = "CI: " ^ (List.map title_of_project refs |> String.concat ~sep:" / ") in
   page title Nav.Tags @@ opt_warning ci @ sections
 
 let history_button url =
@@ -515,14 +521,14 @@ let encode = Uri.pct_encode ~scheme:"http"
 
 module LogScore : sig
   type t
-  type log = [`Live of CI_live_log.t | `Saved of CI_result.Step_log.saved]
+  type log = [`Live of CI_live_log.t | `Saved of CI_output.saved]
 
   val create : unit -> t
   val update : t -> log -> unit
   val best : t -> log option
 end = struct
   type score = int
-  type log = [`Live of CI_live_log.t | `Saved of CI_result.Step_log.saved]
+  type log = [`Live of CI_live_log.t | `Saved of CI_output.saved]
   type t = (score * log) option ref
 
   let ok = 1
@@ -535,7 +541,7 @@ end = struct
     let new_score =
       match x with
       | `Live _ -> pending
-      | `Saved {CI_result.Step_log.failed = true; _} -> failed
+      | `Saved {CI_output.failed = true; _} -> failed
       | `Saved _ -> ok
     in
     match !best with
@@ -551,27 +557,27 @@ end
 
 let logs_frame_link = function
   | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
-  | `Saved {CI_result.Step_log.branch; commit; _} -> Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
+  | `Saved {CI_output.branch; commit; _} -> Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
 
 let score_logs ~best job =
-  let open CI_result.Step_log in
+  let open CI_output in
   let rec aux = function
     | Empty -> ()
     | Live live_log -> LogScore.update best (`Live live_log);
     | Saved saved -> LogScore.update best (`Saved saved);
     | Pair (a, b) -> aux a; aux b
   in
-  aux (CI_engine.state job).CI_state.logs
+  aux (CI_engine.state job).logs
 
 let logs ~csrf_token ~page_url ~selected state =
-  let open CI_result.Step_log in
-  let logs = state.CI_state.logs in
+  let open CI_output in
+  let logs = state.logs in
   let last_title = ref None in
   let seen = ref String.Set.empty in
   let selected_branch =
     match selected with
     | Some (`Live x) -> Some (CI_live_log.branch x)
-    | Some (`Saved x) -> Some x.CI_result.Step_log.branch
+    | Some (`Saved x) -> Some x.branch
     | None -> None
   in
   let log_link ~branch ~title log =
@@ -604,7 +610,7 @@ let logs ~csrf_token ~page_url ~selected state =
           log_link ~branch ~title (`Live live_log);
         ];
       ]
-    | Saved ({CI_result.Step_log.commit = _; branch; title; rebuild = _; failed} as saved) ->
+    | Saved ({commit = _; branch; title; rebuild = _; failed} as saved) ->
       seen := String.Set.add branch !seen;
       let query = [
         "CSRFToken", [csrf_token];
@@ -629,8 +635,8 @@ let logs ~csrf_token ~page_url ~selected state =
   let items = aux logs in
   (* Don't show the overall status if it's the same as the last log title. *)
   match !last_title with
-  | Some shown when shown = state.CI_state.descr -> items
-  | _ -> items @ [p [status_flag state.CI_state.status; pcdata state.CI_state.descr]]
+  | Some shown when shown = state.descr -> items
+  | _ -> items @ [p [status_flag state.status; pcdata state.descr]]
 
 let job_row ~csrf_token ~page_url ~best_log job =
   let state = CI_engine.state job in
@@ -644,27 +650,27 @@ let job_row ~csrf_token ~page_url ~best_log job =
   ]
 
 let target_title = function
-  | `PR pr -> Printf.sprintf "PR %d" (CI_github_hooks.PR.id pr)
-  | `Ref r -> Fmt.strf "Ref %a" Datakit_path.pp (CI_github_hooks.Ref.name r)
+  | `PR pr -> Printf.sprintf "PR %d" (PR.number pr)
+  | `Ref r -> Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
 
 let target_commit = function
-  | `PR pr -> CI_github_hooks.Commit.hash (CI_github_hooks.PR.head pr)
-  | `Ref r -> CI_github_hooks.Commit.hash (CI_github_hooks.Ref.head r)
+  | `PR pr -> PR.commit_hash pr
+  | `Ref r -> Ref.commit_hash r
 
-let target_project = function
-  | `PR pr -> CI_github_hooks.PR.project pr
-  | `Ref r -> CI_github_hooks.Ref.project r
+let target_repo = function
+  | `PR pr -> PR.repo pr
+  | `Ref r -> Ref.repo r
 
 let target_page_url target =
-  let project = target_project target in
+  let repo = target_repo target in
   match target with
-  | `PR pr -> pr_url project (CI_github_hooks.PR.id pr)
-  | `Ref r -> ref_url project (CI_github_hooks.Ref.name r)
+  | `PR pr -> pr_url repo (PR.number pr)
+  | `Ref r -> ref_url repo (Ref.name r)
 
 let target_page ~csrf_token ~target jobs t =
   let target = CI_engine.git_target target in
   let title = target_title target in
-  let project = target_project target in
+  let repo = target_repo target in
   let commit = target_commit target in
   let page_url = target_page_url target in
   let best_log =
@@ -679,7 +685,7 @@ let target_page ~csrf_token ~target jobs t =
     match target with
     | `PR _ -> Nav.PRs
     | `Ref r ->
-      match CI_github_hooks.Ref.name r |> Datakit_path.unwrap with
+      match Ref.name r with
       | "heads" :: _ -> Nav.Branches
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false
@@ -693,7 +699,7 @@ let target_page ~csrf_token ~target jobs t =
     p [
       a ~a:[a_href (gh_target_url target)] [pcdata title];
       pcdata " has head commit ";
-      a ~a:[a_href (commit_url ~project commit)] [pcdata commit];
+      a ~a:[a_href (commit_url ~repo commit)] [pcdata commit];
       pcdata " [ ";
       a ~a:[a_href (metadata_url t target)] [pcdata "head history"];
       pcdata " ]";

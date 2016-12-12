@@ -72,7 +72,7 @@ let () =
   | "datakit-ci" -> Ok [
       Pkg.lib   "pkg/META.ci"     ~dst:"META";
       Pkg.lib   "datakit-ci.opam" ~dst:"opam";
-      Pkg.mllib "ci/src/datakit-ci.mllib";
+      Pkg.mllib ~api:["Datakit_ci"] "ci/src/datakit-ci.mllib";
       Pkg.test  "ci/tests/test_ci" ~args:(Cmd.v "-q");
       Pkg.test  "ci/tests/exampleCI" ~run:false;
     ]

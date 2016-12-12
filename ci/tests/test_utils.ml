@@ -1,7 +1,8 @@
+open Datakit_github
 open Result
 open Lwt.Infix
 open! Astring
-open DataKitCI
+open Datakit_ci
 
 let ( / ) = Datakit_path.Infix.( / )
 
@@ -14,7 +15,23 @@ let ( >>*= ) x f =
 let ( >|*= ) x f =
   x >>*= fun x -> Lwt.return (f x)
 
-module Store = Irmin_unix.Irmin_git.Memory(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+(* FIXME: this is a bit ridiculous *)
+module Contents_string = struct
+  open !Irmin.Contents.String
+  type t = string
+  let equal = equal
+  let compare = compare
+  let hash = hash
+  let to_json = to_json
+  let of_json = of_json
+  let size_of = size_of
+  let write = write
+  let read = read
+  let merge _ = merge []
+  module Path = Ivfs_tree.Path
+end
+
+module Store = Irmin_unix.Irmin_git.Memory(Contents_string)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 let config = Irmin_mem.config ()
 
 (*
@@ -37,6 +54,7 @@ let () =
   Logs.Src.list () |> List.iter (fun src ->
       match Logs.Src.name src with
       | "datakit-ci" -> Logs.Src.set_level src (Some Logs.Debug)
+      | "dkt-github" -> Logs.Src.set_level src (Some Logs.Debug)
       | "Client9p" -> Logs.Src.set_level src (Some Logs.Info)
       | "datakit.client" -> Logs.Src.set_level src (Some Logs.Info)
       | "git.memory"
@@ -158,6 +176,7 @@ let assert_file branch path value =
 let update_pr hooks ~id ~head ~states ~message =
   update hooks ~message (
     (Printf.sprintf "user/project/pr/%d/head" id, head) ::
+    (Printf.sprintf "user/project/pr/%d/state" id, "open") ::
     List.map (fun (path, data) -> Printf.sprintf "user/project/commit/%s/status/%s" head path, data) states
   )
 
@@ -171,18 +190,21 @@ let with_handler set_handler ~logs ?pending key fn =
   let branch = "log-branch-for-" ^ key in
   let switch = Lwt_switch.create () in
   let log = Live_log.create ~switch ~pending ~branch ~title:"Title" logs in
-  set_handler key (Error (`Pending (pending, finished)), DataKitCI.Step_log.Live log);
+  set_handler key { result = Error (`Pending (pending, finished)) ;
+                    output = Output.Live log };
   fn ~switch log >|= fun result ->
-  DataKitCI.Live_log.finish log;
-  set_handler key (result, DataKitCI.Step_log.Live log);
+  Live_log.finish log;
+  set_handler key { result; output = Output.Live log };
   Lwt.wakeup waker ()
+
+let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)
 
 (* [with_ci conn workflow fn] is [fn ~logs ~switch dk with_handler], where:
    - switch is turned off when [fn] ends and will stop the CI
    - dk is a DataKit connection which never fails
    - with_handler can be used to register handlers for jobs the CI receives
  *)
-let with_ci ?(project=ProjectID.v ~user:"user" ~project:"project") conn workflow fn =
+let with_ci ?(repo=Repo.v ~user:"user" ~repo:"project") conn workflow fn =
   let logs = Private.create_logs () in
   let handlers = ref String.Map.empty in
   let check_build key () =
@@ -193,13 +215,13 @@ let with_ci ?(project=ProjectID.v ~user:"user" ~project:"project") conn workflow
   let web_ui = Uri.of_string "https://localhost/" in
   let dk = Private.connect conn in
   let ci = Private.test_engine ~web_ui (fun () -> Lwt.return dk)
-      (ProjectID.Map.singleton project (fun t -> String.Map.singleton "test" (workflow check_build t)))
+      (Repo.Map.singleton repo (fun t -> String.Map.singleton "test" (workflow check_build t)))
   in
   Utils.with_switch @@ fun switch ->
   Lwt.async (fun () -> Private.listen ci ~switch);
   DK.branch dk "github-metadata" >>*= fun hooks ->
   (* Work-around for https://github.com/mirage/irmin/issues/373 *)
-  DK.Branch.wait_for_path hooks (ProjectID.path project / ".monitor") (function
+  DK.Branch.wait_for_path hooks (repo_root repo / ".monitor") (function
       | None -> Lwt.return (Ok `Again)
       | Some _ -> Lwt.return (Ok (`Finish ()))
     )

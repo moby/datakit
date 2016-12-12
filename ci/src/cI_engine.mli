@@ -1,5 +1,7 @@
+open Datakit_github
 open Astring
 open CI_utils
+open CI_s
 
 type t
 (** A DataKit CI instance. *)
@@ -12,9 +14,9 @@ type job
 
 val create :
   web_ui:Uri.t ->
-  ?canaries:CI_target.ID_Set.t CI_projectID.Map.t ->
+  ?canaries:CI_target.Set.t Repo.Map.t ->
   (unit -> DK.t Lwt.t) ->
-  (CI_target.Full.t -> string CI_term.t String.Map.t) CI_projectID.Map.t ->
+  (CI_target.t -> string CI_term.t String.Map.t) Repo.Map.t ->
   t
 (** [create ~web_ui connect projects] is a new DataKit CI that calls [connect] to connect to the database.
     Once [listen] has been called, it will handle CI for [projects].
@@ -30,8 +32,11 @@ val dk : t -> DK.t Lwt.t
 (** [dk t] is the connection to DataKit. If not currently connected, this will be a sleeping
     thread that will resolve to the next successful connection. *)
 
-val targets : t -> (target IntMap.t * target Datakit_path.Map.t) CI_projectID.Map.t
-(** [targets t] is a snapshot of the current state of all known PRs and branches. *)
+val prs: t -> target PR.Index.t Repo.Map.t
+(** [prs t] is a snapshot of the current state of all known PRs. *)
+
+val refs: t -> target Ref.Index.t Repo.Map.t
+(** [targets t] is a snapshot of the current state of all branches. *)
 
 val jobs : target -> job list
 (** [jobs t] is the list of jobs for a target. *)
@@ -39,14 +44,14 @@ val jobs : target -> job list
 val job_name : job -> string
 (** [job_name j] is the name of the GitHub status that this job computes. *)
 
-val state : job -> CI_state.t
+val state : job -> state
 (** [state job] is the current state of [job]. *)
 
-val git_target : target -> [`PR of CI_github_hooks.PR.t | `Ref of CI_github_hooks.Ref.t]
+val git_target : target -> [`PR of PR.t | `Ref of Ref.t]
 (** [git_target target] is the GitHub metadata about this target. *)
 
-val project : target -> CI_projectID.t
-(** [project t] is the GitHub project that contains [target]. *)
+val repo : target -> Repo.t
+(** [repo t] is the GitHub repository that contains [target]. *)
 
 val title : target -> string
 (** [title t] is the title of PR [t]. *)

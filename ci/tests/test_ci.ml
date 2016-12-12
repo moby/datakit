@@ -1,6 +1,7 @@
-open DataKitCI
+open Datakit_github
+open Datakit_ci
 open! Astring
-open Utils
+open Utils.Infix
 
 let ( / ) = Datakit_path.Infix.( / )
 
@@ -8,10 +9,10 @@ let src = Logs.Src.create "datakit-ci.tests" ~doc:"CI Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Workflows = struct
-  module T = DataKitCI.Term
+  module T = Term
   open T.Infix
 
-  let circle_success_url = T.ci_success_target_url "ci/circleci" 
+  let circle_success_url = T.ci_success_target_url ["ci"; "circleci"]
 
   let test_circleci_artifact check_build target =
     circle_success_url target >>= fun url ->
@@ -23,15 +24,15 @@ module Workflows = struct
     T.return (^) $ a $ b
 
   let test_cross_project _check_build target =
-    let other = ProjectID.v ~user:"bob" ~project:"bproj" in
-    let pr = T.head target >|= Github_hooks.Commit.hash in
-    let other_master = T.branch_head other "master" >|= Github_hooks.Commit.hash in
+    let other = Repo.v ~user:"bob" ~repo:"bproj" in
+    let pr = T.head target >|= Commit.hash in
+    let other_master = T.branch_head other "master" >|= Commit.hash in
     T.return (Fmt.strf "Compile %s with %s") $ pr $ other_master
 
-  let ls = DKCI_git.command ~timeout:60.0 ~label:"ls" ~clone:false [[| "ls" |]]
-  let ls_clone = DKCI_git.command ~timeout:60.0 ~label:"ls" ~clone:true [[| "ls" |]]
+  let ls = Git.command ~timeout:60.0 ~label:"ls" ~clone:false [[| "ls" |]]
+  let ls_clone = Git.command ~timeout:60.0 ~label:"ls" ~clone:true [[| "ls" |]]
   let pull_and_run local_repo ~cmd check_build target =
-    DKCI_git.fetch_head local_repo target >>= DKCI_git.run cmd >>= fun () ->
+    Git.fetch_head local_repo target >>= Git.run cmd >>= fun () ->
     T.of_lwt_slow (check_build "a")
 
   let pass check_build _target =
@@ -218,10 +219,10 @@ end
 module Test_cache = Cache.Make(Builder)
 
 let rec read_logs dk = function
-  | Step_log.Empty -> Lwt.return ""
-  | Step_log.Live l -> Lwt.return (Live_log.contents l)
-  | Step_log.Saved saved -> Private.read_log dk saved >>*= Lwt.return
-  | Step_log.Pair (a, b) ->
+  | Output.Empty -> Lwt.return ""
+  | Output.Live l -> Lwt.return (Live_log.contents l)
+  | Output.Saved saved -> Private.read_log dk saved >>*= Lwt.return
+  | Output.Pair (a, b) ->
     read_logs dk a >>= fun a ->
     read_logs dk b >>= fun b ->
     Lwt.return (Printf.sprintf "(%s,%s)" a b)
@@ -246,11 +247,11 @@ let test_cache ~regen =
     let c = get_cache () in
     let rec aux ~rebuild =
       Test_cache.lookup c conn ~rebuild Builder.NoContext key >>= function
-      | Ok x, logs ->
-        read_logs dk logs >>= fun logs ->
+      | { result = Ok x; output } ->
+        read_logs dk output >>= fun logs ->
         Lwt.return (x, Test_utils.strip_times logs)
-      | Error (`Failure msg), _logs -> Alcotest.fail msg
-      | Error (`Pending (msg, ready)), _logs ->
+      | { result = Error (`Failure msg); _ } -> Alcotest.fail msg
+      | { result = Error (`Pending (msg, ready)); _ } ->
         Log.debug (fun f -> f "Waiting for result to be returned: %s" msg);
         ready >>= fun () ->
         aux ~rebuild:false
@@ -288,8 +289,8 @@ let test_pending_updates conn =
   let b = { Builder.time = 0; step = Some step } in
   let c = Test_cache.create ~logs b in
   let check_pending expected =
-    Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= fun (status, _log) ->
-    let (reason, update) = expect_pending status in
+    Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= fun s ->
+    let (reason, update) = expect_pending s.result in
     Alcotest.(check string) expected expected reason;
     assert (Lwt.state update = Lwt.Sleep);
     advance (Some ());
@@ -299,7 +300,7 @@ let test_pending_updates conn =
   check_pending "Paused" >>= fun () ->
   check_pending "Get key" >>= fun () ->
   Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= function
-  | Ok 1, _ -> Lwt.return ()
+  | { result = Ok 1; _ } -> Lwt.return ()
   | _ -> Alcotest.fail "Expected success"
 
 let test_git_dir conn ~clone =
@@ -328,7 +329,7 @@ let test_git_dir conn ~clone =
            Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
            (* Clone a "local" copy *)
            run ["git"; "clone"; tmpdir / "my-repo"; tmpdir / "clone"] >>= fun () ->
-           let local_repo = DKCI_git.connect ~logs ~dir:(tmpdir / "clone") in
+           let local_repo = Git.v ~logs ~dir:(tmpdir / "clone") in
            (* Start the CI *)
            Test_utils.with_ci conn (Workflows.pull_and_run local_repo ~cmd) @@ fun ~logs ~switch dk with_handler ->
            DK.branch dk "github-metadata" >>*= fun hooks ->
@@ -414,7 +415,7 @@ let test_auth () =
 let status_code = Alcotest.of_pp (Fmt.of_to_string Cohttp.Code.string_of_status)
 
 let test_roles conn =
-  let tests = CI_projectID.Map.of_list [
+  let tests = Repo.Map.of_list [
   ] in
   let dk = CI_utils.DK.connect conn in
   let ci = CI_engine.create ~web_ui:(Uri.of_string "http://localhost/") (fun () -> Lwt.return dk) tests in
@@ -425,7 +426,7 @@ let test_roles conn =
     let can_build = CI_ACL.username "admin" in
     let web_config = CI_web_templates.config ~name:"test-ci" ~can_read ~can_build () in
     let server = CI_web_utils.server ~web_config ~auth ~session_backend:`Memory in
-    let routes = CI_web.routes ~server ~logs ~ci ~dashboards:(CI_target.Full.map_of_list []) in
+    let routes = CI_web.routes ~server ~logs ~ci ~dashboards:(CI_target.map_of_list []) in
     fun ~expect path ->
       let request = Cohttp.Request.make (Uri.make ~path ()) in
       CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >|= function

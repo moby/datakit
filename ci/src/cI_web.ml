@@ -1,6 +1,8 @@
+open Datakit_github
 open! Astring
 open Lwt.Infix
 open CI_utils
+open CI_utils.Infix
 
 module Wm = CI_web_utils.Wm
 module Rd = Webmachine.Rd
@@ -9,7 +11,7 @@ type t = {
   ci : CI_engine.t;
   logs : CI_live_log.manager;
   server : CI_web_utils.server;
-  dashboards : CI_target.ID_Set.t CI_projectID.Map.t;
+  dashboards : CI_target.Set.t Repo.Map.t;
 }
 
 class virtual http_page t = object(self)
@@ -71,18 +73,18 @@ let check_metrics_token server provided =
   match String.cut ~sep:" " provided with
   | Some (typ, provided) when String.Ascii.lowercase typ = "bearer" ->
     begin match (CI_web_utils.web_config server).CI_web_templates.metrics_token with
-    | None -> false
-    | Some (`SHA256 expected_hash) ->
-      let user_hash = (Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)) in
-      if Cstruct.equal expected_hash user_hash then true
-      else (
-        Log.info (fun f ->
-            f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
-              Cstruct.hexdump_pp expected_hash
-              Cstruct.hexdump_pp user_hash
-          );
-        false
-      )
+      | None -> false
+      | Some (`SHA256 expected_hash) ->
+        let user_hash = (Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)) in
+        if Cstruct.equal expected_hash user_hash then true
+        else (
+          Log.info (fun f ->
+              f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
+                Cstruct.hexdump_pp expected_hash
+                Cstruct.hexdump_pp user_hash
+            );
+          false
+        )
     end
   | _ ->
     Log.info (fun f -> f "Bad token %S" provided);
@@ -142,15 +144,15 @@ class pr_page t = object(self)
 
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
-    let project = Rd.lookup_path_info_exn "project" rd in
+    let repo = Rd.lookup_path_info_exn "repo" rd in
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = int_of_string id in
-    let project = CI_projectID.v ~user ~project in
-    let projects = CI_engine.targets t.ci in
-    match CI_projectID.Map.find project projects with
-    | None -> Wm.respond 404 rd ~body:(`String "No such project")
-    | Some (prs, _) ->
-      match IntMap.find id prs with
+    let repo = Repo.v ~user ~repo in
+    let prs = CI_engine.prs t.ci in
+    match Repo.Map.find repo prs with
+    | None  -> Wm.respond 404 rd ~body:(`String "No such project")
+    | Some prs ->
+      match PR.Index.find (repo, id) prs with
       | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
       | Some target ->
         let jobs = CI_engine.jobs target in
@@ -166,17 +168,17 @@ class ref_page t = object(self)
 
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
-    let project = Rd.lookup_path_info_exn "project" rd in
+    let repo = Rd.lookup_path_info_exn "repo" rd in
     let id = Rd.lookup_path_info_exn "id" rd in
     let id = CI_web_templates.unescape_ref id in
-    let project = CI_projectID.v ~user ~project in
-    let projects = CI_engine.targets t.ci in
-    match CI_projectID.Map.find project projects with
+    let repo = Repo.v ~user ~repo in
+    let refs = CI_engine.refs t.ci in
+    match Repo.Map.find repo refs with
     | None -> Wm.respond 404 rd ~body:(`String "No such project")
-    | Some (_, refs) ->
-      match Datakit_path.Map.find id refs with
-      | exception Not_found -> Wm.respond 404 rd ~body:(`String "No such ref")
-      | target ->
+    | Some refs ->
+      match Ref.Index.find (repo, id) refs with
+      | None        -> Wm.respond 404 rd ~body:(`String "No such ref")
+      | Some target ->
         let jobs = CI_engine.jobs target in
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
@@ -275,8 +277,8 @@ let routes ~logs ~ci ~server ~dashboards =
     ("branch",          fun () -> new branch_list t);
     ("tag",             fun () -> new tag_list t);
     (* Individual targets *)
-    ("pr/:user/:project/:id",                   fun () -> new pr_page t);
-    ("ref/:user/:project/:id",                  fun () -> new ref_page t);
+    ("pr/:user/:repo/:id",                   fun () -> new pr_page t);
+    ("ref/:user/:repo/:id",                  fun () -> new ref_page t);
     (* Logs *)
     ("log/live/:branch",                        fun () -> new live_log_page t);
     ("log/saved/:branch/:commit",               fun () -> new saved_log_page t);

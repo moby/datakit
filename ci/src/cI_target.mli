@@ -1,18 +1,14 @@
-open Asetmap
+open Datakit_github
+open !Asetmap
 
-module ID : sig
-  type t = [ `PR of int | `Ref of Datakit_path.t ]
-  val pp : t Fmt.t
-  val compare : t -> t -> int
-end
+type t = [ `PR of PR.id | `Ref of Ref.id ]
+val pp : t Fmt.t
+val compare : t -> t -> int
+val arg : t Cmdliner.Arg.converter
+val repo : t -> Repo.t
+val id : t -> [`PR of int | `Ref of string list ]
+module Set: Set.S with type elt = t
+val map_of_list : t list -> Set.t Repo.Map.t
 
-module ID_Set : Set.S with type elt = ID.t
-
-module Full : sig
-  type t = CI_projectID.t * ID.t
-  val pp : t Fmt.t
-  val arg : t Cmdliner.Arg.converter
-  val project : t -> CI_projectID.t
-  val id : t -> ID.t
-  val map_of_list : t list -> ID_Set.t CI_projectID.Map.t
-end
+type v = [ `PR of PR.t | `Ref of Ref.t ]
+val head: v -> Commit.t

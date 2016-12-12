@@ -2,9 +2,9 @@ open Lwt.Infix
 
 type 'a or_error = 'a CI_result.t
 
-module L = CI_result.Step_log
+module L = CI_output
 
-module Make(C:CI_s.CONTEXT) = struct
+module Make (C: CI_s.CONTEXT) = struct
   type context = C.t
   type 'a key = C.t -> 'a
 
@@ -39,12 +39,12 @@ module Make(C:CI_s.CONTEXT) = struct
     x >>= fun x -> Lwt.return (Ok x, L.Empty)
 
   let of_lwt_slow check ctx =
-    check () >|= fun (x, logs) ->
-    match x with
-    | Ok _ | Error (`Failure _) as x -> x, logs
+    check () >|= fun { CI_s.result; output } ->
+    match result with
+    | Ok _ | Error (`Failure _) as x -> x, output
     | Error (`Pending (message, ready)) ->
       C.watch ctx ready;
-      Error (`Pending message), logs
+      Error (`Pending message), output
 
   let pair a b ctx =
     a ctx >>= fun (a, a_logs) ->
@@ -101,7 +101,7 @@ module Make(C:CI_s.CONTEXT) = struct
       | Ok _ -> (ps, fs)
       | Error (`Pending _) -> (name :: ps), fs
       | Error (`Failure _) -> ps, (name :: fs)
-    in   
+    in
     let get_state (name, x) = state x >|= fun s -> (name, s) in
     list_map_p get_state l >>= fun states ->
     match List.fold_left partition ([], []) states with

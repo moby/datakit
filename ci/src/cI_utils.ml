@@ -1,4 +1,3 @@
-open Asetmap
 open Result
 open Lwt.Infix
 
@@ -6,11 +5,6 @@ let src9p = Logs.Src.create "Client9p" ~doc:"9p client"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
 module Client9p = Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
-module Int = struct
-  type t = int
-  let compare (a:t) (b:t) = compare a b
-end
-module IntMap = Map.Make(Int)
 
 let src = Logs.Src.create "datakit-ci" ~doc:"DataKit-based CI system"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -20,14 +14,16 @@ let chdir_lock = Lwt_mutex.create ()
 
 let ok x = Lwt.return (Ok x)
 
-(* Chain operations together, returning early if we get an error *)
-let ( >>*= ) x f =
-  x >>= function
-  | Ok x -> f x
-  | Error (`Msg msg) -> Lwt.fail (Failure msg)
+module Infix = struct
+  (* Chain operations together, returning early if we get an error *)
+  let ( >>*= ) x f =
+    x >>= function
+    | Ok x -> f x
+    | Error (`Msg msg) -> Lwt.fail (Failure msg)
 
-let ( >|*= ) x f =
-  x >>*= fun x -> Lwt.return (f x)
+  let ( >|*= ) x f =
+    x >>*= fun x -> Lwt.return (f x)
+end
 
 let return_error fmt =
   fmt |> Fmt.kstrf @@ fun msg -> Lwt.return (Error msg)
@@ -84,13 +80,13 @@ let ensure_dir ~mode path =
   let rec loop path =
     match Unix.stat path with
     | info ->
-        if info.Unix.st_kind = Unix.S_DIR then ()
-        else failf "Not a directory: %s" path
+      if info.Unix.st_kind = Unix.S_DIR then ()
+      else failf "Not a directory: %s" path
     | exception _ ->
-        let parent = Filename.dirname path in
-        assert (path <> parent);
-        loop parent;
-        Unix.mkdir path mode
+      let parent = Filename.dirname path in
+      assert (path <> parent);
+      loop parent;
+      Unix.mkdir path mode
   in
   loop path
 

@@ -5,7 +5,7 @@ type role = [`Reader | `LoggedIn | `Builder]
     - [Reader] permitted to look at the CI state, build logs, etc
     - [LoggedIn] must be logged in (not anonymous)
     - [Builder] permitted to control the builds (cancel, rebuild)
-  *)
+*)
 
 module User : sig
   type t
@@ -60,9 +60,9 @@ class static_crunch : mime_type:(Uri.t -> string option) -> (string -> string op
     The MIME type returned will be [mime_type uri]. *)
 
 class virtual resource_with_session : server -> object
-  inherit [Cohttp_lwt_body.t] Wm.resource
-  method private session : Cohttp_lwt_body.t Webmachine.Rd.t -> Session_data.t Lwt.t
-end
+    inherit [Cohttp_lwt_body.t] Wm.resource
+    method private session : Cohttp_lwt_body.t Webmachine.Rd.t -> Session_data.t Lwt.t
+  end
 (** [resource_with_session] ensures there is a session for each request. *)
 
 class login_page : server -> resource
@@ -72,23 +72,23 @@ class github_callback : server -> resource
 (** Page to serve at [/auth/github-callback] *)
 
 class virtual protected_page : server -> object
-  inherit resource_with_session
+    inherit resource_with_session
 
-  method private authenticated_user : string option
+    method private authenticated_user : string option
 
-  method virtual private required_roles : role list
-  (* Users must have all these roles in order to view the page.
-     If empty then the page can be viewed by anyone. *)
-end
+    method virtual private required_roles : role list
+    (* Users must have all these roles in order to view the page.
+       If empty then the page can be viewed by anyone. *)
+  end
 (** The [is_authorized] method checks that the session has an associated user and asks the
     user to log in if not.
     [authenticated_user] returns the name of the user once [is_authorized] has completed. *)
 
 class virtual post_page : server -> object
-  inherit protected_page
-  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
-end
+    inherit protected_page
+    method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
+    method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+  end
 (** [post_page] accepts form POST submissions.
     It overrides [forbidden] to check that the CSRF token is present and correct. *)
 

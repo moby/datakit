@@ -1,3 +1,6 @@
+open Datakit_github
+module Conv = Datakit_github_conv.Make(CI_utils.DK)
+
 module Metrics = struct
   let namespace = "DataKitCI"
   let subsystem = "term"
@@ -11,7 +14,7 @@ module Context = struct
   (* The context in which a term is evaluated. We create a fresh context each time
      the term is evaluated. *)
   type t = {
-    github : CI_github_hooks.Snapshot.t;
+    github : CI_utils.DK.Tree.t;
     job_id : CI_s.job_id;
     mutable recalc : unit -> unit;              (* Call this to schedule a recalculation. *)
     dk : unit -> CI_utils.DK.t Lwt.t;
@@ -38,38 +41,42 @@ let github = value Context.github
 let job_id = value Context.job_id
 
 let pp_target f = function
-  | `PR pr -> CI_github_hooks.PR.dump f pr
-  | `Ref r -> CI_github_hooks.Ref.dump f r
+  | `PR pr -> PR.pp f pr
+  | `Ref r -> Ref.pp f r
 
-let github_target id =
+let (>?=) x f = Lwt.map (function None -> None | Some x -> Some (f x)) x
+
+let target t = function
+  | `PR x  -> Conv.pr t x >?= fun x -> `PR x
+  | `Ref x -> Conv.ref t x >?= fun x -> `Ref x
+
+let target id =
   github >>= fun gh ->
-  of_lwt_quick (CI_github_hooks.Snapshot.find id gh) >>= function
-  | None -> fail "Target %a does not exist" CI_target.Full.pp id
+  of_lwt_quick (target gh id) >>= function
+  | None   -> fail "Target %a does not exist" CI_target.pp id
   | Some x -> return x
 
-let head id =
-  github_target id >|= CI_github_hooks.Target.head
+let head id = target id >|= CI_target.head
 
-let ref_head project_id ref_name =
+let ref_head repo ref_name =
   match Datakit_path.of_string ref_name with
-  | Error msg -> fail "Invalid ref name %S: %s" ref_name msg
-  | Ok ref_path -> head (project_id, `Ref ref_path)
+  | Error msg   -> fail "Invalid ref name %S: %s" ref_name msg
+  | Ok ref_path -> head @@ `Ref (repo, Datakit_path.unwrap ref_path)
 
-let branch_head project_id branch =
-  ref_head project_id ("heads/" ^ branch)
+let branch_head repo branch = ref_head repo ("heads/" ^ branch)
 
-let tag project_id tag =
-  ref_head project_id ("tags/" ^ tag)
+let tag repo tag = ref_head repo ("tags/" ^ tag)
 
 let ci_state fn ci t =
-  head t >>= fun commit ->
-  let gh_ci = CI_github_hooks.CI.of_string ci in
-  let state = CI_github_hooks.Commit.state gh_ci commit in
-  of_lwt_quick (fn state)
+  head t >>= fun c ->
+  github >>= fun s ->
+  of_lwt_quick (Conv.status s (c, ci)) >|= function
+  | Some s -> fn s
+  | None   -> None
 
-let ci_status     = ci_state CI_github_hooks.Commit_state.status
-let ci_descr      = ci_state CI_github_hooks.Commit_state.descr
-let ci_target_url = ci_state CI_github_hooks.Commit_state.target_url
+let ci_status     = ci_state (fun s -> Some (Status.state s))
+let ci_descr      = ci_state Status.description
+let ci_target_url = ci_state Status.url
 
 let pp_opt_descr f = function
   | None -> ()
@@ -77,13 +84,13 @@ let pp_opt_descr f = function
 
 let ci_success_target_url ci target =
   ci_status ci target >>= function
-  | None -> pending "Waiting for %s status to appear" ci
-  | Some `Pending -> ci_descr ci target >>= pending "Waiting for %s to complete%a" ci pp_opt_descr
-  | Some `Failure -> ci_descr ci target >>= fail "%s failed%a" ci pp_opt_descr
-  | Some `Error   -> ci_descr ci target >>= fail "%s errored%a" ci pp_opt_descr
+  | None -> pending "Waiting for %a status to appear" Ref.pp_name ci
+  | Some `Pending -> ci_descr ci target >>= pending "Waiting for %a to complete%a" Ref.pp_name ci pp_opt_descr
+  | Some `Failure -> ci_descr ci target >>= fail "%a failed%a" Ref.pp_name ci pp_opt_descr
+  | Some `Error   -> ci_descr ci target >>= fail "%a errored%a" Ref.pp_name ci pp_opt_descr
   | Some `Success ->
-    ci_state CI_github_hooks.Commit_state.target_url ci target >>= function
-    | None -> fail "%s succeeded, but has no URL!" ci
+    ci_state Status.url ci target >>= function
+    | None     -> fail "%a succeeded, but has no URL!" Ref.pp_name ci
     | Some url -> return url
 
 let run ~snapshot ~job_id ~recalc ~dk term =

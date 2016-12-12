@@ -1,22 +1,26 @@
-module Step_log = CI_result.Step_log
+open Datakit_github
+
+module Output = CI_output
+
+(* FIXME: we should probably make that type abstract *)
+type 'a status = 'a CI_s.status = {
+  result: ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result;
+  output: Output.t
+}
 
 type job_id = CI_s.job_id
-
-type 'a lwt_status = 'a CI_s.lwt_status
-
 module Term = CI_term
-module Main = CI_main
+include CI_main
 module Utils = CI_utils
 module Process = CI_process
 module Live_log = CI_live_log
 module Monitored_pool = CI_monitored_pool
-module ProjectID = CI_projectID
-module Github_hooks = CI_github_hooks
 module Cache = CI_cache
 module type BUILDER = CI_s.BUILDER
 module DK = Utils.DK
 module ACL = CI_ACL
 module Target = CI_target
+module Git = CI_git
 
 module Web = struct
   type config = CI_web_templates.t
@@ -38,8 +42,8 @@ end
 
 module Config = struct
   type t = CI_config.t
-  type project = CI_projectID.t * CI_config.project
+  type project = Repo.t * CI_config.project
   type test = CI_config.test
   let project = CI_config.project
-  let ci = CI_config.ci
+  let v = CI_config.v
 end

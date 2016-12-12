@@ -1,6 +1,9 @@
+open Datakit_github
+
 let key_bits = 4096
 
 open CI_utils
+open CI_utils.Infix
 open! Astring
 open Lwt.Infix
 
@@ -27,8 +30,8 @@ let make_session_backend = function
 
 let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend =
   let { CI_config.web_config; projects } = config in
-  let dashboards = CI_projectID.Map.map (fun p -> p.CI_config.dashboards) projects in
-  let projects = CI_projectID.Map.map (fun p -> p.CI_config.tests) projects in
+  let dashboards = Repo.Map.map (fun p -> p.CI_config.dashboards) projects in
+  let projects = Repo.Map.map (fun p -> p.CI_config.tests) projects in
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
   let github = CI_secrets.github_auth secrets in
   CI_web_utils.Auth.create ?github (CI_secrets.passwords_path secrets) >>= fun auth ->
@@ -37,7 +40,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   let canaries =
     match canaries with
     | [] -> None
-    | canaries -> Some (CI_target.Full.map_of_list canaries)
+    | canaries -> Some (CI_target.map_of_list canaries)
   in
   let ci = CI_engine.create ~web_ui ?canaries connect_dk projects in
   let main_thread = CI_engine.listen ci >|= fun `Abort -> assert false in
@@ -101,7 +104,7 @@ let canaries =
     Arg.info ~doc:"Only test these refs (e.g user/project/heads/master)"
       ~docv:"TARGET" ["canary"]
   in
-  Arg.(value (opt_all CI_target.Full.arg [] doc))
+  Arg.(value (opt_all CI_target.arg [] doc))
 
 let session_backend =
   let parse s =

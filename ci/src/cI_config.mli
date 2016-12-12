@@ -1,20 +1,21 @@
+open Datakit_github
 open Astring
 
 type test = string CI_term.t
 
 type project = {
-  dashboards : CI_target.ID_Set.t;
-  tests : CI_target.Full.t -> test String.Map.t;
+  dashboards : CI_target.Set.t;
+  tests : CI_target.t -> test String.Map.t;
 }
 
 type t = private {
   web_config : CI_web_templates.t;
-  projects : project CI_projectID.Map.t;
+  projects : project Repo.Map.t;
 }
 
-val project : id:string -> ?dashboards:string list -> (CI_target.Full.t -> (string * test) list) -> CI_projectID.t * project
+val project : id:string -> ?dashboards:string list -> (CI_target.t -> (string * test) list) -> Repo.t * project
 
-val ci :
+val v:
   web_config:CI_web_templates.t ->
-  projects:(CI_projectID.t * project) list ->
+  projects:(Repo.t * project) list ->
   t

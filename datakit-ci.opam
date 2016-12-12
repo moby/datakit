@@ -17,6 +17,7 @@ depends: [
   "ocamlfind" {build}
   "multipart-form-data"
   "datakit-client"
+  "datakit-github"
   "protocol-9p" {>= "0.7.4"}
   "astring"
   "cmdliner"

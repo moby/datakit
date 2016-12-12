@@ -9,6 +9,8 @@ RUN opam depext -ui cohttp yojson ssl tyxml fmt rresult logs lwt conf-libev reac
 
 RUN opam pin add datakit-client https://github.com/docker/datakit.git
 RUN opam pin add session "https://github.com/talex5/ocaml-session.git#redis"
+RUN opam pin add github --dev
+RUN opam pin add datakit-github https://github.com/docker/datakit.git
 
 ADD . /home/opam/datakit
 RUN opam pin add -k git datakit-ci /home/opam/datakit

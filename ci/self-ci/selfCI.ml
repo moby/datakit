@@ -1,17 +1,12 @@
-open DataKitCI
-open DataKitCI.Term.Infix
+open Datakit_ci
+open Term.Infix
 
-let logs = Main.logs
 let minute = 60.
 
-let repo = DKCI_git.connect ~logs ~dir:"/data/repos/datakit"
+let repo = Git.v ~logs ~dir:"/data/repos/datakit"
 
 let is_gh_pages = function
-  | _project, `Ref branch ->
-    begin match Datakit_path.unwrap branch with
-      | ["heads"; "gh-pages"] -> true
-      | _ -> false
-    end
+  | `Ref id -> (match id with (_, ["heads"; "gh-pages"]) -> true | _ -> false)
   | _ -> false
 
 let docker_build target ~timeout name =
@@ -20,15 +15,16 @@ let docker_build target ~timeout name =
     | "datakit" -> "Dockerfile"
     | name -> "Dockerfile." ^ name
   in
-  let build = DKCI_git.command ~timeout ~logs ~label:("docker-build-" ^ name) ~clone:true
+  let build =
+    Git.command ~timeout ~logs ~label:("docker-build-" ^ name) ~clone:true
       [
         [| "docker"; "build"; "--pull"; "-f"; dockerfile; "." |]
       ]
   in
   let term =
-    DKCI_git.fetch_head repo target >>= fun src ->
-    DKCI_git.run build src >>= fun () ->
-    Term.return "Build succeeded"
+    Git.fetch_head repo target >>= fun src ->
+    Git.run build src >|= fun () ->
+    "Build succeeded"
   in
   (name, term)
 
@@ -69,4 +65,4 @@ let web_config =
     ()
 
 let () =
-  DataKitCI.Main.run (Cmdliner.Term.pure (Config.ci ~web_config ~projects))
+  run (Cmdliner.Term.pure (Config.v ~web_config ~projects))

@@ -139,6 +139,9 @@ module Target: sig
   val head: v -> Commit.t
   (** [head v] is the head commit of [v]. *)
 
+  val compare_v: v -> v -> int
+  (** [compare_v] compares values of type {!v}. *)
+
 end
 
 module Term: sig

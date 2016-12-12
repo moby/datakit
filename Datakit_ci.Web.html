@@ -37,17 +37,17 @@
 <br>
 <h1 id="web">Web Configuration</h1><br>
 
-<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<pre><span id="TYPEconfig"><span class="keyword">type</span> <code class="type"></code>config</span> </pre>
 <div class="info ">
 The type for web configuration.<br>
 </div>
 
 
-<pre><span id="VALconfig"><span class="keyword">val</span> config</span> : <code class="type">?name:string -><br>       ?state_repo:Uri.t -><br>       ?metrics_token:[ `SHA256 of string ] -><br>       can_read:<a href="Datakit_ci.ACL.html#TYPEt">Datakit_ci.ACL.t</a> -><br>       can_build:<a href="Datakit_ci.ACL.html#TYPEt">Datakit_ci.ACL.t</a> -> unit -> <a href="Datakit_ci.Web.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALconfig"><span class="keyword">val</span> config</span> : <code class="type">?name:string -><br>       ?state_repo:Uri.t -><br>       ?metrics_token:[ `SHA256 of string ] -><br>       can_read:<a href="Datakit_ci.ACL.html#TYPEt">Datakit_ci.ACL.t</a> -><br>       can_build:<a href="Datakit_ci.ACL.html#TYPEt">Datakit_ci.ACL.t</a> -> unit -> <a href="Datakit_ci.Web.html#TYPEconfig">config</a></code></pre><div class="info ">
 <code class="code">config ~name ~state_repo ~can_read ~can_build ()</code> is a web
       configuration. If <code class="code">name</code> is given, it is used as the main
       heading, and also as the name of the session cookie (useful if
-      you run multiple CIs on the same host, on different ports). If
+      you run multiple CIs on the same host, on different ports).  If
       <code class="code">state_repo</code> is given, it is used to construct links to the
       state repository on GitHub. If <code class="code">metrics_token</code> is <code class="code"><span class="constructor">Some</span>
       (<span class="keywordsign">`</span><span class="constructor">SHA256</span> expected)</code> given then doing an HTTP GET on <code class="code">/metrics</code>

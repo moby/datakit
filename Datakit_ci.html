@@ -45,12 +45,13 @@ Datakit CI
     final step (think of live-logs of long-running builds).
 <p>
 
-    The <a href="Datakit_ci.html#core"><i>Core</i></a> of <code class="code"><span class="constructor">Datakit_ci</span></code> is the <a href="Datakit_ci.Job.html"><code class="code"><span class="constructor">Datakit_ci</span>.<span class="constructor">Job</span></code></a> module used to define
-    long-running computation jobs, with an attached, individual
-    <a href="Datakit_ci.Output.html">output</a> (which can be live). A project
-    configuration tied together a collection of job
-    description and a simple description for the web
-    interface, whose access is granted using ACLs.
+    The <a href="Datakit_ci.html#core"><i>Core</i></a> of <code class="code"><span class="constructor">Datakit_ci</span></code> are <a href="Datakit_ci.Term.html">term</a>combinators to
+    describe the composition of long-running computation jobs, with an
+    attached, individual <a href="Datakit_ci.Output.html">output</a> (which can be
+    live). A project configuration tied
+    together a collection of job description and a simple description
+    for the web interface, whose access is granted using
+    ACLs.
 <p>
 
     TODO.<br>
@@ -83,16 +84,23 @@ Datakit client library.
 }
 
 <div class="info ">
-The type for job status. It is a mix between the usual error
+The type for term status. It is a mix between the usual error
     monad, but where we also keep a local log for every
     computation. Morever, computation can be long-running, so there is
-    a new <code class="code"><span class="keywordsign">`</span><span class="constructor">Pending</span></code> state and a continuation to run when the job
+    a new <code class="code"><span class="keywordsign">`</span><span class="constructor">Pending</span></code> state and a continuation to run when the term
     complete.<br>
 </div>
 
 
+<pre><span id="TYPEjob_id"><span class="keyword">type</span> <code class="type"></code>job_id</span> </pre>
+<div class="info ">
+The type for job IDs. They are used to identfy the worker actually
+    doing the computation.<br>
+</div>
+
+
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Target.html">Target</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Target.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
-<pre><span class="keyword">module</span> <a href="Datakit_ci.Job.html">Job</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Job.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_ci.Term.html">Term</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Term.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_ci.ACL.html">ACL</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.ACL.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Web.html">Web</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Web.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Config.html">Config</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Config.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>

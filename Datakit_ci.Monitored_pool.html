@@ -47,7 +47,7 @@ The type for pools of workers.<br>
 <code class="code">create s n</code> create a new pool with <code class="code">n</code> workers.<br>
 </div>
 
-<pre><span id="VALuse"><span class="keyword">val</span> use</span> : <code class="type"><a href="Datakit_ci.Monitored_pool.html#TYPEt">t</a> -><br>       ?log:<a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -><br>       ?label:string -> <a href="Datakit_ci.Job.html#TYPEid">Datakit_ci.Job.id</a> -> (unit -> 'a Lwt.t) -> 'a Lwt.t</code></pre><div class="info ">
+<pre><span id="VALuse"><span class="keyword">val</span> use</span> : <code class="type"><a href="Datakit_ci.Monitored_pool.html#TYPEt">t</a> -><br>       ?log:<a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -><br>       ?label:string -> <a href="Datakit_ci.html#TYPEjob_id">Datakit_ci.job_id</a> -> (unit -> 'a Lwt.t) -> 'a Lwt.t</code></pre><div class="info ">
 <code class="code">use t job fn</code> evaluates <code class="code">fn ()</code> with one pool resource held.
       <code class="code">job</code> (and <code class="code">label</code>) will be displayed as the reason why the
       resource is in use. If <code class="code">log</code> is provided then a message will be

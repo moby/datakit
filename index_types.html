@@ -37,6 +37,11 @@ A cache of executions of a shell command.
 The type for Git commits.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_ci.Web.html#TYPEconfig">config</a> [<a href="Datakit_ci.Web.html">Datakit_ci.Web</a>]</td>
+<td><div class="info">
+The type for web configuration.
+</div>
+</td></tr>
 <tr><td><a href="Datakit_ci.BUILDER.html#TYPEcontext">context</a> [<a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a>]</td>
 <td><div class="info">
 For passing context parameters to the builder which aren't part
@@ -95,11 +100,6 @@ The type for file IDs (hashes).
 </div>
 </td></tr>
 <tr><td align="left"><br>I</td></tr>
-<tr><td><a href="Datakit_ci.Job.html#TYPEid">id</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
-<td><div class="info">
-The type for job IDs.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_github.Elt.html#TYPEid">id</a> [<a href="Datakit_github.Elt.html">Datakit_github.Elt</a>]</td>
 <td></td></tr>
 <tr><td><a href="Datakit_github.Ref.html#TYPEid">id</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
@@ -115,6 +115,12 @@ The type for build-status IDs.
 <tr><td><a href="Datakit_github.PR.html#TYPEid">id</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
 <td><div class="info">
 The type for commit ids.
+</div>
+</td></tr>
+<tr><td align="left"><br>J</td></tr>
+<tr><td><a href="Datakit_ci.html#TYPEjob_id">job_id</a> [<a href="Datakit_ci.html">Datakit_ci</a>]</td>
+<td><div class="info">
+The type for job IDs.
 </div>
 </td></tr>
 <tr><td align="left"><br>K</td></tr>
@@ -194,7 +200,7 @@ The type for results.
 <tr><td align="left"><br>S</td></tr>
 <tr><td><a href="Datakit_ci.Output.html#TYPEsaved">saved</a> [<a href="Datakit_ci.Output.html">Datakit_ci.Output</a>]</td>
 <td><div class="info">
-The type for jobs output saved in Datakit.
+The type for <code class="code">term</code> output saved in Datakit.
 </div>
 </td></tr>
 <tr><td><a href="Vfs.File.Stream.html#TYPEsession">session</a> [<a href="Vfs.File.Stream.html">Vfs.File.Stream</a>]</td>
@@ -211,7 +217,7 @@ The type for repository state.
 </td></tr>
 <tr><td><a href="Datakit_ci.html#TYPEstatus">status</a> [<a href="Datakit_ci.html">Datakit_ci</a>]</td>
 <td><div class="info">
-The type for job status.
+The type for term status.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.html#TYPEstatus_state">status_state</a> [<a href="Datakit_S.html">Datakit_S</a>]</td>
@@ -250,29 +256,24 @@ The type for pools of workers.
 The type for the project configuration.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_ci.Web.html#TYPEt">t</a> [<a href="Datakit_ci.Web.html">Datakit_ci.Web</a>]</td>
-<td><div class="info">
-The type for web configuration.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_ci.ACL.html#TYPEt">t</a> [<a href="Datakit_ci.ACL.html">Datakit_ci.ACL</a>]</td>
 <td><div class="info">
 The type for GitHub ACLs.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_ci.Job.html#TYPEt">t</a> [<a href="Datakit_ci.Job.html">Datakit_ci.Job</a>]</td>
+<tr><td><a href="Datakit_ci.Term.html#TYPEt">t</a> [<a href="Datakit_ci.Term.html">Datakit_ci.Term</a>]</td>
 <td><div class="info">
-The type for jobs.
+The type for computation terms.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_ci.Target.html#TYPEt">t</a> [<a href="Datakit_ci.Target.html">Datakit_ci.Target</a>]</td>
 <td><div class="info">
-The type for job targets.
+The type for computation targets.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_ci.Output.html#TYPEt">t</a> [<a href="Datakit_ci.Output.html">Datakit_ci.Output</a>]</td>
 <td><div class="info">
-The type for job's output.
+The type for <code class="code">term</code>'s output.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_ci.Live_log.html#TYPEt">t</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>

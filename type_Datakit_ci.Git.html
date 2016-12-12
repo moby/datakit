@@ -29,14 +29,14 @@
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;is_after&nbsp;:&nbsp;old:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;bool&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;fetch_head&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Job</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;with_checkout&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;log:<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;job_id:<span class="constructor">Datakit_ci</span>.<span class="constructor">Job</span>.id&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;job_id:<span class="constructor">Datakit_ci</span>.job_id&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;with_clone&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;log:<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;job_id:<span class="constructor">Datakit_ci</span>.<span class="constructor">Job</span>.id&nbsp;<span class="keywordsign">-&gt;</span>
+&nbsp;&nbsp;&nbsp;&nbsp;job_id:<span class="constructor">Datakit_ci</span>.job_id&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Lwt</span>.t
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;command
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;command&nbsp;:
@@ -44,5 +44,5 @@
 &nbsp;&nbsp;&nbsp;&nbsp;timeout:float&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;label:string&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;clone:bool&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;array&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.command
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;run&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.command&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Job</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.command&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Git</span>.commit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t
 <span class="keyword">end</span></code></body></html>

@@ -22,11 +22,11 @@
 </head>
 <body>
 <code class="code"><span class="keyword">sig</span>
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;config
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;config&nbsp;:
 &nbsp;&nbsp;&nbsp;&nbsp;?name:string&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;?state_repo:<span class="constructor">Uri</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;?metrics_token:[&nbsp;<span class="keywordsign">`</span><span class="constructor">SHA256</span>&nbsp;<span class="keyword">of</span>&nbsp;string&nbsp;]&nbsp;<span class="keywordsign">-&gt;</span>
 &nbsp;&nbsp;&nbsp;&nbsp;can_read:<span class="constructor">Datakit_ci</span>.<span class="constructor">ACL</span>.t&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;can_build:<span class="constructor">Datakit_ci</span>.<span class="constructor">ACL</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Web</span>.t
+&nbsp;&nbsp;&nbsp;&nbsp;can_build:<span class="constructor">Datakit_ci</span>.<span class="constructor">ACL</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Web</span>.config
 <span class="keyword">end</span></code></body></html>

@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <link rel="Start" href="index.html">
-<link rel="Up" href="Datakit_ci.Job.html">
+<link rel="Up" href="Datakit_ci.Term.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
 <link title="Index of modules" rel=Appendix href="index_modules.html">
@@ -22,34 +22,34 @@
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="Infix operators" rel="Section" href="#1_Infixoperators">
-<title>Datakit_ci.Job.Infix</title>
+<title>Datakit_ci.Term.Infix</title>
 </head>
 <body>
-<div class="navbar">&nbsp;<a class="up" href="Datakit_ci.Job.html" title="Datakit_ci.Job">Up</a>
+<div class="navbar">&nbsp;<a class="up" href="Datakit_ci.Term.html" title="Datakit_ci.Term">Up</a>
 &nbsp;</div>
-<h1>Module <a href="type_Datakit_ci.Job.Infix.html">Datakit_ci.Job.Infix</a></h1>
+<h1>Module <a href="type_Datakit_ci.Term.Infix.html">Datakit_ci.Term.Infix</a></h1>
 
-<pre><span class="keyword">module</span> Infix: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Job.Infix.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+<pre><span class="keyword">module</span> Infix: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Term.Infix.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 <br>
 <h1 id="1_Infixoperators">Infix operators</h1><br>
 
-<pre><span id="VAL($)"><span class="keyword">val</span> ($)</span> : <code class="type">('a -> 'b) <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a> -> 'a <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a> -> 'b <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a></code></pre><div class="info ">
-<code class="code">fn $ x</code> is the result of applying the evaluation of the job
-        <code class="code">fn</code> to the evaluation of the job <code class="code">x</code>. <code class="code">fn</code> and <code class="code">x</code> are
+<pre><span id="VAL($)"><span class="keyword">val</span> ($)</span> : <code class="type">('a -> 'b) <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a> -> 'a <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a> -> 'b <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a></code></pre><div class="info ">
+<code class="code">fn $ x</code> is the result of applying the evaluation of the term
+        <code class="code">fn</code> to the evaluation of the term <code class="code">x</code>. <code class="code">fn</code> and <code class="code">x</code> are
         evaluated in parallel. While <code class="code">fn</code> is not successful, the
-        result is the same as <code class="code">fn</code>. Otherwise, if <code class="code">x</code> is not
-        successful then the result is the same as <code class="code">x</code>. You can use <code class="code">$</code>
-        multiple times to support functions of multiple arguments
-        (e.g. <code class="code">fn $ a $ b $ c</code>). Use with <code class="code">join</code> if <code class="code">fn</code> itself
-        returns a job.<br>
+        result is the same as <code class="code">fn</code>.  Otherwise, if <code class="code">x</code> is not
+        successful then the result is the same as <code class="code">x</code>.  You can use
+        <code class="code">$</code> multiple times to support functions of multiple arguments
+        (e.g. <code class="code">fn $ a $ b $ c</code>).  Use with <code class="code">join</code> if <code class="code">fn</code> itself
+        returns a term.<br>
 </div>
 
-<pre><span id="VAL(>>=)"><span class="keyword">val</span> (&gt;&gt;=)</span> : <code class="type">'a <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a> -> ('a -> 'b <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a>) -> 'b <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a></code></pre><div class="info ">
+<pre><span id="VAL(>>=)"><span class="keyword">val</span> (&gt;&gt;=)</span> : <code class="type">'a <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a> -> ('a -> 'b <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a>) -> 'b <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a></code></pre><div class="info ">
 <code class="code">x &gt;&gt;= fn</code> (bind) is <code class="code">fn y</code> where <code class="code">y</code> is the successful result
         of evaluating <code class="code">x</code>, or simply <code class="code">x</code> if <code class="code">x</code> is not successful.<br>
 </div>
 
-<pre><span id="VAL(>|=)"><span class="keyword">val</span> (&gt;|=)</span> : <code class="type">'a <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a> -> ('a -> 'b) -> 'b <a href="Datakit_ci.Job.html#TYPEt">Datakit_ci.Job.t</a></code></pre><div class="info ">
+<pre><span id="VAL(>|=)"><span class="keyword">val</span> (&gt;|=)</span> : <code class="type">'a <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a> -> ('a -> 'b) -> 'b <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a></code></pre><div class="info ">
 <code class="code">x &gt;|= fn</code> (map) is <code class="code">return (fn y)</code> where <code class="code">y</code> is the
         successful result of evaluating <code class="code">x</code>, or simply <code class="code">x</code> if <code class="code">x</code> is
         not successful.<br>

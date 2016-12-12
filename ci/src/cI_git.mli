@@ -2,7 +2,11 @@ open CI_s
 
 type t
 val v: logs:CI_live_log.manager -> dir:string -> t
+
 type commit
+val hash: commit -> string
+val is_after: old:string -> commit -> bool Lwt.t
+
 val fetch_head: t -> CI_target.t -> commit CI_term.t
 val with_checkout:
   log:CI_live_log.t -> job_id:job_id -> commit -> (string -> 'a Lwt.t) -> 'a Lwt.t

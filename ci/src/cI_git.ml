@@ -28,9 +28,24 @@ module Commit = struct
   let compare a b = String.compare a.hash b.hash
   let hash t = t.hash
   let pp f t = Fmt.string f t.hash
+
+  let is_after ~old t =
+    try Hashtbl.find t.repo.is_ancestor (old, t.hash)
+    with Not_found ->
+      let result =
+        let cmd = "", [| "git"; "merge-base"; "--is-ancestor"; old; t.hash |] in
+        CI_process.run_with_exit_status ~cwd:t.repo.dir ~output:ignore cmd >|= function
+        | Unix.WEXITED 0 -> true
+        | Unix.WEXITED _ -> false
+        | x -> CI_process.check_status cmd x; true
+      in
+      Hashtbl.add t.repo.is_ancestor (old, t.hash) result;
+      result
 end
 
 type commit = Commit.t
+let hash = Commit.hash
+let is_after = Commit.is_after
 
 module Builder = struct
   module Key = struct

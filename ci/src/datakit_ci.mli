@@ -453,6 +453,13 @@ module Git: sig
   type commit
   (** The type for Git commits. *)
 
+  val hash: commit -> string
+  (** [hash c] is [c]'s hash. *)
+
+  val is_after: old:string -> commit -> bool Lwt.t
+  (** [is_after ~old c] is true iff [old] appears in the history of
+      [c]. *)
+
   val fetch_head: t -> Target.t -> commit Term.t
   (** [fetch_head t target] evaluates to a local branch in [t] with a
       copy of [target]'s head commit (downloading it first if

@@ -67,6 +67,22 @@ let map_of_list xs =
     ) xs;
   !map
 
+let pr_path { Repo.user; repo} pr =
+  Printf.sprintf "/%s/%s/pr/%d" user repo pr
+
+let unescape_ref s =
+  Uri.pct_decode s |> (fun s -> String.cuts ~sep:"/" s)
+
+let escape_ref path =
+  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" path)
+
+let ref_path { Repo.user; repo} r =
+    Fmt.strf "/%s/%s/ref/%s" user repo (escape_ref r)
+
+let path = function
+  | `PR (repo, pr) -> pr_path repo pr
+  | `Ref (repo, r) -> ref_path repo r
+
 type v = [ `PR of PR.t | `Ref of Ref.t ]
 
 let head = function
@@ -74,3 +90,7 @@ let head = function
   | `Ref x -> Ref.commit x
 
 let compare_v (x:v) (y:v) = Elt.compare (x :> Elt.t) (y :> Elt.t)
+
+let path_v = function
+  | `PR pr -> path (`PR (PR.id pr))
+  | `Ref r -> path (`Ref (Ref.id r))

@@ -47,7 +47,7 @@ val job_name : job -> string
 val state : job -> state
 (** [state job] is the current state of [job]. *)
 
-val target : target -> [`PR of PR.t | `Ref of Ref.t]
+val target : target -> CI_target.v
 (** [target target] is the GitHub metadata about this target. *)
 
 val repo : target -> Repo.t

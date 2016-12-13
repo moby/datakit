@@ -49,27 +49,23 @@ type job = {
                                            (commit, state) *)
 }
 and target = {
-  mutable head : [`PR of PR.t | `Ref of Ref.t];
+  mutable v : CI_target.v;
   mutable jobs : job list;      (* (only mutable for init) *)
 }
 
 let job_id job =
-  let target = match job.parent.head with
+  let target = match job.parent.v with
     | `PR pr -> `PR (PR.id pr)
     | `Ref r -> `Ref (Ref.id r)
   in
   target, job.name
 
 let pp_target f target =
-  match target.head with
+  match target.v with
   | `PR pr -> Fmt.pf f "%a/pr/%d" Repo.pp (PR.repo pr) (PR.number pr)
   | `Ref r -> Fmt.pf f "%a/ref/%a" Repo.pp (Ref.repo r) Ref.pp_name (Ref.name r)
 
-let commit = function
-  | `PR pr -> PR.commit pr
-  | `Ref r -> Ref.commit r
-
-let repo t = match t.head with
+let repo t = match t.v with
   | `PR r  -> PR.repo r
   | `Ref r -> Ref.repo r
 
@@ -77,10 +73,10 @@ let pp_job f j =
   Fmt.pf f "%a:%s" pp_target j.parent j.name
 
 let state job = snd job.state
-let target job = job.head
+let target job = job.v
 
 let title pr =
-  match pr.head with
+  match pr.v with
   | `PR pr -> PR.title pr
   | `Ref r -> Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
 
@@ -271,7 +267,7 @@ let rec recalculate t ~snapshot job =
       )
   in
   job.cancel ();        (* Stop any previous evaluation *)
-  let head = job.parent.head in
+  let head = job.parent.v in
   Lwt.catch
     (fun () ->
        let r, cancel =
@@ -295,7 +291,7 @@ let rec recalculate t ~snapshot job =
     | Error (`Failure descr) -> `Failure, descr
   in
   let (old_head, old_state) = job.state in
-  let new_hash = Commit.hash (commit head) in
+  let new_hash = Commit.hash (CI_target.head head) in
   begin if (old_head, old_state.status, old_state.descr) <>
            (new_hash, status, descr) then (
       set_status t head job.name ~status ~descr
@@ -307,7 +303,7 @@ let rec recalculate t ~snapshot job =
   job.state <- state
 
 let make_job snapshot ~parent name term =
-  let head_commit = commit parent.head in
+  let head_commit = CI_target.head parent.v in
   let id = head_commit, datakit_ci name in
   Conv.status snapshot id >|= fun status ->
   let state = match status with None -> None | Some s -> Some (Status.state s) in
@@ -351,7 +347,7 @@ let listen ?switch t =
     Log.debug (fun f -> f "Checking for work on %a" PR.pp_id id);
     begin match PR.Index.find id project.open_prs with
       | None ->
-        let open_pr = { head = `PR pr; jobs = [] } in
+        let open_pr = { v = `PR pr; jobs = [] } in
         let terms = project.make_terms (`PR id) in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
@@ -361,7 +357,7 @@ let listen ?switch t =
         project.open_prs <- PR.Index.add id open_pr project.open_prs;
         Lwt.return open_pr
       | Some open_pr ->
-        open_pr.head <- `PR pr; (* Update in all cases, because we read other things from the same snapshot.
+        open_pr.v <- `PR pr; (* Update in all cases, because we read other things from the same snapshot.
                                    XXX: so compare is very misleading here! *)
         Lwt.return open_pr
     end >>= fun open_pr ->
@@ -371,10 +367,7 @@ let listen ?switch t =
     Log.debug (fun f -> f "Checking for work on %a" Ref.pp_id id);
     begin match Ref.Index.find id project.refs with
       | None ->
-        let target = {
-          head = `Ref r;
-          jobs = [];
-        } in
+        let target = { v = `Ref r; jobs = []; } in
         let terms = project.make_terms @@ `Ref id in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
@@ -384,7 +377,7 @@ let listen ?switch t =
         project.refs <- Ref.Index.add id target project.refs;
         Lwt.return target
       | Some target ->
-        target.head <- `Ref r;
+        target.v <- `Ref r;
         Lwt.return target
     end >>= fun target ->
     Lwt_list.iter_s (recalculate t ~snapshot) target.jobs

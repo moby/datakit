@@ -668,7 +668,7 @@ let target_page_url target =
   | `Ref r -> ref_url repo (Ref.name r)
 
 let target_page ~csrf_token ~target jobs t =
-  let target = CI_engine.git_target target in
+  let target = CI_engine.target target in
   let title = target_title target in
   let repo = target_repo target in
   let commit = target_commit target in

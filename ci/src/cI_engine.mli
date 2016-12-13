@@ -47,8 +47,8 @@ val job_name : job -> string
 val state : job -> state
 (** [state job] is the current state of [job]. *)
 
-val git_target : target -> [`PR of PR.t | `Ref of Ref.t]
-(** [git_target target] is the GitHub metadata about this target. *)
+val target : target -> [`PR of PR.t | `Ref of Ref.t]
+(** [target target] is the GitHub metadata about this target. *)
 
 val repo : target -> Repo.t
 (** [repo t] is the GitHub repository that contains [target]. *)

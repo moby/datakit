@@ -77,7 +77,7 @@ let pp_job f j =
   Fmt.pf f "%a:%s" pp_target j.parent j.name
 
 let state job = snd job.state
-let git_target job = job.head
+let target job = job.head
 
 let title pr =
   match pr.head with

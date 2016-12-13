@@ -1511,7 +1511,7 @@ let rec read_state ~user ~repo ~commit tree path context =
          [ Status.v ?description ?url commit context state]
     end
     >>= fun this_state ->
-    items |> Lwt_list.map_s (function
+    items |> Lwt_list.map_p (function
         | "status" | "description" | "target_url" -> Lwt.return []
         | item ->
           read_state ~user ~repo ~commit tree (path / item) (context @ [item])
@@ -1528,7 +1528,7 @@ let read_opt_dir tree path =
 let read_commits tree ~user ~repo =
   let path = Datakit_path.of_steps_exn [user; repo; "commit"] in
   read_opt_dir tree path >>=
-  Lwt_list.map_s (fun commit ->
+  Lwt_list.map_p (fun commit ->
       let path =
         Datakit_path.of_steps_exn [user; repo; "commit"; commit; "status"]
       in
@@ -1539,7 +1539,7 @@ let read_commits tree ~user ~repo =
 let read_prs tree ~user ~repo =
   let path = Datakit_path.of_steps_exn [user; repo; "pr"] in
   read_opt_dir tree path >>=
-  Lwt_list.map_s (fun number ->
+  Lwt_list.map_p (fun number ->
       let path = Datakit_path.of_steps_exn [user; repo; "pr"; number] in
       let number = int_of_string number in
       let read name =
@@ -1742,11 +1742,11 @@ let test_random_datakit ~quick _repo conn =
   let update_datakit users =
     let events = Users.diff_events users (Users.empty ()) in
     DK.Branch.with_transaction branch (fun tr ->
-        Lwt_list.iter_s (fun { Repo.user; repo } ->
+        Lwt_list.iter_p (fun { Repo.user; repo } ->
             safe_remove tr Datakit_path.(empty / user / repo)
           ) (Repo.Set.elements all_repos)
         >>= fun () ->
-        Lwt_list.iter_s (Conv.update_event tr) events >>= fun () ->
+        Lwt_list.iter_p (Conv.update_event tr) events >>= fun () ->
         DK.Transaction.commit tr ~message:"User updates"
       ) >>= function
     | Error e -> Lwt.fail (DK_error e)

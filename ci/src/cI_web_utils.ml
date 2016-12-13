@@ -401,7 +401,9 @@ module Session_data = struct
 
   let csrf_token t = t.csrf_token
   let to_string t = Sexplib.Sexp.to_string (sexp_of_t t)
-  let of_string s = t_of_sexp (Sexplib.Sexp.of_string s)
+  let of_string s =
+    try Ok (t_of_sexp (Sexplib.Sexp.of_string s))
+    with ex -> Error ex
 end
 
 class virtual resource_with_session t =
@@ -410,14 +412,22 @@ class virtual resource_with_session t =
     inherit [Cohttp_lwt_body.t] Session.manager ~cookie_key:(cookie_key t) t.session_backend
 
     method private session rd =
-      self#session_of_rd rd >>= function
-      | Ok (Some session) -> Lwt.return (Session_data.of_string session.Session.value)
-      | Ok None | Error _ ->
+      let generate_new_session () =
         Log.info (fun f -> f "Generating new session");
         let csrf_token = B64.encode (Nocrypto.Rng.generate 16 |> Cstruct.to_string) in
         let value = { Session_data.csrf_token; username = None; login_redirect = None; attrs = Auth.empty_attrs } in
         self#session_set (Session_data.to_string value) rd >>= fun () ->
         Lwt.return value
+      in
+      self#session_of_rd rd >>= function
+      | Ok None | Error _ -> generate_new_session ()
+      | Ok (Some session) ->
+        match Session_data.of_string session.Session.value with
+        | Ok data -> Lwt.return data
+        | Error ex ->
+          Log.warn (fun f -> f "Failed to load session data %S: %a"
+                       session.Session.value CI_utils.pp_exn ex);
+          generate_new_session ()
 
     method! finish_request rd =
       let rd = self#session_set_hdrs ~path:"/" ~secure:true rd in

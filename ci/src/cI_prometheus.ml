@@ -125,7 +125,7 @@ module TextFormat_0_0_4 = struct
   let output_pairs f (label_names, label_values) =
     let cont = ref false in
     let output_pair name value =
-      if !cont then Fmt.string f " "
+      if !cont then Fmt.string f ", "
       else cont := true;
       Fmt.pf f "%a=\"%a\"" LabelName.pp name output_quoted value
     in

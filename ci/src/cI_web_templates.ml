@@ -89,7 +89,7 @@ let escape_ref path =
   Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" path)
 
 let unescape_ref s =
-  Uri.pct_encode ~scheme:"http" s |> (fun s -> String.cuts ~sep:"/" s)
+  Uri.pct_decode s |> (fun s -> String.cuts ~sep:"/" s)
 
 let ref_url { Repo.user; repo} r =
   Fmt.strf "/ref/%s/%s/%s" user repo (escape_ref r)

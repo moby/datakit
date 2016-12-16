@@ -274,7 +274,23 @@ let test_cache ~regen =
   test_lookup ~rebuild:true "1" >>= fun (value, log) ->
   Alcotest.(check int) "Rebuild 1 lookup" 1 value;
   Alcotest.(check string) "Rebuild 1 lookup log" "=== Get key\nStarting...\nTime=2\nSuccess\n" log;
-  Lwt.return ()
+  (* Parallel rebuilds *)
+  if not regen then (
+    let stream, push  = Lwt_stream.create () in
+    b.Builder.step <- Some stream;
+    let a = test_lookup ~rebuild:true "1" in
+    let b = test_lookup ~rebuild:true "1" in
+    push (Some ());
+    push (Some ());
+    push (Some ());
+    a >>= fun ra ->
+    b >>= fun rb ->
+    assert (ra = rb);
+    Lwt.return ()
+  ) else (
+    (* Can't test in-memory locking if we create a new cache each time. *)
+    Lwt.return ()
+  )
 
 let expect_pending = function
   | Error (`Pending x) -> x

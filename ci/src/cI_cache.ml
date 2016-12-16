@@ -239,13 +239,13 @@ module Make(B : CI_s.BUILDER) = struct
     M.find k t.cache
 
   let rec lookup t conn ~rebuild ctx k =
+    Lwt_mutex.with_lock t.mutex @@ fun () ->
     match lookup_mem t ~rebuild k with
     | Some v -> Lwt.return v
     | None ->
       let do_rebuild = lazy (
         lookup t conn ~rebuild:true ctx k >|= fun (_:B.value CI_s.status) -> ()
       ) in
-      Lwt_mutex.with_lock t.mutex @@ fun () ->
       conn () >>= fun dk ->
       match rebuild with
       | true ->

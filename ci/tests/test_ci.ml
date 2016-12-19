@@ -37,6 +37,10 @@ module Workflows = struct
 
   let pass check_build _target =
     T.of_lwt_slow (check_build "pass")
+
+  let fetch_only ~local_repo check_build t =
+    Git.fetch_head local_repo t >>= fun _ ->
+    T.of_lwt_slow (check_build "a")
 end
 
 open Lwt.Infix
@@ -319,62 +323,92 @@ let test_pending_updates conn =
   | { result = Ok 1; _ } -> Lwt.return ()
   | _ -> Alcotest.fail "Expected success"
 
-let test_git_dir conn ~clone =
-  let logs = Private.create_logs () in
-  let run args = Process.run ~output:print_string ("", Array.of_list args) in
+let run args = Process.run ~output:print_string ("", Array.of_list args)
+
+let with_git_remote fn =
   let ( / ) = Filename.concat in
   let old_cwd = Sys.getcwd () in
-  let cmd =
-    if clone then Workflows.ls_clone ~logs
-    else Workflows.ls ~logs
-  in
   Lwt.finalize
     (fun () ->
        Utils.with_tmpdir (fun tmpdir ->
            (* Set up the "remote" Git repository *)
            Sys.chdir tmpdir;
-           run ["git"; "init"; "my-repo"] >>= fun () ->
-           Sys.chdir "my-repo";
+           let remote_dir = tmpdir / "my-repo" in
+           run ["git"; "init"; remote_dir] >>= fun () ->
+           Sys.chdir remote_dir;
+           (* Add a test file *)
            Lwt_io.with_file ~mode:Lwt_io.output "src" (fun ch ->
                Lwt_io.write ch "Test"
              )
            >>= fun () ->
-           (* Add a test file *)
            run ["git"; "add"; "src"] >>= fun () ->
            run ["git"; "commit"; "-m"; "Initial commit"] >>= fun () ->
-           Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
            (* Clone a "local" copy *)
-           run ["git"; "clone"; tmpdir / "my-repo"; tmpdir / "clone"] >>= fun () ->
-           let local_repo = Git.v ~logs ~dir:(tmpdir / "clone") in
-           (* Start the CI *)
-           Test_utils.with_ci conn (Workflows.pull_and_run local_repo ~cmd) @@ fun ~logs ~switch dk with_handler ->
-           DK.branch dk "github-metadata" >>*= fun hooks ->
-           let wait_for ~commit path = Test_utils.wait_for_file ~switch hooks (Printf.sprintf "user/project/commit/%s/status/%s" commit path) in
-           (* Create a pull request *)
-           with_handler ~logs "a" (fun ~switch:_ _log ->
-               Test_utils.update_pr hooks ~message:"Init" ~id:1 ~head:hash ~states:[] >>= fun () ->
-               wait_for ~commit:hash "ci/datakit/test/state" "pending" >>= fun () ->
-               Lwt.return (Ok "Success!")
-             )
-           >>= fun () ->
-           wait_for ~commit:hash "ci/datakit/test/state" ~old:"pending" "success" >>= fun () ->
-           DK.branch dk (Printf.sprintf "shell-of-ls-on-%s" hash) >>*= fun results ->
-           DK.Branch.head results >>*= function
-           | None -> Alcotest.fail "Missing results branch!"
-           | Some head ->
-             let tree = DK.Commit.tree head in
-             DK.Tree.read_file tree (Datakit_path.of_string_exn "log") >>*= fun log ->
-             let log = Cstruct.to_string log in
-             if not (String.is_infix ~affix:"Running \"ls\"...\nsrc" log) then
-               Alcotest.fail "Missing 'src' in log output"
-             else
-               Lwt.return ()
+           let local_clone = tmpdir / "clone" in
+           run ["git"; "clone"; tmpdir / "my-repo"; local_clone] >>= fun () ->
+           fn ~remote_dir ~local_clone
          )
     )
     (fun () ->
        Sys.chdir old_cwd;
        Lwt.return ()
     )
+
+let test_git_dir conn ~clone =
+  let logs = Private.create_logs () in
+  let cmd =
+    if clone then Workflows.ls_clone ~logs
+    else Workflows.ls ~logs
+  in
+  with_git_remote @@ fun ~remote_dir ~local_clone ->
+  Sys.chdir remote_dir;
+  Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
+  let local_repo = Git.v ~logs ~dir:local_clone in
+  (* Start the CI *)
+  Test_utils.with_ci conn (Workflows.pull_and_run local_repo ~cmd) @@ fun ~logs ~switch dk with_handler ->
+  DK.branch dk "github-metadata" >>*= fun hooks ->
+  let wait_for ~commit path = Test_utils.wait_for_file ~switch hooks (Printf.sprintf "user/project/commit/%s/status/%s" commit path) in
+  (* Create a pull request *)
+  with_handler ~logs "a" (fun ~switch:_ _log ->
+      Test_utils.update_pr hooks ~message:"Init" ~id:1 ~head:hash ~states:[] >>= fun () ->
+      wait_for ~commit:hash "ci/datakit/test/state" "pending" >>= fun () ->
+      Lwt.return (Ok "Success!")
+    )
+  >>= fun () ->
+  wait_for ~commit:hash "ci/datakit/test/state" ~old:"pending" "success" >>= fun () ->
+  DK.branch dk (Printf.sprintf "shell-of-ls-on-%s" hash) >>*= fun results ->
+  DK.Branch.head results >>*= function
+  | None -> Alcotest.fail "Missing results branch!"
+  | Some head ->
+    let tree = DK.Commit.tree head in
+    DK.Tree.read_file tree (Datakit_path.of_string_exn "log") >>*= fun log ->
+    let log = Cstruct.to_string log in
+    if not (String.is_infix ~affix:"Running \"ls\"...\nsrc" log) then
+      Alcotest.fail "Missing 'src' in log output"
+    else
+      Lwt.return ()
+
+let test_git_tag conn =
+  let logs = Private.create_logs () in
+  with_git_remote @@ fun ~remote_dir ~local_clone ->
+  let local_repo = Git.v ~logs ~dir:local_clone in
+  (* Start the CI *)
+  Test_utils.with_ci conn Workflows.(fetch_only ~local_repo) @@ fun ~logs ~switch dk with_handler ->
+  DK.branch dk "github-metadata" >>*= fun hooks ->
+  let wait_for ~commit path = Test_utils.wait_for_file ~switch hooks (Printf.sprintf "user/project/commit/%s/status/%s" commit path) in
+  (* Create a tag *)
+  Sys.chdir remote_dir;
+  run ["git"; "commit"; "--allow-empty"; "-m"; "Release 0.1"] >>= fun () ->
+  Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
+  run ["git"; "tag"; "-a"; "-m"; "Release 0.1"; "v0.1"; hash] >>= fun () ->
+  with_handler ~logs "a" (fun ~switch:_ _log ->
+      Test_utils.update_ref hooks ~message:"Tag" ~id:"v0.1" ~head:hash ~states:[] >>= fun () ->
+      wait_for ~commit:hash "ci/datakit/test/state" "pending" >>= fun () ->
+      Lwt.return (Ok "Success")
+    )
+  >>= fun () ->
+  wait_for ~old:"pending" ~commit:hash "ci/datakit/test/state" "success" >>= fun () ->
+  Lwt.return ()
 
 let test_cross_project conn =
   Test_utils.with_ci conn Workflows.test_cross_project @@ fun ~logs ~switch dk _with_handler ->
@@ -492,6 +526,7 @@ let test_set = [
   "Test pending",   `Quick, Test_utils.run test_pending_updates;
   "Git",            `Quick, Test_utils.run (test_git_dir ~clone:false);
   "Git (clone)",    `Quick, Test_utils.run (test_git_dir ~clone:true);
+  "Git tag",        `Quick, Test_utils.run test_git_tag;
   "Cross-project",  `Quick, Test_utils.run test_cross_project;
   "Auth",           `Quick, test_auth;
   "Roles",          `Quick, Test_utils.run_private test_roles;

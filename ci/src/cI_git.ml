@@ -96,10 +96,11 @@ module Builder = struct
     let hash = Key.hash key in
     Printf.sprintf "git-pull-of-%s" hash
 
-  let generate t ~switch ~log _trans NoContext pr =
+  let generate t ~switch ~log _trans NoContext target =
     let output = CI_live_log.write log in
-    let hash = Key.hash pr in
-    let tmp_branch = branch t pr in
+    let hash = Key.hash target in
+    let tmp_branch = branch t target in
+    let tmp_tag = Printf.sprintf "%s.new" tmp_branch in
     let env = Unix.environment () |> with_gitdir (Filename.concat t.dir ".git") in
     (* First, see if we've already got this commit. *)
     Lwt.try_bind
@@ -116,11 +117,14 @@ module Builder = struct
          CI_live_log.log log "Fetching PR branch";
          (* We can't be sure the PR's head still exists, but we can fetch the current
             head and then try to switch to the one we want. *)
+         (* We fetch to a tag rather than a branch in case the target is a tag object. *)
          (* Three step process to ensure we don't end up pointing at the wrong commit *)
-         CI_process.run ~switch ~env ~output ("", [| "git"; "fetch"; "origin"; Printf.sprintf "%s:%s.new" (Key.branch pr) tmp_branch |]) >>= fun () ->
+         let cmd = [| "git"; "fetch"; "origin";
+                      Printf.sprintf "%s:tags/%s" (Key.branch target) tmp_tag |] in
+         CI_process.run ~switch ~env ~output ("", cmd) >>= fun () ->
          Lwt_mutex.with_lock git_lock @@ fun () -> (* (hopefully fetch can handle parallel uses) *)
          CI_process.run ~env ~output ("", [| "git"; "branch"; "-f"; tmp_branch; hash |]) >>= fun () ->
-         CI_process.run ~env ~output ("", [| "git"; "branch"; "-D"; tmp_branch ^ ".new" |]) >>= fun () ->
+         CI_process.run ~env ~output ("", [| "git"; "tag"; "-d"; tmp_tag |]) >>= fun () ->
          Lwt.return @@ Ok { Commit.repo = t; hash }
       )
 end

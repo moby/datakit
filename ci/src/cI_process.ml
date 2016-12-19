@@ -2,6 +2,9 @@ open! Astring
 open CI_utils
 open Lwt.Infix
 
+let child_src = Logs.Src.create "datakit-ci.child" ~doc:"Output from child process"
+module Child = (val Logs.src_log child_src : Logs.LOG)
+
 let pp_args =
   let sep = Fmt.(const string) " " in
   Fmt.array ~sep String.dump
@@ -69,6 +72,7 @@ let run_with_exit_status ?switch ?log ?cwd ?env ~output ?log_cmd cmd =
                 Lwt.return `Eof
               | data ->
                 output data;
+                Child.debug (fun f -> f "%S" data);
                 (* Hack because child#terminate may not kill sub-children.
                    Hopefully closing stdout will encourage them to exit. *)
                 Lwt_switch.check switch;

@@ -53,6 +53,7 @@ let () =
   CI_log_reporter.init None (Some Logs.Info);
   Logs.Src.list () |> List.iter (fun src ->
       match Logs.Src.name src with
+      | "datakit-ci.child" -> Logs.Src.set_level src (Some Logs.Debug)
       | "datakit-ci" -> Logs.Src.set_level src (Some Logs.Debug)
       | "dkt-github" -> Logs.Src.set_level src (Some Logs.Debug)
       | "Client9p" -> Logs.Src.set_level src (Some Logs.Info)
@@ -172,6 +173,13 @@ let assert_file branch path value =
     let data = single_line data in
     Alcotest.(check string) (Printf.sprintf "%s=%s" path value) value data;
     Lwt.return ()
+
+let update_ref hooks ~id ~head ~states ~message =
+  update hooks ~message (
+    (Printf.sprintf "user/project/ref/%s/head" id, head) ::
+    (Printf.sprintf "user/project/ref/%s/state" id, "open") ::
+    List.map (fun (path, data) -> Printf.sprintf "user/project/commit/%s/status/%s" head path, data) states
+  )
 
 let update_pr hooks ~id ~head ~states ~message =
   update hooks ~message (

@@ -405,18 +405,18 @@ let resource_pools ~csrf_token =
     items
   )
 
-let login_page ?github ~csrf_token t ~user =
+let field descr ty name =
+  let id = "field-" ^ name in
+  div ~a:[a_class ["form-group"]] [
+    label ~a:[a_label_for id] [pcdata descr];
+    input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name] ()
+  ]
+
+let login_page ?github ~csrf_token ~is_configured t ~user =
   let query = [
     "CSRFToken", [csrf_token];
   ] in
   let action = Printf.sprintf "/auth/login?%s" (Uri.encoded_of_query query) in
-  let field descr ty name =
-    let id = "field-" ^ name in
-    div ~a:[a_class ["form-group"]] [
-      label ~a:[a_label_for id] [pcdata descr];
-      input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name] ()
-    ]
-  in
   let github_login =
     match github with
     | None ->
@@ -426,7 +426,18 @@ let login_page ?github ~csrf_token t ~user =
         a ~a:[a_href (Uri.to_string github)] [pcdata "Log in with GitHub"];
       ]
   in
-  page "Login" Nav.Home ~user [
+  let warnings =
+    if is_configured then []
+    else [
+      div ~a:[a_class ["alert"; "alert-warning"]] [
+        pcdata
+          "The CI has not yet been configured with an administrator user. \
+           In the CI's logs you should find a URL containing a token - open this \
+           URL to create an 'admin' user."
+      ]
+    ]
+  in
+  page "Login" Nav.Home ~user ([
     h2 [pcdata "Login"];
     form ~a:[a_class ["login-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
       field "Username" `Text "user";
@@ -434,7 +445,27 @@ let login_page ?github ~csrf_token t ~user =
       div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
     ];
     github_login;
-  ] t
+  ] @ warnings) t
+
+let auth_setup ~csrf_token =
+  let query = [
+    "CSRFToken", [csrf_token];
+  ] in
+  let action = Printf.sprintf "/auth/setup?%s" (Uri.encoded_of_query query) in
+  page "Auth Setup" Nav.Home [
+    form ~a:[a_class ["auth-setup-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
+      div ~a:[a_class ["form-group"]] [
+        label ~a:[a_label_for "user"] [pcdata "Username"];
+        input ~a:[a_class ["form-control"]; a_id "user"; a_input_type `Text;
+                  a_disabled (); a_name "name"; a_value "admin"] ()
+      ];
+      field "Password" `Password "password";
+      field "Confirm" `Password "password2";
+      button ~a:[a_class ["btn"; "btn-default"]; a_button_type `Submit] [
+        pcdata "Submit"
+      ]
+    ]
+  ]
 
 let user_page ~csrf_token =
   let query = [

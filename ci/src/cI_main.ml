@@ -34,7 +34,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   let projects = Repo.Map.map (fun p -> p.CI_config.tests) projects in
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
   let github = CI_secrets.github_auth secrets in
-  CI_web_utils.Auth.create ?github (CI_secrets.passwords_path secrets) >>= fun auth ->
+  CI_web_utils.Auth.create ?github ~web_ui (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
   let connect_dk () = connect proto addr >|*= DK.connect in
   let canaries =
@@ -61,6 +61,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   ]
 
 let start () pr_store web_ui secrets_dir config canaries session_backend =
+  let secrets_dir = CI_utils.abs_path secrets_dir in
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
   try
     Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend)
@@ -97,7 +98,7 @@ let web_ui =
     Arg.info ~doc:"URL of main web page (for GitHub status URLs)"
       ~docv:"URL" ["web-ui"]
   in
-  Arg.(value (opt uri (Uri.of_string "http://127.0.0.1:8080/") doc))
+  Arg.(value (opt uri (Uri.of_string "https://127.0.0.1:8443/") doc))
 
 let canaries =
   let doc =

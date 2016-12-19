@@ -51,12 +51,21 @@ The arguments are:
 - `my-ci` is the image you just built.
 - `--metadata-store tcp:HOST:PORT` is the address of your running DataKit server.
 
-On the first run, you will be prompted to choose a password for the "admin" user.
+On the first run, you will see a log message containing a setup URL, e.g.
 
-To view your new service, open <https://localhost:8443/> in a web browser.
-Because the certificate is self-signed, you'll probably have to click through some kind of security warning.
+```
+2016-12-19 16:32.47 APP [datakit-ci] >>> Configure the CI by visiting
+                                     https://127.0.0.1:8443/auth/intro/XK2qPqmIGnc3_VG1OQ_EDg==
+```
+
+To view your new service, open this URL in a web browser.
+
+Note: The server automatically generates an X.509 certificate for itself on the first run.
+Since this is self-signed, you'll probably have to click through some kind of security warning.
 If you wish to use your own key and certificate, find the container's `secrets` volume, replace the files (`server.key` and `server.crt`) and restart.
 
+Once the CI loads, it will prompt you to choose a password for the "admin" user.
+Enter a password and then log in as your new user.
 
 ## Writing tests
 

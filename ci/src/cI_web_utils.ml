@@ -99,7 +99,7 @@ end
 let () =
   Nocrypto_entropy_unix.initialize ()
 
-type role = [`Reader | `LoggedIn | `Builder]
+type role = [`Reader | `LoggedIn | `Builder | `Admin]
 
 module Hashed_password = struct
   type t = {
@@ -165,49 +165,75 @@ module Auth = struct
   }
 
   type t = {
+    passwd_file : string;
     github : github_auth option;
-    local_users : User.t String.Map.t;
+    mutable local_users : [`Configured of User.t String.Map.t | `Config_token of string];
   }
 
   let empty_attrs = { github_orgs = []; can_read_github = [] }
 
+  let is_configured t =
+    match t.local_users with
+    | `Config_token _ -> false
+    | `Configured _ -> true
+
   let lookup t ~user ~password =
-    match String.Map.find user t.local_users with
-    | Some ({ User.password = stored_pw; _ } as user) when Hashed_password.matches ~password stored_pw -> Some user
-    | Some _ -> Log.info (fun f -> f "Incorrect password for user %S" user); None
-    | None -> Log.info (fun f -> f "No such user %S" user); None
+    match t.local_users with
+    | `Config_token _ -> Log.info (fun f -> f "Local users not configured yet"); None
+    | `Configured user_db ->
+      match String.Map.find user user_db with
+      | Some ({ User.password = stored_pw; _ } as user)
+        when Hashed_password.matches ~password stored_pw -> Some user
+      | Some _ -> Log.info (fun f -> f "Incorrect password for user %S" user); None
+      | None -> Log.info (fun f -> f "No such user %S" user); None
 
-  let with_echo_off fn =
-    let terminal = Unix.tcgetattr Unix.stdin in
-    let no_echo = {terminal with Unix.c_echo = false} in
-    Unix.tcsetattr Unix.stdin Unix.TCSANOW no_echo;
-    let result = fn () in
-    Unix.tcsetattr Unix.stdin Unix.TCSANOW terminal;
-    result
+  let load_local_users passwd_file =
+    Lwt_io.with_file ~mode:Lwt_io.input passwd_file (fun ch -> Lwt_io.read ch) >|= fun contents ->
+    password_file_of_sexp (Sexplib.Sexp.of_string contents)
+    |> String.Map.of_list
+    |> String.Map.mapi (fun name password -> { User.name; password })
 
-  let ensure_initialised passwd_file =
-    if Sys.file_exists passwd_file then Lwt.return ()
-    else (
+  let try_load_local_users ~web_ui ~passwd_file =
+    if Sys.file_exists passwd_file then (
+      load_local_users passwd_file >|= fun db -> `Configured db
+    ) else (
+      let token = B64.(encode ~alphabet:uri_safe_alphabet) (Nocrypto.Rng.generate 16 |> Cstruct.to_string) in
+      let setup_url = Uri.with_path web_ui ("/auth/intro/" ^ token) in
+      Log.app (fun f -> f ">>> Configure the CI by visiting@\n%a" Uri.pp_hum setup_url);
+      Lwt.return (`Config_token token)
+    )
+
+  let tokens_equal a b =
+    Nocrypto.Uncommon.Cs.ct_eq (Cstruct.of_string a) (Cstruct.of_string b)
+
+  let check_setup_token t token =
+    match t.local_users with
+    | `Config_token required when tokens_equal required token -> Ok ()
+    | `Configured _ -> Error "Already initialised - log in as admin"
+    | `Config_token _ -> Error "Bad token"
+
+  let initialise_local_users t ~password =
+    match t.local_users with
+    | `Configured _ ->
+      (* For now, we only allow the admin password to be set once.
+         If we want to allow changes too, need to think about protecting other users in the DB. *)
+      Lwt.return @@ Error "Already configured!"
+    | `Config_token _ ->
       let user = "admin" in
-      Fmt.pr "Enter password for %S user:@.%!" user;
-      let password = with_echo_off (fun () -> input_line stdin) in
       let entry = Hashed_password.of_plain ~password in
       let contents =
         [user, entry]
         |> sexp_of_password_file
         |> Sexplib.Sexp.to_string in
-      Lwt_io.with_file ~mode:Lwt_io.output passwd_file (fun ch -> Lwt_io.write ch contents)
-    )
+      Lwt_io.with_file ~mode:Lwt_io.output t.passwd_file (fun ch -> Lwt_io.write ch contents) >>= fun () ->
+      load_local_users t.passwd_file >>= fun local_users ->
+      t.local_users <- `Configured local_users;
+      Lwt.return @@ Ok ()
 
-  let create ?github passwd =
-    ensure_initialised passwd >>= fun () ->
-    Lwt_io.with_file ~mode:Lwt_io.input passwd (fun ch -> Lwt_io.read ch) >|= fun contents ->
-    let local_users =
-      password_file_of_sexp (Sexplib.Sexp.of_string contents)
-      |> String.Map.of_list
-      |> String.Map.mapi (fun name password -> { User.name; password })
-    in
-    { github; local_users }
+  let create ?github ~web_ui passwd_file =
+    if Filename.is_relative passwd_file then CI_utils.failf "Path %S is relative" passwd_file;
+    try_load_local_users ~web_ui ~passwd_file >>= fun local_users ->
+    Lwt.return { passwd_file; github; local_users }
 
   let scopes = [`Read_org; `Repo]
 
@@ -319,6 +345,7 @@ let server ~auth ~web_config ~session_backend =
     | `Reader -> matches_acl web_config.CI_web_templates.can_read ~user ~attrs
     | `Builder -> matches_acl web_config.CI_web_templates.can_build ~user ~attrs
     | `LoggedIn -> Ok (user <> None)
+    | `Admin -> Ok (user = Some "admin")
   in
   let acl_github_repos =
     Repo.Set.union
@@ -480,6 +507,15 @@ class virtual protected_page t =
         | Error err -> Wm.continue (`Redirect (CI_web_templates.Error.(uri err))) rd
   end
 
+let check_csrf session_data rd =
+  let expected_token = session_data.Session_data.csrf_token in
+  match Uri.get_query_param rd.Wm.Rd.uri "CSRFToken" with
+  | Some provided_token when provided_token = expected_token -> Wm.continue () rd
+  | None -> Wm.respond 403 ~body:(`String "Missing CSRFToken") rd
+  | Some provided_token ->
+    Log.info (fun f -> f "Expecting CSRFToken %S; got %S" expected_token provided_token);
+    Wm.respond 403 ~body:(`String "Incorrect CSRFToken") rd
+
 class virtual post_page t = object(self)
   inherit protected_page t as super
 
@@ -498,13 +534,9 @@ class virtual post_page t = object(self)
 
   method! forbidden rd =
     self#session rd >>= fun session_data ->
-    let expected_token = session_data.Session_data.csrf_token in
-    match Uri.get_query_param rd.Wm.Rd.uri "CSRFToken" with
-    | Some provided_token when provided_token = expected_token -> super#forbidden rd
-    | None -> Wm.respond 403 ~body:(`String "Missing CSRFToken") rd
-    | Some provided_token ->
-      Log.info (fun f -> f "Expecting CSRFToken %S; got %S" expected_token provided_token);
-      Wm.respond 403 ~body:(`String "Incorrect CSRFToken") rd
+    check_csrf session_data rd >>= function
+    | Wm.Ok (), rd -> super#forbidden rd
+    | (Wm.Error _, _) as x -> Lwt.return x
 end
 
 class logout_page t = object(self)
@@ -519,70 +551,33 @@ class logout_page t = object(self)
     Wm.continue true (Wm.Rd.redirect "/" rd)
 end
 
-class login_page t = object(self)
+(* This is used to log in before the user database has been configured. *)
+class auth_intro t = object(self)
   inherit resource_with_session t
 
   method! allowed_methods rd =
-    Wm.continue [`GET; `POST] rd
+    Wm.continue [`GET] rd
 
   method content_types_provided rd =
     Wm.continue [
       "text/html", self#to_html;
     ] rd
 
-  method private to_html rd =
-    self#session rd >>= fun {Session_data.username; csrf_token; _} ->
-    let github = Auth.github_login_url ~csrf_token t.auth in
-    let html = CI_web_templates.login_page ?github ~csrf_token ~user:username t.web_config in
-    let body = Fmt.to_to_string (Tyxml.Html.pp ()) html in
-    Wm.continue (`String body) rd
-
   method content_types_accepted rd =
-    Wm.continue [
-      "multipart/form-data", (fun _ -> assert false);
-    ] rd
+    Wm.continue [] rd
 
-  method! private process_post rd =
-    self#session rd >>= fun session_data ->
-    let expected_token = session_data.Session_data.csrf_token in
-    match Uri.get_query_param rd.Wm.Rd.uri "CSRFToken" with
-    | None -> Wm.respond 403 ~body:(`String "Missing CSRFToken") rd
-    | Some provided_token when provided_token <> expected_token ->
-      Log.info (fun f -> f "Expecting CSRFToken %S; got %S" expected_token provided_token);
-      Wm.respond 403 ~body:(`String "Incorrect CSRFToken") rd
-    | Some _ ->
-      match Cohttp.Header.get rd.Wm.Rd.req_headers "content-type" with
-      | None -> Wm.respond 403 ~body:(`String "Missing Content-Type header") rd
-      | Some content_type ->
-        let body = rd.Wm.Rd.req_body in
-        Multipart.parse_stream ~stream:(Cohttp_lwt_body.to_stream body) ~content_type >>= fun parts ->
-        Multipart.get_parts parts >>= fun parts ->
-        let get name =
-          match Multipart.StringMap.find name parts with
-          | `String s -> Ok s
-          | `File _ -> Error "File upload in form!"
-          | exception Not_found -> Error (Printf.sprintf "Missing %S in form submission" name)
-        in
-        match get "user", get "password" with
-        | Error msg, _ -> Wm.respond 403 ~body:(`String msg) rd
-        | Ok _, Error msg -> Wm.respond 403 ~body:(`String msg) rd
-        | Ok user, Ok password ->
-          match Auth.lookup t.auth ~user ~password with
-          | Some _ ->
-            CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
-            let session = {session_data with Session_data.username = Some user} in
-            self#session_set (Session_data.to_string session) rd >>= fun () ->
-            begin match session.Session_data.login_redirect with
-              | None -> Lwt.return "/"
-              | Some redirect ->
-                let value = {session with Session_data.login_redirect = None} in
-                self#session_set (Session_data.to_string value) rd >>= fun () ->
-                Lwt.return redirect
-            end >>= fun redirect ->
-            Wm.continue true (Wm.Rd.redirect redirect rd)
-          | None ->
-            CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
-            Wm.respond 403 ~body:(`String "Invalid username/password") rd
+  method private to_html rd =
+    let token = Wm.Rd.lookup_path_info_exn "token" rd in
+    match Auth.check_setup_token t.auth token with
+    | Error msg ->
+      CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
+      Wm.respond 403 ~body:(`String msg) rd
+    | Ok () ->
+      CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
+      self#session rd >>= fun session_data ->
+      let session = {session_data with Session_data.username = Some "admin"} in
+      self#session_set (Session_data.to_string session) rd >>= fun () ->
+      Wm.respond 303 (Wm.Rd.redirect "/auth/setup" rd)
 end
 
 class github_callback t = object(self)
@@ -666,3 +661,141 @@ let serve ~mode ~routes =
            Lwt.return ()
         )
     )
+
+class virtual html_page t = object(self)
+  inherit protected_page t
+
+  method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt_body.t) Wm.op
+
+  method content_types_provided rd =
+    Wm.continue [
+      "text/html" , self#to_html;
+    ] rd
+
+  method content_types_accepted rd =
+    Wm.continue [] rd
+
+  method private to_html rd =
+    self#render rd >>= fun (resp, rd) ->
+    match resp with
+    | Wm.Error _ as e -> Lwt.return (e, rd)
+    | Wm.Ok html ->
+      let user = self#authenticated_user in
+      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user (web_config t)) in
+      Wm.continue (`String body) rd
+end
+
+class virtual form_page t = object(self)
+  inherit html_page t
+
+  method virtual private receive :
+    [`File of Multipart.file | `String of string] Multipart.StringMap.t -> Cohttp_lwt_body.t Wm.acceptor
+
+  method! allowed_methods rd =
+    Wm.continue [`GET; `POST] rd
+
+  method! content_types_accepted rd =
+    Wm.continue [
+      "application/x-www-form-urlencoded", (fun _ -> assert false);
+    ] rd
+
+  method! private process_post rd =
+    self#session rd >>= fun session_data ->
+    let expected_token = session_data.Session_data.csrf_token in
+    match Uri.get_query_param rd.Wm.Rd.uri "CSRFToken" with
+    | None -> Wm.respond 403 ~body:(`String "Missing CSRFToken") rd
+    | Some provided_token when provided_token <> expected_token ->
+      Log.info (fun f -> f "Expecting CSRFToken %S; got %S" expected_token provided_token);
+      Wm.respond 403 ~body:(`String "Incorrect CSRFToken") rd
+    | Some _ ->
+      match Cohttp.Header.get rd.Wm.Rd.req_headers "content-type" with
+      | None -> Wm.respond 403 ~body:(`String "Missing Content-Type header") rd
+      | Some content_type ->
+        let body = rd.Wm.Rd.req_body in
+        Multipart.parse_stream ~stream:(Cohttp_lwt_body.to_stream body) ~content_type >>= fun parts ->
+        Multipart.get_parts parts >>= fun parts ->
+        self#receive parts rd
+end
+
+class auth_setup t =
+  let parse_form parts =
+      let get name =
+        match Multipart.StringMap.find name parts with
+        | `String s -> Ok s
+        | `File _ -> Error "File upload in form!"
+        | exception Not_found -> Error (Printf.sprintf "Missing %S in form submission" name)
+      in
+      match get "password", get "password2" with
+      | Ok "", Ok "" -> Error "Passwords cannot be blank"
+      | Ok p1, Ok p2 when p1 = p2 -> Ok p1
+      | Ok _, Ok _ -> Error "Passwords don't match"
+      | (Error _ as e), _ -> e
+      | _, (Error _ as e) -> e
+  in
+  object(self)
+    inherit form_page t
+
+    method private required_roles = [`Admin]
+
+    method private render rd =
+      self#session rd >>= fun session_data ->
+      let csrf_token = Session_data.csrf_token session_data in
+      Wm.continue (CI_web_templates.auth_setup ~csrf_token) rd
+
+    method private receive parts rd =
+      match parse_form parts with
+      | Error e -> Wm.respond 400 ~body:(`String e) rd
+      | Ok password ->
+        Auth.initialise_local_users t.auth ~password >>= function
+        | Error e -> Wm.respond 400 ~body:(`String e) rd
+        | Ok () ->
+          self#session rd >>= fun session_data ->
+          let session = { session_data with Session_data.
+                                         username = None;
+                                         attrs = Auth.empty_attrs;
+                                         login_redirect = Some "/";
+                        } in
+          self#session_set (Session_data.to_string session) rd >>= fun () ->
+          Wm.respond 303 (Wm.Rd.redirect "/auth/login" rd)
+  end
+
+class login_page t = object(self)
+  inherit form_page t
+
+  method private required_roles = []
+
+  method private render rd =
+    self#session rd >>= fun {Session_data.csrf_token; _} ->
+    let github = Auth.github_login_url ~csrf_token t.auth in
+    let is_configured = Auth.is_configured t.auth in
+    Wm.continue (CI_web_templates.login_page ?github ~csrf_token ~is_configured) rd
+
+  method private receive parts rd =
+    let get name =
+      match Multipart.StringMap.find name parts with
+      | `String s -> Ok s
+      | `File _ -> Error "File upload in form!"
+      | exception Not_found -> Error (Printf.sprintf "Missing %S in form submission" name)
+    in
+    match get "user", get "password" with
+    | Error msg, _ -> Wm.respond 403 ~body:(`String msg) rd
+    | Ok _, Error msg -> Wm.respond 403 ~body:(`String msg) rd
+    | Ok user, Ok password ->
+      match Auth.lookup t.auth ~user ~password with
+      | Some _ ->
+        CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
+        self#session rd >>= fun session_data ->
+        let session = {session_data with Session_data.username = Some user} in
+        self#session_set (Session_data.to_string session) rd >>= fun () ->
+        begin match session.Session_data.login_redirect with
+          | None -> Lwt.return "/"
+          | Some redirect ->
+            let value = {session with Session_data.login_redirect = None} in
+            self#session_set (Session_data.to_string value) rd >>= fun () ->
+            Lwt.return redirect
+        end >>= fun redirect ->
+        Wm.continue true (Wm.Rd.redirect redirect rd)
+      | None ->
+        CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
+        Wm.respond 403 ~body:(`String "Invalid username/password") rd
+end

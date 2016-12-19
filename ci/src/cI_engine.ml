@@ -149,8 +149,6 @@ let create ~web_ui ?canaries connect_dk projects =
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
 let refs t = t.projects |> Repo.Map.map (fun project -> project.refs)
 
-let escape_ref path = List.map (fun p -> Uri.pct_encode ~scheme:"http" p) path
-
 let metadata_branch = "github-metadata"
 
 let take_snapshot t =
@@ -198,25 +196,17 @@ let monitor t ?switch fn =
 let datakit_ci x = ["ci"; "datakit"; x]
 
 let set_status t target name ~status ~descr =
-  let { Repo.user; repo } = match target with
-    | `PR x -> PR.repo x | `Ref x -> Ref.repo x
-  in
   CI_prometheus.Counter.inc_one Metrics.status_updates;
   let commit, url =
     match target with
     | `PR pr ->
       Log.info (fun f -> f "Job %a:%s -> %s" PR.pp_id (PR.id pr) name descr);
-      let url =
-        Uri.with_path t.web_ui (Printf.sprintf "pr/%s/%s/%d" user repo (PR.number pr))
-      in
+      let url = Uri.with_path t.web_ui (CI_target.path_v target) in
       let commit = PR.commit pr in
       (commit, url)
     | `Ref r ->
       Log.info (fun f -> f "Job ref %a:%s -> %s" Ref.pp_id (Ref.id r) name descr);
-      let url =
-        Uri.with_path t.web_ui
-          (Fmt.strf "ref/%s/%s/%a" user repo Ref.pp_name (escape_ref (Ref.name r)))
-      in
+      let url = Uri.with_path t.web_ui (CI_target.path_v target) in
       let commit = Ref.commit r in
       (commit, url)
   in

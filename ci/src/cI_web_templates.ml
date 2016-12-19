@@ -82,18 +82,6 @@ let commit_url ~repo commit =
   let { Repo.user; repo } = repo in
   Printf.sprintf "https://github.com/%s/%s/commit/%s" user repo commit
 
-let pr_url { Repo.user; repo} pr =
-  Printf.sprintf "/pr/%s/%s/%d" user repo pr
-
-let escape_ref path =
-  Uri.pct_encode ~scheme:"http" (String.concat ~sep:"/" path)
-
-let unescape_ref s =
-  Uri.pct_decode s |> (fun s -> String.cuts ~sep:"/" s)
-
-let ref_url { Repo.user; repo} r =
-  Fmt.strf "/ref/%s/%s/%s" user repo (escape_ref r)
-
 let tag_map f map =
   Ref.Index.fold (fun key value acc ->
       match snd key with
@@ -198,20 +186,22 @@ let dashboard_widget (_repo, id) ref =
     small [ pcdata comment ];
   ]
 
-let ref_job (project, id) ref =
+let ref_job (_repo, id) ref =
   let jobs = CI_engine.jobs ref in
   let summary = summarise jobs in
+  let ref_url = CI_target.path_v (CI_engine.target ref) in
   tr [
-    td [a ~a:[a_href (ref_url project id)] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
+    td [a ~a:[a_href ref_url] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
     td [status_list jobs];
     td [pcdata summary.descr];
   ]
 
-let pr_job (repo, id) open_pr =
+let pr_job (_repo, id) open_pr =
   let jobs = CI_engine.jobs open_pr in
   let summary = summarise jobs in
+  let pr_url = CI_target.path_v (CI_engine.target open_pr) in
   tr [
-    td [a ~a:[a_href (pr_url repo id)] [pcdata (string_of_int id)]];
+    td [a ~a:[a_href pr_url] [pcdata (string_of_int id)]];
     td [pcdata (CI_engine.title open_pr)];
     td [status_list jobs];
     td [pcdata summary.descr];
@@ -389,11 +379,7 @@ let html_of_user ~csrf_token ((job, label), log) =
   ] in
   let action = Printf.sprintf "/cancel/%s?%s" branch (Uri.encoded_of_query query) in
   let target, job_name = job in
-  let link =
-    match target with
-    | `Ref (repo, id) -> ref_url repo id
-    | `PR (repo, id)  -> pr_url repo id
-  in
+  let link = CI_target.path target in
   let reason = Fmt.strf "%a:%s%a" CI_target.pp target job_name pp_opt_label label in
   [
     br ();
@@ -661,11 +647,7 @@ let target_repo = function
   | `PR pr -> PR.repo pr
   | `Ref r -> Ref.repo r
 
-let target_page_url target =
-  let repo = target_repo target in
-  match target with
-  | `PR pr -> pr_url repo (PR.number pr)
-  | `Ref r -> ref_url repo (Ref.name r)
+let target_page_url = CI_target.path_v
 
 let target_page ~csrf_token ~target jobs t =
   let target = CI_engine.target target in

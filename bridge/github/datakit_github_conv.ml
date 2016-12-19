@@ -86,6 +86,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
         let added = match d with `Removed _ -> false | _ -> true in
         let t = match path with
           | [] | [_]             -> None
+          | [org; ".monitor"]    -> Some (`Org (Org.v org))
           | user :: repo :: path ->
             let repo = Repo.v ~user ~repo in
             let pr repo id = `PR (repo, int_of_string id) in
@@ -139,6 +140,35 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let empty = Datakit_path.empty
 
   let root r = empty / r.Repo.user / r.Repo.repo
+
+  (* Orgs *)
+
+  let org_monitor_file (o:Org.t) = empty / (o :> string) / ".monitor"
+
+  let org tree o =
+    safe_read_file tree (org_monitor_file o) >|= function
+    | None   -> None
+    | Some _ -> Some o
+
+  let reduce_orgs = List.fold_left Org.Set.union Org.Set.empty
+
+  let orgs tree =
+    safe_read_dir tree empty >>= fun orgs ->
+    Lwt_list.map_p (fun o ->
+        safe_read_file tree (empty / o / ".monitor") >|= function
+        | None   -> Org.Set.empty
+        | Some _ -> Org.Set.singleton (Org.v o)
+      ) orgs >|= fun orgs ->
+    let orgs = reduce_orgs orgs in
+    Log.debug (fun l -> l "orgs -> @;@[<2>%a@]" Org.Set.pp orgs);
+    orgs
+
+  let update_org tr o =
+    let file = org_monitor_file o in
+    lift_errors "update_org" @@
+    DK.Transaction.create_or_replace_file tr file (Cstruct.of_string "")
+
+  let remove_org t o = safe_remove t (org_monitor_file o)
 
   (* Repos *)
 
@@ -445,11 +475,12 @@ module Make (DK: Datakit_S.CLIENT) = struct
   (* Snapshot *)
 
   let snapshot_of_repos tree repos =
+    orgs tree >>= fun orgs ->
     commits ~repos tree >>= fun commits ->
     prs ~repos tree >>= fun prs ->
     statuses ~commits tree >>= fun status ->
     refs ~repos tree >|= fun refs ->
-    Snapshot.v ~repos ~status ~prs ~refs ~commits
+    Snapshot.v ~orgs ~repos ~status ~prs ~refs ~commits
 
   let snapshot_of_commit c =
     let tree = DK.Commit.tree c in
@@ -524,13 +555,19 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let find t (id:Elt.id) =
     match id with
+    | `Org id    -> org t id    >|= mapo (fun o -> `Org o)
     | `Repo id   -> repo t id   >|= mapo (fun r -> `Repo r)
     | `Commit id -> commit t id >|= mapo (fun c -> `Commit c)
     | `PR id     -> pr t id     >|= mapo (fun p -> `PR p)
-    | `Ref id    -> ref t id   >|= mapo (fun r -> `Ref r)
+    | `Ref id    -> ref t id    >|= mapo (fun r -> `Ref r)
     | `Status id -> status t id >|= mapo (fun s -> `Status s)
 
   (* Diffs *)
+
+  let combine_org t tree o =
+    org tree o >|= function
+    | None   -> Diff.with_remove (`Org o) t
+    | Some o -> Diff.with_update (`Org o) t
 
   let combine_repo t tree r =
     repo tree r >>= function
@@ -564,6 +601,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     let tree = DK.Commit.tree head in
     if Elt.IdSet.is_empty diff then Lwt.return Diff.empty
     else Lwt_list.fold_left_s (fun acc -> function
+        | `Org org   -> combine_org acc tree org
         | `Repo repo -> combine_repo acc tree repo
         | `PR id     -> combine_pr acc tree id
         | `Ref id    -> combine_ref acc tree id
@@ -642,6 +680,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       { head; snapshot; dirty }
 
   let remove_elt tr = function
+    | `Org o     -> remove_org tr o
     | `Repo repo -> remove_repo tr repo
     | `PR pr     -> remove_pr tr pr
     | `Ref r     -> remove_ref tr r
@@ -656,6 +695,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       safe_remove tr dir
 
   let update_elt tr = function
+    | `Org o    -> update_org tr o
     | `Repo r   -> update_repo tr r
     | `Commit c -> update_commit tr c
     | `PR pr    -> update_pr tr pr

@@ -66,6 +66,14 @@ end
 
 let pp_path = Fmt.(list ~sep:(unit "/") string)
 
+module Org = struct
+  type t = string
+  let v x = trim_and_validate x
+  let pp = Fmt.string
+  let compare = String.compare
+  module Set = Set(struct type t = string let compare = compare let pp = pp end)
+end
+
 module Repo = struct
 
   type t = { user: string; repo: string }
@@ -486,6 +494,7 @@ end
 module Elt = struct
 
   type t = [
+    | `Org of Org.t
     | `Repo of Repo.t
     | `Commit of Commit.t
     | `PR of PR.t
@@ -494,6 +503,7 @@ module Elt = struct
   ]
 
   let pp ppf = function
+    | `Org o    -> Org.pp ppf o
     | `Repo r   -> Repo.pp ppf r
     | `Commit c -> Commit.pp ppf c
     | `PR pr    -> PR.pp ppf pr
@@ -501,11 +511,14 @@ module Elt = struct
     | `Ref r    -> Ref.pp ppf r
 
   let compare x y = match x, y with
+    | `Org x  , `Org y     -> Org.compare x y
     | `Repo x  , `Repo y   -> Repo.compare x y
     | `Commit x, `Commit y -> Commit.compare x y
     | `PR x    , `PR y     -> PR.compare x y
     | `Status x, `Status y -> Status.compare x y
     | `Ref x   , `Ref y    -> Ref.compare x y
+    | `Org _, _    -> 1
+    | _, `Org _    -> -1
     | `Repo _  , _ -> 1
     | _, `Repo _   -> -1
     | `Commit _, _ -> 1
@@ -516,6 +529,7 @@ module Elt = struct
     | _, `Status _ -> -1
 
   type id = [
+    | `Org of Org.t
     | `Repo of Repo.t
     | `Commit of Commit.t
     | `PR of PR.id
@@ -524,6 +538,7 @@ module Elt = struct
   ]
 
   let id = function
+    | `Org o    -> `Org o
     | `Repo r   -> `Repo r
     | `Commit c -> `Commit c
     | `PR pr    -> `PR (PR.id pr)
@@ -531,6 +546,7 @@ module Elt = struct
     | `Ref r    -> `Ref (Ref.id r)
 
   let pp_id ppf = function
+    | `Org o    -> Org.pp ppf o
     | `Repo r   -> Repo.pp ppf r
     | `Commit c -> Commit.pp ppf c
     | `PR pr    -> PR.pp_id ppf pr
@@ -538,11 +554,14 @@ module Elt = struct
     | `Ref r    -> Ref.pp_id ppf r
 
   let compare_id x y = match x, y with
+    | `Org x   , `Org y    -> Org.compare x y
     | `Repo x  , `Repo y   -> Repo.compare x y
     | `Commit x, `Commit y -> Commit.compare x y
     | `PR x    , `PR y     -> PR.compare_id x y
     | `Status x, `Status y -> Status.compare_id x y
     | `Ref x   , `Ref y    -> Ref.compare_id x y
+    | `Org _   , _ -> 1
+    | _, `Org _    -> -1
     | `Repo _  , _ -> 1
     | _, `Repo _   -> -1
     | `Commit _, _ -> 1
@@ -558,6 +577,11 @@ module Elt = struct
         let pp = pp_id
         let compare = compare_id
       end)
+
+    let filter_orgs s =
+      fold
+        (fun e acc -> match e with `Org o -> Org.Set.add o acc | _ -> acc)
+        s Org.Set.empty
 
     let filter_repos s =
       fold
@@ -623,6 +647,7 @@ end
 module Snapshot = struct
 
   type t = {
+    orgs   : Org.Set.t;
     repos  : Repo.Set.t;
     commits: Commit.Set.t;
     status : Status.Set.t;
@@ -630,6 +655,7 @@ module Snapshot = struct
     refs   : Ref.Set.t;
   }
 
+  let orgs t = t.orgs
   let repos t = t.repos
   let status t = t.status
   let prs t = t.prs
@@ -637,13 +663,15 @@ module Snapshot = struct
   let commits t = t.commits
 
   let empty =
-    { repos = Repo.Set.empty;
+    { orgs = Org.Set.empty;
+      repos = Repo.Set.empty;
       commits = Commit.Set.empty;
       status = Status.Set.empty;
       prs = PR.Set.empty;
       refs = Ref.Set.empty }
 
   let is_empty s =
+    Org.Set.is_empty s.orgs &&
     Repo.Set.is_empty s.repos &&
     Commit.Set.is_empty s.commits &&
     Status.Set.is_empty s.status &&
@@ -651,6 +679,7 @@ module Snapshot = struct
     Ref.Set.is_empty s.refs
 
   let elts t =
+    let orgs = Org.Set.elements t.orgs |> List.map (fun x -> `Org x) in
     let repos = Repo.Set.elements t.repos |> List.map (fun x -> `Repo x) in
     let commits =
       Commit.Set.elements t.commits |> List.map (fun x -> `Commit x)
@@ -662,12 +691,13 @@ module Snapshot = struct
     let refs = Ref.Set.elements t.refs |> List.map (fun x -> `Ref x) in
     let (++) = Elt.Set.union in
     let (l) = Elt.Set.of_list in
-    l repos ++ l commits ++ l status ++ l prs ++ l refs
+    l orgs ++ l repos ++ l commits ++ l status ++ l prs ++ l refs
 
   let pp ppf t =
     if compare t empty = 0 then Fmt.string ppf "{}"
     else
-      Fmt.pf ppf "{%a%a%a%a%a}"
+      Fmt.pf ppf "{%a%a%a%a%a%a}"
+        (pp_set "orgs"    (module Org.Set)) t.orgs
         (pp_set "repos"   (module Repo.Set)) t.repos
         (pp_set "prs"     (module PR.Set)) t.prs
         (pp_set "refs"    (module Ref.Set)) t.refs
@@ -675,6 +705,7 @@ module Snapshot = struct
         (pp_set "status"  (module Status.Set)) t.status
 
   let union x y = {
+    orgs    = Org.Set.union x.orgs y.orgs;
     repos   = Repo.Set.union x.repos y.repos;
     commits = Commit.Set.union x.commits y.commits;
     status  = Status.Set.union x.status y.status;
@@ -682,7 +713,7 @@ module Snapshot = struct
     refs    = Ref.Set.union x.refs y.refs;
   }
 
-  let v ~repos ~commits ~status ~prs ~refs =
+  let v ~orgs ~repos ~commits ~status ~prs ~refs =
     let repos =
       let (++) = Repo.Set.union in
       repos ++ Commit.Set.repos commits ++ Status.Set.repos status
@@ -693,8 +724,9 @@ module Snapshot = struct
       commits ++ Status.Set.commits status ++ PR.Set.commits prs
       ++ Ref.Set.commits refs
     in
-    { repos; commits; status; prs; refs }
+    { orgs; repos; commits; status; prs; refs }
 
+  let compare_orgs x y = Org.Set.compare x.orgs y.orgs
   let compare_repos x y = Repo.Set.compare x.repos y.repos
   let compare_commits x y = Commit.Set.compare x.commits y.commits
   let compare_status x y = Status.Set.compare x.status y.status
@@ -702,6 +734,7 @@ module Snapshot = struct
   let compare_refs x y = Ref.Set.compare x.refs y.refs
 
   let compare = compare_fold [
+      compare_orgs;
       compare_repos;
       compare_commits;
       compare_status;
@@ -711,6 +744,7 @@ module Snapshot = struct
 
   type keep = { f: 'a . ('a -> Repo.t) -> 'a -> bool }
 
+  let with_org o t = { t with orgs = Org.Set.add o t.orgs }
   let with_repo r t = { t with repos = Repo.Set.add r t.repos }
 
   let without_repo_f keep t =
@@ -719,7 +753,9 @@ module Snapshot = struct
     let refs = Ref.Set.filter (keep.f Ref.repo) t.refs in
     let commits = Commit.Set.filter (keep.f Commit.repo) t.commits in
     let status = Status.Set.filter (keep.f Status.repo) t.status in
-    { repos; prs; refs; commits; status }
+    { orgs = t.orgs; repos; prs; refs; commits; status }
+
+  let without_org org t = { t with orgs = Org.Set.remove org t.orgs }
 
   let without_repo repo =
     without_repo_f { f = fun f r -> Repo.compare (f r) repo <> 0 }
@@ -771,6 +807,7 @@ module Snapshot = struct
   let with_ref r t = add_ref r (without_ref (Ref.id r) t)
 
   let with_elt e t = match e with
+    | `Org o    -> with_org o t
     | `Repo r   -> with_repo r t
     | `Commit c -> with_commit c t
     | `PR pr    -> with_pr pr t
@@ -778,6 +815,7 @@ module Snapshot = struct
     | `Status s -> with_status s t
 
   let without_elt e t = match e with
+    | `Org o    -> without_org o t
     | `Repo r   -> without_repo r t
     | `Commit c -> without_commit c t
     | `PR pr    -> without_pr pr t
@@ -860,7 +898,7 @@ module Snapshot = struct
       let status  = open_status in
       let prs     = open_prs in
       let commits = open_commits in
-      { repos; status; prs; refs; commits }
+      { orgs = Org.Set.empty; repos; status; prs; refs; commits }
     in
     Repo.Set.fold (fun r acc -> union acc (aux r)) t.repos empty
 
@@ -870,30 +908,32 @@ module Snapshot = struct
       (pp_field "remove" Elt.IdSet.pp) t.remove
 
   let diff x y =
-    let mk t repos skip_pr skip_ref skip_status skip_commit =
+    let mk t orgs repos skip_pr skip_ref skip_status skip_commit =
       let neg f x = not (f x) in
       let prs = PR.Set.filter (neg skip_pr) t.prs in
       let refs = Ref.Set.filter (neg skip_ref) t.refs in
       let status = Status.Set.filter (neg skip_status) t.status in
       let commits = Commit.Set.filter (neg skip_commit) t.commits in
-      { repos; prs; refs; commits; status }
+      { orgs; repos; prs; refs; commits; status }
     in
     let remove =
+      let orgs = Org.Set.diff y.orgs x.orgs in
       let repos = Repo.Set.diff y.repos x.repos in
       let skip_pr pr = PR.Set.exists (PR.same_id pr) x.prs in
       let skip_ref r = Ref.Set.exists (Ref.same_id r) x.refs in
       let skip_status s = Status.Set.exists (Status.same_id s) x.status in
       let skip_commit c = Commit.Set.exists (Commit.equal c) x.commits in
-      mk y repos skip_pr skip_ref skip_status skip_commit
+      mk y orgs repos skip_pr skip_ref skip_status skip_commit
       |> elts |> Elt.Set.ids
     in
     let update =
+      let orgs = Org.Set.diff x.orgs y.orgs in
       let repos = Repo.Set.diff x.repos y.repos in
       let skip_commit c = Commit.Set.mem c y.commits in
       let skip_pr pr = PR.Set.mem pr y.prs in
       let skip_ref r = Ref.Set.mem r y.refs in
       let skip_status s = Status.Set.mem s y.status in
-      mk x repos skip_pr skip_ref skip_status skip_commit
+      mk x orgs repos skip_pr skip_ref skip_status skip_commit
       |> elts
     in
     let r = { remove; update } in
@@ -952,6 +992,7 @@ module Capabilities = struct
   type op = [`Read | `Write | `Excl ]
 
   type resource = [
+    | `Org of string
     | `Repo of string list
     | `PR
     | `Commit
@@ -963,6 +1004,7 @@ module Capabilities = struct
   exception Error of string * string
 
   let pp_resource ppf = function
+    | `Org o     -> Fmt.pf ppf "org[%s]" o
     | `Repo []   -> Fmt.string ppf "repo"
     | `Repo p    -> Fmt.pf ppf "repo[%a]" pp_path p
     | `PR        -> Fmt.string ppf "pr"
@@ -992,6 +1034,7 @@ module Capabilities = struct
     | "*"       -> `Default
     | s         ->
       match parse_kv s with
+      | Some ("org", [o])  -> `Org o
       | Some ("status", l) -> `Status l
       | Some ("repo"  , l) -> `Repo l
       | _                  -> raise (Error (s, "invalid resource"))
@@ -1159,6 +1202,7 @@ module Capabilities = struct
     allowed
 
   let filter_aux t op = function
+    | `Org o    -> X.check (x t (`Org o)) op
     | `Commit _ -> X.check (x t `Commit) op
     | `PR _     -> X.check (x t `PR) op
     | `Ref _    -> X.check (x t `Ref) op
@@ -1167,11 +1211,11 @@ module Capabilities = struct
       X.check (x t (`Repo [repo; user])) op
 
   let filter_elt t op (e:Elt.t) = match e with
-    | `Commit _ | `PR _ | `Ref _ | `Repo _ as x -> filter_aux t op x
+    | `Org _ | `Commit _ | `PR _ | `Ref _ | `Repo _ as x -> filter_aux t op x
     | `Status s -> X.check (x t (`Status (Status.context s))) op
 
   let filter_elt_id t op (e:Elt.id) = match e with
-    | `Commit _ | `PR _ | `Ref _ | `Repo _ as x -> filter_aux t op x
+    | `Org _ | `Commit _ | `PR _ | `Ref _ | `Repo _ as x -> filter_aux t op x
     | `Status s -> X.check (x t (`Status (snd s))) op
 
   let filter_diff t op diff =
@@ -1205,6 +1249,7 @@ module type API = sig
     val run: t -> unit Lwt.t
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t
+    val watch_org: t -> Org.t -> unit Lwt.t
     val events: t -> Event.t list
     val wait: t -> unit Lwt.t
     val clear: t -> unit
@@ -1328,6 +1373,7 @@ module State (API: API) = struct
 
   (* Import http://github.com/usr/repo state. *)
   let import token t ids =
+    let orgs = Elt.IdSet.filter_orgs ids in
     let repos = Elt.IdSet.filter_repos ids in
     new_prs token repos >>= fun new_prs ->
     new_refs token repos >>= fun new_refs ->
@@ -1343,18 +1389,19 @@ module State (API: API) = struct
     in
     status_of_commits token new_commits >|= fun new_status ->
     let new_t =
-      Snapshot.v ~repos ~prs:new_prs ~refs:new_refs ~commits:new_commits
+      Snapshot.v ~orgs ~repos ~prs:new_prs ~refs:new_refs ~commits:new_commits
         ~status:new_status
     in
     Log.debug (fun l -> l "State.import %a@;@[<2>new:%a@]"
                   Repo.Set.pp repos Snapshot.pp new_t);
     let base = Snapshot.without_repos repos t in
+    let orgs = Org.Set.union (Snapshot.orgs t) orgs in
     let repos = Repo.Set.union (Snapshot.repos t) repos in
     let prs = PR.Set.union (Snapshot.prs base) new_prs in
     let refs = Ref.Set.union (Snapshot.refs base) new_refs in
     let commits = Commit.Set.union (Snapshot.commits base) new_commits in
     let status = Status.Set.union (Snapshot.status base) new_status in
-    Snapshot.v ~repos ~prs ~commits ~refs ~status
+    Snapshot.v ~orgs ~repos ~prs ~commits ~refs ~status
 
   let api_set_pr token pr =
     Log.info (fun l -> l "API.set-pr %a" PR.pp pr);
@@ -1407,13 +1454,23 @@ module State (API: API) = struct
     let status = Elt.Set.status (Diff.update diff) in
     Lwt_list.iter_p (api_set_status token) (Status.Set.elements status)
 
-  let add_webhooks token ~watch repos =
-    Log.debug (fun l -> l "[add_webhooks] repos: %a" Repo.Set.pp repos);
+  let add_repo_webhooks token ~watch repos =
+    Log.debug (fun l -> l "[add_repo_webhooks] repos: %a" Repo.Set.pp repos);
     Lwt_list.iter_p (fun r ->
-        Log.info (fun l -> l "API.add-webhook %a" Repo.pp r);
+        Log.info (fun l -> l "API.add-repo-webhook %a" Repo.pp r);
         if not (Capabilities.check token.c `Write `Webhook) then Lwt.return_unit
         else watch r
       ) (Repo.Set.elements repos)
+
+  let add_org_webhooks token ~watch orgs =
+    Log.debug (fun l -> l "[add_org_webhooks] orgs: %a" Org.Set.pp orgs);
+    Lwt_list.iter_p (fun o ->
+        Log.info (fun l -> l "API.add-org-webhook %a" Org.pp o);
+        if not (Capabilities.check token.c `Write `Webhook)
+        && not (Capabilities.check token.c `Write (`Org o))
+        then Lwt.return_unit
+        else watch o
+      ) (Org.Set.elements orgs)
 
   let import_webhook_events token ~events t =
     match events () with

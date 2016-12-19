@@ -42,6 +42,24 @@ module Status_state: sig
 
 end
 
+module Org: sig
+
+  type t = private string
+  (** The type for GitHub organisations. *)
+
+  val v: string -> t
+  (** [v org] is the organisation [org]. *)
+
+  val pp: string Fmt.t
+  (** [pp] is the pretty-printer for organisations. *)
+
+  val compare: string -> string -> int
+  (** [compare] compares organisations. *)
+
+  module Set: SET with type elt = t
+
+end
+
 module Repo: sig
 
   type t = private { user: string; repo: string }
@@ -371,6 +389,7 @@ end
 module Elt: sig
 
   type t = [
+    | `Org of Org.t
     | `Repo of Repo.t
     | `Commit of Commit.t
     | `PR of PR.t
@@ -382,6 +401,7 @@ module Elt: sig
   val compare: t -> t -> int
 
   type id = [
+    | `Org of Org.t
     | `Repo of Repo.t
     | `Commit of Commit.t
     | `PR of PR.id
@@ -389,6 +409,7 @@ module Elt: sig
     | `Ref of Ref.id
   ]
 
+  val id: t -> id
   val pp_id: id Fmt.t
   val compare_id: id -> id -> int
 
@@ -418,12 +439,13 @@ module Snapshot: sig
   val is_empty: t -> bool
   (** [is_empty t] is true if [t] is {!empty}. *)
 
-  val v:
+  val v: orgs:Org.Set.t ->
     repos:Repo.Set.t -> commits:Commit.Set.t -> status:Status.Set.t ->
     prs:PR.Set.t -> refs:Ref.Set.t -> t
-  (** [v ~repos ~commits ~status ~prs ~refs] is a new snapshot [t]
-      with repositories [reps], commits [commits], pull-requests
-      [prs], build statuses [status] and Git references [refs]. *)
+  (** [v ~orgs ~repos ~commits ~status ~prs ~refs] is a new snapshot
+      [t] with orgnasiations [orgs], repositories [reps], commits
+      [commits], pull-requests [prs], build statuses [status] and Git
+      references [refs]. *)
 
   val compare: t -> t -> int
   (** [compare] is the comparison function for snapshots. *)
@@ -448,8 +470,11 @@ module Snapshot: sig
   val elts: t -> Elt.Set.t
   (** [elts t] is the collection of elements of [t]. *)
 
+  val orgs: t -> Org.Set.t
+  (** [org t] are [t]'s organisations. *)
+
   val repos: t -> Repo.Set.t
-  (** [repos t] are [t]'s repository. *)
+  (** [repos t] are [t]'s repositories. *)
 
   val prs: t -> PR.Set.t
   (** [prs t] are [t]'s pull-requests. *)
@@ -557,6 +582,7 @@ module Capabilities: sig
   (** [pp_op] is the pretty-printer for resource operations. *)
 
   type resource = [
+    | `Org of string
     | `Repo of string list
     | `PR
     | `Commit
@@ -670,6 +696,10 @@ module type API = sig
     val watch: t -> Repo.t -> unit Lwt.t
     (** [watch t r] makes [t] watch the repo [r]. *)
 
+    val watch_org: t -> Org.t -> unit Lwt.t
+    (** [watch_org t o] watches all the repositories in [o] using
+        global organisation hooks. *)
+
     val events: t -> Event.t list
     (** [events t] is the list of events stored in [t]. *)
 
@@ -713,9 +743,15 @@ module State (API: API): sig
 
   (** {1 Webhooks} *)
 
-  val add_webhooks:
+  val add_repo_webhooks:
     token -> watch:(Repo.t -> unit Lwt.t) -> Repo.Set.t -> unit Lwt.t
-  (** [add_webhooks t rs] adds webhooks for the repositories [rs]. *)
+  (** [add_repo_webhooks t rs] adds webhooks for the repositories
+      [rs]. *)
+
+  val add_org_webhooks:
+    token -> watch:(Org.t -> unit Lwt.t) -> Org.Set.t -> unit Lwt.t
+  (** [add_org_webhooks t os] adds webhooks for the organisations
+      [os]. *)
 
   val import_webhook_events:
     token -> events:(unit ->  Event.t list) -> Snapshot.t -> Snapshot.t Lwt.t

@@ -95,8 +95,9 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
       Lwt.fail_with "init_sync"
 
   type webhook = {
-    watch : Repo.t -> unit Lwt.t;
-    events: unit -> Event.t list;
+    watch    : Repo.t -> unit Lwt.t;
+    watch_org: Org.t -> unit Lwt.t;
+    events   : unit -> Event.t list;
   }
 
   let commit t tr =
@@ -114,10 +115,11 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
       else safe_abort tr >|= fun () -> true
     )
 
-  let process_webhooks ~token ~webhook t repos = match webhook with
-    | None                   -> Lwt.return t.bridge
-    | Some { watch; events } ->
-      State.add_webhooks token ~watch repos >>= fun () ->
+  let process_webhooks ~token ~webhook t ~repos ~orgs = match webhook with
+    | None -> Lwt.return t.bridge
+    | Some { watch; watch_org; events } ->
+      State.add_repo_webhooks token ~watch:watch repos >>= fun () ->
+      State.add_org_webhooks token ~watch:watch_org orgs >>= fun () ->
       State.import_webhook_events token ~events t.bridge
 
   let update_datakit ?(retries=5) t tr =
@@ -145,8 +147,8 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     let bridge = Diff.apply diff t.bridge in
     { t with bridge }
 
-  let sync ~token ~webhook ~first_sync ~resync t repos tr =
-    process_webhooks ~token ~webhook t repos >>= fun bridge ->
+  let sync ~token ~webhook ~first_sync ~resync ~repos ~orgs t tr =
+    process_webhooks ~token ~webhook t ~repos ~orgs >>= fun bridge ->
     let dirty = Conv.dirty t.datakit in
     let to_import =
       let (++) = Elt.IdSet.union in
@@ -173,9 +175,10 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
   let first_sync ~token ~webhook ~resync br =
     create ~debug:"first-sync" ?old:None br >>= fun (tr, t) ->
     Log.debug (fun l -> l "[first_sync]@ %a" pp_state t);
+    let orgs = Snapshot.orgs (Conv.snapshot t.datakit) in
     let repos = Snapshot.repos (Conv.snapshot t.datakit) in
     if Repo.Set.is_empty repos then safe_abort tr >|= fun _ -> t
-    else sync ~token ~webhook ~first_sync:true ~resync t repos tr
+    else sync ~token ~webhook ~first_sync:true ~resync ~orgs ~repos t tr
 
   (* The main synchonisation function: it is called on every change in
      the datakit branch and when new webhook events are received. *)
@@ -187,7 +190,12 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
         (Snapshot.repos @@ Conv.snapshot t.datakit)
         (Snapshot.repos t.bridge)
     in
-    sync ~token ~webhook ~first_sync:false ~resync t repos tr
+    let orgs =
+      Org.Set.diff
+        (Snapshot.orgs @@ Conv.snapshot t.datakit)
+        (Snapshot.orgs t.bridge)
+    in
+    sync ~token ~webhook ~first_sync:false ~resync ~orgs ~repos t tr
 
   type t = State of state | Starting
 
@@ -201,6 +209,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     | None   -> None, fun _ -> fst (Lwt.task ())
     | Some w ->
       let watch r = API.Webhook.watch w r in
+      let watch_org o = API.Webhook.watch_org w o in
       let events () =
         let e = API.Webhook.events w in
         API.Webhook.clear w;
@@ -217,7 +226,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
           wait s
         ]
       in
-      Some {watch; events}, run
+      Some {watch; watch_org; events}, run
 
   let run ~webhook ?resync_interval ?switch ~token br t policy =
     let webhook, run_webhook = process_webhook webhook in

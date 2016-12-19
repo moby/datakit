@@ -466,5 +466,6 @@ module Webhook = struct
   ]
 
   let watch t r = watch t ~events:default_events (of_repo r)
+  let watch_org t (o:Org.t) = watch_org t ~events:default_events (o :> string)
 
 end

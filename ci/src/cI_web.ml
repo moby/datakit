@@ -169,8 +169,7 @@ class ref_page t = object(self)
   method private render rd =
     let user = Rd.lookup_path_info_exn "user" rd in
     let repo = Rd.lookup_path_info_exn "repo" rd in
-    let id = Rd.lookup_path_info_exn "id" rd in
-    let id = CI_target.unescape_ref id in
+    let id = CI_target.unescape_ref rd.Rd.dispatch_path in
     let repo = Repo.v ~user ~repo in
     let refs = CI_engine.refs t.ci in
     match Repo.Map.find repo refs with
@@ -278,7 +277,7 @@ let routes ~logs ~ci ~server ~dashboards =
     ("tag",             fun () -> new tag_list t);
     (* Individual targets *)
     (":user/:repo/pr/:id",     fun () -> new pr_page t);
-    (":user/:repo/ref/:id",    fun () -> new ref_page t);
+    (":user/:repo/ref/*",      fun () -> new ref_page t);
 
     (* Logs *)
     ("log/live/:branch",                        fun () -> new live_log_page t);

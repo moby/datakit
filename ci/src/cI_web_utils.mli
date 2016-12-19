@@ -1,10 +1,11 @@
 module Wm : Webmachine.S with type 'a io = 'a Lwt.t
 
-type role = [`Reader | `LoggedIn | `Builder]
+type role = [`Reader | `LoggedIn | `Builder | `Admin]
 (** Roles are:
     - [Reader] permitted to look at the CI state, build logs, etc
     - [LoggedIn] must be logged in (not anonymous)
     - [Builder] permitted to control the builds (cancel, rebuild)
+    - [Admin] is an administrator
 *)
 
 module User : sig
@@ -21,9 +22,10 @@ module Auth : sig
     callback : Uri.t option;
   }
 
-  val create : ?github:github_auth -> string -> t Lwt.t
-  (** [create path] is a user authenticator with configuration at [path]. If [path] does not exist, the
-      user is prompted to create one. *)
+  val create : ?github:github_auth -> web_ui:Uri.t -> string -> t Lwt.t
+  (** [create ~web_ui passwd_file] is a user authenticator with configuration at [passwd_file].
+      If [passwd_file] does not exist, a one-time configuration URL under [web_ui] is printed
+      to the logs. [passwd_file] must be an absolute path. *)
 
   val lookup : t -> user:string -> password:string -> User.t option
   (** [lookup t (username, password)] returns the user with name [username] if the user exists and
@@ -68,6 +70,12 @@ class virtual resource_with_session : server -> object
 class login_page : server -> resource
 (** Page to serve at [/auth/login]. *)
 
+class auth_intro : server -> resource
+(** Page to serve at [/auth/intro/:token]. *)
+
+class auth_setup : server -> resource
+(** Page to serve at [/auth/setup]. *)
+
 class github_callback : server -> resource
 (** Page to serve at [/auth/github-callback] *)
 
@@ -100,3 +108,10 @@ val serve :
   routes:(string * (unit -> Cohttp_lwt_body.t Wm.resource)) list ->
   unit Lwt.t
 (** [serve ~mode ~routes] runs a web-server listening on [mode] that dispatches incoming requests using [routes]. *)
+
+class virtual html_page : server -> object
+    inherit protected_page
+    method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt_body.t) Wm.op
+    method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
+    method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+  end

@@ -40,6 +40,12 @@ end
 val login_page :
   ?github:Uri.t ->
   csrf_token:string ->
+  is_configured:bool ->
+  t ->
+  page
+
+val auth_setup :
+  csrf_token:string ->
   t ->
   page
 

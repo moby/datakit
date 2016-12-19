@@ -14,31 +14,8 @@ type t = {
   dashboards : CI_target.Set.t Repo.Map.t;
 }
 
-class virtual http_page t = object(self)
-  inherit CI_web_utils.protected_page t.server
-
-  method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt_body.t) Wm.op
-
-  method content_types_provided rd =
-    Wm.continue [
-      "text/html" , self#to_html;
-    ] rd
-
-  method content_types_accepted rd =
-    Wm.continue [] rd
-
-  method private to_html rd =
-    self#render rd >>= fun (resp, rd) ->
-    match resp with
-    | Wm.Error _ as e -> Lwt.return (e, rd)
-    | Wm.Ok html ->
-      let user = self#authenticated_user in
-      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user (CI_web_utils.web_config t.server)) in
-      Wm.continue (`String body) rd
-end
-
 class user_page t = object(self)
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`LoggedIn]
 
@@ -49,7 +26,7 @@ class user_page t = object(self)
 end
 
 class main t = object(self)
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -60,7 +37,7 @@ class main t = object(self)
 end
 
 class error t = object
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = []
 
@@ -114,7 +91,7 @@ class metrics t = object(self)
 end
 
 class pr_list t = object
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -122,7 +99,7 @@ class pr_list t = object
 end
 
 class branch_list t = object
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -130,7 +107,7 @@ class branch_list t = object
 end
 
 class tag_list t = object
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -138,7 +115,7 @@ class tag_list t = object
 end
 
 class pr_page t = object(self)
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -162,7 +139,7 @@ class pr_page t = object(self)
 end
 
 class ref_page t = object(self)
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -185,7 +162,7 @@ class ref_page t = object(self)
 end
 
 class live_log_page t = object
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -204,7 +181,7 @@ class live_log_page t = object
 end
 
 class saved_log_page t = object
-  inherit http_page t
+  inherit CI_web_utils.html_page t.server
 
   method private required_roles = [`Reader]
 
@@ -266,10 +243,12 @@ let routes ~logs ~ci ~server ~dashboards =
   let t = { logs; ci; server; dashboards } in
   [
     (* Auth *)
-    ("/auth/login",     fun () -> new CI_web_utils.login_page t.server);
-    ("/auth/logout",    fun () -> new CI_web_utils.logout_page t.server);
-    ("/auth/github-callback",    fun () -> new CI_web_utils.github_callback t.server);
-    ("/user/profile",   fun () -> new user_page t);
+    ("auth/intro/:token", fun () -> new CI_web_utils.auth_intro t.server);
+    ("auth/setup",     fun () -> new CI_web_utils.auth_setup t.server);
+    ("auth/login",     fun () -> new CI_web_utils.login_page t.server);
+    ("auth/logout",    fun () -> new CI_web_utils.logout_page t.server);
+    ("auth/github-callback",    fun () -> new CI_web_utils.github_callback t.server);
+    ("user/profile",   fun () -> new user_page t);
     (* Overview pages *)
     ("/",               fun () -> new main t);
     ("pr",              fun () -> new pr_list t);

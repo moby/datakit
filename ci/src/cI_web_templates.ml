@@ -405,14 +405,8 @@ let resource_pools ~csrf_token =
     items
   )
 
-let field descr ty name =
-  let id = "field-" ^ name in
-  div ~a:[a_class ["form-group"]] [
-    label ~a:[a_label_for id] [pcdata descr];
-    input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name] ()
-  ]
-
-let login_page ?github ~csrf_token ~is_configured t ~user =
+let login_page ?github ~csrf_token state ~is_configured t ~user =
+  let field = CI_form.Html.field state in
   let query = [
     "CSRFToken", [csrf_token];
   ] in
@@ -439,7 +433,7 @@ let login_page ?github ~csrf_token ~is_configured t ~user =
   in
   page "Login" Nav.Home ~user ([
     h2 [pcdata "Login"];
-    form ~a:[a_class ["login-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
+    CI_form.Html.form state ~form_class:["login-form"] ~action [
       field "Username" `Text "user";
       field "Password" `Password "password";
       div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
@@ -447,13 +441,14 @@ let login_page ?github ~csrf_token ~is_configured t ~user =
     github_login;
   ] @ warnings) t
 
-let auth_setup ~csrf_token =
+let auth_setup ~csrf_token state =
+  let field = CI_form.Html.field state in
   let query = [
     "CSRFToken", [csrf_token];
   ] in
   let action = Printf.sprintf "/auth/setup?%s" (Uri.encoded_of_query query) in
   page "Auth Setup" Nav.Home [
-    form ~a:[a_class ["auth-setup-form"]; a_action action; a_method `Post; a_enctype "multipart/form-data"] [
+    CI_form.Html.form state ~form_class:["auth-setup-form"] ~action [
       div ~a:[a_class ["form-group"]] [
         label ~a:[a_label_for "user"] [pcdata "Username"];
         input ~a:[a_class ["form-control"]; a_id "user"; a_input_type `Text;

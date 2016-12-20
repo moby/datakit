@@ -685,16 +685,22 @@ class virtual html_page t = object(self)
       Wm.continue (`String body) rd
 end
 
-class virtual form_page t = object(self)
-  inherit html_page t
+class virtual ['a] form_page t = object(self)
+  inherit protected_page t
 
-  method virtual private receive :
-    [`File of Multipart.file | `String of string] Multipart.StringMap.t -> Cohttp_lwt_body.t Wm.acceptor
+  method virtual private render : csrf_token:string -> CI_form.State.t -> CI_web_templates.t -> CI_web_templates.page
+  method virtual private validate : 'a CI_form.Validator.t
+  method virtual private process : 'a -> Cohttp_lwt_body.t Wm.acceptor
 
   method! allowed_methods rd =
     Wm.continue [`GET; `POST] rd
 
-  method! content_types_accepted rd =
+  method content_types_provided rd =
+    Wm.continue [
+      "text/html" , self#to_html;
+    ] rd
+
+  method content_types_accepted rd =
     Wm.continue [
       "application/x-www-form-urlencoded", (fun _ -> assert false);
     ] rd
@@ -714,88 +720,83 @@ class virtual form_page t = object(self)
         let body = rd.Wm.Rd.req_body in
         Multipart.parse_stream ~stream:(Cohttp_lwt_body.to_stream body) ~content_type >>= fun parts ->
         Multipart.get_parts parts >>= fun parts ->
-        self#receive parts rd
+        match CI_form.Validator.run self#validate parts with
+        | Ok data -> self#process data rd
+        | Error state ->
+          self#html_of_form state rd >>= fun body ->
+          Wm.respond 400 ~body:(`String body) rd
+
+  method private html_of_form state rd =
+    self#session rd >|= fun session_data ->
+    let csrf_token = Session_data.csrf_token session_data in
+    let user = self#authenticated_user in
+    let html = self#render ~csrf_token state ~user (web_config t) in
+    Fmt.to_to_string (Tyxml.Html.pp ()) html
+
+  method private to_html rd =
+    self#html_of_form CI_form.State.empty rd >>= fun body ->
+    Wm.continue (`String body) rd
 end
 
 class auth_setup t =
-  let parse_form parts =
-      let get name =
-        match Multipart.StringMap.find name parts with
-        | `String s -> Ok s
-        | `File _ -> Error "File upload in form!"
-        | exception Not_found -> Error (Printf.sprintf "Missing %S in form submission" name)
-      in
-      match get "password", get "password2" with
-      | Ok "", Ok "" -> Error "Passwords cannot be blank"
-      | Ok p1, Ok p2 when p1 = p2 -> Ok p1
-      | Ok _, Ok _ -> Error "Passwords don't match"
-      | (Error _ as e), _ -> e
-      | _, (Error _ as e) -> e
-  in
   object(self)
-    inherit form_page t
+    inherit [string] form_page t
 
     method private required_roles = [`Admin]
 
-    method private render rd =
-      self#session rd >>= fun session_data ->
-      let csrf_token = Session_data.csrf_token session_data in
-      Wm.continue (CI_web_templates.auth_setup ~csrf_token) rd
+    method private render = CI_web_templates.auth_setup
 
-    method private receive parts rd =
-      match parse_form parts with
+    method private validate =
+      let open CI_form.Validator in
+      get "password" non_empty >>!= fun password ->
+      get "password2" (confirm password) >>!= fun () ->
+      maybe password
+
+    method private process password rd =
+      Auth.initialise_local_users t.auth ~password >>= function
       | Error e -> Wm.respond 400 ~body:(`String e) rd
-      | Ok password ->
-        Auth.initialise_local_users t.auth ~password >>= function
-        | Error e -> Wm.respond 400 ~body:(`String e) rd
-        | Ok () ->
-          self#session rd >>= fun session_data ->
-          let session = { session_data with Session_data.
-                                         username = None;
-                                         attrs = Auth.empty_attrs;
-                                         login_redirect = Some "/";
-                        } in
-          self#session_set (Session_data.to_string session) rd >>= fun () ->
-          Wm.respond 303 (Wm.Rd.redirect "/auth/login" rd)
+      | Ok () ->
+        self#session rd >>= fun session_data ->
+        let session = { session_data with Session_data.
+                                       username = None;
+                                       attrs = Auth.empty_attrs;
+                                       login_redirect = Some "/";
+                      } in
+        self#session_set (Session_data.to_string session) rd >>= fun () ->
+        Wm.respond 303 (Wm.Rd.redirect "/auth/login" rd)
   end
 
 class login_page t = object(self)
-  inherit form_page t
+  inherit [string] form_page t
 
   method private required_roles = []
 
-  method private render rd =
-    self#session rd >>= fun {Session_data.csrf_token; _} ->
+  method private render ~csrf_token state =
     let github = Auth.github_login_url ~csrf_token t.auth in
     let is_configured = Auth.is_configured t.auth in
-    Wm.continue (CI_web_templates.login_page ?github ~csrf_token ~is_configured) rd
+    CI_web_templates.login_page ?github ~csrf_token state ~is_configured
 
-  method private receive parts rd =
-    let get name =
-      match Multipart.StringMap.find name parts with
-      | `String s -> Ok s
-      | `File _ -> Error "File upload in form!"
-      | exception Not_found -> Error (Printf.sprintf "Missing %S in form submission" name)
-    in
-    match get "user", get "password" with
-    | Error msg, _ -> Wm.respond 403 ~body:(`String msg) rd
-    | Ok _, Error msg -> Wm.respond 403 ~body:(`String msg) rd
-    | Ok user, Ok password ->
-      match Auth.lookup t.auth ~user ~password with
-      | Some _ ->
-        CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
-        self#session rd >>= fun session_data ->
-        let session = {session_data with Session_data.username = Some user} in
-        self#session_set (Session_data.to_string session) rd >>= fun () ->
-        begin match session.Session_data.login_redirect with
-          | None -> Lwt.return "/"
-          | Some redirect ->
-            let value = {session with Session_data.login_redirect = None} in
-            self#session_set (Session_data.to_string value) rd >>= fun () ->
-            Lwt.return redirect
-        end >>= fun redirect ->
-        Wm.continue true (Wm.Rd.redirect redirect rd)
-      | None ->
-        CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
-        Wm.respond 403 ~body:(`String "Invalid username/password") rd
+  method private validate =
+    let open CI_form.Validator in
+    get "user" non_empty <*> get "password" string >>!= fun (user, password) ->
+    match Auth.lookup t.auth ~user ~password with
+    | None ->
+      CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
+      fail "login" ~msg:"Invalid username/password"
+    | Some _ ->
+      CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
+      maybe user
+
+  method private process user rd =
+    self#session rd >>= fun session_data ->
+    let session = {session_data with Session_data.username = Some user} in
+    self#session_set (Session_data.to_string session) rd >>= fun () ->
+    begin match session.Session_data.login_redirect with
+      | None -> Lwt.return "/"
+      | Some redirect ->
+        let value = {session with Session_data.login_redirect = None} in
+        self#session_set (Session_data.to_string value) rd >>= fun () ->
+        Lwt.return redirect
+    end >>= fun redirect ->
+    Wm.continue true (Wm.Rd.redirect redirect rd)
 end

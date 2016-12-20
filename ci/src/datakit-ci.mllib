@@ -5,6 +5,7 @@ CI_cache
 CI_config
 CI_engine
 CI_eval
+CI_form
 CI_live_log
 CI_log_reporter
 CI_main

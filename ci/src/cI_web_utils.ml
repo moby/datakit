@@ -197,7 +197,7 @@ module Auth = struct
     if Sys.file_exists passwd_file then (
       load_local_users passwd_file >|= fun db -> `Configured db
     ) else (
-      let token = B64.(encode ~alphabet:uri_safe_alphabet) (Nocrypto.Rng.generate 16 |> Cstruct.to_string) in
+      let token = B64.(encode ~alphabet:uri_safe_alphabet) (Nocrypto.Rng.generate 24 |> Cstruct.to_string) in
       let setup_url = Uri.with_path web_ui ("/auth/intro/" ^ token) in
       Log.app (fun f -> f ">>> Configure the CI by visiting@\n%a" Uri.pp_hum setup_url);
       Lwt.return (`Config_token token)

@@ -377,7 +377,7 @@ class static ~valid ~mime_type dir =
       Wm.continue [] rd
 
     method private data rd =
-      (* Reload each time to make testing easier *)
+      (* Reload each time to make testing easier. *)
       let ( / ) = Filename.concat in
       let name = Wm.Rd.lookup_path_info_exn "name" rd in
       if Str.string_match valid name 0 then (

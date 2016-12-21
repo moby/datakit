@@ -1,7 +1,6 @@
 FROM docker/datakit:ci
-RUN sudo apk add docker
-RUN opam pin add protocol-9p.0.7.4 https://github.com/mirage/ocaml-9p.git#v0.7.4
-RUN opam pin add datakit-ci https://github.com/talex5/datakit.git#snap21
+RUN sudo apk add docker certbot
+RUN opam pin add datakit-ci https://github.com/talex5/datakit.git#snap34
 
 ADD . /datakit-ci
 WORKDIR /datakit-ci

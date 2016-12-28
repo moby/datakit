@@ -192,21 +192,7 @@ This allows you to run various downloading, building and testing operations in p
 
 ## GitHub login
 
-You can configure the CI to allow users to authenticate using their GitHub accounts. To do this:
-
-1. Go to <https://github.com/settings/applications/new> and register your CI.
-   Give the callback URL as <https://HOST:PORT/auth/github-callback> (you can use `localhost` for testing).
-
-2. Save the resulting tokens in a JSON file called `github.json` in your `secrets` directory.
-
-The format of the JSON file is:
-
-    {
-        "client-id": "xxxxxxxxxxxxxxxxxxxx",
-        "client-secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    }
-
-You can also specify `callback` here, if you want to override the one configured above. This might be useful if you have several CI instances using a single `client-id`.
+You can configure the CI to allow users to authenticate using their GitHub accounts using the `Settings` tab.
 
 Once GitHub authentication is configured, you can write policies that depend on GitHub permissions. e.g.
 

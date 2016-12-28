@@ -1,3 +1,4 @@
+open Sexplib.Std
 open CI_utils
 open Lwt.Infix
 
@@ -7,9 +8,27 @@ type t = {
   secrets_dir : string;
 }
 
+type github_auth = {
+  client_id : string;
+  client_secret : string;
+  callback : Uri.t option;
+} [@@deriving sexp]
+
+class type ['a] disk_secret = object
+  method read : 'a option Lwt.t
+  method write : 'a option -> unit Lwt.t
+end
+
+type 'a secret = {
+  mutable value : 'a option;
+  conv : 'a disk_secret;
+  lock : Lwt_mutex.t;
+}
+
 let private_key_path t = t.secrets_dir / "server.key"
 let certificate_path t = t.secrets_dir / "server.crt"
 let passwords_path t = t.secrets_dir / "passwords.sexp"
+let github_auth_path t = t.secrets_dir / "github.sexp"
 
 let get_private_key ~key_bits path =
   if Sys.file_exists path then (
@@ -43,28 +62,41 @@ let ensure_crt ~private_key path =
     Lwt_io.with_file ~mode:Lwt_io.output path (fun ch -> Lwt_io.write ch data)
   )
 
+let secret conv =
+  conv#read >|= fun value ->
+  let lock = Lwt_mutex.create () in
+  { value; conv; lock }
+
+let const value =
+  let conv = object method read = assert false method write = failwith "const" end in
+  let lock = Lwt_mutex.create () in
+  { value; conv; lock }
+
 let github_auth t =
-  let path = t.secrets_dir / "github.json" in
-  match Sys.file_exists path with
-  | false -> None
-  | true ->
-    try
-      let json = Yojson.Basic.from_file path in
-      let module U = Yojson.Basic.Util in
-      let member s =
-        try json |> U.member s |> U.to_string
-        with ex -> failwith (Fmt.strf "Error getting %S member: %a" s pp_exn ex)
-      in
-      let client_id = member "client-id" in
-      let client_secret = member "client-secret" in
-      let callback =
-        match U.member "callback" json with
-        | `Null -> None
-        | x -> Some (U.to_string x |> Uri.of_string)
-      in
-      Some { CI_web_utils.Auth.client_id; client_secret; callback }
-    with ex ->
-      failwith (Fmt.strf "Error reading %S:@,%a" path pp_exn ex)
+  let path = github_auth_path t in
+  secret @@ object
+    method read =
+      match Sys.file_exists path with
+      | false -> Lwt.return None
+      | true ->
+        Lwt_io.with_file ~mode:Lwt_io.input path (fun ch -> Lwt_io.read ch) >|= fun data ->
+        Some (github_auth_of_sexp (Sexplib.Sexp.of_string data))
+
+    method write = function
+      | None ->
+        if Sys.file_exists path then Unix.unlink path;
+        Lwt.return_unit
+      | Some settings ->
+        let data = Sexplib.Sexp.to_string (sexp_of_github_auth settings) in
+        Lwt_io.with_file ~mode:Lwt_io.output path (fun ch -> Lwt_io.write ch data)
+  end
+
+let get secret = secret.value
+
+let set secret value =
+  Lwt_mutex.with_lock secret.lock @@ fun () ->
+  secret.conv#write value >|= fun () ->
+  secret.value <- value
 
 let create ~key_bits secrets_dir =
   let t = { secrets_dir } in

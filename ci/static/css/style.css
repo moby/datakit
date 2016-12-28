@@ -118,3 +118,7 @@ span.status {
 table.results span.status {
   margin-right: 8px;
 }
+
+div.github-auth {
+  max-width: 40em;
+}

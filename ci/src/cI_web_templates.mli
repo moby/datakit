@@ -109,3 +109,15 @@ val error_page :
   string ->
   t ->
   page
+
+module Settings : sig
+  val index :
+    t ->
+    page
+
+  val github_auth :
+    csrf_token:string ->
+    CI_form.State.t ->
+    t ->
+    page
+end

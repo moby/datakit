@@ -158,15 +158,9 @@ module Auth = struct
     can_read_github : (Repo.t * bool) list;
   } [@@deriving sexp]
 
-  type github_auth = {
-    client_id : string;
-    client_secret : string;
-    callback : Uri.t option;
-  }
-
   type t = {
     passwd_file : string;
-    github : github_auth option;
+    github : CI_secrets.github_auth CI_secrets.secret;
     mutable local_users : [`Configured of User.t String.Map.t | `Config_token of string];
   }
 
@@ -230,7 +224,7 @@ module Auth = struct
       t.local_users <- `Configured local_users;
       Lwt.return @@ Ok ()
 
-  let create ?github ~web_ui passwd_file =
+  let create ~github ~web_ui passwd_file =
     if Filename.is_relative passwd_file then CI_utils.failf "Path %S is relative" passwd_file;
     try_load_local_users ~web_ui ~passwd_file >>= fun local_users ->
     Lwt.return { passwd_file; github; local_users }
@@ -238,23 +232,23 @@ module Auth = struct
   let scopes = [`Read_org; `Repo]
 
   let github_login_url ~csrf_token t =
-    match t.github with
+    match CI_secrets.get t.github with
     | None -> None
     | Some github ->
       let url = Github.URI.authorize
           ~scopes
-          ~client_id:github.client_id
-          ?redirect_uri:github.callback
+          ~client_id:github.CI_secrets.client_id
+          ?redirect_uri:github.CI_secrets.callback
           ~state:csrf_token
           ()
       in
       Some url
 
   let handle_github_callback t ~code ~repos =
-    match t.github with
+    match CI_secrets.get t.github with
     | None -> Lwt.return @@ Error "GitHub auth is not configured!"
     | Some github ->
-      Github.Token.of_code ~client_id:github.client_id ~client_secret:github.client_secret ~code () >>= function
+      Github.Token.of_code ~client_id:github.CI_secrets.client_id ~client_secret:github.CI_secrets.client_secret ~code () >>= function
        | None -> Lwt.return @@ Error "Token.of_code failed (no further information available)"
        | Some token ->
          Github.Monad.run (Github.User.current_info ~token ()) >>= fun resp ->
@@ -688,6 +682,7 @@ end
 class virtual ['a] form_page t = object(self)
   inherit protected_page t
 
+  method virtual private default : CI_form.State.t Lwt.t
   method virtual private render : csrf_token:string -> CI_form.State.t -> CI_web_templates.t -> CI_web_templates.page
   method virtual private validate : 'a CI_form.Validator.t
   method virtual private process : 'a -> Cohttp_lwt_body.t Wm.acceptor
@@ -734,7 +729,8 @@ class virtual ['a] form_page t = object(self)
     Fmt.to_to_string (Tyxml.Html.pp ()) html
 
   method private to_html rd =
-    self#html_of_form CI_form.State.empty rd >>= fun body ->
+    self#default >>= fun state ->
+    self#html_of_form state rd >>= fun body ->
     Wm.continue (`String body) rd
 end
 
@@ -743,6 +739,8 @@ class auth_setup t =
     inherit [string] form_page t
 
     method private required_roles = [`Admin]
+
+    method private default = Lwt.return CI_form.State.empty
 
     method private render = CI_web_templates.auth_setup
 
@@ -770,6 +768,8 @@ class login_page t = object(self)
   inherit [string] form_page t
 
   method private required_roles = []
+
+  method private default = Lwt.return CI_form.State.empty
 
   method private render ~csrf_token state =
     let github = Auth.github_login_url ~csrf_token t.auth in
@@ -799,4 +799,40 @@ class login_page t = object(self)
         Lwt.return redirect
     end >>= fun redirect ->
     Wm.continue true (Wm.Rd.redirect redirect rd)
+end
+
+class github_auth_settings t = object
+  inherit [CI_secrets.github_auth option] form_page t
+
+  method private required_roles = [`Admin]
+
+  method private default =
+    Lwt.return @@
+      match CI_secrets.get t.auth.Auth.github with
+      | None -> CI_form.State.empty
+      | Some {CI_secrets.client_id; client_secret = _; callback} ->
+        let values = ["client-id", client_id] in
+        let values =
+          match callback with
+          | None -> values
+          | Some callback -> ("callback", Uri.to_string callback) :: values
+        in
+        CI_form.State.of_values values
+
+  method private validate =
+    let open CI_form.Validator in
+    get "client-id" (optional string) <*> get "client-secret" (optional string) <*> get "callback" (optional uri)
+    >>!= function
+    | (None, None), None -> maybe None
+    | (Some client_id, Some client_secret), callback ->
+      maybe (Some { CI_secrets.client_id; client_secret; callback })
+    | (None, Some _), _ -> fail "client-id" ~msg:"Client ID must be set if the secret is"
+    | (None, _), Some _ -> fail "client-id" ~msg:"Client ID must be set if the callback is"
+    | (Some _, None), _ -> fail "client-secret" ~msg:"Client Secret must be provided if Client ID is"
+
+  method private process config rd =
+    CI_secrets.set t.auth.Auth.github config >>= fun () ->
+    Wm.continue true (Wm.Rd.redirect "/auth/login" rd)
+
+  method private render = CI_web_templates.Settings.github_auth
 end

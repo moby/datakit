@@ -5,10 +5,8 @@ true: package(astring, cmdliner, fmt.tty, logs.fmt, fmt.cli, logs.cli)
 true: package(cohttp.lwt)
 true: package(tyxml, webmachine, session.webmachine, session.redis-lwt, multipart-form-data)
 true: package(tls, channel, conduit.lwt-unix, io-page.unix)
-true: package(pbkdf, sexplib)
+true: package(pbkdf, sexplib, ppx_sexp_conv)
 true: package(asetmap)
 true: package(github.unix datakit-github.client)
-
-<src/cI_web_utils.*> or <src/cI_projectID.*>: package(ppx_sexp_conv)
 
 <src>: include

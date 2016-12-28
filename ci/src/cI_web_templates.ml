@@ -209,6 +209,8 @@ let pr_job (_repo, id) open_pr =
 
 let heading x = th [pcdata x]
 
+let url x =
+  a ~a:[a_href x] [pcdata x]
 
 module Nav = struct
   type t =
@@ -216,12 +218,14 @@ module Nav = struct
     | PRs
     | Branches
     | Tags
+    | Settings
 
   let to_string = function
     | Home -> "Home"
     | PRs -> "PRs"
     | Branches -> "Branches"
     | Tags -> "Tags"
+    | Settings -> "Settings"
 end
 
 let build_navbar active =
@@ -234,6 +238,7 @@ let build_navbar active =
     item PRs "/pr";
     item Branches "/branch";
     item Tags "/tag";
+    item Settings "/settings";
   ]
 
 let page ?logs page_title active children t ~user =
@@ -796,3 +801,44 @@ let error_page id =
         p [pcdata (Printf.sprintf "Unknown error code %S" id)]
       ]
   )
+
+module Settings = struct
+  let index =
+    page "Settings" Nav.Settings [
+      ul [
+        li [
+          a ~a:[a_href "/settings/github-auth"] [pcdata "Configure GitHub authentication"]
+        ]
+      ]
+    ]
+
+  let github_auth ~csrf_token state =
+    let action = "/settings/github-auth" in
+    let field = CI_form.Html.field state in
+    page "GitHub authentication" Nav.Settings [
+      div ~a:[a_class ["github-auth"]] [
+        h2 [pcdata "GitHub authentication"];
+        p [pcdata "You can configure the CI to allow users to authenticate using their GitHub accounts. To do this:"];
+        ol [
+          li [
+            p [pcdata "Go to "; url "https://github.com/settings/applications/new"; pcdata " and register your CI. "];
+            p [pcdata "Give the callback URL as <https://HOST:PORT/auth/github-callback> \
+                       (you can use 'localhost' for testing)."];
+          ];
+          li [
+            p [pcdata "Enter the Client ID and Client Secret below."];
+            p [pcdata
+                 "You can also specify a callback here, if you want to override the one you registered with GitHub above. \
+                  This might be useful if you have several CI instances using a single Client ID.";
+              ]
+          ]
+        ];
+        CI_form.Html.form ~csrf_token state ~form_class:["github-auth"] ~action [
+          field "Client ID" `Text "client-id";
+          field "Client Secret" `Password "client-secret";
+          field "Callback (optional)" `Url "callback";
+          div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Submit"]];
+        ];
+      ]
+    ]
+end

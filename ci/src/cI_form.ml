@@ -25,6 +25,15 @@ module State = struct
 
   let bindings t =
     Multipart.StringMap.bindings !t
+
+  let of_values vs =
+    let map =
+      List.fold_left (fun acc (key, data) ->
+          let field = { data = Some data; error = None } in
+          Multipart.StringMap.add key field acc
+        ) Multipart.StringMap.empty vs
+    in
+    ref map
 end
 
 module Html = struct
@@ -87,6 +96,8 @@ end
 module Validator = struct
   type 'a t = data -> string Multipart.StringMap.t -> ('a, string Multipart.StringMap.t) result
 
+  type 'a reader = string -> 'a or_error
+
   let maybe v _ acc =
     if Multipart.StringMap.is_empty acc then Ok v
     else Error acc
@@ -112,9 +123,20 @@ module Validator = struct
     | "" -> Error "Cannot be empty"
     | s -> Ok s
 
+  let uri x =
+    try Ok (Uri.of_string x)
+    with ex -> Error (Printexc.to_string ex)
+
   let confirm required actual =
     if required <> actual then Error "Values don't match!"
     else Ok ()
+
+  let optional v = function
+    | "" -> Ok None
+    | x ->
+      match v x with
+      | Ok x -> Ok (Some x)
+      | Error _ as e -> e
 
   let ( >>!= ) x f parts acc =
     match x parts acc with

@@ -18,6 +18,9 @@ module State : sig
 
   val bindings : t -> (string * field) list
   (** [bindings t] is the list of [(name, field)] pairs that haven't been popped. *)
+
+  val of_values : (string * string) list -> t
+  (** [of_values vs] is a state initialised with [(field_name, value)] pairs in [vs]. *)
 end
 
 module Html : sig
@@ -64,6 +67,8 @@ module Validator : sig
   type 'a t
   (** An ['a t] is a validator that parses a form and, on success, returns an ['a]. *)
 
+  type 'a reader = string -> 'a or_error
+
   val maybe : 'a -> 'a t
   (** [maybe x] is a validator that successfully returns [x] if there were no other validation errors. *)
 
@@ -74,14 +79,21 @@ module Validator : sig
   (** [get field conv] gets the uploaded field named [field] and processes it with [conv].
       If [conv] fails, an error is reported against [field]. *)
 
-  val string : string -> string or_error
+  val string : string reader
   (** [string s] always accepts [s]. *)
 
-  val non_empty : string -> string or_error
+  val uri : Uri.t reader
+  (** [uri s] tries to parse [s] as a Uri. *)
+
+  val non_empty : string reader
   (** [non_empty s] accepts [s] if it is not the empty string. *)
 
-  val confirm : string -> string -> unit or_error
+  val confirm : string -> unit reader
   (** [confirm x y] accepts [y] if it is the same as [x] (useful for enter-this-twice confirmation fields). *)
+
+  val optional : 'a reader -> 'a option reader
+  (** [optional x] is a reader that returns [None] for the empty string,
+      while using [x] to read non-empty strings. *)
 
   val ( >>!= ) : 'a t -> ('a -> 'b t) -> 'b t
   (** [x >>!= f] is [f y] if the validator [x] successfully produces [y]. *)

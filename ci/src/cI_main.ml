@@ -33,8 +33,8 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   let dashboards = Repo.Map.map (fun p -> p.CI_config.dashboards) projects in
   let projects = Repo.Map.map (fun p -> p.CI_config.tests) projects in
   CI_secrets.create ~key_bits secrets_dir >>= fun secrets ->
-  let github = CI_secrets.github_auth secrets in
-  CI_web_utils.Auth.create ?github ~web_ui (CI_secrets.passwords_path secrets) >>= fun auth ->
+  CI_secrets.github_auth secrets >>= fun github ->
+  CI_web_utils.Auth.create ~github ~web_ui (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
   let connect_dk () = connect proto addr >|*= DK.connect in
   let canaries =

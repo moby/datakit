@@ -443,7 +443,8 @@ let with_test_auth fn =
       let ch = open_out path in
       output_string ch "((admin((prf SHA1)(salt\"\\172~\\212>|'\\154\\202\\224\\128?\\158\\160\\245\\243j\")(hashed_password\"_\\231gB\\136\\221\\159!\\164%\\024\\\"0H\\\"\\230\\172\\142\\166\\138\")(count 5000)(dk_len 20))))";
       close_out ch;
-      CI_web_utils.Auth.create ~web_ui:(Uri.of_string "https://localhost") path >>= fn
+      let github = CI_secrets.const None in
+      CI_web_utils.Auth.create ~github ~web_ui:(Uri.of_string "https://localhost") path >>= fn
     )
 
 let test_auth () =

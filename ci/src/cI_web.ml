@@ -227,6 +227,17 @@ class cancel t = object
       | Error body -> Wm.respond ~body:(`String body) 404 rd
 end
 
+module Settings = struct
+  class index t = object
+    inherit CI_web_utils.html_page t.server
+
+    method private required_roles = [`Admin]
+
+    method private render rd =
+      Wm.continue (CI_web_templates.Settings.index) rd
+  end
+end
+
 let mime_type uri =
   match String.take ~sat:((<>) '.') ~rev:true (Uri.path uri) with
   | "css"   -> Some "text/css"
@@ -257,12 +268,14 @@ let routes ~logs ~ci ~server ~dashboards =
     (* Individual targets *)
     (":user/:repo/pr/:id",     fun () -> new pr_page t);
     (":user/:repo/ref/*",      fun () -> new ref_page t);
-
     (* Logs *)
     ("log/live/:branch",                        fun () -> new live_log_page t);
     ("log/saved/:branch/:commit",               fun () -> new saved_log_page t);
     ("log/rebuild/:branch",                     fun () -> new rebuild t);
     ("cancel/:branch",                          fun () -> new cancel t);
+    (* Settings *)
+    ("settings",        fun () -> new Settings.index t);
+    ("settings/github-auth", fun () -> new CI_web_utils.github_auth_settings t.server);
     (* Errors *)
     ("error/:id",       fun () -> new error t);
     (* Reporting *)

@@ -16,14 +16,8 @@ end
 module Auth : sig
   type t
 
-  type github_auth = {
-    client_id : string;
-    client_secret : string;
-    callback : Uri.t option;
-  }
-
-  val create : ?github:github_auth -> web_ui:Uri.t -> string -> t Lwt.t
-  (** [create ~web_ui passwd_file] is a user authenticator with configuration at [passwd_file].
+  val create : github:CI_secrets.github_auth CI_secrets.secret -> web_ui:Uri.t -> string -> t Lwt.t
+  (** [create ~github ~web_ui passwd_file] is a user authenticator with configuration at [passwd_file].
       If [passwd_file] does not exist, a one-time configuration URL under [web_ui] is printed
       to the logs. [passwd_file] must be an absolute path. *)
 
@@ -119,6 +113,9 @@ class virtual html_page : server -> object
 class virtual ['a] form_page : server -> object
   inherit protected_page
 
+  method virtual private default : CI_form.State.t Lwt.t
+  (** [default] is the initial state of the form shown to the user. *)
+
   method virtual private render :
     csrf_token:string -> CI_form.State.t ->
     CI_web_templates.t -> CI_web_templates.page
@@ -136,3 +133,6 @@ class virtual ['a] form_page : server -> object
   method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
   method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
 end
+
+class github_auth_settings : server -> resource
+(** The GitHub authentication settings page. *)

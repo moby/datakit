@@ -69,7 +69,11 @@ module Html = struct
         input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name; a_value init] ()
       ] @ err)
 
-  let form state ~form_class ~action children =
+  let form state ~csrf_token ~form_class ~action children =
+    let query = [
+      "CSRFToken", [csrf_token];
+    ] in
+    let action = Printf.sprintf "%s?%s" action (Uri.encoded_of_query query) in
     let warnings =
       State.bindings state |> List.map (fun (name, field) ->
           let err = field.State.error |> CI_utils.default "Unexpected field" in

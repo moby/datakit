@@ -115,3 +115,24 @@ class virtual html_page : server -> object
     method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
     method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
   end
+
+class virtual ['a] form_page : server -> object
+  inherit protected_page
+
+  method virtual private render :
+    csrf_token:string -> CI_form.State.t ->
+    CI_web_templates.t -> CI_web_templates.page
+  (** [render ~csrf_token state config] should generate the HTML page containing the form.
+      [csrf_token] and [state] should be passed to the [CI_form] functions to generate the form
+      correctly and show any validation errors from a previous submission. *)
+
+  method virtual private validate : 'a CI_form.Validator.t
+  (** [validate] is a validator that returns a validated result from a form submission
+      (or produces suitable errors if the form is not valid). *)
+
+  method virtual private process : 'a -> Cohttp_lwt_body.t Wm.acceptor
+  (** [process data] should act on the valid form data [data], which has been produced by [validate]. *)
+
+  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
+  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+end

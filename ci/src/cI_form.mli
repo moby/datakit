@@ -46,11 +46,13 @@ module Html : sig
     | `Color
     | `Button ]
 
-  val form : State.t -> form_class:string list -> action:string ->
+  val form : State.t -> csrf_token:string -> form_class:string list -> action:string ->
     [< Html_types.form_content_fun > `Div ] Tyxml.Html.elt list ->
     [> Html_types.form ] Tyxml.Html.elt
-  (** [form state ~form_class ~action controls] is an HTML form which posts the values to [action].
-      If [state] still contains any fields, they are reported as unknown-field errors. *)
+  (** [form state ~csrf_token ~form_class ~action controls] is an HTML form
+      which posts the values to [action].
+      If [state] still contains any fields, they are reported as unknown-field
+      errors. *)
 
   val field : State.t -> string -> field_type -> string -> [> Html_types.div] Tyxml.Html.elt
   (** [field state label type name] is an HTML form control for entering a value of type [type].

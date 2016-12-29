@@ -36,6 +36,7 @@ let web_config =
     ~can_build:ACL.(username "admin")
     ?state_repo
     ~metrics_token
+    ~listen_addr:(`HTTPS 8443)
     ()
 
 (* The main entry-point *)

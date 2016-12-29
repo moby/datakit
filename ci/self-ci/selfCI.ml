@@ -55,6 +55,9 @@ let metrics_token =
     None
   )
 
+(* Override the default https listener because we live behind an nginx proxy. *)
+let listen_addr = `HTTP 8080
+
 let web_config =
   Web.config
     ~name:"datakit-ci"
@@ -62,6 +65,7 @@ let web_config =
     ~can_read:ACL.everyone
     ~can_build:ACL.(username "admin")
     ?metrics_token
+    ~listen_addr
     ()
 
 let () =

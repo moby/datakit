@@ -17,9 +17,6 @@ ci:
   links:
     - datakit
     - redis
-  ports:
-    - '443:8443'
-    - '80:80'   # For certbot
   tags:
     - nodecluster-name=datakit-ci-cluster
   volumes:

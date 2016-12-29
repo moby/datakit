@@ -45,12 +45,15 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   let ci = CI_engine.create ~web_ui ?canaries connect_dk projects in
   let main_thread = CI_engine.listen ci >|= fun `Abort -> assert false in
   let mode =
-    `TLS (
-      `Crt_file_path (CI_secrets.certificate_path secrets),
-      `Key_file_path (CI_secrets.private_key_path secrets),
-      `No_password,
-      `Port 8443
-    )
+    match web_config.CI_web_templates.listen_addr with
+    | `HTTP port -> `TCP (`Port port)
+    | `HTTPS port ->
+      `TLS (
+        `Crt_file_path (CI_secrets.certificate_path secrets),
+        `Key_file_path (CI_secrets.private_key_path secrets),
+        `No_password,
+        `Port port
+      )
   in
   let session_backend = make_session_backend session_backend in
   let server = CI_web_utils.server ~web_config ~auth ~session_backend in

@@ -340,6 +340,7 @@ module Web: sig
     ?name:string ->
     ?state_repo:Uri.t ->
     ?metrics_token:[`SHA256 of string] ->
+    ?listen_addr:[`HTTP of int | `HTTPS of int] ->
     can_read:ACL.t ->
     can_build:ACL.t ->
     unit -> config

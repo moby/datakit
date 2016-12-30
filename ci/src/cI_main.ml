@@ -26,7 +26,19 @@ let make_session_backend = function
        just throw away any connection that fails.
        See: https://github.com/0xffea/ocaml-redis/issues/44 *)
     let check _ set_valid = set_valid false in
-    `Redis (Lwt_pool.create 4 ~check (fun () -> Redis_lwt.Client.connect addr))
+    let connect () =
+      Lwt.catch
+        (fun () -> Redis_lwt.Client.connect addr)
+        (fun ex ->
+           Log.warn (fun f ->
+               let { Redis_lwt.Client.host; port } = addr in
+               f "Error connecting to Redis database at %s:%d: %a"
+                 host port CI_utils.pp_exn ex
+             );
+           Lwt.fail ex
+        )
+    in
+    `Redis (Lwt_pool.create 4 ~check connect)
 
 let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend =
   let { CI_config.web_config; projects } = config in

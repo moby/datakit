@@ -37,6 +37,89 @@ module Make (Store : Ivfs_tree.STORE) = struct
   module Merge = Ivfs_merge.Make(Store)(RW)
   module Remote = Ivfs_remote.Make(Store)
 
+  let string_of_commit_ids ids =
+    ids
+    |> List.map (fun h -> Store.Hash.to_hum h ^ "\n")
+    |> String.concat ~sep:""
+
+  module CommitListFile : sig
+    type t
+    val make : Store.Hash.t list -> t
+    val file : t -> Vfs.File.t
+    val read : t -> (Store.Hash.t list, string) result Lwt.t
+    val append : t -> Store.Hash.t -> unit Vfs.or_err
+  end = struct
+    type t = {
+      file : Vfs.File.t;
+      get : unit -> string;
+    }
+
+    let make init =
+      let init = string_of_commit_ids init in
+      let file, get = Vfs.File.rw_of_string init in
+      { file; get }
+
+    let file t = t.file
+
+    let read t =
+      let lines = String.cuts ~empty:false ~sep:"\n" (t.get ()) in
+      match List.map Store.Hash.of_hum lines with
+      | exception Invalid_argument msg -> Lwt.return (Error msg)
+      | hashes -> Lwt.return (Ok hashes)
+
+    let append t commit_id =
+      let data = Cstruct.of_string (Store.Hash.to_hum commit_id ^ "\n") in
+      Vfs.File.size t.file >>*= fun size ->
+      Vfs.File.open_ t.file >>*= fun fd ->
+      Vfs.File.write fd ~offset:size data
+  end
+
+  module PathSetFile : sig
+    type t
+    val make : unit -> t
+    val add_all : t -> PathSet.t -> unit
+    val read : t -> PathSet.t
+    val remove_file : t -> Ivfs_tree.Path.t -> unit
+    val remove_subtree : t -> Ivfs_tree.Path.t -> unit
+    val file : t -> Vfs.File.t
+  end = struct
+    type t = PathSet.t ref
+
+    let format_conflicts conflicts =
+      let lines =
+        conflicts
+        |> PathSet.elements
+        |> List.map (fun p -> Path.to_hum p ^ "\n")
+      in
+      Cstruct.of_string (String.concat ~sep:"" lines)
+
+    let make () =
+      ref PathSet.empty
+
+    let read t = !t
+
+    let remove_file t path =
+      t := PathSet.remove path !t
+
+    let rec has_prefix ~prefix p =
+      match Path.decons prefix, Path.decons p with
+      | None, _ -> true
+      | Some (pre, pres), Some (p, ps) ->
+        if pre = p then has_prefix ~prefix:pres ps
+        else false
+      | _ -> false
+
+    let remove_subtree t path =
+      t := PathSet.filter (has_prefix ~prefix:path) !t
+
+    let add_all t xs =
+      t := PathSet.union !t xs
+
+    let file t =
+      let read () = ok (Some (format_conflicts !t)) in
+      Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
+  end
+
   let empty_file = Ivfs_blob.empty
 
   let stat path root =
@@ -178,17 +261,9 @@ module Make (Store : Ivfs_tree.STORE) = struct
         String.Map.remove name acc
       ) map items
 
-  let rec has_prefix ~prefix p =
-    match Path.decons prefix, Path.decons p with
-    | None, _ -> true
-    | Some (pre, pres), Some (p, ps) ->
-      if pre = p then has_prefix ~prefix:pres ps
-      else false
-    | _ -> false
-
   (* Note: writing to a path removes it from [conflicts], if present *)
   let rw ~conflicts view =
-    let remove_conflict path = conflicts := PathSet.remove path !conflicts in
+    let remove_conflict = PathSetFile.remove_file conflicts in
     let name_of_irmin_path = name_of_irmin_path ~root:"rw" in
     (* Keep track of which qids we're still using. We need to give the
        same qid to the client each time. TODO: use a weak map here. *)
@@ -273,7 +348,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
           | Error `Not_a_directory -> err_not_dir
           | Ok () ->
             extra_dirs := String.Map.empty;
-            conflicts := PathSet.filter (has_prefix ~prefix:path) !conflicts;
+            PathSetFile.remove_subtree conflicts path;
             Lwt.return (Ok ())
       in
       let rename inode new_name =
@@ -298,131 +373,90 @@ module Make (Store : Ivfs_tree.STORE) = struct
     in
     irmin_rw_dir Path.empty
 
-  let transactions_ctl ~merge ~remover = function
-    | "close" -> Lazy.force remover >|= fun () -> Ok ""
-    | "commit" ->
-      begin merge () >>= function
-        | Ok (`Ok ())        -> Lazy.force remover >|= fun () -> Ok ""
-        | Ok (`Conflict msg) -> err_conflict msg
-        | Error ename        -> Vfs.error "%s" ename
-      end
-    | x -> err_unknown_cmd x
+  module Diff : sig
+    val vfs_dir : (unit -> Tree.Dir.t Lwt.t) -> Vfs.Dir.t
+    (* [vfs_dir head] is directory that provides diffs against [head ()]. *)
+  end = struct
+    let pp_op ppf = function
+      | `Added _   -> Fmt.string ppf "+"
+      | `Removed _ -> Fmt.string ppf "-"
+      | `Updated _ -> Fmt.string ppf "*"
 
-  let string_of_parents parents =
-    parents
-    |> List.map (fun h -> Store.Hash.to_hum h ^ "\n")
-    |> String.concat ~sep:""
+    let pp_diff ppf (path, op) =
+      let path = Path.to_hum path in
+      let path =
+        if Filename.is_relative path then path
+        else String.with_index_range ~first:1 path
+      in
+      Fmt.pf ppf "%a %s\n" pp_op op path
 
-  let format_conflicts conflicts =
-    let lines =
-      conflicts
-      |> PathSet.elements
-      |> List.map (fun p -> Path.to_hum p ^ "\n")
-    in
-    Cstruct.of_string (String.concat ~sep:"" lines)
+    let vfs_dir head =
+      let lookup name =
+        head () >>= fun head_t ->
+        let repo = Tree.Dir.repo head_t in
+        let hash = Store.Hash.of_hum name in
+        Store.of_commit_id Irmin.Task.none hash repo >>= fun t ->
+        Tree.snapshot (t ()) >>= fun parent_t ->
+        Tree.Dir.diff parent_t head_t >>= fun diff ->
+        let lines = List.map (Fmt.to_to_string pp_diff) diff in
+        let file  = Vfs.File.ro_of_string (String.concat ~sep:"" lines) in
+        ok (Vfs.Inode.file name file)
+      in
+      let remove () = Vfs.File.err_read_only in
+      let ls () = ok [] in
+      Vfs.Dir.read_only ~ls ~lookup ~remove
+  end
 
-  let pp_op ppf = function
-    | `Added _   -> Fmt.string ppf "+"
-    | `Removed _ -> Fmt.string ppf "-"
-    | `Updated _ -> Fmt.string ppf "*"
+  module Transaction : sig
+    val make : (string -> Store.t) -> remover:unit Lwt.t Lazy.t -> Vfs.Dir.t Lwt.t
+    (* [make store ~remover] is a directory for making a transaction on [store].
+       When done, it will force [remover] (which should remove the directory). *)
+  end = struct
+    type t = {
+      store : string -> Store.t;        (* The branch we're going to commit on *)
+      view : RW.t;                      (* The read/write directory with the current state *)
+      get_msg : unit -> string;
+      parents : CommitListFile.t;
+      conflicts : PathSetFile.t;
+    }
 
-  let pp_diff ppf (path, op) =
-    let path = Path.to_hum path in
-    let path =
-      if Filename.is_relative path then path
-      else String.with_index_range ~first:1 path
-    in
-    Fmt.pf ppf "%a %s\n" pp_op op path
+    let make_commit root task ~parents =
+      let repo = Tree.Dir.repo root in
+      Tree.Dir.hash root >>= fun node ->
+      let commit = Store.Private.Commit.Val.create task ~parents ~node in
+      Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
 
-  let diff repo head =
-    let lookup name =
-      head () >>= fun head_t ->
-      let hash = Store.Hash.of_hum name in
-      Store.of_commit_id Irmin.Task.none hash repo >>= fun t ->
-      Tree.snapshot (t ()) >>= fun parent_t ->
-      Tree.Dir.diff parent_t head_t >>= fun diff ->
-      let lines = List.map (Fmt.to_to_string pp_diff) diff in
-      let file  = Vfs.File.ro_of_string (String.concat ~sep:"" lines) in
-      ok (Vfs.Inode.file name file)
-    in
-    let remove () = Vfs.File.err_read_only in
-    let ls () = ok [] in
-    Vfs.Dir.read_only ~ls ~lookup ~remove
+    let unit_task () = Irmin.Task.empty
 
-  let make_commit root task ~parents =
-    let repo = Tree.Dir.repo root in
-    Tree.Dir.hash root >>= fun node ->
-    let commit = Store.Private.Commit.Val.create task ~parents ~node in
-    Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
+    let base ~our_parents ~ours ~their_commit =
+      match our_parents with
+      | [] ->
+        (* Optimisation: if our new commit has no parents then we know there
+           can be no LCA, so avoid searching (which would be slow, since Irmin
+           would have to explore the entire history to check). *)
+        Lwt.return None
+      | _ ->
+        Store.lcas_head ours ~n:1 their_commit >>= function
+        | `Max_depth_reached | `Too_many_lcas -> assert false
+        | `Ok [] -> Lwt.return None
+        | `Ok (base::_) ->
+          let repo = Store.repo ours in
+          Store.of_commit_id unit_task base repo >|= fun s ->
+          Some (s ())
 
-  let make_instance store ~remover _name =
-    let path = Path.empty in
-    let msg_file, get_msg = Vfs.File.rw_of_string "" in
-    let store1 = store "snapshot" in
-    let repo = Store.repo store1 in
-    Store.head store1 >>= fun orig_head ->
-    begin match orig_head with
+    let snapshot store =
+      let store1 = store "snapshot" in
+      let repo = Store.repo store1 in
+      Store.head store1 >>= fun orig_head ->
+      match orig_head with
       | None -> Lwt.return (Tree.Dir.empty repo, [])
       | Some id ->
         Store.Private.Commit.read_exn (Store.Private.Repo.commit_t repo) id
         >|= fun commit ->
         Tree.Dir.of_hash repo (Store.Private.Commit.Val.node commit),
         [id]
-    end >>= fun (orig_root, parents) ->
-    let view = RW.of_dir orig_root in
-    let parents = string_of_parents parents in
-    let parents_file, get_parents = Vfs.File.rw_of_string parents in
-    let conflicts = ref PathSet.empty in
-    (* Make a commit based on "rw", "parents" and "msg" *)
-    let commit_of_view () =
-      match !conflicts with
-      | e when not (PathSet.is_empty e) ->
-        Lwt.return (Error "conflicts file is not empty")
-      | _ ->
-        let parents = String.cuts ~empty:false ~sep:"\n" (get_parents ()) in
-        match List.map Store.Hash.of_hum parents with
-        | exception Invalid_argument msg -> Lwt.return (Error msg)
-        | parents ->
-          let msg = match get_msg () with
-            | "" -> "(no commit message)"
-            | x -> x
-          in
-          let store = store msg in
-          let root = RW.root view in
-          make_commit root (Store.task store) ~parents >|= fun c ->
-          Ok (c, "Merge", parents)
-    in
-    (* Commit transaction *)
-    let merge () =
-      commit_of_view () >>*= fun (head, msg, _parents) ->
-      Store.merge_head (store msg) head >|= fun x -> Ok x
-    in
-    (* Current state (will finish initialisation below) *)
-    let contents = ref empty_inode_map in
-    (* Files present in both normal and merge modes *)
-    let stage = rw ~conflicts view in
-    let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
-    let ctl = Vfs.File.command (transactions_ctl ~merge ~remover) in
-    let origin = Vfs.File.ro_of_string (Path.to_hum path) in
-    let diff = diff repo (fun  () -> Lwt.return (RW.root view)) in
-    let common =
-      empty_inode_map
-      |> add stage
-      |> add (Vfs.Inode.file "msg"     msg_file)
-      |> add (Vfs.Inode.file "parents" parents_file)
-      |> add (Vfs.Inode.file "ctl"     ctl)
-      |> add (Vfs.Inode.file "origin"  origin)
-      |> add (Vfs.Inode.dir  "diff"    diff)
-    in
-    let rec normal_mode () =
-      common
-      |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
 
-    (* Merge mode *)
-    and merge_mode commit_id =
-      (* Check hash is valid *)
-      let store = store "merge" in
-      let repo = Store.repo store in
+    let store_of_hash repo commit_id =
       match Store.Hash.of_hum commit_id with
       | exception _  -> err_invalid_commit_id commit_id
       | their_commit ->
@@ -430,55 +464,112 @@ module Make (Store : Ivfs_tree.STORE) = struct
         >>= function
         | false -> err_no_entry
         | true ->
-          let unit_task () = Irmin.Task.empty in
-          Store.of_commit_id unit_task their_commit repo >>= fun theirs ->
-          let theirs = theirs () in
-          (* Grab current "rw" dir as "ours" *)
-          commit_of_view () >>= function
-          | Error e -> Vfs.error "Can't start merge: %s" e
-          | Ok (our_commit, _msg, our_parents) ->
-            Store.of_commit_id unit_task our_commit repo >>= fun ours ->
-            let ours = ours () in
-            let ours_ro = read_only ~name:"ours" ours in
-            let theirs_ro = read_only ~name:"theirs" theirs in
-            begin match our_parents with
-              | [] ->
-                (* Optimisation: if our new commit has no parents then we know there
-                   can be no LCA, so avoid searching (which would be slow, since Irmin
-                   would have to explore the entire history to check). *)
-                Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
-              | _ ->
-                Store.lcas_head ours ~n:1 their_commit >>= function
-                | `Max_depth_reached | `Too_many_lcas -> assert false
-                | `Ok [] -> Lwt.return (None, Vfs.Inode.dir "base" Vfs.Dir.empty)
-                | `Ok (base::_) ->
-                  Store.of_commit_id unit_task base repo >|= fun s ->
-                  let s = s () in
-                  (Some s, read_only ~name:"base" s)
-            end >>= fun (base, base_ro) ->
-            (* Add to parents *)
-            let data = Cstruct.of_string (commit_id ^ "\n") in
-            Vfs.File.size parents_file >>*= fun size ->
-            Vfs.File.open_ parents_file >>*= fun fd ->
-            Vfs.File.write fd ~offset:size data >>*= fun () ->
-            (* Do the merge *)
-            Merge.merge ~ours ~theirs ~base view >>= fun merge_conflicts ->
-            conflicts := PathSet.union !conflicts merge_conflicts;
-            let conflicts_file =
-              let read () = ok (Some (format_conflicts !conflicts)) in
-              Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
-            in
-            contents :=
-              common
-              |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
-              |> add (Vfs.Inode.file "conflicts" conflicts_file)
-              |> add ours_ro
-              |> add base_ro
-              |> add theirs_ro;
-            Lwt.return (Ok "ok")
-    in
-    contents := normal_mode ();
-    Lwt.return (Ok (Vfs.Dir.of_map_ref contents))
+          Store.of_commit_id unit_task their_commit repo >>= fun store ->
+          Lwt.return (Ok (store, their_commit))
+
+    let base_dir lca =
+      match lca with
+      | None -> Vfs.Inode.dir "base" Vfs.Dir.empty
+      | Some base -> read_only ~name:"base" base
+
+    let check_no_conflicts conflicts =
+      match PathSetFile.read conflicts with
+      | e when not (PathSet.is_empty e) ->
+        Lwt.return (Error "conflicts file is not empty")
+      | _ -> Lwt.return (Ok ())
+
+    (* Make a commit based on "rw", "parents" and "msg" *)
+    let commit_of_view t =
+      check_no_conflicts t.conflicts >>*= fun () ->
+      CommitListFile.read t.parents >>*= fun parents ->
+      let msg = match t.get_msg () with
+        | "" -> "(no commit message)"
+        | x -> x
+      in
+      let store = t.store msg in
+      let root = RW.root t.view in
+      make_commit root (Store.task store) ~parents >|= fun c ->
+      Ok (c, "Merge", parents)
+
+    (* Commit transaction *)
+    let merge t =
+      commit_of_view t >>*= fun (head, msg, _parents) ->
+      Store.merge_head (t.store msg) head >|= fun x -> Ok x
+
+    let transactions_ctl t ~remover = function
+      | "close" -> Lazy.force remover >|= fun () -> Ok ""
+      | "commit" ->
+        begin merge t >>= function
+          | Ok (`Ok ())        -> Lazy.force remover >|= fun () -> Ok ""
+          | Ok (`Conflict msg) -> err_conflict msg
+          | Error ename        -> Vfs.error "%s" ename
+        end
+      | x -> err_unknown_cmd x
+
+    let make store ~remover =
+      let path = Path.empty in
+      let msg_file, get_msg = Vfs.File.rw_of_string "" in
+      snapshot store >>= fun (orig_root, parents) ->
+      let t = {
+        store;
+        view = RW.of_dir orig_root;
+        get_msg;
+        parents = CommitListFile.make parents;
+        conflicts = PathSetFile.make ();
+      } in
+      (* Current state (will finish initialisation below) *)
+      let contents = ref empty_inode_map in
+      (* Files present in both normal and merge modes *)
+      let stage = rw ~conflicts:t.conflicts t.view in
+      let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
+      let ctl = Vfs.File.command (transactions_ctl t ~remover) in
+      let origin = Vfs.File.ro_of_string (Path.to_hum path) in
+      let diff = Diff.vfs_dir (fun  () -> Lwt.return (RW.root t.view)) in
+      let common =
+        empty_inode_map
+        |> add stage
+        |> add (Vfs.Inode.file "msg"     msg_file)
+        |> add (Vfs.Inode.file "parents" (CommitListFile.file t.parents))
+        |> add (Vfs.Inode.file "ctl"     ctl)
+        |> add (Vfs.Inode.file "origin"  origin)
+        |> add (Vfs.Inode.dir  "diff"    diff)
+      in
+      (* Merge mode *)
+      let rec merge_mode commit_id =
+        let store = store "merge" in
+        let repo = Store.repo store in
+        store_of_hash repo commit_id >>*= fun (theirs, their_commit) ->
+        let theirs = theirs () in
+        (* Grab current "rw" dir as "ours" *)
+        commit_of_view t >>= function
+        | Error e -> Vfs.error "Can't start merge: %s" e
+        | Ok (our_commit, _msg, our_parents) ->
+          Store.of_commit_id unit_task our_commit repo >>= fun ours ->
+          let ours = ours () in
+          let ours_ro = read_only ~name:"ours" ours in
+          let theirs_ro = read_only ~name:"theirs" theirs in
+          base ~our_parents ~ours ~their_commit >>= fun base ->
+          (* Add to parents *)
+          CommitListFile.append t.parents their_commit >>*= fun () ->
+          (* Do the merge *)
+          Merge.merge ~ours ~theirs ~base t.view >>= fun merge_conflicts ->
+          PathSetFile.add_all t.conflicts merge_conflicts;
+          contents :=
+            common
+            |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
+            |> add (Vfs.Inode.file "conflicts" (PathSetFile.file t.conflicts))
+            |> add ours_ro
+            |> add (base_dir base)
+            |> add theirs_ro;
+          Lwt.return (Ok "ok")
+      in
+      let normal_mode () =
+        common
+        |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
+      in
+      contents := normal_mode ();
+      Lwt.return (Vfs.Dir.of_map_ref contents)
+  end
 
   let static_dir name items = Vfs.Inode.dir name (Vfs.Dir.of_list items)
 
@@ -627,7 +718,6 @@ module Make (Store : Ivfs_tree.STORE) = struct
       | Some x -> ok x
       | None   -> err_no_entry
     in
-    let make = make_instance store in
     let remover name =
       lazy (
         Lwt_mutex.with_lock lock (fun () ->
@@ -640,14 +730,12 @@ module Make (Store : Ivfs_tree.STORE) = struct
           if String.Map.mem name !items then Vfs.Dir.err_already_exists
           else (
             let remover = remover name in
-            make ~remover name >>= function
-            | Error _ as e -> Lwt.return e
-            | Ok dir       ->
-              if Lazy.is_val remover then err_no_entry else (
-                let inode = Vfs.Inode.dir name dir in
-                items := String.Map.add name inode !items;
-                ok inode
-              )))
+            Transaction.make store ~remover >>= fun dir ->
+            if Lazy.is_val remover then err_no_entry else (
+              let inode = Vfs.Inode.dir name dir in
+              items := String.Map.add name inode !items;
+              ok inode
+            )))
     in
     let mkfile _ _ = Vfs.Dir.err_dir_only in
     let rename _ _ = Vfs.Dir.err_read_only in   (* TODO *)
@@ -802,7 +890,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
         | Some head -> Store.history store ~depth:1 >|= fun hist ->
           Store.History.pred hist head
       end >|= fun parents ->
-      Ok (Some (Cstruct.of_string (string_of_parents parents))) in
+      Ok (Some (Cstruct.of_string (string_of_commit_ids parents))) in
     Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
 
   let msg_file store commit_id =
@@ -818,13 +906,12 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   let snapshot_dir store name =
     let store = store "ro" in
-    let repo = Store.repo store in
     let dirs = Vfs.ok [
         read_only ~name:"ro"     store;
         Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
         Vfs.Inode.file "msg"     (msg_file store name);
         Vfs.Inode.file "parents" (parents_file store);
-        Vfs.Inode.dir  "diff"    (diff repo (fun () -> Tree.snapshot store));
+        Vfs.Inode.dir  "diff"    (Diff.vfs_dir (fun () -> Tree.snapshot store));
       ] in
     static_dir name (fun () -> dirs)
 

@@ -93,7 +93,11 @@ module Make (C: CI_s.CONTEXT) = struct
         pair acc (f x) >|= fun (acc, x) -> x :: acc
       ) (return []) l
 
-  let pp_names = Fmt.(list ~sep:(const string ", ") string)
+  let pp_names ppf names =
+     if List.length names > 10 then
+       Fmt.pf ppf "%d tasks" (List.length names)
+     else
+       Fmt.(list ~sep:(const string ", ") string) ppf names
 
   let wait_for_all l =
     let partition (ps, fs) (name, state) =

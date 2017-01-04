@@ -1,7 +1,7 @@
 open CI_s
 
 type t
-val v: logs:CI_live_log.manager -> dir:string -> t
+val v: ?remote:string -> logs:CI_live_log.manager -> string -> t
 
 type commit
 val hash: commit -> string

@@ -3,7 +3,7 @@ open Term.Infix
 
 let minute = 60.
 
-let repo = Git.v ~logs ~dir:"/data/repos/datakit"
+let repo = Git.v ~logs ~remote:"https://github.com/docker/datakit.git" "/data/repos/datakit"
 
 let is_gh_pages = function
   | `Ref id -> (match id with (_, ["heads"; "gh-pages"]) -> true | _ -> false)

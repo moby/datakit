@@ -131,12 +131,35 @@ end
 
 module PR_Cache = CI_cache.Make(Builder)
 
-type t = {
+type ready_t = {
   repo : repo;
   fetches : PR_Cache.t;
 }
 
-let v ~logs ~dir =
+type t = ready_t Lwt.t
+
+let is_directory d =
+  match Sys.is_directory d with
+  | r -> r
+  | exception Sys_error _ -> false
+
+let clone_if_missing ?remote ~dir =
+  if is_directory dir then Lwt.return ()
+  else match remote with
+    | None ->
+      CI_utils.failf "Directory %S does not exist (and no ~remote provided, so can't clone it automatically)." dir
+    | Some remote ->
+      Lwt.catch (fun () ->
+          CI_process.run ~output:print_string ("", [| "git"; "clone"; remote; dir |])
+        )
+        (fun ex ->
+           Log.err (fun f -> f "Failed to clone Git repository: %a" CI_utils.pp_exn ex);
+           Lwt.fail ex
+        )
+
+let v ?remote ~logs dir =
+  let dir = CI_utils.abs_path dir in
+  clone_if_missing ?remote ~dir >|= fun () ->
   let repo = {
     dir;
     dir_lock = CI_monitored_pool.create dir 1;
@@ -149,6 +172,7 @@ let v ~logs ~dir =
 
 let fetch_head t target =
   let open !CI_term.Infix in
+  CI_term.of_lwt_quick t >>= fun t ->
   CI_term.target target >>=
   PR_Cache.find t.fetches Builder.NoContext
 

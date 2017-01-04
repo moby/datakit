@@ -345,7 +345,6 @@ let with_git_remote fn =
            run ["git"; "commit"; "-m"; "Initial commit"] >>= fun () ->
            (* Clone a "local" copy *)
            let local_clone = tmpdir / "clone" in
-           run ["git"; "clone"; tmpdir / "my-repo"; local_clone] >>= fun () ->
            fn ~remote_dir ~local_clone
          )
     )
@@ -363,7 +362,7 @@ let test_git_dir conn ~clone =
   with_git_remote @@ fun ~remote_dir ~local_clone ->
   Sys.chdir remote_dir;
   Lwt_process.pread_line ("", [| "git"; "rev-parse"; "HEAD" |]) >>= fun hash ->
-  let local_repo = Git.v ~logs ~dir:local_clone in
+  let local_repo = Git.v ~remote:remote_dir ~logs local_clone in
   (* Start the CI *)
   Test_utils.with_ci conn (Workflows.pull_and_run local_repo ~cmd) @@ fun ~logs ~switch dk with_handler ->
   DK.branch dk "github-metadata" >>*= fun hooks ->
@@ -391,7 +390,7 @@ let test_git_dir conn ~clone =
 let test_git_tag conn =
   let logs = Private.create_logs () in
   with_git_remote @@ fun ~remote_dir ~local_clone ->
-  let local_repo = Git.v ~logs ~dir:local_clone in
+  let local_repo = Git.v ~remote:remote_dir ~logs local_clone in
   (* Start the CI *)
   Test_utils.with_ci conn Workflows.(fetch_only ~local_repo) @@ fun ~logs ~switch dk with_handler ->
   DK.branch dk "github-metadata" >>*= fun hooks ->

@@ -41,7 +41,6 @@ jar
    This allows the bridge to access GitHub. See [ocaml-github][]'s README for details.
 
 2. Populate `ci`'s `/data` directory:
-  - `/data/repos/foo` should be a `git clone` of some repository "foo" you want to test. The CI will `git pull` here to get updates.
   - `/secrets/server.crt` and `/secrets/server.key` will be generated on first run if missing. They are used for the web UI. You can replace these with a proper certificate and key when you get one (e.g. using [certbot][]).
 
 3. Populate `datakit`'s `/root/.ssh` directory with a fresh ssh key (run `ssh-keygen`).

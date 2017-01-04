@@ -454,8 +454,11 @@ module Git: sig
   (** The type for local non-bare git working directory (with a .git
       sub-directory). *)
 
-  val v: logs:Live_log.manager -> dir:string -> t
-  (** [v ~logs ~dir] is the local Git repository at [dir]. *)
+  val v: ?remote:string -> logs:Live_log.manager -> string -> t
+  (** [v ~remote ~logs dir] is the local Git repository at [dir].
+      If [dir] does not exist, it is created by [git clone remote].
+      If [remote] is not given and [dir] does not exist, an exception
+      is raised. *)
 
   type commit
   (** The type for Git commits. *)

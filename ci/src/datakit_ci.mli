@@ -142,6 +142,11 @@ module Target: sig
   val compare_v: v -> v -> int
   (** [compare_v] compares values of type {!v}. *)
 
+  val repo_v: v -> Repo.t
+  (** [repo_v v] is [v]'s repository. *)
+
+  val pp_v: v Fmt.t
+  (** [pp_v] is the pretty-printer for resolved GitHub targets. *)
 end
 
 module Term: sig

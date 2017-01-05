@@ -87,6 +87,10 @@ let path = function
 
 type v = [ `PR of PR.t | `Ref of Ref.t ]
 
+let pp_v f = function
+  | `PR pr  -> Fmt.pf f "prs/%a" PR.pp pr
+  | `Ref x -> Fmt.pf f "refs/%a" Ref.pp x
+
 let head = function
   | `PR x  -> PR.commit x
   | `Ref x -> Ref.commit x
@@ -96,3 +100,7 @@ let compare_v (x:v) (y:v) = Elt.compare (x :> Elt.t) (y :> Elt.t)
 let path_v = function
   | `PR pr -> path (`PR (PR.id pr))
   | `Ref r -> path (`Ref (Ref.id r))
+
+let repo_v = function
+  | `PR pr -> PR.repo pr
+  | `Ref r -> Ref.repo r

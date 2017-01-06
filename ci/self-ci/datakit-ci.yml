@@ -14,6 +14,8 @@ ci:
   restart: always
   command: '--metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
   image: 'editions/datakit-self-ci:latest'
+  environment:
+    - DOCKER_HOST=unix:///var/run/builder/docker.sock
   links:
     - datakit
     - redis
@@ -24,7 +26,7 @@ ci:
     - '/data/repos'
     - '/secrets'
     - '/root/.ssh:/root/.ssh'
-    - '/var/run/datakit/docker.sock:/var/run/docker.sock'
+    - '/var/run/datakit:/var/run/builder'
 datakit:
   restart: always
   user: 'root'

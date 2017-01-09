@@ -16,4 +16,6 @@ type v = [ `PR of PR.t | `Ref of Ref.t ]
 val head: v -> Commit.t
 val compare_v: v -> v -> int
 val path_v: v -> string
+val repo_v : v -> Repo.t
 val unescape_ref: string -> Ref.name
+val pp_v : v Fmt.t

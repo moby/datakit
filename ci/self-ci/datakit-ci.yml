@@ -1,6 +1,6 @@
 bridge:
   restart: always
-  command: '--datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://bridge.datakit-ci.8a6b9483.svc.dockerapp.io:81 --log-destination timestamp'
+  command: '--datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81 --log-destination timestamp'
   image: 'docker/datakit:github'
   links:
     - datakit

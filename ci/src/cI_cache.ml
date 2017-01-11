@@ -34,6 +34,13 @@ module Metrics = struct
     Summary.v_label ~help ~label_name:"name" ~namespace ~subsystem "build_time"
 end
 
+let catch fn =
+  Lwt.catch fn
+    (function
+      | Failure msg -> Lwt.return (Error (`Failure msg))
+      | ex -> Lwt.return (Error (`Failure (Printexc.to_string ex)))
+    )
+
 module Path = struct
   (* Each entry in the cache has a branch in the database:
      - /log contains the build log
@@ -61,7 +68,7 @@ module Make(B : CI_s.BUILDER) = struct
   type t = {
     logs : CI_live_log.manager;
     mutex : Lwt_mutex.t;                        (* Held while updating [cache] *)
-    mutable cache: B.value status M.t;    (* In-memory cache, including pending items *)
+    mutable cache: B.value status M.t;          (* In-memory cache, including pending items *)
     builder : B.t;                              (* The underlying builder *)
   }
 
@@ -79,6 +86,14 @@ module Make(B : CI_s.BUILDER) = struct
   let ensure_removed tr path =
     DK.Transaction.remove tr path >|= fun (Ok () | Error _) -> ()
 
+  let load_from_tree builder tree key =
+    DK.Tree.read_file tree Path.failure >>= function
+    | Ok failure -> Lwt.return @@ Ok (`Failure (Cstruct.to_string failure))
+    | Error (`Msg "No such file or directory") ->
+      (* If we failed to load the failure, this result must be successful. *)
+      catch (fun () -> B.load builder tree key >|= fun v -> Ok (`Success v))
+    | Error (`Msg msg) -> Lwt.return @@ Error (`Failure msg)
+
   (* Load previously-cached results from the database, or [None] if there aren't any. *)
   let load_from_db builder ~rebuild conn key =
     conn () >>= fun dk ->
@@ -93,33 +108,12 @@ module Make(B : CI_s.BUILDER) = struct
       | false ->
         let title = B.title builder key in
         let logs ~failed = CI_output.(Saved { title; commit = DK.Commit.id commit; branch = branch_name; rebuild; failed }) in
-        DK.Tree.read_file tree Path.failure >>= function
-        | Ok failure ->
-          let r = {
-            result = Error (`Failure (Cstruct.to_string failure));
-            output = logs ~failed:true;
-          } in
-          Lwt.return (Some r)
-        | Error (`Msg "No such file or directory") ->
-          (* If we failed to load the failure, this result must be successful. *)
-          Lwt.catch
-            (fun () ->
-               B.load builder tree key >|= fun v ->
-               Some { result = Ok v; output = logs ~failed:false }
-            )
-            (fun ex ->
-               Log.err (fun f -> f "Failed to load value from previously cached result %s: %s"
-                           (DK.Commit.id commit)
-                           (Printexc.to_string ex)
-                       );
-               Lwt.return None
-            )
-        | Error (`Msg msg) ->
-          Log.err (fun f -> f "Failed to load value from previously cached result %s: %s"
-                      (DK.Commit.id commit)
-                      msg
-                  );
-          Lwt.return None
+        load_from_tree builder tree key >|= function
+        | Ok (`Success data)   -> Some { result = Ok data; output = logs ~failed:false }
+        | Ok (`Failure _ as f) -> Some { result = Error f; output = logs ~failed:true }
+        | Error (`Failure msg) ->
+          Log.err (fun f -> f "Failed to load value from previously cached result %s: %s" (DK.Commit.id commit) msg);
+          None
 
   let lookup_mem t ~rebuild k =
     match M.find k t.cache with
@@ -139,13 +133,6 @@ module Make(B : CI_s.BUILDER) = struct
         DK.Transaction.commit t ~message:"Marked for rebuild"
       )
     >>*= Lwt.return
-
-  let catch fn =
-    Lwt.catch fn
-      (function
-        | Failure msg -> Lwt.return (Error (`Failure msg))
-        | ex -> Lwt.return (Error (`Failure (Printexc.to_string ex)))
-      )
 
   (* Monitor the pending state of the log and keep the pending state in our hash table
      updated. Also, notify the user of the cache each time it changes.

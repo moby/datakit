@@ -17,7 +17,8 @@ depends: [
   "ocamlbuild" {build}
   "topkg"      {build}
   "cmdliner"
-  "lwt" "asetmap"
+  "lwt" {>= "2.7.0"}
+  "asetmap"
   "logs" "fmt" "mtime" "asl" "win-eventlog" "hvsock"
   "hex" "nocrypto" "conduit"
   "protocol-9p" {>= "0.8.0"}

@@ -11,7 +11,7 @@ module Make(B : CI_s.BUILDER) : sig
   type t
   val create: logs:CI_live_log.manager -> B.t -> t
   val lookup:
-    t -> (unit -> DK.t Lwt.t) -> rebuild:bool -> B.context -> B.Key.t ->
+    t -> (unit -> DK.t Lwt.t) -> B.context -> B.Key.t ->
     B.value CI_s.status Lwt.t
   val find: t -> B.context -> B.Key.t -> B.value CI_term.t
 end

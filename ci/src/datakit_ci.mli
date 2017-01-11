@@ -583,7 +583,7 @@ module Cache: sig
         [B.Key.t] to values of type [B.value]. *)
 
     val lookup:
-      t -> (unit -> DK.t Lwt.t) -> rebuild:bool -> B.context -> B.Key.t ->
+      t -> (unit -> DK.t Lwt.t) -> B.context -> B.Key.t ->
       B.value status Lwt.t
     (** [lookup t conn ~rebuild ctx key] returns the cached value of
         [key], or uses [B.generate ctx key] to start the process of
@@ -675,5 +675,5 @@ module Private: sig
   val lookup_log: branch:string -> Live_log.manager -> Live_log.t option
   val cancel: Live_log.t -> (unit, string) result Lwt.t
   val read_log: DK.t -> Output.saved -> string DK.or_error Lwt.t
-
+  val rebuild : Output.saved -> unit Lwt.t
 end

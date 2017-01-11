@@ -99,7 +99,9 @@ let run fn () =
     Private.Client9p.connect "unix" for_client () >>*= fun conn ->
     Lwt.finalize
       (fun () -> fn conn)
-      (fun () -> Private.Client9p.disconnect conn)
+      (fun () ->
+         Logs.info (fun f -> f "Disconnecting 9p");
+         Private.Client9p.disconnect conn)
   end
 
 let run_private fn () =
@@ -108,7 +110,10 @@ let run_private fn () =
     CI_utils.Client9p.connect "unix" for_client () >>*= fun conn ->
     Lwt.finalize
       (fun () -> fn conn)
-      (fun () -> CI_utils.Client9p.disconnect conn)
+      (fun () ->
+         Logs.info (fun f -> f "Disconnecting 9p");
+         CI_utils.Client9p.disconnect conn
+      )
   end
 
 let update branch values ~message =

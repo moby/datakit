@@ -231,6 +231,12 @@ let rec read_logs dk = function
     read_logs dk b >>= fun b ->
     Lwt.return (Printf.sprintf "(%s,%s)" a b)
 
+let rec rebuild_logs = function
+  | Output.Empty -> Lwt.return ()
+  | Output.Live _ -> Lwt.return ()
+  | Output.Saved saved -> Private.rebuild saved
+  | Output.Pair (a, b) -> Lwt.join [rebuild_logs a; rebuild_logs b]
+
 (* Check the cache works. If [regen] is [true], make a cache for each
    operation (testing disk pesistence). Otherwise, use the same one, testing
    memory persistence. *)
@@ -247,49 +253,53 @@ let test_cache ~regen =
   Test_utils.run @@ fun conn ->
   let dk = Private.connect conn in
   let conn () = Lwt.return dk in
-  let test_lookup ?(rebuild=false) key =
+  let test_lookup key =
     let c = get_cache () in
-    let rec aux ~rebuild =
-      Test_cache.lookup c conn ~rebuild Builder.NoContext key >>= function
+    let rec aux () =
+      Test_cache.lookup c conn Builder.NoContext key >>= function
       | { result = Ok x; output } ->
         read_logs dk output >>= fun logs ->
-        Lwt.return (x, Test_utils.strip_times logs)
+        Lwt.return (x, Test_utils.strip_times logs, output)
       | { result = Error (`Failure msg); _ } -> Alcotest.fail msg
       | { result = Error (`Pending (msg, ready)); _ } ->
         Log.debug (fun f -> f "Waiting for result to be returned: %s" msg);
         ready >>= fun () ->
-        aux ~rebuild:false
+        aux ()
     in
-    aux ~rebuild
+    aux ()
   in
   (* First check of "1" *)
-  test_lookup "1" >>= fun (value, log) ->
+  test_lookup "1" >>= fun (value, log, _) ->
   Alcotest.(check int) "First 1 lookup" 1 value;
   Alcotest.(check string) "First 1 lookup log" "=== Get key\nStarting...\nTime=0\nSuccess\n" log;
   (* First check of "2" *)
-  test_lookup "2" >>= fun (value, log) ->
+  test_lookup "2" >>= fun (value, log, _) ->
   Alcotest.(check int) "First 2 lookup" 2 value;
   Alcotest.(check string) "First 2 lookup log" "=== Get key\nStarting...\nTime=1\nSuccess\n" log;
   (* Second check of "1" *)
-  test_lookup "1" >>= fun (value, log) ->
+  test_lookup "1" >>= fun (value, log, out) ->
   Alcotest.(check int) "Second 1 lookup" 1 value;
   Alcotest.(check string) "Second 1 lookup log" "=== Get key\nStarting...\nTime=0\nSuccess\n" log;
   (* Rebuild "1" *)
-  test_lookup ~rebuild:true "1" >>= fun (value, log) ->
+  rebuild_logs out >>= fun () ->
+  test_lookup "1" >>= fun (value, log, out) ->
   Alcotest.(check int) "Rebuild 1 lookup" 1 value;
   Alcotest.(check string) "Rebuild 1 lookup log" "=== Get key\nStarting...\nTime=2\nSuccess\n" log;
   (* Parallel rebuilds *)
   if not regen then (
     let stream, push  = Lwt_stream.create () in
     b.Builder.step <- Some stream;
-    let a = test_lookup ~rebuild:true "1" in
-    let b = test_lookup ~rebuild:true "1" in
+    rebuild_logs out >>= fun () ->
+    let a = test_lookup "1" in
+    rebuild_logs out >>= fun () ->
+    let b = test_lookup "1" in
     push (Some ());
     push (Some ());
     push (Some ());
-    a >>= fun ra ->
-    b >>= fun rb ->
+    a >>= fun (ra, la, _) ->
+    b >>= fun (rb, lb, _) ->
     assert (ra = rb);
+    assert (la = lb);
     Lwt.return ()
   ) else (
     (* Can't test in-memory locking if we create a new cache each time. *)
@@ -309,7 +319,7 @@ let test_pending_updates conn =
   let b = { Builder.time = 0; step = Some step } in
   let c = Test_cache.create ~logs b in
   let check_pending expected =
-    Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= fun s ->
+    Test_cache.lookup c conn Builder.NoContext "1" >>= fun s ->
     let (reason, update) = expect_pending s.result in
     Alcotest.(check string) expected expected reason;
     assert (Lwt.state update = Lwt.Sleep);
@@ -319,7 +329,7 @@ let test_pending_updates conn =
   check_pending "Get key" >>= fun () ->
   check_pending "Paused" >>= fun () ->
   check_pending "Get key" >>= fun () ->
-  Test_cache.lookup c conn ~rebuild:false Builder.NoContext "1" >>= function
+  Test_cache.lookup c conn Builder.NoContext "1" >>= function
   | { result = Ok 1; _ } -> Lwt.return ()
   | _ -> Alcotest.fail "Expected success"
 

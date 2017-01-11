@@ -25,7 +25,6 @@ let with_gitdir dir env =
 
 module Commit = struct
   type t = { repo : repo; hash : string; }
-  let compare a b = String.compare a.hash b.hash
   let hash t = t.hash
   let pp f t = Fmt.string f t.hash
 
@@ -56,13 +55,6 @@ module Builder = struct
     let pp f = function
       | `PR pr -> PR.pp f pr
       | `Ref r -> Ref.pp f r
-
-    let compare a b =
-      match a, b with
-      | `PR a, `PR b   -> PR.compare a b
-      | `Ref a, `Ref b -> Ref.compare a b
-      | `Ref _, `PR _ -> -1
-      | `PR _, `Ref _ -> 1
 
     let head = function
       | `PR pr -> PR.commit pr

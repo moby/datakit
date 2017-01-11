@@ -523,7 +523,7 @@ module type BUILDER = sig
       inputs (keys). A builder is typically used with a
       {{!Cache}cache}. *)
 
-  module Key: Map.OrderedType
+  module Key: sig type t end
   (** Input describing what is to be built. *)
 
   type context

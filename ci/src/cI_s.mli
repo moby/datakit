@@ -51,7 +51,7 @@ end
 
 module type BUILDER = sig
   type t
-  module Key: Map.OrderedType
+  module Key: sig type t end
   type context
   type value
   val name: t -> string

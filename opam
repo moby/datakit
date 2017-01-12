@@ -26,7 +26,8 @@ depends: [
   "irmin"       {>= "0.12.0"}
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
-  "result" "lwt"
+  "result"
+  "lwt"		{>= "2.7.0"}
   "conduit" "mirage-flow"
   "cohttp"
   "named-pipe"  {>= "0.4.0"}

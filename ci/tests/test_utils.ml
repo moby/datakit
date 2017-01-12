@@ -69,7 +69,7 @@ let with_named_socket fn =
   begin try Unix.unlink path with _ -> () end;
   Lwt.finalize
     (fun () ->
-       Lwt_unix.bind socket (Lwt_unix.ADDR_UNIX path);
+       Lwt_unix.Versioned.bind_2 socket (Lwt_unix.ADDR_UNIX path) >>= fun () ->
        Lwt_unix.listen socket 2;
        fn (path, socket)
     )

@@ -1,7 +1,6 @@
 opam-version: "1.2"
 maintainer:   "datakit@docker.com"
-authors:      ["Thomas Leonard" "Anil Madhavapeddy"
-               "Dave Tucker" "Thomas Gazagnaire" ]
+authors:      ["Thomas Leonard"]
 license:      "Apache"
 homepage:     "https://github.com/docker/datakit"
 bug-reports:  "https://github.com/docker/datakit/issues"
@@ -10,36 +9,15 @@ doc:          "https://docker.github.io/datakit/"
 
 build: [
   "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false"
-  "-n" "datakit-ci"
+  "-n" "prometheus"
 ]
 
 depends: [
   "ocamlfind" {build}
-  "multipart-form-data"
-  "datakit-client"
-  "datakit-github"
-  "protocol-9p" {>= "0.8.0"}
   "astring"
-  "cmdliner"
-  "fmt"
-  "logs"
-  "tyxml" {>= "4.0.0"}
-  "tls"
-  "channel"
-  "conduit"
-  "io-page"
-  "pbkdf"
-  "webmachine"
-  "session"
-  "redis"
   "asetmap"
-  "github"
-  "prometheus"
-  "lwt" {>= "2.7.0"}
-  "ppx_sexp_conv" {build}
-  "crunch" {build}
-  "datakit" {test}
-  "irmin-unix" {test}
+  "fmt"
+  "lwt"
   "alcotest" {test}
 ]
 available: [ocaml-version >= "4.03.0"]

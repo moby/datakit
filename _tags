@@ -1,6 +1,6 @@
 true : bin_annot, safe_string
 not <ci/**>: warn_error(+1..49-3), warn(A-4-41-44)
-true: package(bytes lwt astring logs result cstruct fmt rresult)
+not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
 
 <src>: include
 

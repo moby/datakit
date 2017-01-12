@@ -4,12 +4,13 @@ EXE=Datakit
 
 TESTS = true
 
-.PHONY: all clean test bundle COMMIT exe ci
+.PHONY: all clean test bundle COMMIT exe prometheus ci
 
 all: datakit
 	@
 
 depends:
+	opam pin add prometheus . -y
 	opam pin add datakit-client . -y
 	opam pin add datakit-server . -y
 	opam pin add datakit-github . -y
@@ -27,6 +28,10 @@ server:
 
 github:
 	ocaml pkg/pkg.ml build -n datakit-github -q
+
+prometheus:
+	ocaml pkg/pkg.ml build -n prometheus -q --tests true
+	ocaml pkg/pkg.ml test _build/prometheus/tests/test.native
 
 ci:
 	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true

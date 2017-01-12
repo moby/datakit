@@ -1,6 +1,6 @@
 FROM docker/datakit:ci
 RUN sudo apk add docker certbot
-RUN opam pin add datakit-ci https://github.com/talex5/datakit.git#snap36
+RUN opam pin add datakit-ci https://github.com/talex5/datakit.git#snap39
 
 ADD . /datakit-ci
 WORKDIR /datakit-ci

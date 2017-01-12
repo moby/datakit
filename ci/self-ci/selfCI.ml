@@ -31,6 +31,7 @@ let docker_build target ~timeout name =
 let datakit_tests target =
   if is_gh_pages target then []
   else [
+    docker_build target ~timeout:(30. *. minute) "prometheus";
     docker_build target ~timeout:(30. *. minute) "client";
     docker_build target ~timeout:(30. *. minute) "ci";
     docker_build target ~timeout:(30. *. minute) "server";

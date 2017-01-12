@@ -1,6 +1,9 @@
 open! Astring
 open Asetmap
 
+let failf fmt =
+  Fmt.kstrf failwith fmt
+
 module type NAME = sig
   val valid : Str.regexp
 end
@@ -15,7 +18,7 @@ end = struct
 
   let v name =
     if not (Str.string_match N.valid name 0) then
-      CI_utils.failf "Invalid name %S" name;
+      failf "Invalid name %S" name;
     name
 
   let compare = String.compare
@@ -107,7 +110,7 @@ module TextFormat_0_0_4 = struct
     | "\\" -> "\\\\"
     | "\n" -> "\\n"
     | "\"" -> "\\\""
-    | x -> CI_utils.failf "Unexpected match %S" x
+    | x -> failf "Unexpected match %S" x
 
   let output_unquoted f s =
     Fmt.string f @@ Str.global_substitute re_unquoted_escapes quote s

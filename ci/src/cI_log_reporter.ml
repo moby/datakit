@@ -15,7 +15,7 @@ let pp_timestamp f x =
     (tm.tm_year + 1900) (tm.tm_mon + 1) tm.tm_mday tm.tm_hour tm.tm_min tm.tm_sec
 
 module Metrics = struct
-  open CI_prometheus
+  open Prometheus
 
   let namespace = "DataKitCI"
   let subsystem = "logs"

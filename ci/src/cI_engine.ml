@@ -13,27 +13,27 @@ module Metrics = struct
 
   let connection_attempts =
     let help = "Number of attempted connections to DataKit" in
-    CI_prometheus.Counter.v ~help ~namespace ~subsystem "connection_attempts_total"
+    Prometheus.Counter.v ~help ~namespace ~subsystem "connection_attempts_total"
 
   let connection_failures =
     let help = "Number of failed attempts to connect to DataKit" in
-    CI_prometheus.Counter.v ~help ~namespace ~subsystem "connection_failures_total"
+    Prometheus.Counter.v ~help ~namespace ~subsystem "connection_failures_total"
 
   let status_updates =
     let help = "Number of status updates" in
-    CI_prometheus.Counter.v ~help ~namespace ~subsystem "status_updates_total"
+    Prometheus.Counter.v ~help ~namespace ~subsystem "status_updates_total"
 
   let update_notifications =
     let help = "Number of notifications from DataKit" in
-    CI_prometheus.Counter.v ~help ~namespace ~subsystem "update_notifications_total"
+    Prometheus.Counter.v ~help ~namespace ~subsystem "update_notifications_total"
 
   let set_active_targets =
     let help = "Number of branches, tags and PRs currently being monitored" in
-    let g = CI_prometheus.Gauge.v_label ~label_name:"type" ~help ~namespace ~subsystem "active_targets" in
+    let g = Prometheus.Gauge.v_label ~label_name:"type" ~help ~namespace ~subsystem "active_targets" in
     let tags = g "tag" in
     let branches = g "branch" in
     let prs = g "pr" in
-    let set guage v = CI_prometheus.Gauge.set guage (float_of_int v) in
+    let set guage v = Prometheus.Gauge.set guage (float_of_int v) in
     function
     | `Tag    -> set tags
     | `Branch -> set branches
@@ -103,11 +103,11 @@ let dk t = t.dk
 let rec connect connect_dk =
   Lwt.catch
     (fun () ->
-       CI_prometheus.Counter.inc_one Metrics.connection_attempts;
+       Prometheus.Counter.inc_one Metrics.connection_attempts;
        connect_dk ()
     )
     (fun ex ->
-       CI_prometheus.Counter.inc_one Metrics.connection_failures;
+       Prometheus.Counter.inc_one Metrics.connection_failures;
        Log.warn (fun f -> f "Failed to connect to DataKit: %s (will retry in 10s)" (Printexc.to_string ex));
        Lwt_unix.sleep 10.0 >>= fun () ->
        connect connect_dk
@@ -196,7 +196,7 @@ let monitor t ?switch fn =
 let datakit_ci x = ["ci"; "datakit"; x]
 
 let set_status t target name ~status ~descr =
-  CI_prometheus.Counter.inc_one Metrics.status_updates;
+  Prometheus.Counter.inc_one Metrics.status_updates;
   let commit, url =
     match target with
     | `PR pr ->
@@ -374,7 +374,7 @@ let listen ?switch t =
   in
   enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
   monitor ?switch t (fun snapshot ->
-      CI_prometheus.Counter.inc_one Metrics.update_notifications;
+      Prometheus.Counter.inc_one Metrics.update_notifications;
       let active_tags = ref 0 in
       let active_braches = ref 0 in
       let active_prs = ref 0 in

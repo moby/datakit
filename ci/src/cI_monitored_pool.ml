@@ -1,7 +1,7 @@
 open Astring
 
 module Metrics = struct
-  open CI_prometheus
+  open Prometheus
 
   let namespace = "DataKitCI"
   let subsystem = "pool"
@@ -42,7 +42,7 @@ let create label capacity =
   let t = { label; capacity; active = 0; pool; users = [] } in
   assert (not (String.Map.mem label !registered_pools));
   registered_pools := String.Map.add label t !registered_pools;
-  CI_prometheus.Gauge.set (Metrics.capacity label) (float_of_int capacity);
+  Prometheus.Gauge.set (Metrics.capacity label) (float_of_int capacity);
   t
 
 let rec remove_first msg = function
@@ -52,21 +52,21 @@ let rec remove_first msg = function
 
 let use ?log t ~reason fn =
   let qlen = Metrics.qlen t.label in
-  CI_prometheus.Gauge.inc_one qlen;
+  Prometheus.Gauge.inc_one qlen;
   let start_wait = Unix.gettimeofday () in
   Lwt_pool.use t.pool
     (fun v ->
-       CI_prometheus.Gauge.dec_one qlen;
+       Prometheus.Gauge.dec_one qlen;
        let stop_wait = Unix.gettimeofday () in
-       CI_prometheus.Summary.observe (Metrics.wait_time t.label) (stop_wait -. start_wait);
+       Prometheus.Summary.observe (Metrics.wait_time t.label) (stop_wait -. start_wait);
        t.active <- t.active + 1;
        t.users <- (reason, log) :: t.users;
-       CI_prometheus.Gauge.track_inprogress (Metrics.resources_in_use t.label) @@ fun () ->
+       Prometheus.Gauge.track_inprogress (Metrics.resources_in_use t.label) @@ fun () ->
        Lwt.finalize
          (fun () -> fn v)
          (fun () ->
             let stop_use = Unix.gettimeofday () in
-            CI_prometheus.Summary.observe (Metrics.use_time t.label) (stop_use -. stop_wait);
+            Prometheus.Summary.observe (Metrics.use_time t.label) (stop_use -. stop_wait);
             t.active <- t.active - 1;
             t.users <- remove_first reason t.users;
             Lwt.return_unit)

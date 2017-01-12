@@ -22,6 +22,7 @@ let metas = [
   Pkg.meta_file ~install:false "pkg/META.server";
   Pkg.meta_file ~install:false "pkg/META.github";
   Pkg.meta_file ~install:false "pkg/META.ci";
+  Pkg.meta_file ~install:false "pkg/META.prometheus";
 ]
 
 let opams =
@@ -33,6 +34,7 @@ let opams =
     Pkg.opam_file "datakit-server.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-github.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-ci.opam" ~lint_deps_excluding ~install;
+    Pkg.opam_file "prometheus.opam" ~lint_deps_excluding ~install;
   ]
 
 let () =
@@ -75,5 +77,11 @@ let () =
       Pkg.mllib ~api:["Datakit_ci"] "ci/src/datakit-ci.mllib";
       Pkg.test  "ci/tests/test_ci" ~args:(Cmd.v "-q");
       Pkg.test  "ci/tests/exampleCI" ~run:false;
+    ]
+  | "prometheus" -> Ok [
+      Pkg.lib   "pkg/META.prometheus"   ~dst:"META";
+      Pkg.lib   "prometheus.opam"       ~dst:"opam";
+      Pkg.mllib ~api:["Prometheus"] "prometheus/src/prometheus.mllib";
+      Pkg.test  "prometheus/tests/test" ~args:(Cmd.v "-q");
     ]
   | other -> R.error_msgf "unknown package name: %s" other

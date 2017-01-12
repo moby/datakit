@@ -7,7 +7,7 @@ module Metrics = struct
 
   let evals =
     let help = "Number of term evaluations" in
-    CI_prometheus.Counter.v ~help ~namespace ~subsystem "evals_total"
+    Prometheus.Counter.v ~help ~namespace ~subsystem "evals_total"
 end
 
 module Context = struct
@@ -94,6 +94,6 @@ let ci_success_target_url ci target =
     | Some url -> return url
 
 let run ~snapshot ~job_id ~recalc ~dk term =
-  CI_prometheus.Counter.inc_one Metrics.evals;
+  Prometheus.Counter.inc_one Metrics.evals;
   let ctx = { Context.recalc; job_id; dk; github = snapshot } in
   (run ctx term, fun () -> Context.disable ctx)

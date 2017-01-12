@@ -5,7 +5,7 @@ open! Astring
 open Lwt.Infix
 
 module Metrics = struct
-  open CI_prometheus
+  open Prometheus
 
   let namespace = "DataKitCI"
   let subsystem = "cache"
@@ -182,7 +182,7 @@ module Make(B : CI_s.BUILDER) = struct
      Mark this entry as in-progress and start generating the new value.
      Must hold the lock while this is called, to insert the pending entry. *)
   let do_build t conn ctx k =
-    CI_prometheus.Counter.inc_one @@ Metrics.builds_started_total (B.name t.builder);
+    Prometheus.Counter.inc_one @@ Metrics.builds_started_total (B.name t.builder);
     let switch = Lwt_switch.create () in
     let title = B.title t.builder k in
     let branch_name = B.branch t.builder k in
@@ -203,8 +203,8 @@ module Make(B : CI_s.BUILDER) = struct
               (* Note: we don't hold the lock here. But that's OK; no-one else can change the entry while it's pending. *)
               conn () >>= fun dk ->
               DK.branch dk branch_name >>*= fun branch ->
-              CI_prometheus.Gauge.track_inprogress (Metrics.builds_in_progress (B.name t.builder)) @@ fun () ->
-              CI_prometheus.Summary.time (Metrics.build_time (B.name t.builder)) @@ fun () ->
+              Prometheus.Gauge.track_inprogress (Metrics.builds_in_progress (B.name t.builder)) @@ fun () ->
+              Prometheus.Summary.time (Metrics.build_time (B.name t.builder)) @@ fun () ->
               DK.Branch.with_transaction branch (fun trans ->
                   ensure_removed trans Path.rebuild >>= fun () ->
                   ensure_removed trans Path.value >>= fun () ->
@@ -214,13 +214,13 @@ module Make(B : CI_s.BUILDER) = struct
                   catch (fun () -> B.generate t.builder ~switch ~log trans ctx k) >>= function
                   | Ok x ->
                     CI_live_log.log log "Success";
-                    CI_prometheus.Counter.inc_one @@ Metrics.builds_succeeded_total (B.name t.builder);
+                    Prometheus.Counter.inc_one @@ Metrics.builds_succeeded_total (B.name t.builder);
                     DK.Transaction.create_or_replace_file trans Path.log (Cstruct.of_string (CI_live_log.contents log)) >>*= fun () ->
                     DK.Transaction.commit trans ~message:"Cached successful result" >>*= fun () ->
                     return (Ok x)
                   | Error (`Failure msg) ->
                     CI_live_log.log log "Failed: %s" msg;
-                    CI_prometheus.Counter.inc_one @@ Metrics.builds_failed_total (B.name t.builder);
+                    Prometheus.Counter.inc_one @@ Metrics.builds_failed_total (B.name t.builder);
                     DK.Transaction.create_or_replace_file trans Path.log (Cstruct.of_string (CI_live_log.contents log)) >>*= fun () ->
                     DK.Transaction.create_file trans Path.failure (Cstruct.of_string msg) >>*= fun () ->
                     DK.Transaction.commit trans ~message:("Cached failure: " ^ msg) >>*= fun () ->
@@ -239,7 +239,7 @@ module Make(B : CI_s.BUILDER) = struct
            (fun ex ->
               let msg = Printexc.to_string ex in
               Log.err (fun f -> f "Uncaught exception in do_build: %s" msg);
-              CI_prometheus.Counter.inc_one @@ Metrics.build_exceptions_total (B.name t.builder);
+              Prometheus.Counter.inc_one @@ Metrics.build_exceptions_total (B.name t.builder);
               finish { result = Error (`Failure msg); output = CI_output.Empty }
            )
       );

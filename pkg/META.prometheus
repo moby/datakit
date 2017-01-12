@@ -1,0 +1,7 @@
+description = "Prometheus metrics reporting (client)"
+version = "%%VERSION%%"
+requires = "astring asetmap fmt"
+archive(byte)   = "prometheus.cma"
+archive(native) = "prometheus.cmxa"
+plugin(byte)    = "prometheus.cma"
+plugin(native)  = "prometheus.cmxs"

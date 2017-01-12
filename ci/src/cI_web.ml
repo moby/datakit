@@ -85,8 +85,8 @@ class metrics t = object(self)
       Wm.respond ~body:(`String "Bad token") 403 rd
 
   method private to_plain rd =
-    let data = CI_prometheus.(CollectorRegistry.collect CollectorRegistry.default) in
-    let body = Fmt.to_to_string CI_prometheus.TextFormat_0_0_4.output data in
+    let data = Prometheus.(CollectorRegistry.collect CollectorRegistry.default) in
+    let body = Fmt.to_to_string Prometheus.TextFormat_0_0_4.output data in
     Wm.continue (`String body) rd
 end
 

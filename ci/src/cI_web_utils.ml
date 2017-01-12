@@ -7,7 +7,7 @@ module Log = CI_utils.Log
 module Server = Cohttp_lwt_unix.Server
 
 module Metrics = struct
-  open CI_prometheus
+  open Prometheus
 
   let namespace = "DataKitCI"
   let subsystem = "web"
@@ -564,10 +564,10 @@ class auth_intro t = object(self)
     let token = Wm.Rd.lookup_path_info_exn "token" rd in
     match Auth.check_setup_token t.auth token with
     | Error msg ->
-      CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
+      Prometheus.Counter.inc_one Metrics.local_login_rejected_total;
       Wm.respond 403 ~body:(`String msg) rd
     | Ok () ->
-      CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
+      Prometheus.Counter.inc_one Metrics.local_login_ok_total;
       self#session rd >>= fun session_data ->
       let session = {session_data with Session_data.username = Some "admin"} in
       self#session_set (Session_data.to_string session) rd >>= fun () ->
@@ -592,7 +592,7 @@ class github_callback t = object(self)
     self#session rd >>= fun session_data ->
     let expected_token = session_data.Session_data.csrf_token in
     let reject msg =
-      CI_prometheus.Counter.inc_one Metrics.github_login_rejected_total;
+      Prometheus.Counter.inc_one Metrics.github_login_rejected_total;
       Wm.respond 403 ~body:(`String msg) rd
     in
     match Uri.get_query_param rd.Wm.Rd.uri "state" with
@@ -616,7 +616,7 @@ class github_callback t = object(self)
                 self#session_set (Session_data.to_string value) rd >>= fun () ->
                 Lwt.return redirect
             end >>= fun redirect ->
-            CI_prometheus.Counter.inc_one Metrics.github_login_ok_total;
+            Prometheus.Counter.inc_one Metrics.github_login_ok_total;
             Wm.respond 303 (Wm.Rd.redirect redirect rd)
 end
 
@@ -625,8 +625,8 @@ let pp_path =
 
 let callback ~routes _conn request body =
   Metrics.record_request request;
-  CI_prometheus.Summary.time Metrics.response_time_seconds @@ fun () ->
-  CI_prometheus.Gauge.track_inprogress Metrics.requests_in_progress @@ fun () ->
+  Prometheus.Summary.time Metrics.response_time_seconds @@ fun () ->
+  Prometheus.Gauge.track_inprogress Metrics.requests_in_progress @@ fun () ->
   Wm.dispatch' routes ~body ~request
   >|= begin function
     | None        -> (`Not_found, Cohttp.Header.init (), `String "Not found", [])
@@ -781,10 +781,10 @@ class login_page t = object(self)
     get "user" non_empty <*> get "password" string >>!= fun (user, password) ->
     match Auth.lookup t.auth ~user ~password with
     | None ->
-      CI_prometheus.Counter.inc_one Metrics.local_login_rejected_total;
+      Prometheus.Counter.inc_one Metrics.local_login_rejected_total;
       fail "login" ~msg:"Invalid username/password"
     | Some _ ->
-      CI_prometheus.Counter.inc_one Metrics.local_login_ok_total;
+      Prometheus.Counter.inc_one Metrics.local_login_ok_total;
       maybe user
 
   method private process user rd =

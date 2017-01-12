@@ -499,32 +499,6 @@ let test_roles conn =
   test_private_server "/" ~expect:`See_other >>= fun () ->
   test_public_server "/" ~expect:`OK
 
-let test_metrics () =
-  let open CI_prometheus in
-  let registry = CollectorRegistry.create () in
-  let requests =
-    let label_names = [| "method"; "path" |] in
-    Counter.v_labels ~label_names ~registry ~help:"Requests" ~namespace:"dkci" ~subsystem:"tests" "requests" in
-  let m = Counter.v ~registry ~help:"Test \\counter:\n1" "tests" in
-  Counter.inc_one m;
-  let get_index = Counter.labels requests [| "GET"; "\"\\-\n" |] in
-  let post_login = Counter.labels requests [| "POST"; "/login" |] in
-  Counter.inc get_index 5.;
-  Counter.inc post_login 2.;
-  let post_login2 = Counter.labels requests [| "POST"; "/login" |] in
-  Counter.inc_one post_login2;
-  let output = Fmt.to_to_string TextFormat_0_0_4.output (CollectorRegistry.collect registry) in
-  Alcotest.(check string) "Text output"
-    "#HELP dkci_tests_requests Requests\n\
-     #TYPE dkci_tests_requests counter\n\
-     dkci_tests_requests{method=\"GET\", path=\"\\\"\\\\-\\n\"} 5\n\
-     dkci_tests_requests{method=\"POST\", path=\"/login\"} 3\n\
-     #HELP tests Test \\\\counter:\\n1\n\
-     #TYPE tests counter\n\
-     tests 1\n\
-    "
-    output
-
 let test_set = [
   "Simple",         `Quick, Test_utils.run test_simple;
   "Branch",         `Quick, Test_utils.run test_branch;
@@ -540,7 +514,6 @@ let test_set = [
   "Cross-project",  `Quick, Test_utils.run test_cross_project;
   "Auth",           `Quick, test_auth;
   "Roles",          `Quick, Test_utils.run_private test_roles;
-  "Metrics",        `Quick, test_metrics;
 ]
 
 let () =

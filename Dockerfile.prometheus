@@ -1,0 +1,6 @@
+FROM ocaml/opam:alpine-3.4_ocaml-4.03.0
+
+RUN opam depext -ui fmt logs asetmap
+
+ADD . /home/opam/datakit
+RUN opam pin add -k git prometheus /home/opam/datakit

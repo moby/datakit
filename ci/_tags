@@ -8,5 +8,6 @@ true: package(tls, channel, conduit.lwt-unix, io-page.unix)
 true: package(pbkdf, sexplib, ppx_sexp_conv)
 true: package(asetmap)
 true: package(github.unix datakit-github.client)
+true: package(prometheus)
 
 <src>: include

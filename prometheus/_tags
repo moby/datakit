@@ -1,0 +1,5 @@
+true: warn(A-4-58)
+true: strict_sequence, safe_string, annot, bin_annot
+true: package(lwt, astring, asetmap, fmt, str)
+<tests/*>: package(alcotest)
+<src>: include

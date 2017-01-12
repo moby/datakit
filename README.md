@@ -341,6 +341,16 @@ To read the last GitHub events related to a repository:
 This is a non-blocking read, and will produce a file where every line is a new
 event.
 
+## Prometheus metric reporting
+
+Run with `--listen-prometheus 9090` to expose metrics at `http://*:9090/metrics`.
+
+Note: there is no encryption and no access control. You are expected to run the
+database in a container and to not export this port to the outside world. You
+can either collect the metrics by running a Prometheus service in a container
+on the same Docker network, or front the service with nginx or similar if you
+want to collect metrics remotely.
+
 ### How do I...
 
 #### Create a new branch

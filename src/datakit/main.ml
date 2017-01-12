@@ -145,7 +145,7 @@ let () =
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
     )
 
-let start listen_9p listen_http git =
+let start ~listen_9p ~listen_http prometheus git =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -163,6 +163,7 @@ let start listen_9p listen_http git =
   Log.app (fun l ->
       l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v
     );
+  let prometheus_threads = Prometheus_app.serve prometheus in
   let serve_http = match listen_http with
     | None     -> []
     | Some uri -> [http_server (Uri.of_string uri) git]
@@ -177,7 +178,7 @@ let start listen_9p listen_http git =
       ) listen_9p
   in
   serve_9p >>= fun serve_9p ->
-  Lwt.choose (serve_http @ serve_9p)
+  Lwt.choose (serve_http @ serve_9p @ prometheus_threads)
 
 let exec ~name cmd =
   Lwt_process.exec cmd >|= function
@@ -189,8 +190,8 @@ let exec ~name cmd =
   | Unix.WSTOPPED i  ->
     Log.err (fun l -> l "%s stopped by signal %d" name i)
 
-let start () listen_9p listen_http git auto_push =
-  let start () = start listen_9p listen_http git in
+let start () listen_9p listen_http prometheus git auto_push =
+  let start () = start ~listen_9p ~listen_http prometheus git in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()
@@ -290,7 +291,7 @@ let term =
     `S "DESCRIPTION";
     `P "$(tname) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ setup_log $ listen_9p $ listen_http
+  Term.(pure start $ setup_log $ listen_9p $ listen_http $ Prometheus_app.opts
         $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 

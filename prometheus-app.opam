@@ -1,0 +1,22 @@
+opam-version: "1.2"
+maintainer:   "datakit@docker.com"
+authors:      ["Thomas Leonard"]
+license:      "Apache"
+homepage:     "https://github.com/docker/datakit"
+bug-reports:  "https://github.com/docker/datakit/issues"
+dev-repo:     "https://github.com/docker/datakit.git"
+doc:          "https://docker.github.io/datakit/"
+
+build: [
+  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false"
+  "-n" "prometheus-app"
+]
+
+depends: [
+  "ocamlfind" {build}
+  "prometheus"
+  "fmt"
+  "cohttp"
+  "lwt"
+]
+available: [ocaml-version >= "4.03.0"]

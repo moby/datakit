@@ -3,13 +3,27 @@
 #require "topkg"
 open Topkg
 
+let includes = function
+  | "prometheus" | "prometheus-app" -> ["prometheus"]
+  | "datakit-ci" -> ["ci"]
+  | "datakit" -> ["src"; "src/datakit"]
+  | "datakit-server" -> ["src"; "src/datakit-server"]
+  | "datakit-github" -> ["src"; "src/datakit"]
+  | "datakit-client" -> ["src"; "src/datakit-client"]
+  | x -> failwith ("Unknown includes for package: " ^ x)
+
 let build =
   let build_with_visible_warnings c os =
     let ocamlbuild = Conf.tool "ocamlbuild" os in
     let build_dir = Conf.build_dir c in
     let debug = Cmd.(on (Conf.debug c) (v "-tag" % "debug")) in
     let profile = Cmd.(on (Conf.profile c) (v "-tag" % "profile")) in
-    Cmd.(ocamlbuild % "-use-ocamlfind" %% debug %% profile % "-build-dir" % build_dir)
+    let includes =
+      match includes (Conf.pkg_name c) with
+      | [] -> Cmd.empty
+      | is -> Cmd.(v "-Is" % String.concat "," is)
+    in
+    Cmd.(ocamlbuild % "-use-ocamlfind" %% debug %% profile %% includes % "-build-dir" % build_dir)
   in
   let cmd c os files =
     OS.Cmd.run @@ Cmd.(build_with_visible_warnings c os %% of_list files)
@@ -23,6 +37,7 @@ let metas = [
   Pkg.meta_file ~install:false "pkg/META.github";
   Pkg.meta_file ~install:false "pkg/META.ci";
   Pkg.meta_file ~install:false "pkg/META.prometheus";
+  Pkg.meta_file ~install:false "pkg/META.prometheus-app";
 ]
 
 let opams =
@@ -35,6 +50,7 @@ let opams =
     Pkg.opam_file "datakit-github.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "datakit-ci.opam" ~lint_deps_excluding ~install;
     Pkg.opam_file "prometheus.opam" ~lint_deps_excluding ~install;
+    Pkg.opam_file "prometheus-app.opam" ~lint_deps_excluding ~install;
   ]
 
 let () =
@@ -81,7 +97,12 @@ let () =
   | "prometheus" -> Ok [
       Pkg.lib   "pkg/META.prometheus"   ~dst:"META";
       Pkg.lib   "prometheus.opam"       ~dst:"opam";
-      Pkg.mllib ~api:["Prometheus"] "prometheus/src/prometheus.mllib";
+      Pkg.mllib "prometheus/src/prometheus.mllib";
       Pkg.test  "prometheus/tests/test" ~args:(Cmd.v "-q");
+    ]
+  | "prometheus-app" -> Ok [
+      Pkg.lib   "pkg/META.prometheus-app" ~dst:"META";
+      Pkg.lib   "prometheus-app.opam"     ~dst:"opam";
+      Pkg.mllib "prometheus/app/prometheus-app.mllib";
     ]
   | other -> R.error_msgf "unknown package name: %s" other

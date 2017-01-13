@@ -293,6 +293,7 @@ type server = {
   auth : Auth.t;
   session_backend : Session.Backend.t;
   web_config : CI_web_templates.t;
+  secure_cookies : bool;
   has_role :
     role -> user:string option -> attrs:Auth.user_attributes ->
     (bool, CI_web_templates.Error.t) result;
@@ -333,7 +334,7 @@ let github_repos_in_policy acl =
   in
   aux Repo.Set.empty acl
 
-let server ~auth ~web_config ~session_backend =
+let server ~auth ~web_config ~session_backend ~public_address =
   let has_role r ~user ~attrs =
     match r with
     | `Reader -> matches_acl web_config.CI_web_templates.can_read ~user ~attrs
@@ -348,7 +349,17 @@ let server ~auth ~web_config ~session_backend =
     |> Repo.Set.elements
   in
   let session_backend = Session.connect session_backend in
-  { auth; session_backend; web_config; has_role; acl_github_repos }
+  let secure_cookies =
+    (* Note: we care about the address the user uses, not the scheme we provide.
+       e.g. we might be providing HTTP behind an HTTPS proxy - we still want secure
+       cookies in that case. *)
+    match Uri.scheme public_address with
+    | Some "https" -> true
+    | Some "http" -> false
+    | None -> CI_utils.failf "Missing scheme in public address"
+    | Some s -> CI_utils.failf "Unknown scheme %S" s
+  in
+  { auth; session_backend; web_config; has_role; acl_github_repos; secure_cookies }
 
 let web_config t = t.web_config
 
@@ -451,7 +462,7 @@ class virtual resource_with_session t =
           generate_new_session ()
 
     method! finish_request rd =
-      let rd = self#session_set_hdrs ~path:"/" ~secure:true rd in
+      let rd = self#session_set_hdrs ~path:"/" ~secure:t.secure_cookies rd in
       Wm.continue () rd
   end
 

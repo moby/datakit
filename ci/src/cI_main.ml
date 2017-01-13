@@ -68,7 +68,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
       )
   in
   let session_backend = make_session_backend session_backend in
-  let server = CI_web_utils.server ~web_config ~auth ~session_backend in
+  let server = CI_web_utils.server ~web_config ~auth ~session_backend ~public_address:web_ui in
   let routes = CI_web.routes ~server ~logs ~ci ~dashboards in
   Lwt.pick [
     main_thread;

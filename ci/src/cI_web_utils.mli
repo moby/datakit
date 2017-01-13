@@ -32,6 +32,7 @@ val server :
   auth:Auth.t ->
   web_config:CI_web_templates.t ->
   session_backend:[< `Memory | `Redis of Redis_lwt.Client.connection Lwt_pool.t] ->
+  public_address:Uri.t ->
   server
 
 val web_config : server -> CI_web_templates.t

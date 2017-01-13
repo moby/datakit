@@ -27,6 +27,7 @@ module Commit = struct
   type t = { repo : repo; hash : string; }
   let hash t = t.hash
   let pp f t = Fmt.string f t.hash
+  let pp_short f t = Fmt.string f (String.with_range ~len:10 t.hash)
 
   let is_after ~old t =
     try Hashtbl.find t.repo.is_ancestor (old, t.hash)

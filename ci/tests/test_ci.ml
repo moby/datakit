@@ -478,14 +478,15 @@ let test_roles conn =
   let tests = Repo.Map.of_list [
   ] in
   let dk = CI_utils.DK.connect conn in
-  let ci = CI_engine.create ~web_ui:(Uri.of_string "http://localhost/") (fun () -> Lwt.return dk) tests in
+  let web_ui = Uri.of_string "http://localhost/" in
+  let ci = CI_engine.create ~web_ui (fun () -> Lwt.return dk) tests in
   let logs = CI_live_log.create_manager () in
   with_test_auth @@ fun auth ->
   let server ~public =
     let can_read = if public then CI_ACL.everyone else CI_ACL.username "admin" in
     let can_build = CI_ACL.username "admin" in
     let web_config = CI_web_templates.config ~name:"test-ci" ~can_read ~can_build () in
-    let server = CI_web_utils.server ~web_config ~auth ~session_backend:`Memory in
+    let server = CI_web_utils.server ~web_config ~auth ~session_backend:`Memory ~public_address:web_ui in
     let routes = CI_web.routes ~server ~logs ~ci ~dashboards:(CI_target.map_of_list []) in
     fun ~expect path ->
       let request = Cohttp.Request.make (Uri.make ~path ()) in

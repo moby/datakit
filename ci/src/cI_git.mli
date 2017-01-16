@@ -3,7 +3,13 @@ open CI_s
 type t
 val v: ?remote:string -> logs:CI_live_log.manager -> string -> t
 
-type commit
+module Commit : sig
+  type t
+  val pp : t Fmt.t
+  val pp_short : t Fmt.t
+end
+
+type commit = Commit.t
 val hash: commit -> string
 val is_after: old:string -> commit -> bool Lwt.t
 

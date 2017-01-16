@@ -21,6 +21,7 @@ module DK = Utils.DK
 module ACL = CI_ACL
 module Target = CI_target
 module Git = CI_git
+module Docker = CI_docker
 
 module Web = struct
   type config = CI_web_templates.t

@@ -3,41 +3,47 @@ open Term.Infix
 
 let minute = 60.
 
+let pool = Monitored_pool.create "Docker build" 10
+
+let dockerfile ~timeout file = Docker.create ~logs ~pool ~timeout ~label:file file
+
+let prometheus  = dockerfile ~timeout:(30. *. minute) "Dockerfile.prometheus"
+let client      = dockerfile ~timeout:(30. *. minute) "Dockerfile.client"
+let ci          = dockerfile ~timeout:(30. *. minute) "Dockerfile.ci"
+let server      = dockerfile ~timeout:(30. *. minute) "Dockerfile.server"
+let github      = dockerfile ~timeout:(30. *. minute) "Dockerfile.github"
+let datakit     = dockerfile ~timeout:(30. *. minute) "Dockerfile"
+
 let repo = Git.v ~logs ~remote:"https://github.com/docker/datakit.git" "/data/repos/datakit"
 
 let is_gh_pages = function
-  | `Ref id -> (match id with (_, ["heads"; "gh-pages"]) -> true | _ -> false)
+  | `Ref (_, ["heads"; "gh-pages"]) -> true
   | _ -> false
 
-let docker_build target ~timeout name =
-  let dockerfile =
-    match name with
-    | "datakit" -> "Dockerfile"
-    | name -> "Dockerfile." ^ name
-  in
-  let build =
-    Git.command ~timeout ~logs ~label:("docker-build-" ^ name) ~clone:true
-      [
-        [| "docker"; "build"; "--pull"; "-f"; dockerfile; "." |]
-      ]
-  in
-  let term =
-    Git.fetch_head repo target >>= fun src ->
-    Git.run build src >|= fun () ->
-    "Build succeeded"
-  in
-  (name, term)
+let build ?from dockerfile src =
+  match from with
+  | None -> src >>= Docker.build dockerfile ?from:None
+  | Some from ->
+    Term.pair src from >>= fun (src, from) ->
+    Docker.build dockerfile ~from src
+
+let test name term =
+  name, (term >|= fun (_:Docker.Image.t) -> "Build succeeded")
 
 let datakit_tests target =
   if is_gh_pages target then []
-  else [
-    docker_build target ~timeout:(30. *. minute) "prometheus";
-    docker_build target ~timeout:(30. *. minute) "client";
-    docker_build target ~timeout:(30. *. minute) "ci";
-    docker_build target ~timeout:(30. *. minute) "server";
-    docker_build target ~timeout:(30. *. minute) "github";
-    docker_build target ~timeout:(30. *. minute) "datakit";
-  ]
+  else (
+    let src = Git.fetch_head repo target in
+    let server = build server src in
+    [
+      test "server"     @@ server;
+      test "prometheus" @@ build prometheus src;
+      test "client"     @@ build client     src;
+      test "ci"         @@ build ci         src;
+      test "github"     @@ build github     src ~from:server;
+      test "datakit"    @@ build datakit    src ~from:server;
+    ]
+  )
 
 let projects = [
   Config.project ~id:"docker/datakit" datakit_tests

@@ -1,6 +1,6 @@
 description = "Define CI pipelines on top of datakit-client"
 version = "%%VERSION%%"
-requires = "fmt astring datakit-client protocol-9p.unix astring cmdliner fmt.tty logs.fmt fmt.cli logs.cli cohttp.lwt tyxml webmachine session.webmachine multipart-form-data tls channel conduit.lwt-unix io-page.unix pbkdf sexplib asetmap github.unix session.redis-lwt datakit-github.client prometheus"
+requires = "fmt astring datakit-client protocol-9p.unix astring cmdliner fmt.tty logs.fmt fmt.cli logs.cli cohttp.lwt tyxml webmachine session.webmachine multipart-form-data tls channel conduit.lwt-unix io-page.unix pbkdf sexplib asetmap github.unix session.redis-lwt datakit-github.client prometheus-app"
 archive(byte)   = "datakit-ci.cma"
 archive(native) = "datakit-ci.cmxa"
 plugin(byte)    = "datakit-ci.cma"

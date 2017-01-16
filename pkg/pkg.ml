@@ -98,11 +98,11 @@ let () =
       Pkg.lib   "pkg/META.prometheus"   ~dst:"META";
       Pkg.lib   "prometheus.opam"       ~dst:"opam";
       Pkg.mllib "prometheus/src/prometheus.mllib";
-      Pkg.test  "prometheus/tests/test" ~args:(Cmd.v "-q");
     ]
   | "prometheus-app" -> Ok [
       Pkg.lib   "pkg/META.prometheus-app" ~dst:"META";
       Pkg.lib   "prometheus-app.opam"     ~dst:"opam";
       Pkg.mllib "prometheus/app/prometheus-app.mllib";
+      Pkg.test  "prometheus/tests/test" ~args:(Cmd.v "-q");
     ]
   | other -> R.error_msgf "unknown package name: %s" other

@@ -9,18 +9,47 @@
     - The [time] functions are unfortunate, as they create a dependency on [Unix].
       Maybe they should be moved elsewhere.
 
-    - This module automatically initialises itself and registers some standard collectors relating to
-      GC statistics, as recommended by Prometheus.
-
     - The API is rather limited. In particular, it is not yet possible to write your own collectors.
+
+    - This library is intended to be a dependency of any library that might need to report metrics,
+      even though many applications will not enable it. Therefore it should have minimal dependencies.
 *)
+
+open Asetmap
+
+type metric_type =
+  | Counter
+  | Gauge
+  | Summary
+
+module type NAME = sig
+  type t = private string
+  val v : string -> t
+  val pp : t Fmt.t
+  val compare : t -> t -> int
+end
+
+module MetricName : NAME
+module LabelName  : NAME
+
+module MetricInfo : sig
+  type t = {
+    name : MetricName.t;
+    metric_type : metric_type;
+    help : string;
+    label_names : LabelName.t array;
+  }
+end
+
+module LabelSetMap : Map.S with type key = string array
+module MetricMap : Map.S with type key = MetricInfo.t
 
 module CollectorRegistry : sig
   type t
   (** A collection of metrics to be monitored. *)
 
-  type snapshot
-  (** The result of reading all the metrics. *)
+  type snapshot = (string * float) list LabelSetMap.t MetricMap.t
+  (** The result of reading a set of metrics. *)
 
   val create : unit -> t
   (** [create ()] is a fresh registry. This is mostly useful for testing. *)
@@ -30,11 +59,15 @@ module CollectorRegistry : sig
 
   val collect : t -> snapshot
   (** Read the current value of each metric. *)
-end
 
-module TextFormat_0_0_4 : sig
-  val output : CollectorRegistry.snapshot Fmt.t
-  (** Format a snapshot in Prometheus's text format, version 0.0.4. *)
+  val register : t -> MetricInfo.t -> (unit -> (string * float) list LabelSetMap.t) -> unit
+  (** [register t metric collector] adds [metric] to the set of metrics being collected.
+      It will call [collector ()] to collect the values each time [collect] is called. *)
+
+  val register_pre_collect : t -> (unit -> unit) -> unit
+  (** [register_pre_collect t fn] arranges for [fn ()] to be called at the start
+      of each collection. This is useful if one expensive call provides
+      information about multiple metrics. *)
 end
 
 module type METRIC = sig

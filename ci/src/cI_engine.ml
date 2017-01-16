@@ -219,7 +219,16 @@ let set_status t target name ~status ~descr =
     let ci = datakit_ci name in
     Status.v ~description:descr ~url commit ci status
   in
-  update_status t ~message status
+  Lwt.catch
+    (fun () -> update_status t ~message status)
+    (fun ex ->
+       (* Most likely the bridge has deleted the commit because the target was deleted.
+          Ideally we'd get the commit it tried to merge with and check, but for now just
+          log a warning. *)
+       Log.warn (fun f -> f "Failed to update status of %a: %a" CI_target.pp_v target CI_utils.pp_exn ex);
+       Lwt.return ()
+    )
+
 
 let reconnect t =
   match Lwt.state t.dk with

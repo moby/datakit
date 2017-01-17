@@ -5,7 +5,10 @@ type manager
 val create_manager : unit -> manager
 
 type t
-type stream
+type stream = {
+  data : string;
+  next : stream option Lwt.t Lazy.t;
+}
 
 val create : ?switch:Lwt_switch.t -> pending:string -> branch:string -> title:string -> manager -> t
 (** [create ~pending ~branch ~title manager] is a fresh, empty log with pending reason [pending].
@@ -20,7 +23,7 @@ val lookup : branch:string -> manager -> t option
 val branch : t -> string
 (** [branch t] is the branch to which this log will be written when finished. *)
 
-val stream : t -> stream Lwt.t
+val stream : t -> stream option Lwt.t
 (** [stream t] reads the contents of the log as a stream. *)
 
 val write : t -> string -> unit

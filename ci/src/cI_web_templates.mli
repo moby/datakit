@@ -89,7 +89,6 @@ val target_page :
 
 val live_log_frame :
   branch:string ->
-  live_log:CI_live_log.t ->
   have_history:bool ->
   t ->
   page

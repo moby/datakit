@@ -738,7 +738,7 @@ let iframe_page ~page_title =
 let plain_error msg _t ~user:_ =
   plain_page ~page_title:"Error" (body [pcdata msg])
 
-let live_log_frame ~branch ~live_log ~have_history t ~user:_ =
+let live_log_frame ~branch ~have_history t ~user:_ =
   let buttons =
     if have_history then [history_button (log_branch_history_url t branch)]
     else []
@@ -754,7 +754,8 @@ let live_log_frame ~branch ~live_log ~have_history t ~user:_ =
             div ~a:[a_class["btn-group";"pull-right"]] buttons
           ]
         ];
-        pre [pcdata (CI_live_log.contents live_log)];
+        pre [pcdata "@STREAM-GOES-HERE@"];
+        p [pcdata "This log is now complete."];
       ]
     )
 

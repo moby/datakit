@@ -1,0 +1,8 @@
+description = "Cohttp server for Prometheus metrics"
+version = "%%VERSION%%"
+requires = "prometheus cohttp.lwt"
+archive(byte)   = "prometheus-app.cma"
+archive(native) = "prometheus-app.cmxa"
+plugin(byte)    = "prometheus-app.cma"
+plugin(native)  = "prometheus-app.cmxs"
+exists_if       = "prometheus-app.cma"

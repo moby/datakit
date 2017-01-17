@@ -5,7 +5,7 @@ requires = ""
 package "ivfs" (
  description = "Project Irmin into a Datakit VFS"
  version = "%%VERSION%%"
- requires = "fmt astring irmin datakit-server.vfs"
+ requires = "fmt astring irmin asetmap prometheus-app datakit-server.vfs"
  archive(byte)   = "ivfs.cma"
  archive(native) = "ivfs.cmxa"
  plugin(byte)    = "ivfs.cma"

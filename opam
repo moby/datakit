@@ -37,6 +37,7 @@ depends: [
   "asl"         {>= "0.10"}
   "mtime"
   "irmin-watcher" {>= "0.2.0"}
+  "prometheus-app"
   "datakit-server" {>= "0.8.0"}
   "datakit-client" {test & >= "0.8.0"}
   "datakit-github" {test & >= "0.8.0"}

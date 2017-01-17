@@ -34,7 +34,7 @@ depends: [
   "redis"
   "asetmap"
   "github"
-  "prometheus"
+  "prometheus-app"
   "lwt" {>= "2.7.0"}
   "ppx_sexp_conv" {build}
   "crunch" {build}

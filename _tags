@@ -1,8 +1,8 @@
+true: -traverse
 true : bin_annot, safe_string
 not <ci/**>: warn_error(+1..49-3), warn(A-4-41-44)
 not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
-
-<src>: include
+<ci/static/**>: traverse
 
 ### datakit-client
 
@@ -15,12 +15,12 @@ not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
 
 ### datakit
 
-<src/datakit>: include
 <src/datakit/ivfs*>: package(irmin tc datakit-server.vfs asetmap)
 
 #### irmin-io
 <src/datakit/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
 
+<src/datakit/*>: package(prometheus-app)
 <src/datakit/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt asetmap)
 <src/datakit/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
 <src/datakit/main.*>: package(irmin.http cohttp.lwt irmin-watcher), thread

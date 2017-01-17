@@ -1,5 +1,6 @@
 open! Astring
 open Prometheus
+open Prometheus_app
 
 let test_metrics () =
   let registry = CollectorRegistry.create () in

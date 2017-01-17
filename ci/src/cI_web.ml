@@ -86,7 +86,7 @@ class metrics t = object(self)
 
   method private to_plain rd =
     let data = Prometheus.(CollectorRegistry.collect CollectorRegistry.default) in
-    let body = Fmt.to_to_string Prometheus.TextFormat_0_0_4.output data in
+    let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
     Wm.continue (`String body) rd
 end
 

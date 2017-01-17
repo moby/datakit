@@ -11,6 +11,7 @@ all: datakit
 
 depends:
 	opam pin add prometheus . -y
+	opam pin add prometheus-app . -y
 	opam pin add datakit-client . -y
 	opam pin add datakit-server . -y
 	opam pin add datakit-github . -y
@@ -29,9 +30,12 @@ server:
 github:
 	ocaml pkg/pkg.ml build -n datakit-github -q
 
-prometheus:
-	ocaml pkg/pkg.ml build -n prometheus -q --tests true
+prometheus-app:
+	ocaml pkg/pkg.ml build -n prometheus-app -q --tests true
 	ocaml pkg/pkg.ml test _build/prometheus/tests/test.native
+
+prometheus:
+	ocaml pkg/pkg.ml build -n prometheus -q
 
 ci:
 	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true

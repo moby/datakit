@@ -5,11 +5,14 @@ let minute = 60.
 
 let pool = Monitored_pool.create "Docker build" 10
 
-let dockerfile ~timeout file = Docker.create ~logs ~pool ~timeout ~label:file file
+let dockerfile ?label ~timeout file =
+  let label = label |> Utils.default file in
+  Docker.create ~logs ~pool ~timeout ~label file
 
 let prometheus  = dockerfile ~timeout:(30. *. minute) "Dockerfile.prometheus"
 let client      = dockerfile ~timeout:(30. *. minute) "Dockerfile.client"
 let ci          = dockerfile ~timeout:(30. *. minute) "Dockerfile.ci"
+let self_ci     = dockerfile ~timeout:(30. *. minute) "ci/self-ci/Dockerfile" ~label:"Dockerfile.self-ci"
 let server      = dockerfile ~timeout:(30. *. minute) "Dockerfile.server"
 let github      = dockerfile ~timeout:(30. *. minute) "Dockerfile.github"
 let datakit     = dockerfile ~timeout:(30. *. minute) "Dockerfile"
@@ -24,7 +27,7 @@ let build ?from dockerfile src =
   match from with
   | None -> src >>= Docker.build dockerfile ?from:None
   | Some from ->
-    Term.pair src from >>= fun (src, from) ->
+    Term.without_logs (Term.pair src from) >>= fun (src, from) ->
     Docker.build dockerfile ~from src
 
 let test name term =
@@ -35,11 +38,13 @@ let datakit_tests target =
   else (
     let src = Git.fetch_head repo target in
     let server = build server src in
+    let ci = build ci src in
     [
       test "server"     @@ server;
       test "prometheus" @@ build prometheus src;
       test "client"     @@ build client     src;
-      test "ci"         @@ build ci         src;
+      test "ci"         @@ ci;
+      test "self-ci"    @@ build self_ci    src ~from:ci;
       test "github"     @@ build github     src ~from:server;
       test "datakit"    @@ build datakit    src ~from:server;
     ]

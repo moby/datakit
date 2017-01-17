@@ -1,6 +1,7 @@
 GITHUB=$(shell opam config var github:installed)
 APP=Datakit.app
 EXE=Datakit
+PINOPTS=-y -k git
 
 TESTS = true
 
@@ -10,12 +11,12 @@ all: datakit
 	@
 
 depends:
-	opam pin add prometheus . -y
-	opam pin add prometheus-app . -y
-	opam pin add datakit-client . -y
-	opam pin add datakit-server . -y
-	opam pin add datakit-github . -y
-	opam pin add datakit-ci . -y
+	opam pin add ${PINOPTS} prometheus .
+	opam pin add ${PINOPTS} prometheus-app .
+	opam pin add ${PINOPTS} datakit-client .
+	opam pin add ${PINOPTS} datakit-server .
+	opam pin add ${PINOPTS} datakit-github .
+	opam pin add ${PINOPTS} datakit-ci .
 	opam update -u datakit-client datakit-server datakit-github datakit-ci -y
 
 datakit:

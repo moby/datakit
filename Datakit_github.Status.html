@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.PR.html">
 <link rel="next" href="Datakit_github.Ref.html">
@@ -37,7 +38,7 @@
 <pre><span id="TYPEcontext"><span class="keyword">type</span> <code class="type"></code>context</span> = <code class="type">string list</code> </pre>
 <div class="info ">
 The type build build status contexts. <code class="code"><span class="string">"ci/datakit"</span></code> is stored
-      as <code class="code"><span class="string">"ci"</span>; <span class="string">"datakit"</span></code>.<br>
+      as <code class="code"><span class="string">"ci"</span>;&nbsp;<span class="string">"datakit"</span></code>.<br>
 </div>
 
 
@@ -85,7 +86,7 @@ The type for status values.<br>
 
 
 <pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">?description:string -><br>       ?url:Uri.t -><br>       <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -><br>       string list -> <a href="Datakit_github.Status_state.html#TYPEt">Datakit_github.Status_state.t</a> -> <a href="Datakit_github.Status.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v c n</code> is the status with commit <code class="code">c</code> and name <code class="code">n</code>.<br>
+<code class="code">v&nbsp;c&nbsp;n</code> is the status with commit <code class="code">c</code> and name <code class="code">n</code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
@@ -107,7 +108,7 @@ The type for build-status IDs.<br>
 </div>
 
 <pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status.html#TYPEid">id</a></code></pre><div class="info ">
-<code class="code">id t</code> is <code class="code">t</code>'s ID.<br>
+<code class="code">id&nbsp;t</code> is <code class="code">t</code>'s ID.<br>
 </div>
 
 <pre><span id="VALcompare_id"><span class="keyword">val</span> compare_id</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEid">id</a> -> <a href="Datakit_github.Status.html#TYPEid">id</a> -> int</code></pre><div class="info ">
@@ -115,35 +116,35 @@ The type for build-status IDs.<br>
 </div>
 
 <pre><span id="VALcontext"><span class="keyword">val</span> context</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status.html#TYPEcontext">context</a></code></pre><div class="info ">
-<code class="code">context t</code> is <code class="code">t</code>'s context.<br>
+<code class="code">context&nbsp;t</code> is <code class="code">t</code>'s context.<br>
 </div>
 
 <pre><span id="VALstate"><span class="keyword">val</span> state</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status_state.html#TYPEt">Datakit_github.Status_state.t</a></code></pre><div class="info ">
-<code class="code">state t</code> is <code class="code">t</code>'s state.<br>
+<code class="code">state&nbsp;t</code> is <code class="code">t</code>'s state.<br>
 </div>
 
 <pre><span id="VALdescription"><span class="keyword">val</span> description</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> string option</code></pre><div class="info ">
-<code class="code">description t</code> is <code class="code">t</code>'s description.<br>
+<code class="code">description&nbsp;t</code> is <code class="code">t</code>'s description.<br>
 </div>
 
 <pre><span id="VALurl"><span class="keyword">val</span> url</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> Uri.t option</code></pre><div class="info ">
-<code class="code">url t</code> is <code class="code">t</code>'s target URL.<br>
+<code class="code">url&nbsp;t</code> is <code class="code">t</code>'s target URL.<br>
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
-<code class="code">repo t</code> is <code class="code">t</code>'s repository.<br>
+<code class="code">repo&nbsp;t</code> is <code class="code">t</code>'s repository.<br>
 </div>
 
 <pre><span id="VALcommit"><span class="keyword">val</span> commit</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code></pre><div class="info ">
-<code class="code">commit t</code> is <code class="code">t</code>'s commit.<br>
+<code class="code">commit&nbsp;t</code> is <code class="code">t</code>'s commit.<br>
 </div>
 
 <pre><span id="VALcommit_hash"><span class="keyword">val</span> commit_hash</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">commit_hash t</code> is <code class="code">t</code>'s commit SHA1.<br>
+<code class="code">commit_hash&nbsp;t</code> is <code class="code">t</code>'s commit SHA1.<br>
 </div>
 
 <pre><span id="VALsame_id"><span class="keyword">val</span> same_id</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
-<code class="code">same_id x y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
+<code class="code">same_id&nbsp;x&nbsp;y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
 </div>
 
 <pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Status.html#TYPEt">t</a> -> <a href="Datakit_github.Status.html#TYPEt">t</a> -> int</code></pre><div class="info ">
@@ -159,6 +160,6 @@ Maps indexed by build status IDs.
 </div>
 
 <pre><span id="VALindex"><span class="keyword">val</span> index</span> : <code class="type">Set.t -><br>       <a href="Datakit_github.Status.html#TYPEt">t</a> Index.t<br>       Datakit_github.Repo.Map.t</code></pre><div class="info ">
-<code class="code">index s</code> indexes <code class="code">s</code> by build status IDs.<br>
+<code class="code">index&nbsp;s</code> indexes <code class="code">s</code> by build status IDs.<br>
 </div>
 </body></html>

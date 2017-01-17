@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="next" href="Vfs.File.html">
 <link rel="Up" href="Vfs.html">
@@ -129,36 +130,36 @@ Infix operators.
 </div>
 
 <pre><span id="VALno_entry"><span class="keyword">val</span> no_entry</span> : <code class="type">('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">no_entry</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Noent</span></code>.<br>
+<code class="code">no_entry</code> is <code class="code"><span class="constructor">Error</span>&nbsp;<span class="constructor">Noent</span></code>.<br>
 </div>
 
 <pre><span id="VALis_dir"><span class="keyword">val</span> is_dir</span> : <code class="type">('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">is_dir</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Isdir</span></code>.<br>
+<code class="code">is_dir</code> is <code class="code"><span class="constructor">Error</span>&nbsp;<span class="constructor">Isdir</span></code>.<br>
 </div>
 
 <pre><span id="VALnot_dir"><span class="keyword">val</span> not_dir</span> : <code class="type">('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">not_dir</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Notdir</span></code>.<br>
+<code class="code">not_dir</code> is <code class="code"><span class="constructor">Error</span>&nbsp;<span class="constructor">Notdir</span></code>.<br>
 </div>
 
 <pre><span id="VALread_only_file"><span class="keyword">val</span> read_only_file</span> : <code class="type">('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">read_only_file</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Read_only_file</span></code>.<br>
+<code class="code">read_only_file</code> is <code class="code"><span class="constructor">Error</span>&nbsp;<span class="constructor">Read_only_file</span></code>.<br>
 </div>
 
 <pre><span id="VALperm"><span class="keyword">val</span> perm</span> : <code class="type">('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">perm</code> is <code class="code"><span class="constructor">Error</span> <span class="constructor">Perm</span></code>.<br>
+<code class="code">perm</code> is <code class="code"><span class="constructor">Error</span>&nbsp;<span class="constructor">Perm</span></code>.<br>
 </div>
 
 <pre><span id="VALother"><span class="keyword">val</span> other</span> : <code class="type">?errno:int32 -><br>       ('a, unit, string, ('b, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result) Pervasives.format4 -> 'a</code></pre><div class="info ">
-<code class="code"><span class="constructor">Other</span> ~errno descr</code> is <code class="code"><span class="constructor">Error</span> { errno; descr }</code>. <code class="code">errno</code> is 0
+<code class="code"><span class="constructor">Other</span>&nbsp;~errno&nbsp;descr</code> is <code class="code"><span class="constructor">Error</span>&nbsp;{&nbsp;errno;&nbsp;descr&nbsp;}</code>. <code class="code">errno</code> is 0
       if not set.<br>
 </div>
 
 <pre><span id="VALnegative_offset"><span class="keyword">val</span> negative_offset</span> : <code class="type">int64 -> ('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">negative_offset o</code> is an error saying that <code class="code">o</code> is negative.<br>
+<code class="code">negative_offset&nbsp;o</code> is an error saying that <code class="code">o</code> is negative.<br>
 </div>
 
 <pre><span id="VALoffset_too_large"><span class="keyword">val</span> offset_too_large</span> : <code class="type">offset:int64 -> int64 -> ('a, <a href="Vfs.Error.html#TYPEt">t</a>) Result.result</code></pre><div class="info ">
-<code class="code">offset_too_large ~offset len</code> is an error saying that <code class="code">offset</code>
+<code class="code">offset_too_large&nbsp;~offset&nbsp;len</code> is an error saying that <code class="code">offset</code>
       is beyond the end of the file (<code class="code">len</code>).<br>
 </div>
 

@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Ivfs_remote.html">
 <link rel="next" href="Datakit_github.html">
@@ -53,45 +54,45 @@ The empty blob.<br>
 </div>
 
 <pre><span id="VALwrite"><span class="keyword">val</span> write</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -><br>       offset:int64 -> Cstruct.t -> (<a href="Ivfs_blob.html#TYPEt">t</a>, <a href="Vfs.Error.html#TYPEt">Vfs.Error.t</a>) Result.result</code></pre><div class="info ">
-<code class="code">write t ~offset data</code> is the blob <code class="code">t</code> overwritten with <code class="code">data</code> at
+<code class="code">write&nbsp;t&nbsp;~offset&nbsp;data</code> is the blob <code class="code">t</code> overwritten with <code class="code">data</code> at
     <code class="code">offset</code>.  The new blob is extended and zero-filled as necessary.
-    If <code class="code">offset = len t</code> then this is very fast.<br>
+    If <code class="code">offset&nbsp;=&nbsp;len&nbsp;t</code> then this is very fast.<br>
 </div>
 
 <pre><span id="VALlen"><span class="keyword">val</span> len</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -> int64</code></pre>
 <pre><span id="VALtruncate"><span class="keyword">val</span> truncate</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -> int64 -> (<a href="Ivfs_blob.html#TYPEt">t</a>, <a href="Vfs.Error.html#TYPEt">Vfs.Error.t</a>) Result.result</code></pre><div class="info ">
-<code class="code">truncate t l</code> is a blob of length <code class="code">l</code>. If <code class="code">l &lt;= len t</code> then it is
-    the prefix of <code class="code">t</code> of length <code class="code">l</code>. If <code class="code">l &gt; len t</code> then it is <code class="code">t</code>
+<code class="code">truncate&nbsp;t&nbsp;l</code> is a blob of length <code class="code">l</code>. If <code class="code">l&nbsp;&lt;=&nbsp;len&nbsp;t</code> then it is
+    the prefix of <code class="code">t</code> of length <code class="code">l</code>. If <code class="code">l&nbsp;&gt;&nbsp;len&nbsp;t</code> then it is <code class="code">t</code>
     followed by enough zero bytes to make up the length. Return an
     error if the requested length is negative.<br>
 </div>
 
 <pre><span id="VALread"><span class="keyword">val</span> read</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -><br>       offset:int64 -> count:int -> (Cstruct.t, <a href="Vfs.Error.html#TYPEt">Vfs.Error.t</a>) Result.result</code></pre><div class="info ">
-<code class="code">read t ~offset ~count</code> is the <code class="code">count</code> bytes in <code class="code">t</code> starting at
+<code class="code">read&nbsp;t&nbsp;~offset&nbsp;~count</code> is the <code class="code">count</code> bytes in <code class="code">t</code> starting at
     <code class="code">offset</code>. If the blob is not long enough to return <code class="code">count</code> bytes,
-    then it returns as many as possible. Return an error if <code class="code">offset &lt;
-    0 <span class="keywordsign">||</span> offset &gt; len t</code>.<br>
+    then it returns as many as possible. Return an error if <code class="code">offset&nbsp;&lt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;<span class="keywordsign">||</span>&nbsp;offset&nbsp;&gt;&nbsp;len&nbsp;t</code>.<br>
 </div>
 
 <pre><span id="VALof_ro_cstruct"><span class="keyword">val</span> of_ro_cstruct</span> : <code class="type">Cstruct.t -> <a href="Ivfs_blob.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">of_ro_cstruct c</code> is a blob containing the data <code class="code">c</code>. Note that we
+<code class="code">of_ro_cstruct&nbsp;c</code> is a blob containing the data <code class="code">c</code>. Note that we
     take a reference to <code class="code">c</code> rather than copying, so <code class="code">c</code> MUST NOT be
     modified after this call. <code class="code">c</code> may also be shared with modified
     versions of the resulting blob.<br>
 </div>
 
 <pre><span id="VALto_ro_cstruct"><span class="keyword">val</span> to_ro_cstruct</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -> Cstruct.t</code></pre><div class="info ">
-<code class="code">to_ro_cstruct t</code> is a read-only Cstruct with the same data as
+<code class="code">to_ro_cstruct&nbsp;t</code> is a read-only Cstruct with the same data as
     <code class="code">t</code>. DO NOT modify this - it may corrupt the blob or other blobs
     sharing data with this one if you do.<br>
 </div>
 
 <pre><span id="VALof_string"><span class="keyword">val</span> of_string</span> : <code class="type">string -> <a href="Ivfs_blob.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">of_string s</code> is a blob containing the same data as <code class="code">s</code>.<br>
+<code class="code">of_string&nbsp;s</code> is a blob containing the same data as <code class="code">s</code>.<br>
 </div>
 
 <pre><span id="VALto_string"><span class="keyword">val</span> to_string</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">to_string t</code> is a string containing the same data as <code class="code">t</code>.<br>
+<code class="code">to_string&nbsp;t</code> is a string containing the same data as <code class="code">t</code>.<br>
 </div>
 
 <pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Ivfs_blob.html#TYPEt">t</a> -> <a href="Ivfs_blob.html#TYPEt">t</a> -> int</code></pre><div class="info ">

@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_S.CLIENT.Transaction.html">
 <link rel="Up" href="Datakit_S.CLIENT.html">
@@ -39,26 +40,26 @@ A <code class="code">t</code> is a named pointer to a commit.<br>
 
 
 <pre><span id="VALname"><span class="keyword">val</span> name</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">name t</code> is <code class="code">t</code>'s name.<br>
+<code class="code">name&nbsp;t</code> is <code class="code">t</code>'s name.<br>
 </div>
 
 <pre><span id="VALremove"><span class="keyword">val</span> remove</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">remove t</code> deletes branch <code class="code">t</code>. If <code class="code">t</code> does not exist, this
+<code class="code">remove&nbsp;t</code> deletes branch <code class="code">t</code>. If <code class="code">t</code> does not exist, this
         does nothing.<br>
 </div>
 
 <pre><span id="VALrename"><span class="keyword">val</span> rename</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">rename t new_name</code> changes the name of this branch. It is an
+<code class="code">rename&nbsp;t&nbsp;new_name</code> changes the name of this branch. It is an
         error if <code class="code">new_name</code> already exists.<br>
 </div>
 
 <pre><span id="VALhead"><span class="keyword">val</span> head</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> option <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">head t</code> is the current head of the branch, or <code class="code"><span class="constructor">None</span></code> if it
+<code class="code">head&nbsp;t</code> is the current head of the branch, or <code class="code"><span class="constructor">None</span></code> if it
         doesn't currently exist.<br>
 </div>
 
 <pre><span id="VALwait_for_head"><span class="keyword">val</span> wait_for_head</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -><br>       ?switch:Lwt_switch.t -><br>       (<a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> option -><br>        [ `Abort | `Again | `Finish of 'a ] <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t) -><br>       [ `Abort | `Finish of 'a ] <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">wait_for_head t fn</code> calls <code class="code">fn commit</code> on the current
+<code class="code">wait_for_head&nbsp;t&nbsp;fn</code> calls <code class="code">fn&nbsp;commit</code> on the current
         commit. If it returns <code class="code"><span class="keywordsign">`</span><span class="constructor">Again</span></code> then it waits for the commit to
         change and tries again.  If <code class="code">switch</code> is provided, then turning
         off the switch will make the wait return <code class="code"><span class="keywordsign">`</span><span class="constructor">Abort</span></code> at the next
@@ -71,21 +72,21 @@ A <code class="code">t</code> is a named pointer to a commit.<br>
 </div>
 
 <pre><span id="VALfast_forward"><span class="keyword">val</span> fast_forward</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">fast_forward t commit</code> changes <code class="code">t</code> to point to <code class="code">commit</code> if
+<code class="code">fast_forward&nbsp;t&nbsp;commit</code> changes <code class="code">t</code> to point to <code class="code">commit</code> if
         <code class="code">t</code>'s head is an ancestor of <code class="code">commit</code> (or returns an error if
         not).<br>
 </div>
 
 <pre><span id="VALwith_transaction"><span class="keyword">val</span> with_transaction</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -><br>       (Datakit_S.CLIENT.Transaction.t -> 'a <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t) -><br>       'a <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">with_transaction t fn</code> is the result of applying <code class="code">fn</code> to a
+<code class="code">with_transaction&nbsp;t&nbsp;fn</code> is the result of applying <code class="code">fn</code> to a
         new transaction on branch <code class="code">t</code>.  If the transaction has not
-        been committed when <code class="code">fn trans</code> returns, the transaction is
+        been committed when <code class="code">fn&nbsp;trans</code> returns, the transaction is
         aborted (and a warning is logged). Use <code class="code"><span class="constructor">Transaction</span>.abort</code> to
         avoid the warning.<br>
 </div>
 
 <pre><span id="VALtransaction"><span class="keyword">val</span> transaction</span> : <code class="type"><a href="Datakit_S.CLIENT.Branch.html#TYPEt">t</a> -><br>       Datakit_S.CLIENT.Transaction.t <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">transaction t</code> creates a new transaction on top of the branch
+<code class="code">transaction&nbsp;t</code> creates a new transaction on top of the branch
         <code class="code">t</code>. Must be closed with <a href="Datakit_S.CLIENT.Transaction.html#VALabort"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">CLIENT</span>.<span class="constructor">Transaction</span>.abort</code></a> or
         <a href="Datakit_S.CLIENT.Transaction.html#VALcommit"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">CLIENT</span>.<span class="constructor">Transaction</span>.commit</code></a>. Use <a href="Datakit_S.CLIENT.Branch.html#VALwith_transaction"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">CLIENT</span>.<span class="constructor">Branch</span>.with_transaction</code></a> to not have to
         worry about resource leaks..<br>

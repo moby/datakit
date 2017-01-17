@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="next" href="Datakit_S.CLIENT.html">
 <link rel="Up" href="Datakit_S.html">
@@ -39,39 +40,39 @@
 
 
 <pre><span id="VALread"><span class="keyword">val</span> read</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       [ `Dir of string list | `File of Cstruct.t | `Link of string ]<br>       <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">read t path</code> is the contents of the object at the <code class="code">path</code>.<br>
+<code class="code">read&nbsp;t&nbsp;path</code> is the contents of the object at the <code class="code">path</code>.<br>
 </div>
 
 <pre><span id="VALstat"><span class="keyword">val</span> stat</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       <a href="Datakit_S.html#TYPEstat">Datakit_S.stat</a> option <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">stat t path</code> is the metadata of the object at <code class="code">path</code>.<br>
+<code class="code">stat&nbsp;t&nbsp;path</code> is the metadata of the object at <code class="code">path</code>.<br>
 </div>
 
 <pre><span id="VALexists"><span class="keyword">val</span> exists</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> bool <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">exists t path</code> is <code class="code"><span class="keyword">true</span></code> if <code class="code">stat t path</code> isn't <code class="code"><span class="constructor">None</span></code>.<br>
+<code class="code">exists&nbsp;t&nbsp;path</code> is <code class="code"><span class="keyword">true</span></code> if <code class="code">stat&nbsp;t&nbsp;path</code> isn't <code class="code"><span class="constructor">None</span></code>.<br>
 </div>
 
 <pre><span id="VALexists_file"><span class="keyword">val</span> exists_file</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> bool <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">exists_file t path</code> is similar to <a href="Datakit_S.READABLE_TREE.html#VALexists"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">READABLE_TREE</span>.exists</code></a> but for files
+<code class="code">exists_file&nbsp;t&nbsp;path</code> is similar to <a href="Datakit_S.READABLE_TREE.html#VALexists"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">READABLE_TREE</span>.exists</code></a> but for files
       only.<br>
 </div>
 
 <pre><span id="VALexists_dir"><span class="keyword">val</span> exists_dir</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> bool <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">exists_dir t path</code> is similar to <a href="Datakit_S.READABLE_TREE.html#VALexists"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">READABLE_TREE</span>.exists</code></a> but for directories
+<code class="code">exists_dir&nbsp;t&nbsp;path</code> is similar to <a href="Datakit_S.READABLE_TREE.html#VALexists"><code class="code"><span class="constructor">Datakit_S</span>.<span class="constructor">READABLE_TREE</span>.exists</code></a> but for directories
       only.<br>
 </div>
 
 <pre><span id="VALread_file"><span class="keyword">val</span> read_file</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> Cstruct.t <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">read_file t path</code> resolves <code class="code">path</code> to a file, or returns an
+<code class="code">read_file&nbsp;t&nbsp;path</code> resolves <code class="code">path</code> to a file, or returns an
       error if it isn't a file.<br>
 </div>
 
 <pre><span id="VALread_dir"><span class="keyword">val</span> read_dir</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> string list <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">read_dir t path</code> resolves <code class="code">path</code> to a directory, or returns an
+<code class="code">read_dir&nbsp;t&nbsp;path</code> resolves <code class="code">path</code> to a directory, or returns an
       error if it isn't one.<br>
 </div>
 
 <pre><span id="VALread_link"><span class="keyword">val</span> read_link</span> : <code class="type"><a href="Datakit_S.READABLE_TREE.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> string <a href="Datakit_S.READABLE_TREE.html#TYPEor_error">or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">read_link t path</code> resolves <code class="code">path</code> to a symlink, or returns an
+<code class="code">read_link&nbsp;t&nbsp;path</code> resolves <code class="code">path</code> to a symlink, or returns an
       error if it isn't one.<br>
 </div>
 </body></html>

@@ -1,8 +1,11 @@
-<html><head>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
+<link rel="Up" href="Datakit_ci.Docker.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
 <link title="Index of modules" rel=Appendix href="index_modules.html">
@@ -19,11 +22,20 @@
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
-<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs.Make</title>
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Docker.Image</title>
 </head>
 <body>
-<code class="code"><span class="keyword">functor</span>&nbsp;(<span class="constructor">Store</span>&nbsp;:&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">STORE</span>)&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;<span class="keyword">sig</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;repo&nbsp;=&nbsp;<span class="constructor">Store</span>.<span class="constructor">Repo</span>.t<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:&nbsp;string&nbsp;<span class="constructor">Irmin</span>.<span class="constructor">Task</span>.f&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;repo&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Vfs</span>.<span class="constructor">Dir</span>.t<br>
-&nbsp;&nbsp;<span class="keyword">end</span></code></body></html>
+<div class="navbar">&nbsp;<a class="up" href="Datakit_ci.Docker.html" title="Datakit_ci.Docker">Up</a>
+&nbsp;</div>
+<h1>Module <a href="type_Datakit_ci.Docker.Image.html">Datakit_ci.Docker.Image</a></h1>
+
+<pre><span class="keyword">module</span> Image: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Docker.Image.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
+
+<pre><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> </pre>
+<div class="info ">
+A Docker image.<br>
+</div>
+
+
+<pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_ci.Docker.Image.html#TYPEt">t</a> -> string</code></pre>
+<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_ci.Docker.Image.html#TYPEt">t</a> Fmt.t</code></pre></body></html>

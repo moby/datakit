@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Utils.html">
 <link rel="Up" href="Datakit_ci.html">
@@ -42,4 +43,5 @@
 <pre><span id="VALcreate_logs"><span class="keyword">val</span> create_logs</span> : <code class="type">unit -> <a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a></code></pre>
 <pre><span id="VALlookup_log"><span class="keyword">val</span> lookup_log</span> : <code class="type">branch:string -> <a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a> -> <a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> option</code></pre>
 <pre><span id="VALcancel"><span class="keyword">val</span> cancel</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -> (unit, string) Pervasives.result Lwt.t</code></pre>
-<pre><span id="VALread_log"><span class="keyword">val</span> read_log</span> : <code class="type">Datakit_ci.DK.t -><br>       <a href="Datakit_ci.Output.html#TYPEsaved">Datakit_ci.Output.saved</a> -> string Datakit_ci.DK.or_error Lwt.t</code></pre></body></html>
+<pre><span id="VALread_log"><span class="keyword">val</span> read_log</span> : <code class="type">Datakit_ci.DK.t -><br>       <a href="Datakit_ci.Output.html#TYPEsaved">Datakit_ci.Output.saved</a> -> string Datakit_ci.DK.or_error Lwt.t</code></pre>
+<pre><span id="VALrebuild"><span class="keyword">val</span> rebuild</span> : <code class="type"><a href="Datakit_ci.Output.html#TYPEsaved">Datakit_ci.Output.saved</a> -> unit Lwt.t</code></pre></body></html>

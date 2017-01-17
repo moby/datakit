@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_S.CLIENT.Commit.html">
 <link rel="next" href="Datakit_S.CLIENT.Branch.html">
@@ -49,52 +50,52 @@ All changes to a branch are made in transactions. When a
 <h2 id="2_Writing">Writing</h2><br>
 
 <pre><span id="VALcreate_dir"><span class="keyword">val</span> create_dir</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_dir t path</code> creates the directory <code class="code">path</code>.<br>
+<code class="code">create_dir&nbsp;t&nbsp;path</code> creates the directory <code class="code">path</code>.<br>
 </div>
 
 <pre><span id="VALcreate_file"><span class="keyword">val</span> create_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -><br>       ?executable:bool -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_file t path ?executable content</code> creates the file
+<code class="code">create_file&nbsp;t&nbsp;path&nbsp;?executable&nbsp;content</code> creates the file
         <code class="code">path</code>.<br>
 </div>
 
 <pre><span id="VALcreate_symlink"><span class="keyword">val</span> create_symlink</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_symlink t path target</code> creates the symlink <code class="code">path</code>.<br>
+<code class="code">create_symlink&nbsp;t&nbsp;path&nbsp;target</code> creates the symlink <code class="code">path</code>.<br>
 </div>
 
 <pre><span id="VALreplace_file"><span class="keyword">val</span> replace_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">replace_file t path new_content</code> changes the content of
+<code class="code">replace_file&nbsp;t&nbsp;path&nbsp;new_content</code> changes the content of
         the existing file <code class="code">path</code>.<br>
 </div>
 
 <pre><span id="VALcreate_or_replace_file"><span class="keyword">val</span> create_or_replace_file</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> Cstruct.t -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">create_or_replace_file t path content</code> uses either <code class="code">create_file</code>
+<code class="code">create_or_replace_file&nbsp;t&nbsp;path&nbsp;content</code> uses either <code class="code">create_file</code>
         or <code class="code">replace_file</code> as appropriate to set the contents.<br>
 </div>
 
 <pre><span id="VALset_executable"><span class="keyword">val</span> set_executable</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> bool -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">set_executable t path flag</code> marks the file at <code class="code">path</code> as
+<code class="code">set_executable&nbsp;t&nbsp;path&nbsp;flag</code> marks the file at <code class="code">path</code> as
         executable or not.<br>
 </div>
 
 <pre><span id="VALremove"><span class="keyword">val</span> remove</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">remove t path</code> removes <code class="code">path</code>. If <code class="code">path</code> is a directory then
+<code class="code">remove&nbsp;t&nbsp;path</code> removes <code class="code">path</code>. If <code class="code">path</code> is a directory then
         the entire subtree is removed.<br>
 </div>
 
 <pre><span id="VALrename"><span class="keyword">val</span> rename</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">rename t path new_name</code> changes the basename of <code class="code">path</code> to
+<code class="code">rename&nbsp;t&nbsp;path&nbsp;new_name</code> changes the basename of <code class="code">path</code> to
         <code class="code">new_name</code>.  Note: it is only possible to rename within a
         directory (this is a 9p limitation).<br>
 </div>
 
 <pre><span id="VALtruncate"><span class="keyword">val</span> truncate</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> int64 -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">truncate t path length</code> sets the length of the file at <code class="code">path</code>
+<code class="code">truncate&nbsp;t&nbsp;path&nbsp;length</code> sets the length of the file at <code class="code">path</code>
         to <code class="code">length</code>.  If <code class="code">length</code> is longer than the current length,
         the file is padded with zero bytes.<br>
 </div>
 
 <pre><span id="VALmake_dirs"><span class="keyword">val</span> make_dirs</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">make_dirs t path</code> ensures that <code class="code">path</code> exists and is a
+<code class="code">make_dirs&nbsp;t&nbsp;path</code> ensures that <code class="code">path</code> exists and is a
         directory, creating it and any missing parents as
         necessary.<br>
 </div>
@@ -102,7 +103,7 @@ All changes to a branch are made in transactions. When a
 <h2 id="2_Finishing">Finishing</h2><br>
 
 <pre><span id="VALcommit"><span class="keyword">val</span> commit</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> message:string -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">commit t ~message</code> creates a new commit with the given log
+<code class="code">commit&nbsp;t&nbsp;~message</code> creates a new commit with the given log
         message and the current contents of the transaction and then
         merges it into the branch from which the transaction was
         created.  The transaction cannot be used after calling
@@ -110,7 +111,7 @@ All changes to a branch are made in transactions. When a
 </div>
 
 <pre><span id="VALabort"><span class="keyword">val</span> abort</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">abort t</code> aborts the transaction without committing it.  The
+<code class="code">abort&nbsp;t</code> aborts the transaction without committing it.  The
         transaction cannot be used after calling this.<br>
 </div>
 <br>
@@ -150,9 +151,9 @@ When performing a merge, these three directories can be used
 
 
 <pre><span id="VALmerge"><span class="keyword">val</span> merge</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> -><br>       (<a href="Datakit_S.CLIENT.Transaction.html#TYPEmerge_inputs">merge_inputs</a> * <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> list)<br>       <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">merge t commit</code> merges <code class="code">commit</code> into the transaction. It
-        performs any trivial merges it can and returns <code class="code">(merge_inputs,
-        conflicts)</code> to allow you to resolve the remaining ones. You
+<code class="code">merge&nbsp;t&nbsp;commit</code> merges <code class="code">commit</code> into the transaction. It
+        performs any trivial merges it can and returns <code class="code">(merge_inputs,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conflicts)</code> to allow you to resolve the remaining ones. You
         must write to each path in <code class="code">conflicts</code> at least once before
         you can commit the transaction.  You may perform multiple
         merges in one transaction, but the <code class="code">merge_inputs</code> returned is
@@ -160,12 +161,12 @@ When performing a merge, these three directories can be used
 </div>
 
 <pre><span id="VALparents"><span class="keyword">val</span> parents</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">parents t</code> is the parents of the transaction (that is, the parents of
+<code class="code">parents&nbsp;t</code> is the parents of the transaction (that is, the parents of
         the commit that would be generated if you committed now.<br>
 </div>
 
 <pre><span id="VALset_parents"><span class="keyword">val</span> set_parents</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> list -> unit <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">set_parents t new_parents</code> replaces the current list of
+<code class="code">set_parents&nbsp;t&nbsp;new_parents</code> replaces the current list of
         parents.  Note that this does not perform a merge - it only
         affects the metadata.  Note also that <code class="code">merge</code> automatically
         updates the parents, so it is not necessary to call it
@@ -173,18 +174,18 @@ When performing a merge, these three directories can be used
 </div>
 
 <pre><span id="VALconflicts"><span class="keyword">val</span> conflicts</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">conflicts t</code> returns the current list of paths that had merge
+<code class="code">conflicts&nbsp;t</code> returns the current list of paths that had merge
         conflicts and have not been written to since.  It is not
         possible to commit while this is non-empty.<br>
 </div>
 
 <pre><span id="VALdiff"><span class="keyword">val</span> diff</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">Datakit_S.CLIENT.Commit.t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> <a href="Datakit_S.html#TYPEdiff">Datakit_S.diff</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">diff t c</code> returns the paths differences between <code class="code">c</code> and <code class="code">t</code>'s
+<code class="code">diff&nbsp;t&nbsp;c</code> returns the paths differences between <code class="code">c</code> and <code class="code">t</code>'s
         head.<br>
 </div>
 
 <pre><span id="VALclosed"><span class="keyword">val</span> closed</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEt">Datakit_S.CLIENT.t</a> -> bool</code></pre><div class="info ">
-<code class="code">closed t</code> is true if <code class="code">t</code> is closed and thus it is not valid
+<code class="code">closed&nbsp;t</code> is true if <code class="code">t</code> is closed and thus it is not valid
         to read/write on it anymore.<br>
 </div>
 </body></html>

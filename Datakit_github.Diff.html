@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.Snapshot.html">
 <link rel="next" href="Datakit_github.Capabilities.html">
@@ -52,7 +53,7 @@ The type for differences between GitHub states.<br>
 </div>
 
 <pre><span id="VALcommit_message"><span class="keyword">val</span> commit_message</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">commit_message d</code> is the commit message corresponding to the
+<code class="code">commit_message&nbsp;d</code> is the commit message corresponding to the
       diff <code class="code">d</code>.<br>
 </div>
 
@@ -61,27 +62,27 @@ The type for differences between GitHub states.<br>
 </div>
 
 <pre><span id="VALis_empty"><span class="keyword">val</span> is_empty</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
-<code class="code">is_empty d</code> is true if <code class="code">d</code> is empty.<br>
+<code class="code">is_empty&nbsp;d</code> is true if <code class="code">d</code> is empty.<br>
 </div>
 
 <pre><span id="VALupdate"><span class="keyword">val</span> update</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> Datakit_github.Elt.Set.t</code></pre><div class="info ">
-<code class="code">update d</code> are the elements in <code class="code">d</code> which needs to be added or
+<code class="code">update&nbsp;d</code> are the elements in <code class="code">d</code> which needs to be added or
       updated.<br>
 </div>
 
 <pre><span id="VALremove"><span class="keyword">val</span> remove</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -> Datakit_github.Elt.IdSet.t</code></pre><div class="info ">
-<code class="code">remove d</code> are the elements in <code class="code">d</code> which needs to be deleted.<br>
+<code class="code">remove&nbsp;d</code> are the elements in <code class="code">d</code> which needs to be deleted.<br>
 </div>
 
 <pre><span id="VALapply"><span class="keyword">val</span> apply</span> : <code class="type"><a href="Datakit_github.Diff.html#TYPEt">t</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> -> <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a></code></pre><div class="info ">
-<code class="code">snapsho d s</code> applies <code class="code">d</code> on top of the snapshot <code class="code">s</code>.<br>
+<code class="code">snapsho&nbsp;d&nbsp;s</code> applies <code class="code">d</code> on top of the snapshot <code class="code">s</code>.<br>
 </div>
 
 <pre><span id="VALwith_update"><span class="keyword">val</span> with_update</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">with_update e d</code> is <code class="code">d</code> augmented with the update of <code class="code">e</code>.<br>
+<code class="code">with_update&nbsp;e&nbsp;d</code> is <code class="code">d</code> augmented with the update of <code class="code">e</code>.<br>
 </div>
 
 <pre><span id="VALwith_remove"><span class="keyword">val</span> with_remove</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEid">Datakit_github.Elt.id</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a> -> <a href="Datakit_github.Diff.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">with_remove e d</code> is <code class="code">d</code> augmented with the removal of <code class="code">e</code>.<br>
+<code class="code">with_remove&nbsp;e&nbsp;d</code> is <code class="code">d</code> augmented with the removal of <code class="code">e</code>.<br>
 </div>
 </body></html>

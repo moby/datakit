@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github_vfs.html">
 <link rel="Up" href="index.html">
@@ -105,7 +106,7 @@ The type for job IDs. They are used to identfy the worker actually
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Web.html">Web</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Web.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Config.html">Config</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Config.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span id="VALrun"><span class="keyword">val</span> run</span> : <code class="type">?info:Cmdliner.Term.info -> <a href="Datakit_ci.Config.html#TYPEt">Config.t</a> Cmdliner.Term.t -> unit</code></pre><div class="info ">
-<code class="code">run ?info config</code> runs DataKitCI. <code class="code">info</code> defaults to a term that
+<code class="code">run&nbsp;?info&nbsp;config</code> runs DataKitCI. <code class="code">info</code> defaults to a term that
     describes the binary as <code class="code"><span class="constructor">DataKitCI</span></code>, but does not include any of
     the other metadata such as versioning. Call <code class="code"><span class="constructor">Cmdliner</span>.<span class="constructor">Term</span>.info</code>
     directly to obtain an <code class="code">info</code> value that exposes all this extra
@@ -120,7 +121,8 @@ The singleton log manager.<br>
 
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Process.html">Process</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Process.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
 <pre><span class="keyword">module</span> <a href="Datakit_ci.Monitored_pool.html">Monitored_pool</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Monitored_pool.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
-<pre><span class="keyword">module</span> <a href="Datakit_ci.Git.html">Git</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Git.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><br>
+<pre><span class="keyword">module</span> <a href="Datakit_ci.Git.html">Git</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Git.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>
+<pre><span class="keyword">module</span> <a href="Datakit_ci.Docker.html">Docker</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Docker.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><br>
 <h1 id="cache">Cache</h1><br>
 
 <pre><span class="keyword">module type</span> <a href="Datakit_ci.BUILDER.html">BUILDER</a> = <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.BUILDER.html">..</a> <code class="code"><span class="keyword">end</span></code></pre>

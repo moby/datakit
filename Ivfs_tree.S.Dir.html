@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Ivfs_tree.S.File.html">
 <link rel="Up" href="Ivfs_tree.S.html">
@@ -71,34 +72,34 @@ List the contents of a directory with the type of each item.<br>
 </div>
 
 <pre><span id="VALiter"><span class="keyword">val</span> iter</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -><br>       (<a href="Ivfs_tree.html#TYPEpath">Ivfs_tree.path</a> -> <a href="Ivfs_tree.S.File.html#TYPEt">Ivfs_tree.S.File.t</a> * <a href="Ivfs_tree.html#TYPEperm">Ivfs_tree.perm</a> -> unit Lwt.t) -><br>       unit Lwt.t</code></pre><div class="info ">
-<code class="code">iter t f</code> applies <code class="code">f</code> over all sub-files.<br>
+<code class="code">iter&nbsp;t&nbsp;f</code> applies <code class="code">f</code> over all sub-files.<br>
 </div>
 
 <pre><span id="VALof_hash"><span class="keyword">val</span> of_hash</span> : <code class="type"><a href="Ivfs_tree.S.html#TYPErepo">Ivfs_tree.S.repo</a> -> <a href="Ivfs_tree.S.Dir.html#TYPEhash">hash</a> -> <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">of_hash repo h</code> is the directory whose hash is <code class="code">h</code> in <code class="code">repo</code>.<br>
+<code class="code">of_hash&nbsp;repo&nbsp;h</code> is the directory whose hash is <code class="code">h</code> in <code class="code">repo</code>.<br>
 </div>
 
 <pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -> <a href="Ivfs_tree.S.Dir.html#TYPEhash">hash</a> Lwt.t</code></pre><div class="info ">
-<code class="code">hash dir</code> is <code class="code">dir</code>'s hash. This writes <code class="code">dir</code> to the
+<code class="code">hash&nbsp;dir</code> is <code class="code">dir</code>'s hash. This writes <code class="code">dir</code> to the
         repository if it's not yet stored.<br>
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -> <a href="Ivfs_tree.S.html#TYPErepo">Ivfs_tree.S.repo</a></code></pre><div class="info ">
-<code class="code">repo dir</code> is the repository in which <code class="code">dir</code> lives.<br>
+<code class="code">repo&nbsp;dir</code> is the repository in which <code class="code">dir</code> lives.<br>
 </div>
 
 <pre><span id="VALwith_child"><span class="keyword">val</span> with_child</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -><br>       <a href="Ivfs_tree.html#TYPEstep">Ivfs_tree.step</a> -><br>       [ `Directory of <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a><br>       | `File of <a href="Ivfs_tree.S.File.html#TYPEt">Ivfs_tree.S.File.t</a> * <a href="Ivfs_tree.html#TYPEperm">Ivfs_tree.perm</a> ] -> <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> Lwt.t</code></pre><div class="info ">
-<code class="code">with_child dir name child</code> is a copy of <code class="code">dir</code> except that
+<code class="code">with_child&nbsp;dir&nbsp;name&nbsp;child</code> is a copy of <code class="code">dir</code> except that
         <code class="code">name</code> links to <code class="code">child</code>.<br>
 </div>
 
 <pre><span id="VALwithout_child"><span class="keyword">val</span> without_child</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -> <a href="Ivfs_tree.html#TYPEstep">Ivfs_tree.step</a> -> <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> Lwt.t</code></pre><div class="info ">
-<code class="code">without_child dir name</code> is a copy of <code class="code">dir</code> except that it has
+<code class="code">without_child&nbsp;dir&nbsp;name</code> is a copy of <code class="code">dir</code> except that it has
         no child called <code class="code">name</code>.<br>
 </div>
 
 <pre><span id="VALdiff"><span class="keyword">val</span> diff</span> : <code class="type"><a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -><br>       <a href="Ivfs_tree.S.Dir.html#TYPEt">t</a> -><br>       (<a href="Ivfs_tree.html#TYPEpath">Ivfs_tree.path</a> * (<a href="Ivfs_tree.S.File.html#TYPEt">Ivfs_tree.S.File.t</a> * <a href="Ivfs_tree.html#TYPEperm">Ivfs_tree.perm</a>) Irmin.diff) list<br>       Lwt.t</code></pre><div class="info ">
-<code class="code">diff x y</code> is the list of files which are different between
+<code class="code">diff&nbsp;x&nbsp;y</code> is the list of files which are different between
         <code class="code">x</code> and <code class="code">y</code>.<br>
 </div>
 </body></html>

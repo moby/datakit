@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Process.html">
 <link rel="next" href="Datakit_ci.Git.html">
@@ -44,11 +45,11 @@ The type for pools of workers.<br>
 
 
 <pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">string -> int -> <a href="Datakit_ci.Monitored_pool.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create s n</code> create a new pool with <code class="code">n</code> workers.<br>
+<code class="code">create&nbsp;s&nbsp;n</code> create a new pool with <code class="code">n</code> workers.<br>
 </div>
 
 <pre><span id="VALuse"><span class="keyword">val</span> use</span> : <code class="type"><a href="Datakit_ci.Monitored_pool.html#TYPEt">t</a> -><br>       ?log:<a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -><br>       ?label:string -> <a href="Datakit_ci.html#TYPEjob_id">Datakit_ci.job_id</a> -> (unit -> 'a Lwt.t) -> 'a Lwt.t</code></pre><div class="info ">
-<code class="code">use t job fn</code> evaluates <code class="code">fn ()</code> with one pool resource held.
+<code class="code">use&nbsp;t&nbsp;job&nbsp;fn</code> evaluates <code class="code">fn&nbsp;()</code> with one pool resource held.
       <code class="code">job</code> (and <code class="code">label</code>) will be displayed as the reason why the
       resource is in use. If <code class="code">log</code> is provided then a message will be
       logged if we have to wait, and if the log is cancellable then

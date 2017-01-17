@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Vfs.File.html">
 <link rel="next" href="Vfs.Inode.html">
@@ -76,13 +77,13 @@ The <code class="code">rename</code> command.<br>
 </div>
 
 <pre><span id="VALof_list"><span class="keyword">val</span> of_list</span> : <code class="type">(unit -> <a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> list <a href="Vfs.html#TYPEor_err">Vfs.or_err</a>) -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">of_list l</code> is a read-only, static directory containing only the
+<code class="code">of_list&nbsp;l</code> is a read-only, static directory containing only the
       inodes <code class="code">l</code>. The sub-directories are re-evaluated on every <code class="code">ls</code>
       and <code class="code">read</code>.<br>
 </div>
 
 <pre><span id="VALof_map_ref"><span class="keyword">val</span> of_map_ref</span> : <code class="type"><a href="Vfs.Inode.html#TYPEt">Vfs.Inode.t</a> Astring.String.Map.t Pervasives.ref -> <a href="Vfs.Dir.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">of_map_ref m</code> is a read-only directory containing the inodes
+<code class="code">of_map_ref&nbsp;m</code> is a read-only directory containing the inodes
       defined in <code class="code">m</code>. The content of the directory is computed
       dynamically by accessing elements in the map on every access.<br>
 </div>

@@ -1,6 +1,7 @@
 <html><head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -21,16 +22,16 @@
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Config</title>
 </head>
 <body>
-<code class="code"><span class="keyword">sig</span>
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;project
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;test&nbsp;=&nbsp;string&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;project&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;id:string&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;?dashboards:string&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(string&nbsp;*&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.test)&nbsp;list)&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.project
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;v&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;web_config:<span class="constructor">Datakit_ci</span>.<span class="constructor">Web</span>.config&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;projects:<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.project&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.t
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;project<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;test&nbsp;=&nbsp;string&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;project&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;id:string&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;?dashboards:string&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(string&nbsp;*&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.test)&nbsp;list)&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.project<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;v&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;web_config:<span class="constructor">Datakit_ci</span>.<span class="constructor">Web</span>.config&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;projects:<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.project&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Config</span>.t<br>
 <span class="keyword">end</span></code></body></html>

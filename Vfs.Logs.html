@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Vfs.Inode.html">
 <link rel="Up" href="Vfs.html">
@@ -34,13 +35,13 @@
 
 <pre><span id="VALdir"><span class="keyword">val</span> dir</span> : <code class="type"><a href="Vfs.Dir.html#TYPEt">Vfs.Dir.t</a></code></pre><div class="info ">
 <code class="code">dir</code> is a projection of <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span></code> into the VFS: each entry <code class="code">s</code> in
-      <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.list ()</code> has a subdirectory <code class="code">&lt;fs&gt;/src/&lt;s&gt;</code> containing
+      <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.list&nbsp;()</code> has a subdirectory <code class="code">&lt;fs&gt;/src/&lt;s&gt;</code> containing
       two files:
 <p>
 
       <ul>
-<li><code class="code">&lt;fs&gt;/src/&lt;s&gt;/doc</code> is <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.doc s</code>. The file is read-only. </li>
-<li><code class="code">&lt;fs&gt;/src/&lt;s&gt;/level</code> is <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.level s</code>. Changing the contents
+<li><code class="code">&lt;fs&gt;/src/&lt;s&gt;/doc</code> is <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.doc&nbsp;s</code>. The file is read-only. </li>
+<li><code class="code">&lt;fs&gt;/src/&lt;s&gt;/level</code> is <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.level&nbsp;s</code>. Changing the contents
          of that file will trigger <code class="code"><span class="constructor">Logs</span>.<span class="constructor">Src</span>.set_level</code>. </li>
 </ul>
 <br>

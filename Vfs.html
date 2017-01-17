@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="next" href="Fs9p.html">
 <link rel="Up" href="index.html">
@@ -50,11 +51,11 @@ The type of errors.<br>
 
 
 <pre><span id="VALok"><span class="keyword">val</span> ok</span> : <code class="type">'a -> 'a <a href="Vfs.html#TYPEor_err">or_err</a></code></pre><div class="info ">
-<code class="code">ok x</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Ok</span> x)</code><br>
+<code class="code">ok&nbsp;x</code> is <code class="code"><span class="constructor">Lwt</span>.return&nbsp;(<span class="constructor">Ok</span>&nbsp;x)</code><br>
 </div>
 
 <pre><span id="VALerror"><span class="keyword">val</span> error</span> : <code class="type">('a, unit, string, 'b <a href="Vfs.html#TYPEor_err">or_err</a>) Pervasives.format4 -> 'a</code></pre><div class="info ">
-<code class="code">error fmt</code> is <code class="code"><span class="constructor">Lwt</span>.return (<span class="constructor">Error</span> &lt;fmt&gt;)</code>.<br>
+<code class="code">error&nbsp;fmt</code> is <code class="code"><span class="constructor">Lwt</span>.return&nbsp;(<span class="constructor">Error</span>&nbsp;&lt;fmt&gt;)</code>.<br>
 </div>
 
 <pre><span id="TYPEperm"><span class="keyword">type</span> <code class="type"></code>perm</span> = <code class="type">[ `Exec | `Link of string | `Normal ]</code> </pre>

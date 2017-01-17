@@ -1,6 +1,7 @@
 <html><head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -21,9 +22,9 @@
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs_remote.Make</title>
 </head>
 <body>
-<code class="code"><span class="keyword">functor</span>&nbsp;(<span class="constructor">Store</span>&nbsp;:&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">STORE</span>)&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;<span class="keyword">sig</span>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?init:(string&nbsp;*&nbsp;string)&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;string&nbsp;<span class="constructor">Irmin</span>.<span class="constructor">Task</span>.f&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Store</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Vfs</span>.<span class="constructor">Dir</span>.t
+<code class="code"><span class="keyword">functor</span>&nbsp;(<span class="constructor">Store</span>&nbsp;:&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">STORE</span>)&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;<span class="keyword">sig</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?init:(string&nbsp;*&nbsp;string)&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;string&nbsp;<span class="constructor">Irmin</span>.<span class="constructor">Task</span>.f&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Store</span>.<span class="constructor">Repo</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Vfs</span>.<span class="constructor">Dir</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">end</span></code></body></html>

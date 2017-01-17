@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Output.html">
 <link rel="next" href="Datakit_ci.Term.html">
@@ -43,7 +44,7 @@ The type for computation targets. A target can either be a
       pull-request ID, e.g. a GitHub repository and a number; or a
       reference ID, e.g. a GitHub repository and a reference name
       (given as a list of string, e.g. <code class="code"><span class="string">"heads/master"</span></code> should be
-      split into <code class="code">[<span class="string">"heads"</span>]; [<span class="string">"master"</span>]</code>).<br>
+      split into <code class="code">[<span class="string">"heads"</span>];&nbsp;[<span class="string">"master"</span>]</code>).<br>
 </div>
 
 
@@ -52,11 +53,11 @@ The type for computation targets. A target can either be a
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_ci.Target.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
-<code class="code">repo t</code> is <code class="code">t</code>'s repository.<br>
+<code class="code">repo&nbsp;t</code> is <code class="code">t</code>'s repository.<br>
 </div>
 
 <pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_ci.Target.html#TYPEt">t</a> -> [ `PR of int | `Ref of string list ]</code></pre><div class="info ">
-<code class="code">id t</code> is <code class="code">t</code>'s ID, e.g either a pull-request number or a
+<code class="code">id&nbsp;t</code> is <code class="code">t</code>'s ID, e.g either a pull-request number or a
       reference name split on <code class="code"><span class="string">'/'</span></code>.<br>
 </div>
 
@@ -73,10 +74,18 @@ The type for resolved GitHub targets. Resolved pull-request and
 
 
 <pre><span id="VALhead"><span class="keyword">val</span> head</span> : <code class="type"><a href="Datakit_ci.Target.html#TYPEv">v</a> -> <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code></pre><div class="info ">
-<code class="code">head v</code> is the head commit of <code class="code">v</code>.<br>
+<code class="code">head&nbsp;v</code> is the head commit of <code class="code">v</code>.<br>
 </div>
 
 <pre><span id="VALcompare_v"><span class="keyword">val</span> compare_v</span> : <code class="type"><a href="Datakit_ci.Target.html#TYPEv">v</a> -> <a href="Datakit_ci.Target.html#TYPEv">v</a> -> int</code></pre><div class="info ">
 <code class="code">compare_v</code> compares values of type <a href="Datakit_ci.Target.html#TYPEv"><code class="code"><span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.v</code></a>.<br>
+</div>
+
+<pre><span id="VALrepo_v"><span class="keyword">val</span> repo_v</span> : <code class="type"><a href="Datakit_ci.Target.html#TYPEv">v</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
+<code class="code">repo_v&nbsp;v</code> is <code class="code">v</code>'s repository.<br>
+</div>
+
+<pre><span id="VALpp_v"><span class="keyword">val</span> pp_v</span> : <code class="type"><a href="Datakit_ci.Target.html#TYPEv">v</a> Fmt.t</code></pre><div class="info ">
+<code class="code">pp_v</code> is the pretty-printer for resolved GitHub targets.<br>
 </div>
 </body></html>

@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="Up" href="Fs9p.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
@@ -28,7 +29,7 @@
 &nbsp;</div>
 <h1>Functor <a href="type_Fs9p.Make.html">Fs9p.Make</a></h1>
 
-<pre><span class="keyword">module</span> Make: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">Flow</span></code><code class="code"> : </code><code class="type">V1_LWT.FLOW</code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="type"><a href="Fs9p.S.html">S</a></code><code class="type">  with type flow = Flow.flow</code></div></pre><div class="info module top">
+<pre><span class="keyword">module</span> Make: <div class="sig_block"><code class="code"><span class="keyword">functor</span>&nbsp;(</code><code class="code"><span class="constructor">Flow</span></code><code class="code">&nbsp;:&nbsp;</code><code class="type">V1_LWT.FLOW</code><code class="code">)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;</code><code class="type"><a href="Fs9p.S.html">S</a></code><code class="type">  with type flow = Flow.flow</code></div></pre><div class="info module top">
 Server builder.<br>
 </div>
 <table border="0" cellpadding="3" width="100%">
@@ -55,7 +56,7 @@ The type for communication "channels" between the clients and
 
 
 <pre><span id="VALaccept"><span class="keyword">val</span> accept</span> : <code class="type">root:<a href="Vfs.Dir.html#TYPEt">Vfs.Dir.t</a> -> msg:string -> <a href="Fs9p.S.html#TYPEflow">flow</a> -> unit Protocol_9p.Error.t Lwt.t</code></pre><div class="info ">
-<code class="code">accept ~root f</code> accepts connection on <code class="code">f</code>, processs requests
+<code class="code">accept&nbsp;~root&nbsp;f</code> accepts connection on <code class="code">f</code>, processs requests
       and returns when the connection has beenn closed.<br>
 </div>
 </body></html>

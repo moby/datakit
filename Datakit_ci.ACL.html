@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Term.html">
 <link rel="next" href="Datakit_ci.Web.html">
@@ -48,22 +49,22 @@ The type for GitHub ACLs.<br>
 </div>
 
 <pre><span id="VALusername"><span class="keyword">val</span> username</span> : <code class="type">string -> <a href="Datakit_ci.ACL.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">username n</code> is the ACL granting access to the user <code class="code">n</code>.<br>
+<code class="code">username&nbsp;n</code> is the ACL granting access to the user <code class="code">n</code>.<br>
 </div>
 
 <pre><span id="VALgithub_org"><span class="keyword">val</span> github_org</span> : <code class="type">string -> <a href="Datakit_ci.ACL.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">github_org o</code> is the ACL granting access to all the users of
+<code class="code">github_org&nbsp;o</code> is the ACL granting access to all the users of
       the <code class="code">o</code> GitHub organisation. Note: currently, only public
       organisation membership is used.<br>
 </div>
 
 <pre><span id="VALcan_read_github"><span class="keyword">val</span> can_read_github</span> : <code class="type">string -> <a href="Datakit_ci.ACL.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">can_read <span class="string">"org/repo"</span></code> is the ACL granting access to users who
+<code class="code">can_read&nbsp;<span class="string">"org/repo"</span></code> is the ACL granting access to users who
       can see the <code class="code">org/repo</code> GitHub repository.<br>
 </div>
 
 <pre><span id="VALany"><span class="keyword">val</span> any</span> : <code class="type"><a href="Datakit_ci.ACL.html#TYPEt">t</a> list -> <a href="Datakit_ci.ACL.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">any l</code> is the ACL granting access to an user iff there is at
+<code class="code">any&nbsp;l</code> is the ACL granting access to an user iff there is at
       least one ACL in <code class="code">l</code> granting access to that user.<br>
 </div>
 </body></html>

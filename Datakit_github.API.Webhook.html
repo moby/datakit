@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="Up" href="Datakit_github.API.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
@@ -37,7 +38,7 @@ The type for the webhook server state.<br>
 
 
 <pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -> Uri.t -> <a href="Datakit_github.API.Webhook.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v tok uri</code> is the webhook server state configured to listen
+<code class="code">v&nbsp;tok&nbsp;uri</code> is the webhook server state configured to listen
         for incoming webhook events to the public address <code class="code">uri</code> and
         using the token <code class="code">tok</code> to perform GitHub API calls. The
         function <code class="code">f</code> will be called everytime a new event is
@@ -45,7 +46,7 @@ The type for the webhook server state.<br>
 </div>
 
 <pre><span id="VALrun"><span class="keyword">val</span> run</span> : <code class="type"><a href="Datakit_github.API.Webhook.html#TYPEt">t</a> -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">run t</code> is a blocking lwt thread which runs the webook
+<code class="code">run&nbsp;t</code> is a blocking lwt thread which runs the webook
         listener.<br>
 </div>
 
@@ -54,18 +55,18 @@ The list of watched repository.<br>
 </div>
 
 <pre><span id="VALwatch"><span class="keyword">val</span> watch</span> : <code class="type"><a href="Datakit_github.API.Webhook.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">watch t r</code> makes <code class="code">t</code> watch the repo <code class="code">r</code>.<br>
+<code class="code">watch&nbsp;t&nbsp;r</code> makes <code class="code">t</code> watch the repo <code class="code">r</code>.<br>
 </div>
 
 <pre><span id="VALevents"><span class="keyword">val</span> events</span> : <code class="type"><a href="Datakit_github.API.Webhook.html#TYPEt">t</a> -> <a href="Datakit_github.Event.html#TYPEt">Datakit_github.Event.t</a> list</code></pre><div class="info ">
-<code class="code">events t</code> is the list of events stored in <code class="code">t</code>.<br>
+<code class="code">events&nbsp;t</code> is the list of events stored in <code class="code">t</code>.<br>
 </div>
 
 <pre><span id="VALwait"><span class="keyword">val</span> wait</span> : <code class="type"><a href="Datakit_github.API.Webhook.html#TYPEt">t</a> -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">wait t</code> waits for new events to be available.<br>
+<code class="code">wait&nbsp;t</code> waits for new events to be available.<br>
 </div>
 
 <pre><span id="VALclear"><span class="keyword">val</span> clear</span> : <code class="type"><a href="Datakit_github.API.Webhook.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
-<code class="code">clear t</code> clears the list of events stored in <code class="code">t</code>.<br>
+<code class="code">clear&nbsp;t</code> clears the list of events stored in <code class="code">t</code>.<br>
 </div>
 </body></html>

@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.Commit.html">
 <link rel="next" href="Datakit_github.Status.html">
@@ -78,7 +79,7 @@ The type for pull-requests values.<br>
 
 
 <pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">?state:[ `Closed | `Open ] -><br>       title:string -><br>       ?base:string -> <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -> int -> <a href="Datakit_github.PR.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v c n ~title</code> is the pull-request <code class="code">n</code> with head commit <code class="code">c</code> and
+<code class="code">v&nbsp;c&nbsp;n&nbsp;~title</code> is the pull-request <code class="code">n</code> with head commit <code class="code">c</code> and
       title <code class="code">title</code>. If <code class="code">base</code> is not set, use <code class="code"><span class="string">"master"</span></code>. If <code class="code">state</code>
       is not set, use <code class="code"><span class="keywordsign">`</span><span class="constructor">Open</span></code>.<br>
 </div>
@@ -102,53 +103,53 @@ The type for commit ids.<br>
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
-<code class="code">repo t</code> is <code class="code">t</code>'s repostiory.<br>
+<code class="code">repo&nbsp;t</code> is <code class="code">t</code>'s repostiory.<br>
 </div>
 
 <pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.PR.html#TYPEid">id</a></code></pre><div class="info ">
-<code class="code">id t</code> is <code class="code">t</code>'s ID.<br>
+<code class="code">id&nbsp;t</code> is <code class="code">t</code>'s ID.<br>
 </div>
 
 <pre><span id="VALcommit"><span class="keyword">val</span> commit</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code></pre><div class="info ">
-<code class="code">commit t</code> is <code class="code">t</code>'s commit.<br>
+<code class="code">commit&nbsp;t</code> is <code class="code">t</code>'s commit.<br>
 </div>
 
 <pre><span id="VALcommit_hash"><span class="keyword">val</span> commit_hash</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">commit_hash t</code> is the SHA1 of <code class="code">t</code>'s commit.<br>
+<code class="code">commit_hash&nbsp;t</code> is the SHA1 of <code class="code">t</code>'s commit.<br>
 </div>
 
 <pre><span id="VALnumber"><span class="keyword">val</span> number</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> int</code></pre><div class="info ">
-<code class="code">number t</code> is <code class="code">t</code>'s number.<br>
+<code class="code">number&nbsp;t</code> is <code class="code">t</code>'s number.<br>
 </div>
 
 <pre><span id="VALstate"><span class="keyword">val</span> state</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> [ `Closed | `Open ]</code></pre><div class="info ">
-<code class="code">state t</code> is <code class="code">t</code>'s state.<br>
+<code class="code">state&nbsp;t</code> is <code class="code">t</code>'s state.<br>
 </div>
 
 <pre><span id="VALclose"><span class="keyword">val</span> close</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.PR.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">close t</code> is <code class="code">t</code> with <code class="code">state t</code> set to <code class="code"><span class="keywordsign">`</span><span class="constructor">Closed</span></code>.<br>
+<code class="code">close&nbsp;t</code> is <code class="code">t</code> with <code class="code">state&nbsp;t</code> set to <code class="code"><span class="keywordsign">`</span><span class="constructor">Closed</span></code>.<br>
 </div>
 
 <pre><span id="VALstate_of_string"><span class="keyword">val</span> state_of_string</span> : <code class="type">string -> [ `Closed | `Open ] option</code></pre><div class="info ">
-<code class="code">string_of_state str</code> is <code class="code"><span class="constructor">Some</span> s</code> if there exists a state <code class="code">s</code>
-      such that <code class="code">state_of_string s</code> is <code class="code">str</code>. Otherwise it is
+<code class="code">string_of_state&nbsp;str</code> is <code class="code"><span class="constructor">Some</span>&nbsp;s</code> if there exists a state <code class="code">s</code>
+      such that <code class="code">state_of_string&nbsp;s</code> is <code class="code">str</code>. Otherwise it is
       <code class="code"><span class="constructor">None</span></code>.<br>
 </div>
 
 <pre><span id="VALstring_of_state"><span class="keyword">val</span> string_of_state</span> : <code class="type">[ `Closed | `Open ] -> string</code></pre><div class="info ">
-<code class="code">state_of_string s</code> is <code class="code">s</code>'s string representation.<br>
+<code class="code">state_of_string&nbsp;s</code> is <code class="code">s</code>'s string representation.<br>
 </div>
 
 <pre><span id="VALtitle"><span class="keyword">val</span> title</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">title t</code> is <code class="code">t</code>'s title.<br>
+<code class="code">title&nbsp;t</code> is <code class="code">t</code>'s title.<br>
 </div>
 
 <pre><span id="VALsame_id"><span class="keyword">val</span> same_id</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEt">t</a> -> <a href="Datakit_github.PR.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
-<code class="code">same_id x y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
+<code class="code">same_id&nbsp;x&nbsp;y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
 </div>
 
 <pre><span id="VALcompare_id"><span class="keyword">val</span> compare_id</span> : <code class="type"><a href="Datakit_github.PR.html#TYPEid">id</a> -> <a href="Datakit_github.PR.html#TYPEid">id</a> -> int</code></pre><div class="info ">
-<code class="code">compare_id x y</code> compare the pull-request IDs <code class="code">x</code> and <code class="code">y</code>.<br>
+<code class="code">compare_id&nbsp;x&nbsp;y</code> compare the pull-request IDs <code class="code">x</code> and <code class="code">y</code>.<br>
 </div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.PR.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.PR.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
@@ -160,6 +161,6 @@ Maps indexed by pull-request IDs.
 </div>
 
 <pre><span id="VALindex"><span class="keyword">val</span> index</span> : <code class="type">Set.t -><br>       <a href="Datakit_github.PR.html#TYPEt">t</a> Index.t Datakit_github.Repo.Map.t</code></pre><div class="info ">
-<code class="code">index s</code> indexes <code class="code">s</code> by pull-request IDs.<br>
+<code class="code">index&nbsp;s</code> indexes <code class="code">s</code> by pull-request IDs.<br>
 </div>
 </body></html>

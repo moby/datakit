@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_S.CLIENT.Tree.html">
 <link rel="next" href="Datakit_S.CLIENT.Transaction.html">
@@ -49,22 +50,22 @@ A <code class="code">t</code> is an immutable commit in the database.<br>
 </div>
 
 <pre><span id="VALtree"><span class="keyword">val</span> tree</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -> Datakit_S.CLIENT.Tree.t</code></pre><div class="info ">
-<code class="code">tree t</code> is the content of the commit.<br>
+<code class="code">tree&nbsp;t</code> is the content of the commit.<br>
 </div>
 
 <pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">id t</code> is the unique ID of this commit.<br>
+<code class="code">id&nbsp;t</code> is the unique ID of this commit.<br>
 </div>
 
 <pre><span id="VALmessage"><span class="keyword">val</span> message</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -> string <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">message t</code> is <code class="code">t</code>'s log message.<br>
+<code class="code">message&nbsp;t</code> is <code class="code">t</code>'s log message.<br>
 </div>
 
 <pre><span id="VALparents"><span class="keyword">val</span> parents</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">parents t</code> is the list of <code class="code">t</code>'s parent commits.<br>
+<code class="code">parents&nbsp;t</code> is the list of <code class="code">t</code>'s parent commits.<br>
 </div>
 
 <pre><span id="VALdiff"><span class="keyword">val</span> diff</span> : <code class="type"><a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -><br>       <a href="Datakit_S.CLIENT.Commit.html#TYPEt">t</a> -><br>       <a href="Datakit_path.html#TYPEt">Datakit_path.t</a> <a href="Datakit_S.html#TYPEdiff">Datakit_S.diff</a> list <a href="Datakit_S.CLIENT.html#TYPEor_error">Datakit_S.CLIENT.or_error</a> Lwt.t</code></pre><div class="info ">
-<code class="code">diff a b</code> returns the paths with differences between <code class="code">a</code> and <code class="code">b</code>.<br>
+<code class="code">diff&nbsp;a&nbsp;b</code> returns the paths with differences between <code class="code">a</code> and <code class="code">b</code>.<br>
 </div>
 </body></html>

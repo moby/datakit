@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Web.html">
 <link rel="next" href="Datakit_ci.Process.html">
@@ -56,7 +57,7 @@ The type for individual tests.<br>
 
 
 <pre><span id="VALproject"><span class="keyword">val</span> project</span> : <code class="type">id:string -><br>       ?dashboards:string list -><br>       (<a href="Datakit_ci.Target.html#TYPEt">Datakit_ci.Target.t</a> -> (string * <a href="Datakit_ci.Config.html#TYPEtest">test</a>) list) -><br>       <a href="Datakit_ci.Config.html#TYPEproject">project</a></code></pre><div class="info ">
-<code class="code">project ~id tests</code> is the configuration for a single GitHub
+<code class="code">project&nbsp;~id&nbsp;tests</code> is the configuration for a single GitHub
       project. <code class="code">tests</code> is a list tests to apply to branches, tags and
       open PRs within the project. <code class="code">dashboards</code> (default
       <code class="code">[<span class="string">"master"</span>]</code>) is a list of branches to display in the main
@@ -64,7 +65,7 @@ The type for individual tests.<br>
 </div>
 
 <pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">web_config:<a href="Datakit_ci.Web.html#TYPEconfig">Datakit_ci.Web.config</a> -><br>       projects:<a href="Datakit_ci.Config.html#TYPEproject">project</a> list -> <a href="Datakit_ci.Config.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v ~web_config ~project</code> describe a complete project
+<code class="code">v&nbsp;~web_config&nbsp;~project</code> describe a complete project
       configuration.<br>
 </div>
 </body></html>

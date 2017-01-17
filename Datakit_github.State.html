@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.Capabilities.html">
 <link rel="Up" href="Datakit_github.html">
@@ -33,7 +34,7 @@
 &nbsp;</div>
 <h1>Functor <a href="type_Datakit_github.State.html">Datakit_github.State</a></h1>
 
-<pre><span class="keyword">module</span> State: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">API</span></code><code class="code"> : </code><code class="type"><a href="Datakit_github.API.html">API</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.State.html">..</a> <code class="code"><span class="keyword">end</span></code></div></pre><div class="info module top">
+<pre><span class="keyword">module</span> State: <div class="sig_block"><code class="code"><span class="keyword">functor</span>&nbsp;(</code><code class="code"><span class="constructor">API</span></code><code class="code">&nbsp;:&nbsp;</code><code class="type"><a href="Datakit_github.API.html">API</a></code><code class="code">)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;</code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.State.html">..</a> <code class="code"><span class="keyword">end</span></code></div></pre><div class="info module top">
 API State: TODO find a better name?<br>
 </div>
 <table border="0" cellpadding="3" width="100%">
@@ -61,38 +62,38 @@ The type for state token.<br>
 
 
 <pre><span id="VALtoken"><span class="keyword">val</span> token</span> : <code class="type"><a href="Datakit_github.API.html#TYPEtoken">Datakit_github.API.token</a> -><br>       <a href="Datakit_github.Capabilities.html#TYPEt">Datakit_github.Capabilities.t</a> -> <a href="Datakit_github.State.html#TYPEtoken">token</a></code></pre><div class="info ">
-<code class="code">token t c</code> is the token using the GitHub API token <code class="code">t</code> limited
+<code class="code">token&nbsp;t&nbsp;c</code> is the token using the GitHub API token <code class="code">t</code> limited
       by the capabilities <code class="code">c</code>.<br>
 </div>
 
 <pre><span id="VALcapabilities"><span class="keyword">val</span> capabilities</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -> <a href="Datakit_github.Capabilities.html#TYPEt">Datakit_github.Capabilities.t</a></code></pre><div class="info ">
-<code class="code">capabilities t</code> is the token <code class="code">t</code>'s capabilities.<br>
+<code class="code">capabilities&nbsp;t</code> is the token <code class="code">t</code>'s capabilities.<br>
 </div>
 
 <pre><span id="VALwith_capabilities"><span class="keyword">val</span> with_capabilities</span> : <code class="type"><a href="Datakit_github.Capabilities.html#TYPEt">Datakit_github.Capabilities.t</a> -><br>       <a href="Datakit_github.State.html#TYPEtoken">token</a> -> <a href="Datakit_github.State.html#TYPEtoken">token</a></code></pre><div class="info ">
-<code class="code">with_capabilities c t</code> is <code class="code">t</code> with the capabilities <code class="code">c</code>.<br>
+<code class="code">with_capabilities&nbsp;c&nbsp;t</code> is <code class="code">t</code> with the capabilities <code class="code">c</code>.<br>
 </div>
 <br>
 <h1 id="1_Synchronisation">Synchronisation</h1><br>
 
 <pre><span id="VALimport"><span class="keyword">val</span> import</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> -><br>       Datakit_github.Elt.IdSet.t -> <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> Lwt.t</code></pre><div class="info ">
-<code class="code">import token t r</code> imports the state of GitHub for the elements
+<code class="code">import&nbsp;token&nbsp;t&nbsp;r</code> imports the state of GitHub for the elements
       in <code class="code">r</code> into <code class="code">t</code>. API calls use the token <code class="code">token</code>.<br>
 </div>
 
 <pre><span id="VALapply"><span class="keyword">val</span> apply</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -> <a href="Datakit_github.Diff.html#TYPEt">Datakit_github.Diff.t</a> -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">apply token d</code> applies the snapshot diff <code class="code">d</code> as a series of
+<code class="code">apply&nbsp;token&nbsp;d</code> applies the snapshot diff <code class="code">d</code> as a series of
       GitHub API calls, using the token <code class="code">token</code>.<br>
 </div>
 <br>
 <h1 id="1_Webhooks">Webhooks</h1><br>
 
 <pre><span id="VALadd_webhooks"><span class="keyword">val</span> add_webhooks</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -><br>       watch:(<a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> unit Lwt.t) -><br>       Datakit_github.Repo.Set.t -> unit Lwt.t</code></pre><div class="info ">
-<code class="code">add_webhooks t rs</code> adds webhooks for the repositories <code class="code">rs</code>.<br>
+<code class="code">add_webhooks&nbsp;t&nbsp;rs</code> adds webhooks for the repositories <code class="code">rs</code>.<br>
 </div>
 
 <pre><span id="VALimport_webhook_events"><span class="keyword">val</span> import_webhook_events</span> : <code class="type"><a href="Datakit_github.State.html#TYPEtoken">token</a> -><br>       events:(unit -> <a href="Datakit_github.Event.html#TYPEt">Datakit_github.Event.t</a> list) -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> -> <a href="Datakit_github.Snapshot.html#TYPEt">Datakit_github.Snapshot.t</a> Lwt.t</code></pre><div class="info ">
-<code class="code">import_webhook_events t ~events s</code> applies <code class="code">events ()</code> on top
+<code class="code">import_webhook_events&nbsp;t&nbsp;~events&nbsp;s</code> applies <code class="code">events&nbsp;()</code> on top
       of <code class="code">s</code>. Note: it ensure that all the metadata are correctly
       updated by inserting (possibly) missing events in the mix. For
       instance, GitHub never sends status events, so

@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Fs9p.html">
 <link rel="next" href="Datakit_S.html">
@@ -50,11 +51,11 @@ The empty path.<br>
 </div>
 
 <pre><span id="VALof_steps"><span class="keyword">val</span> of_steps</span> : <code class="type">string list -> (<a href="Datakit_path.html#TYPEt">t</a>, string) Result.result</code></pre><div class="info ">
-Converts a list of the form <code class="code"><span class="string">"a"</span>; <span class="string">"b"</span>; <span class="string">"c"</span></code> to a path.<br>
+Converts a list of the form <code class="code"><span class="string">"a"</span>;&nbsp;<span class="string">"b"</span>;&nbsp;<span class="string">"c"</span></code> to a path.<br>
 </div>
 
 <pre><span id="VALof_steps_exn"><span class="keyword">val</span> of_steps_exn</span> : <code class="type">string list -> <a href="Datakit_path.html#TYPEt">t</a></code></pre><div class="info ">
-Converts a list of the form <code class="code"><span class="string">"a"</span>; <span class="string">"b"</span>; <span class="string">"c"</span></code> to a path.<br>
+Converts a list of the form <code class="code"><span class="string">"a"</span>;&nbsp;<span class="string">"b"</span>;&nbsp;<span class="string">"c"</span></code> to a path.<br>
 </div>
 
 <pre><span id="VALof_string"><span class="keyword">val</span> of_string</span> : <code class="type">string -> (<a href="Datakit_path.html#TYPEt">t</a>, string) Result.result</code></pre><div class="info ">
@@ -67,8 +68,8 @@ Cast to a list of strings<br>
 </div>
 
 <pre><span id="VALpop"><span class="keyword">val</span> pop</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> (<a href="Datakit_path.html#TYPEt">t</a> * string) option</code></pre><div class="info ">
-<code class="code">pop (dir / leaf)</code> is <code class="code"><span class="constructor">Some</span> (dir, leaf)</code>.
-    <code class="code">pop empty</code> is <code class="code"><span class="constructor">None</span></code>.<br>
+<code class="code">pop&nbsp;(dir&nbsp;/&nbsp;leaf)</code> is <code class="code"><span class="constructor">Some</span>&nbsp;(dir,&nbsp;leaf)</code>.
+    <code class="code">pop&nbsp;empty</code> is <code class="code"><span class="constructor">None</span></code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
@@ -84,11 +85,11 @@ Convert to a string, in the same format as <code class="code">pp</code>.<br>
 </div>
 
 <pre><span id="VALbasename"><span class="keyword">val</span> basename</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> string option</code></pre><div class="info ">
-<code class="code">basename t</code> is <code class="code">t</code>'s basename.<br>
+<code class="code">basename&nbsp;t</code> is <code class="code">t</code>'s basename.<br>
 </div>
 
 <pre><span id="VALdirname"><span class="keyword">val</span> dirname</span> : <code class="type"><a href="Datakit_path.html#TYPEt">t</a> -> <a href="Datakit_path.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">dirname t</code> is <code class="code">t</code>'s dirname.<br>
+<code class="code">dirname&nbsp;t</code> is <code class="code">t</code>'s dirname.<br>
 </div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_path.Set.html">Set</a>: <code class="type">Set.S</code><code class="type">  with type elt = t</code></pre><div class="info">

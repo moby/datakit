@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.Status.html">
 <link rel="next" href="Datakit_github.Event.html">
@@ -64,7 +65,7 @@ The type for Git references.<br>
 
 
 <pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a> -> <a href="Datakit_github.Ref.html#TYPEname">name</a> -> <a href="Datakit_github.Ref.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v head name</code> is a fresh <a href="Datakit_github.Ref.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t</code></a> with the <code class="code">head</code> commit and
+<code class="code">v&nbsp;head&nbsp;name</code> is a fresh <a href="Datakit_github.Ref.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Ref</span>.t</code></a> with the <code class="code">head</code> commit and
       <code class="code">name</code>. <code class="code">name</code> should only contain alpha-numeric character,
       <code class="code"><span class="string">'_'</span></code> and <code class="code"><span class="string">'-'</span></code>.<br>
 </div>
@@ -74,7 +75,7 @@ The type for Git references.<br>
 </div>
 
 <pre><span id="VALpp_name"><span class="keyword">val</span> pp_name</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEname">name</a> Fmt.t</code></pre><div class="info ">
-<code class="code">pp_name [<span class="string">"a"</span>;<span class="string">"b"</span>;<span class="string">"c"</span>]</code> is <code class="code"><span class="string">"a/b/c"</span></code><br>
+<code class="code">pp_name&nbsp;[<span class="string">"a"</span>;<span class="string">"b"</span>;<span class="string">"c"</span>]</code> is <code class="code"><span class="string">"a/b/c"</span></code><br>
 </div>
 
 <pre><span id="VALcompare"><span class="keyword">val</span> compare</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEt">t</a> -> int</code></pre><div class="info ">
@@ -92,31 +93,31 @@ The type for Git reference IDs.<br>
 </div>
 
 <pre><span id="VALid"><span class="keyword">val</span> id</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEid">id</a></code></pre><div class="info ">
-<code class="code">id t</code> is <code class="code">t</code>'s ID.<br>
+<code class="code">id&nbsp;t</code> is <code class="code">t</code>'s ID.<br>
 </div>
 
 <pre><span id="VALname"><span class="keyword">val</span> name</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEname">name</a></code></pre><div class="info ">
-<code class="code">name t</code> is <code class="code">t</code>'s name.<br>
+<code class="code">name&nbsp;t</code> is <code class="code">t</code>'s name.<br>
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
-<code class="code">repo t</code> is <code class="code">t</code>'s repository.<br>
+<code class="code">repo&nbsp;t</code> is <code class="code">t</code>'s repository.<br>
 </div>
 
 <pre><span id="VALcommit"><span class="keyword">val</span> commit</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">Datakit_github.Commit.t</a></code></pre><div class="info ">
-<code class="code">commit t</code> is <code class="code">t</code>'s commit.<br>
+<code class="code">commit&nbsp;t</code> is <code class="code">t</code>'s commit.<br>
 </div>
 
 <pre><span id="VALcommit_hash"><span class="keyword">val</span> commit_hash</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">commit_hash t</code> is <code class="code">t</code>'s commit SHA1.<br>
+<code class="code">commit_hash&nbsp;t</code> is <code class="code">t</code>'s commit SHA1.<br>
 </div>
 
 <pre><span id="VALsame_id"><span class="keyword">val</span> same_id</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEt">t</a> -> <a href="Datakit_github.Ref.html#TYPEt">t</a> -> bool</code></pre><div class="info ">
-<code class="code">same_id x y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
+<code class="code">same_id&nbsp;x&nbsp;y</code> is true if <code class="code">x</code> and <code class="code">y</code> have the same ID.<br>
 </div>
 
 <pre><span id="VALcompare_id"><span class="keyword">val</span> compare_id</span> : <code class="type"><a href="Datakit_github.Ref.html#TYPEid">id</a> -> <a href="Datakit_github.Ref.html#TYPEid">id</a> -> int</code></pre><div class="info ">
-<code class="code">compare_id x y</code> compares the Git reference IDs <code class="code">x</code> and <code class="code">y</code>.<br>
+<code class="code">compare_id&nbsp;x&nbsp;y</code> compares the Git reference IDs <code class="code">x</code> and <code class="code">y</code>.<br>
 </div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_github.Ref.Set.html">Set</a>: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Ref.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><div class="info">
@@ -138,6 +139,6 @@ Maps indexed by Git reference IDs.
 </div>
 
 <pre><span id="VALindex"><span class="keyword">val</span> index</span> : <code class="type">Set.t -><br>       <a href="Datakit_github.Ref.html#TYPEt">t</a> Index.t Datakit_github.Repo.Map.t</code></pre><div class="info ">
-<code class="code">index s</code> indexes <code class="code">s</code> by Git reference IDs.<br>
+<code class="code">index&nbsp;s</code> indexes <code class="code">s</code> by Git reference IDs.<br>
 </div>
 </body></html>

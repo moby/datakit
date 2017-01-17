@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="Up" href="Vfs.File.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
@@ -43,16 +44,16 @@ The type for stream sessions.<br>
 
 
 <pre><span id="VALsession"><span class="keyword">val</span> session</span> : <code class="type">'a -> 'a <a href="Vfs.File.Stream.html#TYPEsession">session</a></code></pre><div class="info ">
-<code class="code">session init</code> creates a fresh session, whose initial value is
+<code class="code">session&nbsp;init</code> creates a fresh session, whose initial value is
         <code class="code">init</code>.<br>
 </div>
 
 <pre><span id="VALpublish"><span class="keyword">val</span> publish</span> : <code class="type">'a <a href="Vfs.File.Stream.html#TYPEsession">session</a> -> 'a -> unit</code></pre><div class="info ">
-<code class="code">publish s v</code> publishes <code class="code">v</code> in the session <code class="code">s</code>.<br>
+<code class="code">publish&nbsp;s&nbsp;v</code> publishes <code class="code">v</code> in the session <code class="code">s</code>.<br>
 </div>
 
 <pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">'a Fmt.t -> 'a <a href="Vfs.File.Stream.html#TYPEsession">session</a> -> <a href="Vfs.File.Stream.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create pp session</code> is a fresh file stream. Readers of the
+<code class="code">create&nbsp;pp&nbsp;session</code> is a fresh file stream. Readers of the
         stream will first get an initial line, printed with <code class="code">pp</code>,
         corresponding to the current session's value. Everytime the
         session's state is changing, a new line -- formatted with <code class="code">pp</code>

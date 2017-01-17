@@ -3,9 +3,10 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Monitored_pool.html">
-<link rel="next" href="Datakit_ci.Cache.html">
+<link rel="next" href="Datakit_ci.Docker.html">
 <link rel="Up" href="Datakit_ci.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -29,7 +30,7 @@
 <body>
 <div class="navbar"><a class="pre" href="Datakit_ci.Monitored_pool.html" title="Datakit_ci.Monitored_pool">Previous</a>
 &nbsp;<a class="up" href="Datakit_ci.html" title="Datakit_ci">Up</a>
-&nbsp;<a class="post" href="Datakit_ci.Cache.html" title="Datakit_ci.Cache">Next</a>
+&nbsp;<a class="post" href="Datakit_ci.Docker.html" title="Datakit_ci.Docker">Next</a>
 </div>
 <h1>Module <a href="type_Datakit_ci.Git.html">Datakit_ci.Git</a></h1>
 
@@ -38,7 +39,7 @@
 <h1 id="git">Git Manipulation</h1>
 <p>
 
-      <code class="code"><span class="constructor">Git</span></code> extends Term with Git-related combinators.It
+      The <code class="code"><span class="constructor">Git</span></code> plugin provides Git-related combinators. It
       defines types for <a href="Datakit_ci.Git.html#TYPEt">local Git repositories</a>, <a href="Datakit_ci.Git.html#TYPEcommit">Git
       commits</a> inside these repositories and <a href="Datakit_ci.Git.html#VALcommand">shell command</a>
       to run on a given checkout.<br>
@@ -50,8 +51,11 @@ The type for local non-bare git working directory (with a .git
 </div>
 
 
-<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">logs:<a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a> -> dir:string -> <a href="Datakit_ci.Git.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v ~logs ~dir</code> is the local Git repository at <code class="code">dir</code>.<br>
+<pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type">?remote:string -><br>       logs:<a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a> -> string -> <a href="Datakit_ci.Git.html#TYPEt">t</a></code></pre><div class="info ">
+<code class="code">v&nbsp;~remote&nbsp;~logs&nbsp;dir</code> is the local Git repository at <code class="code">dir</code>.
+      If <code class="code">dir</code> does not exist, it is created by <code class="code">git&nbsp;clone&nbsp;remote</code>.
+      If <code class="code">remote</code> is not given and <code class="code">dir</code> does not exist, an exception
+      is raised.<br>
 </div>
 
 <pre><span id="TYPEcommit"><span class="keyword">type</span> <code class="type"></code>commit</span> </pre>
@@ -61,22 +65,22 @@ The type for Git commits.<br>
 
 
 <pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Datakit_ci.Git.html#TYPEcommit">commit</a> -> string</code></pre><div class="info ">
-<code class="code">hash c</code> is <code class="code">c</code>'s hash.<br>
+<code class="code">hash&nbsp;c</code> is <code class="code">c</code>'s hash.<br>
 </div>
 
 <pre><span id="VALis_after"><span class="keyword">val</span> is_after</span> : <code class="type">old:string -> <a href="Datakit_ci.Git.html#TYPEcommit">commit</a> -> bool Lwt.t</code></pre><div class="info ">
-<code class="code">is_after ~old c</code> is true iff <code class="code">old</code> appears in the history of
+<code class="code">is_after&nbsp;~old&nbsp;c</code> is true iff <code class="code">old</code> appears in the history of
       <code class="code">c</code>.<br>
 </div>
 
 <pre><span id="VALfetch_head"><span class="keyword">val</span> fetch_head</span> : <code class="type"><a href="Datakit_ci.Git.html#TYPEt">t</a> -><br>       <a href="Datakit_ci.Target.html#TYPEt">Datakit_ci.Target.t</a> -> <a href="Datakit_ci.Git.html#TYPEcommit">commit</a> <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a></code></pre><div class="info ">
-<code class="code">fetch_head t target</code> evaluates to a local branch in <code class="code">t</code> with a
+<code class="code">fetch_head&nbsp;t&nbsp;target</code> evaluates to a local branch in <code class="code">t</code> with a
       copy of <code class="code">target</code>'s head commit (downloading it first if
       needed).<br>
 </div>
 
 <pre><span id="VALwith_checkout"><span class="keyword">val</span> with_checkout</span> : <code class="type">log:<a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -><br>       job_id:<a href="Datakit_ci.html#TYPEjob_id">Datakit_ci.job_id</a> -><br>       <a href="Datakit_ci.Git.html#TYPEcommit">commit</a> -> (string -> 'a Lwt.t) -> 'a Lwt.t</code></pre><div class="info ">
-<code class="code">with_checkout ~log ~job_id commit fn</code> is <code class="code">fn path</code>, where <code class="code">path</code>
+<code class="code">with_checkout&nbsp;~log&nbsp;~job_id&nbsp;commit&nbsp;fn</code> is <code class="code">fn&nbsp;path</code>, where <code class="code">path</code>
       is the path of a local checkout of <code class="code">commit</code>. <code class="code">path</code> must not be
       used after <code class="code">fn</code>'s thread terminates. The directory is locked while
       <code class="code">fn</code> runs with <code class="code">job_id</code> displayed to show why it is busy.<br>
@@ -96,7 +100,7 @@ A cache of executions of a shell command.<br>
 
 
 <pre><span id="VALcommand"><span class="keyword">val</span> command</span> : <code class="type">logs:<a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a> -><br>       timeout:float -><br>       label:string -> clone:bool -> string array list -> <a href="Datakit_ci.Git.html#TYPEcommand">command</a></code></pre><div class="info ">
-<code class="code">command ~logs ~timeout ~label ~clone cmds</code> is a caching executor
+<code class="code">command&nbsp;~logs&nbsp;~timeout&nbsp;~label&nbsp;~clone&nbsp;cmds</code> is a caching executor
       of <code class="code">cmds</code>, which caches results in a branch whose name includes
       <code class="code">label</code>. The command will be terminated if it exceeds <code class="code">timeout</code>
       seconds. If <code class="code">clone</code> is set then <code class="code">with_clone</code> is used rather than
@@ -104,7 +108,7 @@ A cache of executions of a shell command.<br>
 </div>
 
 <pre><span id="VALrun"><span class="keyword">val</span> run</span> : <code class="type"><a href="Datakit_ci.Git.html#TYPEcommand">command</a> -> <a href="Datakit_ci.Git.html#TYPEcommit">commit</a> -> unit <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a></code></pre><div class="info ">
-<code class="code">run cmd commit</code> succeeds if running <code class="code">cmd</code> in a checkout of
+<code class="code">run&nbsp;cmd&nbsp;commit</code> succeeds if running <code class="code">cmd</code> in a checkout of
       <code class="code">commit</code> returns an exit status of zero.<br>
 </div>
 </body></html>

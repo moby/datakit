@@ -19,11 +19,11 @@
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
 <link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
 <link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
-<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Ivfs.Make</title>
+<link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Docker.Image</title>
 </head>
 <body>
-<code class="code"><span class="keyword">functor</span>&nbsp;(<span class="constructor">Store</span>&nbsp;:&nbsp;<span class="constructor">Ivfs_tree</span>.<span class="constructor">STORE</span>)&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;<span class="keyword">sig</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;repo&nbsp;=&nbsp;<span class="constructor">Store</span>.<span class="constructor">Repo</span>.t<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;create&nbsp;:&nbsp;string&nbsp;<span class="constructor">Irmin</span>.<span class="constructor">Task</span>.f&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;repo&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Vfs</span>.<span class="constructor">Dir</span>.t<br>
-&nbsp;&nbsp;<span class="keyword">end</span></code></body></html>
+<code class="code"><span class="keyword">sig</span><br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;id&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Docker</span>.<span class="constructor">Image</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;pp&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Docker</span>.<span class="constructor">Image</span>.t&nbsp;<span class="constructor">Fmt</span>.t<br>
+<span class="keyword">end</span></code></body></html>

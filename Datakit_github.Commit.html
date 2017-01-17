@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_github.Repo.html">
 <link rel="next" href="Datakit_github.PR.html">
@@ -57,7 +58,7 @@ The type for commits.<br>
 
 
 <pre><span id="VALv"><span class="keyword">val</span> v</span> : <code class="type"><a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a> -> string -> <a href="Datakit_github.Commit.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">v repo id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.<br>
+<code class="code">v&nbsp;repo&nbsp;id</code> builds a fresh <a href="Datakit_github.Commit.html#TYPEt"><code class="code"><span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t</code></a> with <code class="code">repo</code> and <code class="code">id</code>.<br>
 </div>
 
 <pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> Fmt.t</code></pre><div class="info ">
@@ -74,11 +75,11 @@ The type for commits.<br>
 </div>
 
 <pre><span id="VALrepo"><span class="keyword">val</span> repo</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Repo.html#TYPEt">Datakit_github.Repo.t</a></code></pre><div class="info ">
-<code class="code">repo t</code> is <code class="code">t</code>'s repository.<br>
+<code class="code">repo&nbsp;t</code> is <code class="code">t</code>'s repository.<br>
 </div>
 
 <pre><span id="VALhash"><span class="keyword">val</span> hash</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">hash t</code> is <code class="code">t</code>'s SHA1.<br>
+<code class="code">hash&nbsp;t</code> is <code class="code">t</code>'s SHA1.<br>
 </div>
 
 <pre><span id="VALequal"><span class="keyword">val</span> equal</span> : <code class="type"><a href="Datakit_github.Commit.html#TYPEt">t</a> -> <a href="Datakit_github.Commit.html#TYPEt">t</a> -> bool</code></pre><div class="info ">

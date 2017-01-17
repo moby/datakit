@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.Cache.Path.html">
 <link rel="Up" href="Datakit_ci.Cache.html">
@@ -30,7 +31,7 @@
 &nbsp;</div>
 <h1>Functor <a href="type_Datakit_ci.Cache.Make.html">Datakit_ci.Cache.Make</a></h1>
 
-<pre><span class="keyword">module</span> Make: <div class="sig_block"><code class="code"><span class="keyword">functor</span> (</code><code class="code"><span class="constructor">B</span></code><code class="code"> : </code><code class="type"><a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a></code><code class="code">) <span class="keywordsign">-&gt;</span> </code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Cache.Make.html">..</a> <code class="code"><span class="keyword">end</span></code></div></pre><table border="0" cellpadding="3" width="100%">
+<pre><span class="keyword">module</span> Make: <div class="sig_block"><code class="code"><span class="keyword">functor</span>&nbsp;(</code><code class="code"><span class="constructor">B</span></code><code class="code">&nbsp;:&nbsp;</code><code class="type"><a href="Datakit_ci.BUILDER.html">Datakit_ci.BUILDER</a></code><code class="code">)&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;</code><code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Cache.Make.html">..</a> <code class="code"><span class="keyword">end</span></code></div></pre><table border="0" cellpadding="3" width="100%">
 <tr>
 <td align="left" valign="top" width="1%%"><b>Parameters: </b></td>
 <td>
@@ -53,13 +54,13 @@ A <code class="code">t</code> is a cache of values created by <code class="code"
 
 
 <pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">logs:<a href="Datakit_ci.Live_log.html#TYPEmanager">Datakit_ci.Live_log.manager</a> -> B.t -> <a href="Datakit_ci.Cache.Make.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create ~logs b</code> is a fresh cache that maps keys of type
+<code class="code">create&nbsp;~logs&nbsp;b</code> is a fresh cache that maps keys of type
         <code class="code"><span class="constructor">B</span>.<span class="constructor">Key</span>.t</code> to values of type <code class="code"><span class="constructor">B</span>.value</code>.<br>
 </div>
 
-<pre><span id="VALlookup"><span class="keyword">val</span> lookup</span> : <code class="type"><a href="Datakit_ci.Cache.Make.html#TYPEt">t</a> -><br>       (unit -> Datakit_ci.DK.t Lwt.t) -><br>       rebuild:bool -> B.context -> B.Key.t -> B.value <a href="Datakit_ci.html#TYPEstatus">Datakit_ci.status</a> Lwt.t</code></pre><div class="info ">
-<code class="code">lookup t conn ~rebuild ctx key</code> returns the cached value of
-        <code class="code">key</code>, or uses <code class="code"><span class="constructor">B</span>.generate ctx key</code> to start the process of
+<pre><span id="VALlookup"><span class="keyword">val</span> lookup</span> : <code class="type"><a href="Datakit_ci.Cache.Make.html#TYPEt">t</a> -><br>       (unit -> Datakit_ci.DK.t Lwt.t) -><br>       B.context -> B.Key.t -> B.value <a href="Datakit_ci.html#TYPEstatus">Datakit_ci.status</a> Lwt.t</code></pre><div class="info ">
+<code class="code">lookup&nbsp;t&nbsp;conn&nbsp;~rebuild&nbsp;ctx&nbsp;key</code> returns the cached value of
+        <code class="code">key</code>, or uses <code class="code"><span class="constructor">B</span>.generate&nbsp;ctx&nbsp;key</code> to start the process of
         calculating the value if this is the first time <code class="code">key</code> has been
         requested. If <code class="code">rebuild</code> is <code class="code"><span class="keyword">true</span></code> then any complete cached
         result is ignored (we mark the result branch as needing a
@@ -67,7 +68,7 @@ A <code class="code">t</code> is a cache of values created by <code class="code"
 </div>
 
 <pre><span id="VALfind"><span class="keyword">val</span> find</span> : <code class="type"><a href="Datakit_ci.Cache.Make.html#TYPEt">t</a> -> B.context -> B.Key.t -> B.value <a href="Datakit_ci.Term.html#TYPEt">Datakit_ci.Term.t</a></code></pre><div class="info ">
-<code class="code">find t key</code> is the terms which evaluates to the result of
+<code class="code">find&nbsp;t&nbsp;key</code> is the terms which evaluates to the result of
         looking up <code class="code">key</code> in the cache (using <code class="code">lookup</code>).<br>
 </div>
 </body></html>

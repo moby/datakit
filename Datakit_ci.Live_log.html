@@ -3,6 +3,7 @@
 <head>
 <link rel="stylesheet" href="style.css" type="text/css">
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
 <link rel="previous" href="Datakit_ci.DK.html">
 <link rel="next" href="Datakit_ci.Output.html">
@@ -50,50 +51,50 @@ The type for live-logs.<br>
 
 
 <pre><span id="VALcreate"><span class="keyword">val</span> create</span> : <code class="type">?switch:Lwt_switch.t -><br>       pending:string -><br>       branch:string -><br>       title:string -> <a href="Datakit_ci.Live_log.html#TYPEmanager">manager</a> -> <a href="Datakit_ci.Live_log.html#TYPEt">t</a></code></pre><div class="info ">
-<code class="code">create ~pending ~branch ~title manager</code> is a fresh, empty log
+<code class="code">create&nbsp;~pending&nbsp;~branch&nbsp;~title&nbsp;manager</code> is a fresh, empty log
       with pending reason <code class="code">pending</code>.  It is an error to have two live
       logs on the same branch at the same time (finish the other one
       first).<br>
 </div>
 
 <pre><span id="VALfinish"><span class="keyword">val</span> finish</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> unit</code></pre><div class="info ">
-<code class="code">finish t</code> prevents any further changes and notifies anyone
+<code class="code">finish&nbsp;t</code> prevents any further changes and notifies anyone
       waiting on <code class="code">pending</code>.<br>
 </div>
 
 <pre><span id="VALwrite"><span class="keyword">val</span> write</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> string -> unit</code></pre><div class="info ">
-<code class="code">write t msg</code> appends <code class="code">msg</code> to the log.<br>
+<code class="code">write&nbsp;t&nbsp;msg</code> appends <code class="code">msg</code> to the log.<br>
 </div>
 
 <pre><span id="VALprintf"><span class="keyword">val</span> printf</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       ('a, Format.formatter, unit, unit) Pervasives.format4 -> 'a</code></pre><div class="info ">
-<code class="code">printf t fmt</code> appends a formatted message to the log.<br>
+<code class="code">printf&nbsp;t&nbsp;fmt</code> appends a formatted message to the log.<br>
 </div>
 
 <pre><span id="VALlog"><span class="keyword">val</span> log</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       ('a, Format.formatter, unit, unit) Pervasives.format4 -> 'a</code></pre><div class="info ">
-<code class="code">log t fmt</code> appends a formatted message to the log, with a
+<code class="code">log&nbsp;t&nbsp;fmt</code> appends a formatted message to the log, with a
       newline added at the end.<br>
 </div>
 
 <pre><span id="VALheading"><span class="keyword">val</span> heading</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       ('a, Format.formatter, unit, unit) Pervasives.format4 -> 'a</code></pre><div class="info ">
-<code class="code">heading t fmt</code> appends a formatted message to the log as a
+<code class="code">heading&nbsp;t&nbsp;fmt</code> appends a formatted message to the log as a
       heading.<br>
 </div>
 
 <pre><span id="VALwith_pending_reason"><span class="keyword">val</span> with_pending_reason</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t</code></pre><div class="info ">
-<code class="code">with_pending_reason t msg fn</code> calls <code class="code">fn ()</code>. If it gets a
+<code class="code">with_pending_reason&nbsp;t&nbsp;msg&nbsp;fn</code> calls <code class="code">fn&nbsp;()</code>. If it gets a
       sleeping thread, then it pushes <code class="code">msg</code> onto the pending-reason
       stack, waits for the thread to finish, and then removes the
       pending message.<br>
 </div>
 
 <pre><span id="VALenter_with_pending_reason"><span class="keyword">val</span> enter_with_pending_reason</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -><br>       string -> (('a -> 'b Lwt.t) -> 'b Lwt.t) -> ('a -> 'b Lwt.t) -> 'b Lwt.t</code></pre><div class="info ">
-<code class="code">enter_with_pending_reason t msg use fn</code> is like <code class="code">use fn</code>, but
+<code class="code">enter_with_pending_reason&nbsp;t&nbsp;msg&nbsp;use&nbsp;fn</code> is like <code class="code">use&nbsp;fn</code>, but
       posts <code class="code">msg</code> as the pending reason until <code class="code">fn</code> is called (or <code class="code">use</code>
       fails).  This is useful to give a pending reason while getting a
       mutex or pool resource.<br>
 </div>
 
 <pre><span id="VALcontents"><span class="keyword">val</span> contents</span> : <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">t</a> -> string</code></pre><div class="info ">
-<code class="code">contents t</code> is the current contents of the buffer.<br>
+<code class="code">contents&nbsp;t</code> is the current contents of the buffer.<br>
 </div>
 </body></html>

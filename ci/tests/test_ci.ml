@@ -500,6 +500,56 @@ let test_roles conn =
   test_private_server "/" ~expect:`See_other >>= fun () ->
   test_public_server "/" ~expect:`OK
 
+let read_to stream expect =
+  let rec aux ~sofar =
+    Lwt_stream.get stream >>= function
+    | None -> Alcotest.fail (Fmt.strf "End-of-stream waiting for %S@.Got: %s" expect sofar)
+    | Some next ->
+      let sofar = sofar ^ next in
+      if String.is_infix ~affix:expect sofar then Lwt.return ()
+      else aux ~sofar
+  in
+  aux ~sofar:""
+
+let read_to_end stream =
+  let rec aux () =
+    Lwt_stream.get stream >>= function
+    | None -> Lwt.return ()
+    | Some _ -> aux ()
+  in
+  aux ()
+
+let test_live_logs conn =
+  let tests = Repo.Map.of_list [
+  ] in
+  let dk = CI_utils.DK.connect conn in
+  let web_ui = Uri.of_string "http://localhost/" in
+  let ci = CI_engine.create ~web_ui (fun () -> Lwt.return dk) tests in
+  let logs = CI_live_log.create_manager () in
+  with_test_auth @@ fun auth ->
+  let can_read = CI_ACL.everyone in
+  let can_build = CI_ACL.everyone in
+  let web_config = CI_web_templates.config ~name:"test-ci" ~can_read ~can_build () in
+  let server = CI_web_utils.server ~web_config ~auth ~session_backend:`Memory ~public_address:web_ui in
+  let routes = CI_web.routes ~server ~logs ~ci ~dashboards:(CI_target.map_of_list []) in
+  let get path =
+    let request = Cohttp.Request.make (Uri.make ~path ()) in
+    CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >|= function
+    | None -> Alcotest.fail "No response!"
+    | Some (code, _header, body, _path) ->
+      Alcotest.(check status_code) "Web response" `OK code;
+      body
+  in
+  let log = CI_live_log.create ~pending:"Building" ~branch:"test-log" ~title:"Test" logs in
+  CI_live_log.printf log "TEST-OUTPUT-1\n";
+  get "/log/live/test-log" >|= Cohttp_lwt_body.to_stream >>= fun log_page ->
+  read_to log_page "TEST-OUTPUT-1" >>= fun () ->
+  CI_live_log.printf log "TEST-OUTPUT-2\n";
+  read_to log_page "TEST-OUTPUT-2" >>= fun () ->
+  CI_live_log.finish log;
+  read_to_end log_page >>= fun () ->
+  Lwt.return ()
+
 let test_set = [
   "Simple",         `Quick, Test_utils.run test_simple;
   "Branch",         `Quick, Test_utils.run test_branch;
@@ -515,6 +565,7 @@ let test_set = [
   "Cross-project",  `Quick, Test_utils.run test_cross_project;
   "Auth",           `Quick, test_auth;
   "Roles",          `Quick, Test_utils.run_private test_roles;
+  "Live logs",      `Quick, Test_utils.run_private test_live_logs;
 ]
 
 let () =

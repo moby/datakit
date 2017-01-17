@@ -22,7 +22,7 @@ and manager = t String.Map.t ref        (* Branch -> current live log *)
 
 type stream = {
   data : string;
-  next : stream Lwt.t Lazy.t;
+  next : stream option Lwt.t Lazy.t;
 }
 
 let create_manager () =
@@ -57,13 +57,15 @@ let title t = t.title
 let stream t =
   let rec loop offset =
     let length = Buffer.length t.buffer in
-    begin
-      if length = offset then Lwt_condition.wait t.cond
-      else Lwt.return ()
-    end >|= fun () ->
-    let data = Bytes.create (length - offset) in
-    Buffer.blit t.buffer offset data 0 (length - offset);
-    { data = Bytes.unsafe_to_string data; next = lazy (loop length) }
+    let send () =
+      let data = Bytes.create (length - offset) in
+      Buffer.blit t.buffer offset data 0 (length - offset);
+      Lwt.return @@ Some { data = Bytes.unsafe_to_string data; next = lazy (loop length) }
+    in
+    if length = offset then (
+      if t.finished then Lwt.return None
+      else Lwt_condition.wait t.cond >>= send
+    ) else send ()
   in
   loop 0
 
@@ -138,6 +140,7 @@ let finish t =
   if not t.finished then (
     t.finished <- true;
     t.manager := String.Map.remove t.branch !(t.manager);
+    Lwt_condition.broadcast t.cond ();
     notify_pending t
   )
 

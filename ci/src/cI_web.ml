@@ -161,23 +161,62 @@ class ref_page t = object(self)
         Wm.continue (CI_web_templates.target_page ~csrf_token ~target jobs) rd
 end
 
-class live_log_page t = object
-  inherit CI_web_utils.html_page t.server
+class live_log_page t = object(self)
+  inherit CI_web_utils.protected_page t.server
+
+  method content_types_provided rd =
+    Wm.continue [
+      "text/html" , self#to_html;
+    ] rd
+
+  method content_types_accepted rd =
+    Wm.continue [] rd
 
   method private required_roles = [`Reader]
 
-  method private render rd =
+  method private to_html rd =
     let branch = Rd.lookup_path_info_exn "branch" rd in
+    let user = self#authenticated_user in
+    let web_config = CI_web_utils.web_config t.server in
     match CI_live_log.lookup t.logs ~branch with
     | None ->
       (* todo: find out what commit it turned into and serve that instead *)
-      Wm.continue (CI_web_templates.plain_error "This log is no longer building") rd
+      let html = CI_web_templates.plain_error "This log is no longer building" in
+      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
+      Wm.continue (`String body) rd
     | Some live_log ->
       CI_engine.dk t.ci >>= fun dk ->
       DK.branch dk branch >>*= fun b ->
       DK.Branch.head b >>*= fun head ->
       let have_history = head <> None in
-      Wm.continue (CI_web_templates.live_log_frame ~branch ~live_log ~have_history) rd
+      let html = CI_web_templates.live_log_frame ~branch ~have_history in
+      let template = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
+      match String.cut ~sep:"@STREAM-GOES-HERE@" template with
+      | None -> CI_utils.failf "Bad template output %S" template
+      | Some (head, tail) ->
+        let stream, out = Lwt_stream.create_bounded 100 in
+        CI_live_log.stream live_log >>= fun src ->
+        out#push head >>= fun () ->
+        Lwt.async (fun () ->
+            Lwt.catch
+              (fun () ->
+                 let rec aux = function
+                   | None ->
+                     out#push tail >>= fun () ->
+                     out#close;
+                     Lwt.return ()
+                   | Some {CI_live_log.data; next} ->
+                     out#push data >>= fun () ->
+                     Lazy.force next >>= aux
+                 in
+                 aux src
+              )
+              (fun ex ->
+                 Log.warn (fun f -> f "Error streaming log: %a" CI_utils.pp_exn ex);
+                 Lwt.return ()
+              )
+          );
+        Wm.continue (`Stream stream) rd
 end
 
 class saved_log_page t = object

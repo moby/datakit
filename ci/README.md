@@ -29,7 +29,7 @@ When you're happy with the results, simply start the GitHub bridge to sync every
 ## Installation
 
 The `self-ci` directory contains the configuration we use to test DataKit itself.
-`self-ci/README.md` explains how to use Docker Compose to deploy your own instance.
+`self-ci/README.md` explains how to use Docker Cloud to deploy your own instance.
 
 The `skeleton` directory contains a very minimal example for this tutorial.
 You can build the example using Docker:
@@ -127,17 +127,18 @@ let my_test = Term.pending "Running your test now..."
 
 More usefully, the result can depend on the pull request...
 
-## The DKCI_git plugin
+## The Git plugin
 
-One very important term is `DKCI_git.fetch_head`, which fetches the PR's head commit to a local git repository, ready for testing:
+One very important term is `Git.fetch_head`, which fetches the PR's head commit to a local git repository, ready for testing:
 
 ```ocaml
+open Datakit_ci
 open Term.Infix   (* Provides the >>= operator *)
 
-let local_repo = DKCI_git.connect ~dir:"/tmp/example"
+let local_repo = Git.v ~logs ~dir:"/tmp/example" ~remote:"https://github.com/example/project.git"
 
 let my_test =
-  DKCI_git.fetch_head local_repo >>= fun local_commit ->
+  Git.fetch_head local_repo >>= fun local_commit ->
   Term.return "Fetched head commit successfully"
 ```
 
@@ -145,24 +146,25 @@ The `>>=` operator is used to combine terms.
 `x >>= f` first evaluates `x`.
 If `x` is a success value then it evaluates to `f x`, otherwise it just reports the current status (pending or error) of `x`.
 
-In this case, we `git fetch` the head commit into the `/tmp/example` repository (which must already exist as a clone of the remote repository).
+In this case, we `git fetch` the head commit into the `/tmp/example` repository (which DataKit will clone from `~remote` if it doesn't already exist).
 This term will be pending while the `git fetch` is in progress and will then report success.
 
-Use `DKCI_git.command` to configure a command to run on the commit (e.g. `make`) and use `DKCI_git.run` to execute it, e.g.
+Use `Git.command` to configure a command to run on the commit (e.g. `make`) and use `Git.run` to execute it, e.g.
 
 ```
 let one_hour = 60. *. 60.
 
-let make = DKCI_git.command ~logs ~label:"make" ~timeout:one_hour ~clone:true [
+let make = Git.command ~logs ~label:"make" ~timeout:one_hour ~clone:true [
     [| "make"; "build" |];
     [| "make"; "test" |];
   ]
 
 let my_test =
-  DKCI_git.fetch_head local_repo >>= fun src ->
-  DKCI_git.run make src >>= fun () ->
+  Git.fetch_head local_repo >>= fun src ->
+  Git.run make src >>= fun () ->
   Term.return "Tests succeeded"
 ```
+
 
 ## Parallel execution
 
@@ -179,16 +181,26 @@ let my_test =
   Term.return (combine a b)
 ```
 
-You can also use `$` (also from `Term.Infix`) to evaluate multiple terms in parallel and combine them. e.g.
-
-```ocaml
-let my_test =
-  let a = Term.return 1 in
-  let b = Term.return 2 in
-  Term.return combine $ a $ b
-```
-
 This allows you to run various downloading, building and testing operations in parallel where possible.
+
+## Examples
+
+# SelfCI
+
+[SelfCI][] is the CI we use to test DataKit itself. It builds all of the Dockerfiles in this repository, handling the dependencies between them.
+
+# MirageCI
+
+DataKitCI is used as the basis of the [MirageCI service][], which builds all the packages in the main OCaml repository. Each time a package is submitted, it checks that it builds on multiple distributions and with multiple versions of the OCaml compiler. It also finds all packages that depend on the new one and checks that they still build too. See the [MirageCI source][] for inspiration.
+
+
+## Extending DataKitCI
+
+Various other terms are available. See the [`src/datakit_ci.mli`][DataKitCI API] file for details.
+Other plugins are under development.
+To make your own, you need to implement the `BUILDER` interface.
+Consult the API documentation and the Git plugin example for more information.
+
 
 ## GitHub login
 
@@ -207,12 +219,10 @@ This will allow read access to the CI if the user is the local "admin" user, or
 is a GitHub user who can read the "my-org/my-private-repository" repository.
 
 
-## Extending DataKitCI
-
-Various other terms are available. See the `src/dataKitCI.mli` and `src/dKCI_git.mli` files for details.
-Other plugins are under development.
-To make your own, you need to implement the `BUILDER` interface.
-Consult the API documentation and the Git plugin example for more information.
 
 [DataKit]: https://github.com/docker/datakit
 [cmdliner]: http://erratique.ch/software/cmdliner/doc/Cmdliner
+[DataKitCI API]: https://docker.github.io/datakit/Datakit_ci.html
+[MirageCI service]: https://ci.mirage.io/
+[MirageCI source]: https://github.com/avsm/mirage-ci/tree/master/src-bin
+[SelfCI]: https://github.com/docker/datakit/blob/master/ci/self-ci/selfCI.ml

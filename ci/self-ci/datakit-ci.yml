@@ -30,7 +30,7 @@ ci:
 datakit:
   restart: always
   user: 'root'
-  command: '--git /data --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:docker/datakit.logs'
+  command: '--git /data --listen-prometheus=9090 --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:docker/datakit.logs'
   image: 'docker/datakit:latest'
   tags:
     - nodecluster-name=datakit-ci-cluster

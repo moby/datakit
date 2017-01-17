@@ -185,11 +185,11 @@ This allows you to run various downloading, building and testing operations in p
 
 ## Examples
 
-# SelfCI
+### SelfCI
 
 [SelfCI][] is the CI we use to test DataKit itself. It builds all of the Dockerfiles in this repository, handling the dependencies between them.
 
-# MirageCI
+### MirageCI
 
 DataKitCI is used as the basis of the [MirageCI service][], which builds all the packages in the main OCaml repository. Each time a package is submitted, it checks that it builds on multiple distributions and with multiple versions of the OCaml compiler. It also finds all packages that depend on the new one and checks that they still build too. See the [MirageCI source][] for inspiration.
 

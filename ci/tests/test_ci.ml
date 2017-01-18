@@ -540,15 +540,34 @@ let test_live_logs conn =
       Alcotest.(check status_code) "Web response" `OK code;
       body
   in
-  let log = CI_live_log.create ~pending:"Building" ~branch:"test-log" ~title:"Test" logs in
+  let branch = "test/log" in
+  let log = CI_live_log.create ~pending:"Building" ~branch ~title:"Test" logs in
   CI_live_log.printf log "TEST-OUTPUT-1\n";
-  get "/log/live/test-log" >|= Cohttp_lwt_body.to_stream >>= fun log_page ->
+  let path = "/log/live/test%2flog" in
+  get path >|= Cohttp_lwt_body.to_stream >>= fun log_page ->
   read_to log_page "TEST-OUTPUT-1" >>= fun () ->
   CI_live_log.printf log "TEST-OUTPUT-<&2>\n";
   read_to log_page "TEST-OUTPUT-&lt;&amp;2" >>= fun () ->
   CI_live_log.finish log;
   read_to_end log_page >>= fun () ->
-  Lwt.return ()
+  (* Once log is built, check we redirect to the saved log *)
+  CI_utils.DK.branch dk branch >>*= fun dk_branch ->
+  CI_utils.DK.Branch.with_transaction dk_branch (fun trans ->
+      let data = Cstruct.of_string (CI_live_log.contents log) in
+      CI_utils.DK.Transaction.create_file trans CI_cache.Path.log data >>*= fun () ->
+      CI_utils.DK.Transaction.commit trans ~message:"Log saved"
+    )
+  >>*= fun () ->
+  let request = Cohttp.Request.make (Uri.make ~path ()) in
+  CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >>= function
+  | None -> Alcotest.fail "No response!"
+  | Some (code, header, _body, _path) ->
+    Alcotest.(check status_code) "Web response" `Moved_permanently code;
+    let path = Cohttp.Header.get header "location" |> Test_utils.or_fail "Missing location" in
+    get path >>= Cohttp_lwt_body.to_string >>= fun body ->
+    if not (String.is_infix ~affix:"TEST-OUTPUT-&lt;&amp;" body) then
+      Alcotest.fail ("Missing saved data in: " ^body);
+    Lwt.return ()
 
 let test_set = [
   "Simple",         `Quick, Test_utils.run test_simple;

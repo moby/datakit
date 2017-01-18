@@ -15,6 +15,10 @@ let ( >>*= ) x f =
 let ( >|*= ) x f =
   x >>*= fun x -> Lwt.return (f x)
 
+let or_fail msg = function
+  | None -> Alcotest.fail msg
+  | Some x -> x
+
 (* FIXME: this is a bit ridiculous *)
 module Contents_string = struct
   open !Irmin.Contents.String

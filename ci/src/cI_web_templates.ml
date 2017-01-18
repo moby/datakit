@@ -567,9 +567,11 @@ end = struct
     | Some (_, x) -> Some x
 end
 
+let saved_log_frame_link ~branch ~commit = Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
+
 let logs_frame_link = function
   | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
-  | `Saved {CI_output.branch; commit; _} -> Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
+  | `Saved {CI_output.branch; commit; _} -> saved_log_frame_link ~branch ~commit
 
 let score_logs ~best job =
   let open CI_output in

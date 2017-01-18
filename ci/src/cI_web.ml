@@ -175,19 +175,24 @@ class live_log_page t = object(self)
   method private required_roles = [`Reader]
 
   method private to_html rd =
-    let branch = Rd.lookup_path_info_exn "branch" rd in
+    let branch = Uri.pct_decode (Rd.lookup_path_info_exn "branch" rd) in
     let user = self#authenticated_user in
     let web_config = CI_web_utils.web_config t.server in
+    CI_engine.dk t.ci >>= fun dk ->
+    DK.branch dk branch >>*= fun b ->
+    DK.Branch.head b >>*= fun head ->
     match CI_live_log.lookup t.logs ~branch with
     | None ->
       (* todo: find out what commit it turned into and serve that instead *)
-      let html = CI_web_templates.plain_error "This log is no longer building" in
-      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
-      Wm.continue (`String body) rd
+      begin match head with
+        | Some head ->
+          let path = CI_web_templates.saved_log_frame_link ~branch ~commit:(DK.Commit.id head) in
+          Wm.respond 301 (Rd.redirect path rd)
+        | None ->
+          Log.warn (fun f -> f "Live log %S not found, and no saved branch either" branch);
+          Wm.respond 500 rd ~body:(`String "Log finished, but wasn't saved!")
+      end
     | Some live_log ->
-      CI_engine.dk t.ci >>= fun dk ->
-      DK.branch dk branch >>*= fun b ->
-      DK.Branch.head b >>*= fun head ->
       let have_history = head <> None in
       let html = CI_web_templates.live_log_frame ~branch ~have_history in
       let template = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
@@ -230,7 +235,7 @@ class saved_log_page t = object
   method private required_roles = [`Reader]
 
   method private render rd =
-    let branch = Rd.lookup_path_info_exn "branch" rd in
+    let branch = Uri.pct_decode (Rd.lookup_path_info_exn "branch" rd) in
     let commit = Rd.lookup_path_info_exn "commit" rd in
     CI_engine.dk t.ci >>= fun dk ->
     let tree = DK.Commit.tree (DK.commit dk commit) in

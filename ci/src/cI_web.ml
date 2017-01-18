@@ -216,7 +216,12 @@ class live_log_page t = object(self)
                  Lwt.return ()
               )
           );
-        Wm.continue (`Stream stream) rd
+        Wm.continue
+          (`Stream stream)
+          { rd with
+            (* Otherwise, an nginx reverse proxy will wait for the whole log before sending anything. *)
+            Rd.resp_headers = Cohttp.Header.add rd.Rd.resp_headers "X-Accel-Buffering" "no";
+          }
 end
 
 class saved_log_page t = object

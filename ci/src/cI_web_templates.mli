@@ -122,3 +122,6 @@ module Settings : sig
     t ->
     page
 end
+
+val saved_log_frame_link : branch:string -> commit:string -> string
+(** [saved_log_frame_link ~branch ~commit] is the path component of the iframe link for the given saved log. *)

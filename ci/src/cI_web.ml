@@ -206,7 +206,7 @@ class live_log_page t = object(self)
                      out#close;
                      Lwt.return ()
                    | Some {CI_live_log.data; next} ->
-                     out#push data >>= fun () ->
+                     out#push (Xml_print.encode_unsafe_char data) >>= fun () ->
                      Lazy.force next >>= aux
                  in
                  aux src
@@ -216,7 +216,12 @@ class live_log_page t = object(self)
                  Lwt.return ()
               )
           );
-        Wm.continue (`Stream stream) rd
+        Wm.continue
+          (`Stream stream)
+          { rd with
+            (* Otherwise, an nginx reverse proxy will wait for the whole log before sending anything. *)
+            Rd.resp_headers = Cohttp.Header.add rd.Rd.resp_headers "X-Accel-Buffering" "no";
+          }
 end
 
 class saved_log_page t = object

@@ -544,8 +544,8 @@ let test_live_logs conn =
   CI_live_log.printf log "TEST-OUTPUT-1\n";
   get "/log/live/test-log" >|= Cohttp_lwt_body.to_stream >>= fun log_page ->
   read_to log_page "TEST-OUTPUT-1" >>= fun () ->
-  CI_live_log.printf log "TEST-OUTPUT-2\n";
-  read_to log_page "TEST-OUTPUT-2" >>= fun () ->
+  CI_live_log.printf log "TEST-OUTPUT-<&2>\n";
+  read_to log_page "TEST-OUTPUT-&lt;&amp;2" >>= fun () ->
   CI_live_log.finish log;
   read_to_end log_page >>= fun () ->
   Lwt.return ()

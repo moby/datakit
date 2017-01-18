@@ -206,7 +206,7 @@ class live_log_page t = object(self)
                      out#close;
                      Lwt.return ()
                    | Some {CI_live_log.data; next} ->
-                     out#push data >>= fun () ->
+                     out#push (Xml_print.encode_unsafe_char data) >>= fun () ->
                      Lazy.force next >>= aux
                  in
                  aux src

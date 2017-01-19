@@ -19,5 +19,5 @@ depends: [
   "base-bytes"
   "astring" "logs" "uri" "rresult" "cstruct" "fmt"
   "protocol-9p" {>= "0.7.4"}
-  "sexplib" "mirage-types-lwt"
+  "sexplib" "mirage-flow-lwt"
 ]

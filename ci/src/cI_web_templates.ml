@@ -6,7 +6,6 @@ open CI_s
 type t = {
   name : string;
   state_repo : Uri.t option;
-  metrics_token : [`SHA256 of Cstruct.t] option;
   listen_addr: [`HTTP of int | `HTTPS of int];
   can_read : CI_ACL.t;
   can_build : CI_ACL.t;
@@ -24,13 +23,8 @@ module Error = struct
   let uri id = Uri.of_string (uri_path id)
 end
 
-let config ?(name="datakit-ci") ?state_repo ?metrics_token ?(listen_addr=`HTTPS 8443) ~can_read ~can_build () =
-  let metrics_token =
-    match metrics_token with
-    | None -> None
-    | Some (`SHA256 str) -> Some (`SHA256 (Cstruct.of_string str))
-  in
-  { name; state_repo; metrics_token; listen_addr; can_read; can_build }
+let config ?(name="datakit-ci") ?state_repo ?(listen_addr=`HTTPS 8443) ~can_read ~can_build () =
+  { name; state_repo; listen_addr; can_read; can_build }
 
 let state_repo_url t fmt =
   fmt |> Fmt.kstrf @@ fun path ->

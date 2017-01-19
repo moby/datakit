@@ -46,50 +46,6 @@ class error t = object
     Wm.continue (CI_web_templates.error_page id) rd
 end
 
-let check_metrics_token server provided =
-  match String.cut ~sep:" " provided with
-  | Some (typ, provided) when String.Ascii.lowercase typ = "bearer" ->
-    begin match (CI_web_utils.web_config server).CI_web_templates.metrics_token with
-      | None -> false
-      | Some (`SHA256 expected_hash) ->
-        let user_hash = (Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)) in
-        if Cstruct.equal expected_hash user_hash then true
-        else (
-          Log.info (fun f ->
-              f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
-                Cstruct.hexdump_pp expected_hash
-                Cstruct.hexdump_pp user_hash
-            );
-          false
-        )
-    end
-  | _ ->
-    Log.info (fun f -> f "Bad token %S" provided);
-    false
-
-class metrics t = object(self)
-  inherit [Cohttp_lwt_body.t] Wm.resource
-
-  method content_types_provided rd =
-    Wm.continue [
-      "text/plain; version=0.0.4" , self#to_plain;
-    ] rd
-
-  method content_types_accepted rd =
-    Wm.continue [] rd
-
-  method! is_authorized rd =
-    match Cohttp.Header.get_authorization rd.Rd.req_headers with
-    | Some (`Other token) when check_metrics_token t.server token -> Wm.continue `Authorized rd
-    | _ ->
-      Wm.respond ~body:(`String "Bad token") 403 rd
-
-  method private to_plain rd =
-    let data = Prometheus.(CollectorRegistry.collect CollectorRegistry.default) in
-    let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
-    Wm.continue (`String body) rd
-end
-
 class pr_list t = object
   inherit CI_web_utils.html_page t.server
 
@@ -327,8 +283,6 @@ let routes ~logs ~ci ~server ~dashboards =
     ("settings/github-auth", fun () -> new CI_web_utils.github_auth_settings t.server);
     (* Errors *)
     ("error/:id",       fun () -> new error t);
-    (* Reporting *)
-    ("metrics",         fun () -> new metrics t);
     (* Static resources *)
     (":dir/:name",      fun () -> new CI_web_utils.static_crunch ~mime_type CI_static.read);
   ]

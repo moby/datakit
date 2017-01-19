@@ -5,7 +5,6 @@ open Datakit_github
 type t = private {
   name : string;
   state_repo : Uri.t option;
-  metrics_token : [`SHA256 of Cstruct.t] option;
   listen_addr: [`HTTP of int | `HTTPS of int];
   can_read : CI_ACL.t;
   can_build : CI_ACL.t;
@@ -14,7 +13,6 @@ type t = private {
 val config:
   ?name:string ->
   ?state_repo:Uri.t ->
-  ?metrics_token:[`SHA256 of string] ->
   ?listen_addr:[`HTTP of int | `HTTPS of int] ->
   can_read:CI_ACL.t ->
   can_build:CI_ACL.t ->

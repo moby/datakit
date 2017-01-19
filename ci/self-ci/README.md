@@ -56,27 +56,7 @@ The `bridge` service should then start populating the branch with information ab
 
 ## Prometheus metrics
 
-To enable metrics monitoring, generate a long random token and store it in a file called `metrics_token` (in the same directory as `selfCI.ml`:
-
-```
-$ TOKEN=$(pwgen 20 1)
-$ echo $TOKEN
-Uot1boh6urae8ei2AhNg
-$ python -c 'import sys, hashlib, base64; print base64.b64encode(hashlib.sha256(sys.argv[1]).digest())' $TOKEN > metrics_token
-```
-
-Then, configure your Prometheus instance to monitor the CI service by adding this to your `prometheus.yml`:
-
-```
-  - job_name: 'ci'
-    scheme: https
-    bearer_token: Uot1boh6urae8ei2AhNg
-    static_configs:
-      - targets: ['example.com:8443']
-```
-
-(set `bearer_token` to the value of `$TOKEN` printed above, and change `example.com` to the address of your CI web interface)
-
+All the DataKit services are run with `--listen-prometheus=9090`, which means that they will provide Prometheus metrics on port 9090 at `/metrics`. You can configure a Prometheus server to monitor these ports.
 
 [DataKitCI]: https://github.com/talex5/datakit/tree/self-ci/ci
 [ocaml-github]: https://github.com/mirage/ocaml-github

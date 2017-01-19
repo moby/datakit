@@ -336,15 +336,10 @@ module Web: sig
       heading, and also as the name of the session cookie (useful if
       you run multiple CIs on the same host, on different ports).  If
       [state_repo] is given, it is used to construct links to the
-      state repository on GitHub. If [metrics_token] is [Some
-      (`SHA256 expected)] given then doing an HTTP GET on [/metrics]
-      with an Authorization header containing "Bearer TTT" will return
-      Prometheus-format metrics if sha256(TTT) = expected. There is no
-      rate limiting, so pick a long [token]. *)
+      state repository on GitHub. *)
   val config:
     ?name:string ->
     ?state_repo:Uri.t ->
-    ?metrics_token:[`SHA256 of string] ->
     ?listen_addr:[`HTTP of int | `HTTPS of int] ->
     can_read:ACL.t ->
     can_build:ACL.t ->

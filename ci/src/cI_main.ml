@@ -40,7 +40,8 @@ let make_session_backend = function
     in
     `Redis (Lwt_pool.create 4 ~check connect)
 
-let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend =
+let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend ~prometheus =
+  let prometheus_threads = Prometheus_app.serve prometheus in
   let { CI_config.web_config; projects } = config in
   let dashboards = Repo.Map.map (fun p -> p.CI_config.dashboards) projects in
   let projects = Repo.Map.map (fun p -> p.CI_config.tests) projects in
@@ -70,16 +71,13 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   let session_backend = make_session_backend session_backend in
   let server = CI_web_utils.server ~web_config ~auth ~session_backend ~public_address:web_ui in
   let routes = CI_web.routes ~server ~logs ~ci ~dashboards in
-  Lwt.pick [
-    main_thread;
-    CI_web_utils.serve ~routes ~mode
-  ]
+  Lwt.pick (main_thread :: CI_web_utils.serve ~routes ~mode :: prometheus_threads)
 
-let start () pr_store web_ui secrets_dir config canaries session_backend =
+let start () pr_store web_ui secrets_dir config canaries session_backend prometheus =
   let secrets_dir = CI_utils.abs_path secrets_dir in
   if Logs.Src.level src < Some Logs.Info then Logs.Src.set_level src (Some Logs.Info);
   try
-    Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend)
+    Lwt_main.run (start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend ~prometheus)
   with Failure msg ->
     Fmt.epr "Failure:@,%s@." msg;
     exit 1
@@ -157,6 +155,7 @@ let run ?(info=default_info) config =
                    $ config
                    $ canaries
                    $ session_backend
+                   $ Prometheus_app.opts
                   ) in
   match Term.eval (spec, info) with
   | `Error _ -> exit 1

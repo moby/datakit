@@ -1,6 +1,6 @@
 bridge:
   restart: always
-  command: '--datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81 --log-destination timestamp'
+  command: '--listen-prometheus=9090 --datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81 --log-destination timestamp'
   image: 'docker/datakit:github'
   links:
     - datakit
@@ -12,7 +12,7 @@ bridge:
     - /root/.github
 ci:
   restart: always
-  command: '--metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
+  command: '--listen-prometheus=9090 --metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
   image: 'editions/datakit-self-ci:latest'
   environment:
     - DOCKER_HOST=unix:///var/run/builder/docker.sock

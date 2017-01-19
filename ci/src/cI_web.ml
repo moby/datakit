@@ -187,7 +187,7 @@ class live_log_page t = object(self)
       begin match head with
         | Some head ->
           let path = CI_web_templates.saved_log_frame_link ~branch ~commit:(DK.Commit.id head) in
-          Wm.respond 301 (Rd.redirect path rd)
+          Wm.respond 307 (Rd.redirect path rd)
         | None ->
           Log.warn (fun f -> f "Live log %S not found, and no saved branch either" branch);
           Wm.respond 500 rd ~body:(`String "Log finished, but wasn't saved!")

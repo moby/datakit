@@ -562,7 +562,7 @@ let test_live_logs conn =
   CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >>= function
   | None -> Alcotest.fail "No response!"
   | Some (code, header, _body, _path) ->
-    Alcotest.(check status_code) "Web response" `Moved_permanently code;
+    Alcotest.(check status_code) "Web response" `Temporary_redirect code;
     let path = Cohttp.Header.get header "location" |> Test_utils.or_fail "Missing location" in
     get path >>= Cohttp_lwt_body.to_string >>= fun body ->
     if not (String.is_infix ~affix:"TEST-OUTPUT-&lt;&amp;" body) then

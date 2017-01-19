@@ -30,7 +30,7 @@ depends: [
   "logs"
   "tyxml" {>= "4.0.0"}
   "tls"
-  "channel"
+  "mirage-channel"
   "conduit"
   "io-page"
   "pbkdf"

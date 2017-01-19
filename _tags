@@ -37,8 +37,8 @@ not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
 
 ### datakit-bridge
 
-<bridge/github/*>: package(uri datakit-client datakit-server.vfs asetmap)
-<bridge/github/main.*>: package(datakit-server.fs9p)
+<bridge/github/*>: package(uri datakit-client datakit-server.vfs asetmap prometheus)
+<bridge/github/main.*>: package(datakit-server.fs9p prometheus-app)
 <bridge/github/datakit_github_*>: package(github github-hooks.unix)
 <bridge/github/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
 <bridge/github/main.*>: package(github.unix github-hooks.unix)

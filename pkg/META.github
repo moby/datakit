@@ -1,6 +1,6 @@
 description = "Use Datakit to interact with the GitHub API"
 version = "%%VERSION%%"
-requires = "github.unix github-hooks.unix lwt.unix datakit-github.client datakit-github.server"
+requires = "github.unix github-hooks.unix lwt.unix datakit-github.client datakit-github.server prometheus-app"
 archive(byte)   = "datakit-github.cma"
 archive(native) = "datakit-github.cmxa"
 plugin(byte)    = "datakit-github.cma"

@@ -1,0 +1,29 @@
+version: '3'
+services:
+  # This Docker Compose file is for testing locally against a local Git repository.
+  # Also, we use --canary to test only the master branch.
+  # For production use datakit-ci.yml, which tests against GitHub.
+  bridge:
+    command: '--metadata-store tcp:datakit:5640 -v docker/datakit:/data/repos/datakit'
+    image: 'docker/datakit:bridge-local-git'
+    links:
+      - datakit
+    volumes:
+      - '../../.git:/data/repos/datakit/.git:ro'
+  ci:
+    command: '--profile=localhost --metadata-store tcp:datakit:5640 --web-ui=http://localhost:8080/ --canary=docker/datakit/heads/master'
+    build: .
+    links:
+      - datakit
+    ports:
+      - '8080:8080'
+    volumes:
+      - '../../.git:/mnt/datakit/.git:ro'
+      - '/secrets'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+  datakit:
+    user: 'root'
+    command: '--git /data --listen-9p tcp://0.0.0.0:5640'
+    image: 'docker/datakit:latest'
+    volumes:
+      - /data

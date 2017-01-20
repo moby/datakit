@@ -2,10 +2,10 @@ open Lwt.Infix
 open Astring
 open Result
 
-let src = Logs.Src.create "gh-bridge" ~doc:"Github bridge for Datakit "
+let src = Logs.Src.create "gh-bridge" ~doc:"Github bridge for Datakit"
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let src9p = Logs.Src.create "g9p" ~doc:"Github bridge for Datakit (9p) "
+let src9p = Logs.Src.create "g9p" ~doc:"Github bridge for Datakit (9p)"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
 
 let quiet_9p () =
@@ -268,7 +268,7 @@ let capabilities =
   Arg.(value & opt cap Datakit_github.Capabilities.all doc)
 
 let term =
-  let doc = "Bridge between GiHub API and Datakit." in
+  let doc = "Bridge between GitHub API and Datakit." in
   let man = [
     `S "DESCRIPTION";
     `P "$(tname) exposes a subset of the GitHub API as a 9p \

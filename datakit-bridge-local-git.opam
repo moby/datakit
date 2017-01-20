@@ -1,0 +1,25 @@
+opam-version: "1.2"
+maintainer:   "thomas.leonard@docker.com"
+authors:      ["Thomas Leonard"]
+license:      "Apache"
+homepage:     "https://github.com/docker/datakit"
+bug-reports:  "https://github.com/docker/datakit/issues"
+dev-repo:     "https://github.com/docker/datakit.git"
+doc:          "https://docker.github.io/datakit/"
+
+build: [
+  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" "datakit-bridge-local-git"
+]
+
+depends: [
+  "ocamlfind"  {build}
+  "ocamlbuild" {build}
+  "topkg"      {build}
+  "cmdliner"
+  "irmin-unix"
+  "lwt" {>= "2.7.0"}
+  "logs" "fmt"
+  "protocol-9p" {>= "0.8.0"}
+  "datakit-client" {>= "0.7.0"}
+  "datakit-github"
+]

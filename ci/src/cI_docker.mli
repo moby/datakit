@@ -4,6 +4,7 @@ val create : logs:CI_live_log.manager -> pool:CI_monitored_pool.t -> timeout:flo
 
 module Image : sig
   type t
+  val of_published : string -> t
   val id : t -> string
   val pp : t Fmt.t
 end

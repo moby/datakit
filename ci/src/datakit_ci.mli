@@ -529,6 +529,9 @@ module Docker : sig
     type t
     (** A Docker image. *)
 
+    val of_published : string -> t
+    (** [of_published name] refers to the image [name] (as published on Docker Hub or similar). *)
+
     val id : t -> string
 
     val pp : t Fmt.t

@@ -11,6 +11,8 @@ module Image = struct
 
   let v id = { id }
 
+  let of_published = v
+
   let id t = t.id
 
   let pp f t = Fmt.string f t.id

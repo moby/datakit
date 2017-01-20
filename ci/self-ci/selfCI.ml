@@ -19,6 +19,8 @@ let datakit     = dockerfile ~timeout:(30. *. minute) "Dockerfile"
 
 let repo = Git.v ~logs ~remote:"https://github.com/docker/datakit.git" "/data/repos/datakit"
 
+let alpine_4_02 = Term.return (Docker.Image.of_published "ocaml/opam:alpine_ocaml-4.02.3")
+
 let is_gh_pages = function
   | `Ref (_, ["heads"; "gh-pages"]) -> true
   | _ -> false
@@ -30,8 +32,8 @@ let build ?from dockerfile src =
     Term.without_logs (Term.pair src from) >>= fun (src, from) ->
     Docker.build dockerfile ~from src
 
-let test name term =
-  name, (term >|= fun (_:Docker.Image.t) -> "Build succeeded")
+let test term =
+  term >|= fun (_:Docker.Image.t) -> "Build succeeded"
 
 let datakit_tests target =
   if is_gh_pages target then []
@@ -40,13 +42,14 @@ let datakit_tests target =
     let server = build server src in
     let ci = build ci src in
     [
-      test "server"     @@ server;
-      test "prometheus" @@ build prometheus src;
-      test "client"     @@ build client     src;
-      test "ci"         @@ ci;
-      test "self-ci"    @@ build self_ci    src ~from:ci;
-      test "github"     @@ build github     src ~from:server;
-      test "datakit"    @@ build datakit    src ~from:server;
+      "server",      test @@ server;
+      "prometheus",  test @@ build prometheus src;
+      "client",      test @@ build client     src;
+      "client-4.02", test @@ build client     src ~from:alpine_4_02;
+      "ci",          test @@ ci;
+      "self-ci",     test @@ build self_ci    src ~from:ci;
+      "github",      test @@ build github     src ~from:server;
+      "datakit",     test @@ build datakit    src ~from:server;
     ]
   )
 

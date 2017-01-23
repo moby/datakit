@@ -9,6 +9,7 @@ let includes = function
   | "datakit" -> ["src"; "src/datakit"]
   | "datakit-server" -> ["src"; "src/datakit-server"]
   | "datakit-github" -> ["src"; "src/datakit"]
+  | "datakit-bridge-local-git" -> ["bridge/local"]
   | "datakit-client" -> ["src"; "src/datakit-client"]
   | x -> failwith ("Unknown includes for package: " ^ x)
 
@@ -86,6 +87,12 @@ let () =
       Pkg.mllib "bridge/github/datakit-github-client.mllib";
       Pkg.mllib "bridge/github/datakit-github-server.mllib";
       Pkg.bin   "bridge/github/main" ~dst:"datakit-github" ;
+    ]
+  | "datakit-bridge-local-git" -> Ok [
+      Pkg.lib   "pkg/META.bridge-local-git"     ~dst:"META";
+      Pkg.lib   "datakit-bridge-local-git.opam" ~dst:"opam";
+      Pkg.mllib "bridge/local/datakit-bridge-local-git.mllib";
+      Pkg.bin   "bridge/local/main" ~dst:"datakit-bridge-local-git" ;
     ]
   | "datakit-ci" -> Ok [
       Pkg.lib   "pkg/META.ci"     ~dst:"META";

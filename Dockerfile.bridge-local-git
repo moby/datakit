@@ -1,0 +1,27 @@
+FROM docker/datakit:client
+
+RUN opam pin add github --dev -n
+RUN opam pin add prometheus.dev /home/opam/src/datakit -n
+RUN opam pin add prometheus-app.dev /home/opam/src/datakit -n
+RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
+RUN opam depext datakit-github && opam install datakit-github --deps
+COPY datakit-bridge-local-git.opam /home/opam/src/datakit/datakit-bridge-local-git.opam
+RUN opam pin add datakit-bridge-local-git.dev /home/opam/src/datakit -n
+RUN opam depext datakit-bridge-local-git && opam install datakit-bridge-local-git --deps
+
+COPY . /home/opam/src/datakit/
+RUN sudo chown opam.nogroup -R /home/opam/src/datakit
+RUN cd /home/opam/src/datakit && \
+    git diff && git status --porcelain && \
+    git checkout . && scripts/watermark.sh && \
+    git status --porcelain
+
+RUN opam update datakit-bridge-local-git
+RUN opam install datakit-bridge-local-git -vv
+
+RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
+RUN sudo cp $(opam config exec -- which datakit-bridge-local-git) /usr/bin/
+
+USER root
+ENTRYPOINT ["/usr/bin/datakit-bridge-local-git"]
+CMD ["-v", "--datakit=tcp:datakit:5640"]

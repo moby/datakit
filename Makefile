@@ -31,6 +31,9 @@ server:
 github:
 	ocaml pkg/pkg.ml build -n datakit-github -q
 
+bridge-local-git:
+	ocaml pkg/pkg.ml build -n datakit-bridge-local-git -q
+
 prometheus-app:
 	ocaml pkg/pkg.ml build -n prometheus-app -q --tests true
 	ocaml pkg/pkg.ml test _build/prometheus/tests/test.native

@@ -1,11 +1,36 @@
 The CI configuration for testing DataKit itself, using DataKitCI.
+The `docker-compose.yml` file describes a configuration for testing the CI locally with `docker-compose`.
+The `datakit-ci.yml` file describes the configuration we use to run <https://datakit.datakit.ci>, managed by `docker-cloud`.
+
+# Local testing
+
+To test it locally, use:
+
+```
+$ docker-compose up
+ci_1       | 2017-01-23 14:15.55 APP [datakit-ci] >>> Configure the CI by visiting
+ci_1       |                                      http://localhost:8080/auth/intro/...
+```
+
+Visit the URL shown to configure an admin user.
+
+In this configuration:
+
+- The bridge that normally syncs the CI state with GitHub is replaced by `docker/datakit:bridge-local-git`, which tracks the local DataKit Git repository (`../../.git`).
+- Only the master branch is tested (`--canary=docker/datakit/heads/master`).
+- Plain HTTP connections are used, to avoid browser warnings about self-signed certificates when testing.
+- The main executable is called with `--profile=localhost`, which affects some settings in `selfCI.ml` (search for `Localhost` to find the changes).
+
+This mode is useful for testing changes to the CI itself, or for testing your changes before making a public PR.
+
+
+# Docker Cloud configuration
 
 To use this as a template for your own projects:
 
 1. Edit `datakit-ci.yml`.
    - For the `ci` service:
-     - Change `--web-ui=https://datakit.ci:8446/` to the URL users should use to see the web user interface of your service.
-     - Adjust the first port in `ports` if you change the port.
+     - Change `--web-ui=https://datakit.datakit.ci/` to the URL users should use to see the web user interface of your service.
    - For the `datakit` service:
      - Edit (or remove) the `--auto-push git@github.com:docker/datakit.logs` option to point at a new, empty, GitHub repository
        which will mirror the results.

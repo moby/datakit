@@ -16,7 +16,7 @@ depends: [
   "ocamlfind" {build}
   "prometheus"
   "fmt"
-  "cohttp"
-  "lwt"
+  "cohttp" {>="0.20.0"}
+  "lwt" {>="2.5.0"}
 ]
 available: [ocaml-version >= "4.03.0"]

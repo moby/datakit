@@ -86,20 +86,20 @@ let commit_url ~repo commit =
 let tag_map f map =
   Ref.Index.fold (fun key value acc ->
       match snd key with
-      | "tags" :: _ -> [f key value] @ acc
+      | "tags" :: _ -> f key value @ acc
       | _ -> acc
     ) map []
 
 let branch_map f map =
   Ref.Index.fold (fun key value acc ->
       match snd key with
-      | "heads" :: _ -> [f key value] @ acc
+      | "heads" :: _ -> f key value @ acc
       | _ -> acc
     ) map []
 
 let pr_map f map =
   PR.Index.fold (fun key value acc ->
-      [f key value] @ acc
+      f key value @ acc
     ) map []
 
 let dash_map f map targets =
@@ -188,25 +188,33 @@ let dashboard_widget (_repo, id) ref =
   ]
 
 let ref_job (_repo, id) ref =
-  let jobs = CI_engine.jobs ref in
-  let summary = summarise jobs in
-  let ref_url = CI_target.path_v (CI_engine.target ref) in
-  tr [
-    td [a ~a:[a_href ref_url] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
-    td [status_list jobs];
-    td [pcdata summary.descr];
-  ]
+  match CI_engine.jobs ref with
+  | [] -> []
+  | jobs ->
+    let summary = summarise jobs in
+    let ref_url = CI_target.path_v (CI_engine.target ref) in
+    [
+      tr [
+        td [a ~a:[a_href ref_url] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
+        td [status_list jobs];
+        td [pcdata summary.descr];
+      ]
+    ]
 
 let pr_job (_repo, id) open_pr =
-  let jobs = CI_engine.jobs open_pr in
-  let summary = summarise jobs in
-  let pr_url = CI_target.path_v (CI_engine.target open_pr) in
-  tr [
-    td [a ~a:[a_href pr_url] [pcdata (string_of_int id)]];
-    td [pcdata (CI_engine.title open_pr)];
-    td [status_list jobs];
-    td [pcdata summary.descr];
-  ]
+  match CI_engine.jobs open_pr with
+  | [] -> []
+  | jobs ->
+    let summary = summarise jobs in
+    let pr_url = CI_target.path_v (CI_engine.target open_pr) in
+    [
+      tr [
+        td [a ~a:[a_href pr_url] [pcdata (string_of_int id)]];
+        td [pcdata (CI_engine.title open_pr)];
+        td [status_list jobs];
+        td [pcdata summary.descr];
+      ]
+    ]
 
 let heading x = th [pcdata x]
 

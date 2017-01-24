@@ -672,7 +672,7 @@ let job_row ~csrf_token ~page_url ~best_log job =
   ]
 
 let target_title = function
-  | `PR pr -> Printf.sprintf "PR %d" (PR.number pr)
+  | `PR pr -> Printf.sprintf "PR %d (%s)" (PR.number pr) (PR.title pr)
   | `Ref r -> Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
 
 let target_commit = function

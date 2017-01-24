@@ -112,7 +112,7 @@ module Builder = struct
     let {Key.src; from} = key in
     let output = CI_live_log.write log in
     CI_git.with_clone ~log ~job_id src (fun srcdir ->
-        CI_monitored_pool.use t.pool ~label:(label t key) job_id @@ fun () ->
+        CI_monitored_pool.use t.pool ~log ~label:(label t key) job_id @@ fun () ->
         CI_utils.with_timeout ~switch t.timeout @@ fun switch ->
         validate_path ~log ~base:srcdir t.dockerfile;
         let dockerpath = Filename.concat srcdir t.dockerfile in

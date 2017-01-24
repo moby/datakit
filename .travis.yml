@@ -6,14 +6,13 @@ dist: trusty
 env:
   global:
   - EXTRA_DEPS="inotify"
-  - PINS="prometheus:. prometheus-app:. datakit-client:. datakit-server:. datakit-github:. datakit-ci:. datakit:. github"
+  - PINS="prometheus:. prometheus-app:. datakit-client:. datakit-server:. datakit-github:. datakit:. github"
   - ALCOTEST_SHOW_ERRORS="1"
   matrix:
   - OCAML_VERSION=4.02 PACKAGE="datakit-client"
   - OCAML_VERSION=4.03 PACKAGE="datakit-client"
   - OCAML_VERSION=4.03 PACKAGE="datakit-server"
   - OCAML_VERSION=4.03 PACKAGE="datakit-github"
-  - OCAML_VERSION=4.03 PACKAGE="datakit-ci" PINS="prometheus:. prometheus-app:. session datakit-client:. datakit-server:. datakit-github:. datakit-ci:. datakit:. github"
   - OCAML_VERSION=4.03 PACKAGE="datakit"
 os:
   - linux

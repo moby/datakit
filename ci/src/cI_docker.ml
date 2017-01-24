@@ -4,6 +4,10 @@ open CI_utils.Infix
 
 module DK = CI_utils.DK
 
+let branch_safe_char = function
+  | ':' -> '-'
+  | x -> x
+
 module Image = struct
   type t = {
     id : string;
@@ -75,10 +79,6 @@ module Builder = struct
     DK.Tree.read_file tree CI_cache.Path.value >>*= fun data ->
     Lwt.return (Image.v (String.trim (Cstruct.to_string data)))
 
-  let branch_safe_char = function
-    | ':' -> '-'
-    | x -> x
-
   let branch t {Key.src; from} =
     let from =
       match from with
@@ -143,3 +143,64 @@ let build t ?from src =
   let open! CI_term.Infix in
   CI_term.job_id >>= fun job_id ->
   Build_cache.find t job_id {Builder.Key.src; from}
+
+module Runner = struct
+
+  module Key = struct
+    type t = {
+      image : Image.t;
+    }
+  end
+
+  type t = {
+    label : string;
+    command : string list;
+    timeout : float;
+    pool : CI_monitored_pool.t;
+  }
+
+  type context = CI_s.job_id
+
+  type value = unit
+
+  let pp_args =
+    let sep = Fmt.(const string) " " in
+    Fmt.list ~sep String.dump
+
+  let name t =
+    Fmt.strf "docker run %a" pp_args t.command
+
+  let title _t _key = "Docker run"
+
+  let label t {Key.image} =
+    Fmt.strf "Run %s in %a" t.label Image.pp_short image
+
+  let load _t _tree _key =
+    Lwt.return ()
+
+  let branch t {Key.image} =
+    Printf.sprintf "docker-run-%s-in-%s" t.label (String.map branch_safe_char (Image.id image))
+
+  let generate t ~switch ~log _trans job_id key =
+    let {Key.image} = key in
+    let output = CI_live_log.write log in
+    CI_monitored_pool.use t.pool ~log ~label:(label t key) job_id @@ fun () ->
+    CI_utils.with_timeout ~switch t.timeout @@ fun switch ->
+    let cmd = Array.of_list (["docker"; "run"; "--rm"; Image.id image] @ t.command) in
+    CI_process.run ~switch ~log ~output ("", cmd) >>= fun () ->
+    Lwt.return (Ok ())
+end
+
+module Run_cache = CI_cache.Make(Runner)
+
+type command = Run_cache.t
+
+let command ~logs ~pool ~timeout ~label command =
+  Run_cache.create ~logs { Runner.label; command; timeout; pool }
+
+let run t image =
+  let open! CI_term.Infix in
+  CI_term.job_id >>= fun job_id ->
+  Run_cache.find t job_id {Runner.Key.image}
+
+

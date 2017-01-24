@@ -2,9 +2,9 @@ open Datakit_ci
 
 let minute = 60.
 
-module Dockerfile = struct
-  let pool = Monitored_pool.create "Docker build" 10
+let pool = Monitored_pool.create "Docker" 10
 
+module Dockerfile = struct
   (* [v ~timeout file] is a caching builder for [file]. *)
   let v ?label ~timeout file =
     let label = label |> Utils.default file in
@@ -21,6 +21,13 @@ module Dockerfile = struct
 end
 
 let alpine_4_02 = Term.return (Docker.Image.of_published "ocaml/opam:alpine_ocaml-4.02.3")
+
+let opam_test pkg =
+  (* Hack until we have opam 2 *)
+  let cmd = Fmt.strf "opam remove %S && opam depext -i conf-autoconf conf-libpcre && opam install -t --deps-only %S && opam reinstall -v -t %S" pkg pkg pkg in
+  Docker.command ~logs ~pool ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ["sh"; "-c"; cmd]
+
+let opam_test_ci = opam_test "datakit-ci"
 
 module Tests = struct
   open Term.Infix
@@ -51,6 +58,9 @@ module Tests = struct
   let check_builds term =
     term >|= fun (_:Docker.Image.t) -> "Build succeeded"
 
+  let run_tests image tests =
+    image >>= Docker.run tests >|= fun () -> "Tests passed"
+
   (* [datakit repo target] is the set of tests to run on [target]. *)
   let datakit repo = function
     | `Ref (_, ["heads"; "gh-pages"]) -> []       (* Don't try to build the gh-pages branch *)
@@ -62,7 +72,7 @@ module Tests = struct
         "prometheus",  check_builds images#prometheus;
         "client",      check_builds images#client;
         "client-4.02", check_builds images#client_4_02;
-        "ci",          check_builds images#ci;
+        "ci",          run_tests    images#ci           opam_test_ci;
         "self-ci",     check_builds images#self_ci;
         "github",      check_builds images#github;
         "datakit",     check_builds images#datakit;

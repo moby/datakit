@@ -14,6 +14,8 @@ RUN opam pin add datakit-client https://github.com/docker/datakit.git
 RUN opam pin add session --dev
 RUN opam pin add github --dev
 RUN opam pin add datakit-github https://github.com/docker/datakit.git
+RUN opam pin add datakit-server https://github.com/docker/datakit.git -n
+RUN opam pin add datakit https://github.com/docker/datakit.git -n
 
 ADD . /home/opam/datakit
 RUN opam pin add -k git datakit-ci /home/opam/datakit

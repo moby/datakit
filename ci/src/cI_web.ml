@@ -251,7 +251,7 @@ class rebuild t = object
   method private required_roles = [`Builder]
 
   method! private process_post rd =
-    let branch_name = Rd.lookup_path_info_exn "branch" rd in
+    let branch_name = Uri.pct_decode (Rd.lookup_path_info_exn "branch" rd) in
     match Uri.get_query_param rd.Rd.uri "redirect" with
     | None -> Wm.respond ~body:(`String "Missing redirect") 400 rd
     | Some redirect ->
@@ -265,7 +265,7 @@ class cancel t = object
   method private required_roles = [`Builder]
 
   method! private process_post rd =
-    let branch = Rd.lookup_path_info_exn "branch" rd in
+    let branch = Uri.pct_decode (Rd.lookup_path_info_exn "branch" rd) in
     match CI_live_log.lookup ~branch t.logs with
     | None ->
       let body = Fmt.strf "Branch %S is not currently building" branch in

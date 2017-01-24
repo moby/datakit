@@ -13,6 +13,11 @@ build: [
   "-n" "datakit-ci"
 ]
 
+build-test: [
+  ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true" "-n" "datakit-ci"]
+  ["ocaml" "pkg/pkg.ml" "test" "_build/ci/tests/test_ci.native"]
+]
+
 depends: [
   "ocamlfind" {build}
   "multipart-form-data"

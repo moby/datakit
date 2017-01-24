@@ -1,5 +1,4 @@
-*.native
-*.byte
-_build
-setup.data
-setup.log
+**/*.native
+**/*.byte
+**/_build
+ci/self-ci/data

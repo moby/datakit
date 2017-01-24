@@ -542,6 +542,17 @@ module Docker : sig
       If [~from:image] is given, the initial "FROM" line in the file is replaced by
       "FROM image". This is useful if the base image is also being built by the CI. *)
 
+  type command
+
+  val command :
+    logs:Live_log.manager -> pool:Monitored_pool.t -> timeout:float ->
+    label:string -> string list -> command
+  (** [create ~logs ~pool ~timeout ~label args] is a cache of Docker run results. *)
+
+  val run : command -> Image.t -> unit Term.t
+  (** [run command image] runs "docker run image command-args". It succeeds if the command returns with
+      an exit status of zero. *)
+
 end
 
 (** {1:cache Cache} *)

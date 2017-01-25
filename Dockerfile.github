@@ -1,9 +1,5 @@
 FROM docker/datakit:server
 
-# TMP
-RUN cd /home/opam/opam-repository && git pull && \
-    opam update -y
-
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
 RUN opam pin add github --dev -n
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
@@ -18,7 +14,7 @@ RUN cd /home/opam/src/datakit && \
     git status --porcelain
 
 RUN opam update datakit-github
-RUN opam install datakit-github -vv
+RUN opam install datakit-github -vv -y
 
 EXPOSE 5641
 

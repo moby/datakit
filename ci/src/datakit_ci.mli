@@ -546,7 +546,7 @@ module Docker : sig
 
   val command :
     logs:Live_log.manager -> pool:Monitored_pool.t -> timeout:float ->
-    label:string -> string list -> command
+    label:string -> ?entrypoint:string -> string list -> command
   (** [create ~logs ~pool ~timeout ~label args] is a cache of Docker run results. *)
 
   val run : command -> Image.t -> unit Term.t

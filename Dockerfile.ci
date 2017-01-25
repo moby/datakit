@@ -1,23 +1,29 @@
-FROM ocaml/opam:alpine-3.4_ocaml-4.03.0
+FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
+ENV OPAMYES=1
 RUN sudo apk add tzdata
 
-# TMP
-RUN cd /home/opam/opam-repository && \
-    git pull && opam update -y
+RUN opam depext -i opam-devel && sudo cp $(opam config var "opam-devel:lib")/opam /usr/bin/opam
+RUN rm -rf ~/.opam
+RUN opam init -y
+RUN opam install ocaml -y
+RUN opam install depext -y
 
-RUN opam depext -ui cohttp yojson ssl tyxml fmt rresult logs lwt conf-libev react camlp4 \
-    tls pbkdf ppx_sexp_conv webmachine session asetmap
+RUN opam pin add -yn prometheus https://github.com/docker/datakit.git && \
+    opam pin add -yn prometheus-app https://github.com/docker/datakit.git && \
+    opam pin add -yn datakit-client https://github.com/docker/datakit.git && \
+    opam pin add -yn session --dev && \
+    opam pin add -yn github --dev && \
+    opam pin add -yn datakit-github https://github.com/docker/datakit.git && \
+    opam pin add -yn datakit-server https://github.com/docker/datakit.git && \
+    opam pin add -yn datakit https://github.com/docker/datakit.git
 
-RUN opam pin add prometheus https://github.com/docker/datakit.git
-RUN opam pin add prometheus-app https://github.com/docker/datakit.git
-RUN opam pin add datakit-client https://github.com/docker/datakit.git
-RUN opam pin add session --dev
-RUN opam pin add github --dev
-RUN opam pin add datakit-github https://github.com/docker/datakit.git
-RUN opam pin add datakit-server https://github.com/docker/datakit.git -n
-RUN opam pin add datakit https://github.com/docker/datakit.git -n
+ADD datakit-ci.opam /tmp/deps/opam
+RUN opam pin add -y tmp /tmp/deps/opam -n
+RUN opam depext tmp -y
+RUN opam install --deps-only tmp -y
 
 ADD . /home/opam/datakit
-RUN opam pin add -k git datakit-ci /home/opam/datakit
+RUN sudo chown opam /home/opam/datakit
+RUN opam pin add -k git datakit-ci /home/opam/datakit -y
 
 VOLUME /secrets

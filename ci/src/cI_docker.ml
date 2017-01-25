@@ -68,7 +68,7 @@ module Builder = struct
   let name t =
     Fmt.strf "docker build -f %S" t.dockerfile
 
-  let title _t _key = "Docker build"
+  let title t _key = Fmt.strf "Docker build %s" t.label
 
   let label t {Key.from; src} =
     match from with
@@ -154,6 +154,7 @@ module Runner = struct
 
   type t = {
     label : string;
+    entrypoint : string option;
     command : string list;
     timeout : float;
     pool : CI_monitored_pool.t;
@@ -163,14 +164,10 @@ module Runner = struct
 
   type value = unit
 
-  let pp_args =
-    let sep = Fmt.(const string) " " in
-    Fmt.list ~sep String.dump
-
   let name t =
-    Fmt.strf "docker run %a" pp_args t.command
+    Fmt.strf "docker run %s" t.label
 
-  let title _t _key = "Docker run"
+  let title t _key = Fmt.strf "Docker run %s" t.label
 
   let label t {Key.image} =
     Fmt.strf "Run %s in %a" t.label Image.pp_short image
@@ -186,7 +183,12 @@ module Runner = struct
     let output = CI_live_log.write log in
     CI_monitored_pool.use t.pool ~log ~label:(label t key) job_id @@ fun () ->
     CI_utils.with_timeout ~switch t.timeout @@ fun switch ->
-    let cmd = Array.of_list (["docker"; "run"; "--rm"; Image.id image] @ t.command) in
+    let docker_opts =
+      match t.entrypoint with
+      | None -> []
+      | Some entrypoint -> ["--entrypoint"; entrypoint]
+    in
+    let cmd = Array.of_list (["docker"; "run"; "--rm"] @ docker_opts @ [Image.id image] @ t.command) in
     CI_process.run ~switch ~log ~output ("", cmd) >>= fun () ->
     Lwt.return (Ok ())
 end
@@ -195,8 +197,8 @@ module Run_cache = CI_cache.Make(Runner)
 
 type command = Run_cache.t
 
-let command ~logs ~pool ~timeout ~label command =
-  Run_cache.create ~logs { Runner.label; command; timeout; pool }
+let command ~logs ~pool ~timeout ~label ?entrypoint command =
+  Run_cache.create ~logs { Runner.label; entrypoint; command; timeout; pool }
 
 let run t image =
   let open! CI_term.Infix in

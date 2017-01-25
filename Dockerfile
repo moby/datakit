@@ -1,11 +1,9 @@
 FROM docker/datakit:server
 
-# TMP
-RUN cd /home/opam/opam-repository && git pull && opam update -y
-
 COPY opam /home/opam/src/datakit/opam
 RUN opam pin add datakit.dev /home/opam/src/datakit -n
-RUN opam depext datakit && opam install datakit --deps
+RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
+RUN opam depext datakit && opam install datakit -y --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
@@ -15,7 +13,7 @@ RUN cd /home/opam/src/datakit && \
     git status --porcelain
 
 RUN opam update datakit
-RUN opam install datakit -vv
+RUN opam install datakit -vv -y
 
 EXPOSE 5640
 

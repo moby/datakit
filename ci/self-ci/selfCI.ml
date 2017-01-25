@@ -1,3 +1,4 @@
+open! Astring
 open Datakit_ci
 
 let minute = 60.
@@ -22,12 +23,23 @@ end
 
 let alpine_4_02 = Term.return (Docker.Image.of_published "ocaml/opam:alpine_ocaml-4.02.3")
 
-let opam_test pkg =
-  (* Hack until we have opam 2 *)
-  let cmd = Fmt.strf "opam remove %S && opam depext -i conf-autoconf conf-libpcre && opam install -t --deps-only %S && opam reinstall -v -t %S" pkg pkg pkg in
-  Docker.command ~logs ~pool ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ["sh"; "-c"; cmd]
+let pp_packages = Fmt.(list ~sep:(const string " ") String.dump)
 
-let opam_test_ci = opam_test "datakit-ci"
+let opam_test ?depexts pkg =
+  let depexts =
+    match depexts with
+    | None -> ""
+    | Some depexts -> Fmt.strf " && opam depext -i -y %a" pp_packages depexts
+  in
+  let cmd =
+    Fmt.strf "opam remove -y %S%s&& opam install -y -t --deps-only %S && opam install -y -v -t %S"
+      pkg depexts pkg pkg in
+  let entrypoint = "/bin/sh" in
+  Docker.command ~logs ~pool ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
+
+let opam_test_ci = opam_test "datakit-ci" ~depexts:["conf-autoconf"; "conf-libpcre"]
+let opam_test_datakit = opam_test "datakit" ~depexts:["conf-gmp"; "conf-libpcre"; "conf-perl"; "conf-autoconf"]
+let opam_test_prometheus = opam_test "prometheus-app"
 
 module Tests = struct
   open Term.Infix
@@ -68,15 +80,17 @@ module Tests = struct
       let src = Git.fetch_head repo target in
       let images = images src in
       [
-        "server",      check_builds images#server;
-        "prometheus",  check_builds images#prometheus;
-        "client",      check_builds images#client;
-        "client-4.02", check_builds images#client_4_02;
         "ci",          run_tests    images#ci           opam_test_ci;
         "self-ci",     check_builds images#self_ci;
         "github",      check_builds images#github;
-        "datakit",     check_builds images#datakit;
+        "datakit",     run_tests    images#datakit      opam_test_datakit;
         "local-git",   check_builds images#local_git;
+        "libraries",   Term.wait_for_all [
+          "server",      check_builds images#server;
+          "prometheus",  run_tests    images#prometheus   opam_test_prometheus;
+          "client",      check_builds images#client;
+          "client-4.02", check_builds images#client_4_02;
+        ] >|= fun () -> "Library tests succeeded"
       ]
 end
 

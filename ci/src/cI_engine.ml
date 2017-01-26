@@ -43,10 +43,10 @@ end
 type job = {
   name : string;
   parent : target;
+  term_lock : Lwt_mutex.t;         (* Held while evaluating term *)
   mutable term : string CI_term.t;
-  mutable cancel : unit -> unit;    (* Cancel the previous evaluation, if any *)
-  mutable state : string * state;  (* The last result of evaluating [term]
-                                           (commit, state) *)
+  mutable cancel : unit -> unit;   (* Cancel the previous evaluation, if any *)
+  mutable state : string * state;  (* The last result of evaluating [term] (commit, state) *)
 }
 and target = {
   mutable v : CI_target.v;
@@ -94,11 +94,16 @@ type t = {
   web_ui : Uri.t;
   connect_dk : unit -> DK.t Lwt.t;
   projects : project Repo.Map.t;
-  term_lock : Lwt_mutex.t;              (* Held while evaluating terms *)
   mutable dk : DK.t Lwt.t;
+  mutable snapshot : DK.Tree.t option;
 }
 
 let dk t = t.dk
+
+let snapshot t =
+  match t.snapshot with
+  | None -> CI_utils.failf "CI engine not yet initialised!"
+  | Some s -> s
 
 let rec connect connect_dk =
   Lwt.catch
@@ -112,6 +117,8 @@ let rec connect connect_dk =
        Lwt_unix.sleep 10.0 >>= fun () ->
        connect connect_dk
     )
+
+let metadata_branch = "github-metadata"
 
 let create ~web_ui ?canaries connect_dk projects =
   begin match canaries with
@@ -138,26 +145,17 @@ let create ~web_ui ?canaries connect_dk projects =
           canaries }
       ) projects
   in
+  let dk = connect connect_dk in
   {
     web_ui;
     connect_dk;
-    dk = connect connect_dk;
+    dk;
     projects;
-    term_lock = Lwt_mutex.create ();
+    snapshot = None;
   }
 
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
 let refs t = t.projects |> Repo.Map.map (fun project -> project.refs)
-
-let metadata_branch = "github-metadata"
-
-let take_snapshot t =
-  t.dk >>= fun t ->
-  DK.branch t metadata_branch >>*= fun metadata ->
-  DK.Branch.head metadata >|*= function
-  | None   -> failf "Metadata branch does not exist!"
-  | Some c -> DK.Commit.tree c
-
 
 let update_status t ~message s =
   t.dk >>= fun t ->
@@ -254,15 +252,15 @@ let rec auto_restart t ?switch label fn =
            auto_restart t label fn
     )
 
-(* Note: must hold [t.term_lock] while calling this. *)
-let rec recalculate t ~snapshot job =
+let rec recalculate t job =
   Log.debug (fun f -> f "Recalculate %a" pp_job job);
+  (* Need to avoid either recalculating the same term twice at the same time,
+     or doing a second calculation with an earlier snapshot. *)
+  Lwt_mutex.with_lock job.term_lock @@ fun () ->
+  let snapshot = snapshot t in
   let recalc () =
     Lwt.async (fun () ->
-        Lwt_mutex.with_lock t.term_lock (fun () ->
-            take_snapshot t >>= fun snapshot ->
-            recalculate t ~snapshot job
-          )
+        recalculate t job
       )
   in
   job.cancel ();        (* Stop any previous evaluation *)
@@ -301,7 +299,8 @@ let rec recalculate t ~snapshot job =
   let state = (new_hash, { status; descr; logs }) in
   job.state <- state
 
-let make_job snapshot ~parent name term =
+let make_job t ~parent name term =
+  let snapshot = snapshot t in
   let head_commit = CI_target.head parent.v in
   let id = head_commit, datakit_ci name in
   Conv.status snapshot id >|= fun status ->
@@ -315,9 +314,11 @@ let make_job snapshot ~parent name term =
   let hash = Commit.hash head_commit in
   { name;
     parent;
+    term_lock = Lwt_mutex.create ();
     term;
     cancel = ignore;
-    state = (hash, state); }
+    state = (hash, state);
+  }
 
 let apply_canaries canaries prs refs =
   match canaries with
@@ -342,7 +343,7 @@ let is_tag = function
 let listen ?switch t =
   auto_restart t ?switch "monitor" @@ fun () ->
   Log.info (fun f -> f "Starting monitor loop");
-  let check_pr ~snapshot project (id, pr) =
+  let check_pr project (id, pr) =
     Log.debug (fun f -> f "Checking for work on %a" PR.pp_id id);
     begin match PR.Index.find id project.open_prs with
       | None ->
@@ -350,7 +351,7 @@ let listen ?switch t =
         let terms = project.make_terms (`PR id) in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
-            make_job snapshot ~parent:open_pr name term)
+            make_job t ~parent:open_pr name term)
         >>= fun jobs ->
         open_pr.jobs <- jobs;
         project.open_prs <- PR.Index.add id open_pr project.open_prs;
@@ -360,9 +361,9 @@ let listen ?switch t =
                                    XXX: so compare is very misleading here! *)
         Lwt.return open_pr
     end >>= fun open_pr ->
-    Lwt_list.iter_s (recalculate t ~snapshot) open_pr.jobs
+    Lwt_list.iter_s (recalculate t) open_pr.jobs
   in
-  let check_ref ~snapshot project (id, r) =
+  let check_ref project (id, r) =
     Log.debug (fun f -> f "Checking for work on %a" Ref.pp_id id);
     begin match Ref.Index.find id project.refs with
       | None ->
@@ -370,7 +371,7 @@ let listen ?switch t =
         let terms = project.make_terms @@ `Ref id in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
-            make_job snapshot ~parent:target name term)
+            make_job t ~parent:target name term)
         >>= fun jobs ->
         target.jobs <- jobs;
         project.refs <- Ref.Index.add id target project.refs;
@@ -379,10 +380,11 @@ let listen ?switch t =
         target.v <- `Ref r;
         Lwt.return target
     end >>= fun target ->
-    Lwt_list.iter_s (recalculate t ~snapshot) target.jobs
+    Lwt_list.iter_s (recalculate t) target.jobs
   in
   enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
   monitor ?switch t (fun snapshot ->
+      t.snapshot <- Some snapshot;
       Prometheus.Counter.inc_one Metrics.update_notifications;
       let active_tags = ref 0 in
       let active_braches = ref 0 in
@@ -411,11 +413,9 @@ let listen ?switch t =
             current
           in
           project.open_prs <- PR.Index.filter is_current project.open_prs;
-          Lwt_mutex.with_lock t.term_lock (fun () ->
-              PR.Index.bindings prs |> Lwt_list.iter_s (fun pr ->
-                  incr active_prs;
-                  check_pr ~snapshot project pr
-                )
+          PR.Index.bindings prs |> Lwt_list.iter_s (fun pr ->
+              incr active_prs;
+              check_pr project pr
             )
           >>= fun () ->
           (* Refs *)
@@ -428,11 +428,9 @@ let listen ?switch t =
             current
           in
           project.refs <- Ref.Index.filter is_current project.refs;
-          Lwt_mutex.with_lock t.term_lock (fun () ->
-              Ref.Index.bindings refs |> Lwt_list.iter_s (fun r ->
-                  if is_tag (fst r) then incr active_tags else incr active_braches;
-                  check_ref ~snapshot project r
-                )
+          Ref.Index.bindings refs |> Lwt_list.iter_s (fun r ->
+              if is_tag (fst r) then incr active_tags else incr active_braches;
+              check_ref project r
             )
         )
       >|= fun () ->
@@ -472,7 +470,4 @@ let rebuild t ~branch_name =
   | [], [] -> CI_utils.failf "No job depends on %S, so can't rebuild anything" branch_name
   | triggers, jobs_needing_recalc ->
     Lwt.join triggers >>= fun () ->
-    Lwt_mutex.with_lock t.term_lock (fun () ->
-        take_snapshot t >>= fun snapshot ->
-        Lwt_list.iter_s (recalculate t ~snapshot) jobs_needing_recalc
-      )
+    Lwt_list.iter_s (recalculate t) jobs_needing_recalc

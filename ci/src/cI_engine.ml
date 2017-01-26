@@ -340,8 +340,56 @@ let is_tag = function
   | _, "tags" :: _ ->  true
   | _ -> false
 
+module Pool : sig
+  type t
+
+  val create : int -> t
+
+  val iter : t -> ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+  (** [iter t fn xs] iterates over [xs], starting [f x] for each element.
+      If the pool is full, it waits before starting new jobs.
+      It does not wait for the jobs to complete. *)
+
+  val wait : t -> unit Lwt.t
+  (** [wait t] waits for all jobs to complete. *)
+end = struct
+  type t = {
+    cond : unit Lwt_condition.t;
+    mutable free : int;
+    mutable outstanding : int;
+  }
+
+  let create free = { free; outstanding = 0; cond = Lwt_condition.create () }
+
+  let rec push t f =
+    match t.free with
+    | 0 -> Lwt_condition.wait t.cond >>= fun () -> push t f
+    | free ->
+      t.free <- free - 1;
+      t.outstanding <- t.outstanding + 1;
+      Lwt.async (fun () ->
+          Lwt.finalize f
+            (fun () ->
+               t.outstanding <- t.outstanding - 1;
+               t.free <- t.free + 1;
+               Lwt_condition.broadcast t.cond ();
+               Lwt.return_unit
+            )
+        );
+      Lwt.return_unit
+
+  let iter t f =
+    Lwt_list.iter_s (fun x -> push t (fun () -> f x))
+
+  let rec wait t =
+    if t.outstanding = 0 then Lwt.return_unit
+    else Lwt_condition.wait t.cond >>= fun () -> wait t
+end
+
 let listen ?switch t =
   auto_restart t ?switch "monitor" @@ fun () ->
+  let pool_size = 50 in
+  let pool = Pool.create pool_size in
   Log.info (fun f -> f "Starting monitor loop");
   let check_pr project (id, pr) =
     Log.debug (fun f -> f "Checking for work on %a" PR.pp_id id);
@@ -361,7 +409,7 @@ let listen ?switch t =
                                    XXX: so compare is very misleading here! *)
         Lwt.return open_pr
     end >>= fun open_pr ->
-    Lwt_list.iter_s (recalculate t) open_pr.jobs
+    Lwt_list.iter_p (recalculate t) open_pr.jobs
   in
   let check_ref project (id, r) =
     Log.debug (fun f -> f "Checking for work on %a" Ref.pp_id id);
@@ -380,7 +428,7 @@ let listen ?switch t =
         target.v <- `Ref r;
         Lwt.return target
     end >>= fun target ->
-    Lwt_list.iter_s (recalculate t) target.jobs
+    Lwt_list.iter_p (recalculate t) target.jobs
   in
   enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
   monitor ?switch t (fun snapshot ->
@@ -390,7 +438,8 @@ let listen ?switch t =
       let active_braches = ref 0 in
       let active_prs = ref 0 in
 
-      t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (repo, project) ->
+      t.projects |> Repo.Map.bindings |> Lwt_list.iter_p (fun (repo, project) ->
+          Log.debug (fun f -> f "Monitor iter");
           Conv.prs snapshot ~repos:(Repo.Set.singleton repo) >>= fun prs ->
           Conv.refs snapshot ~repos:(Repo.Set.singleton repo) >>= fun refs ->
           let prs = match Repo.Map.find repo (PR.index prs) with
@@ -400,8 +449,7 @@ let listen ?switch t =
           let refs = match Repo.Map.find repo (Ref.index refs) with
             | None   ->  Ref.Index.empty
             | Some i -> i
-              in
-          Log.debug (fun f -> f "Monitor iter");
+          in
           let prs, refs = apply_canaries project.canaries prs refs in
           (* PRs *)
           let is_current id open_pr =
@@ -413,7 +461,7 @@ let listen ?switch t =
             current
           in
           project.open_prs <- PR.Index.filter is_current project.open_prs;
-          PR.Index.bindings prs |> Lwt_list.iter_s (fun pr ->
+          PR.Index.bindings prs |> Pool.iter pool (fun pr ->
               incr active_prs;
               check_pr project pr
             )
@@ -428,15 +476,16 @@ let listen ?switch t =
             current
           in
           project.refs <- Ref.Index.filter is_current project.refs;
-          Ref.Index.bindings refs |> Lwt_list.iter_s (fun r ->
+          Ref.Index.bindings refs |> Pool.iter pool (fun r ->
               if is_tag (fst r) then incr active_tags else incr active_braches;
               check_ref project r
             )
         )
-      >|= fun () ->
+      >>= fun () ->
       Metrics.set_active_targets `Tag !active_tags;
       Metrics.set_active_targets `Branch !active_braches;
       Metrics.set_active_targets `PR !active_prs;
+      Pool.wait pool
     )
 
 let rebuild t ~branch_name =

@@ -13,7 +13,7 @@ let connect protocol address =
   (* Connect to 9p server *)
   Log.info (fun f -> f "Connecting to DataKit server on %s:%s" protocol address);
   Lwt.catch
-    (fun () -> Client9p.connect protocol address ())
+    (fun () -> Client9p.connect protocol address ~max_fids:Int32.max_int ())
     (fun ex ->
        failf "Failed to connect to DataKit server at proto=%S addr=%S: %s"
          protocol address (Printexc.to_string ex)

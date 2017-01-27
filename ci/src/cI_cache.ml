@@ -71,22 +71,37 @@ module Make(B : CI_s.BUILDER) = struct
     val find : t -> string -> B.value status option
     val set : t -> string -> B.value status -> unit
     val remove : t -> string -> unit
+    val with_lock : t -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
   end = struct
+    type entry = {
+      lock : Lwt_mutex.t;
+      mutable value : B.value status option;
+    }
+
     type t = {
-      mutable cache : B.value status String.Map.t;
+      mutable cache : entry String.Map.t;
     }
 
     let create () = { cache = String.Map.empty }
-    let find t k = String.Map.find k t.cache
-    let set t key value =
-      t.cache <- String.Map.add key value t.cache
-    let remove t key =
-      t.cache <- String.Map.remove key t.cache
+
+    let entry t k =
+      match String.Map.find k t.cache with
+      | Some e -> e
+      | None ->
+        let e = { lock = Lwt_mutex.create (); value = None } in
+        t.cache <- String.Map.add k e t.cache;
+        e
+
+    let find t k = (entry t k).value
+    let set t k value = (entry t k).value <- Some value
+    let remove t k = t.cache <- String.Map.remove k t.cache
+
+    let with_lock t k fn =
+      Lwt_mutex.with_lock (entry t k).lock fn
   end
 
   type t = {
     logs : CI_live_log.manager;
-    mutex : Lwt_mutex.t;        (* Held while updating [cache] *)
     cache : Cache.t;            (* In-memory cache, including pending items *)
     builder : B.t;              (* The underlying builder *)
   }
@@ -95,7 +110,6 @@ module Make(B : CI_s.BUILDER) = struct
     {
       logs;
       cache = Cache.create ();
-      mutex = Lwt_mutex.create ();
       builder;
     }
 
@@ -123,7 +137,7 @@ module Make(B : CI_s.BUILDER) = struct
     >>*= Lwt.return
 
   let mark_for_rebuild t conn branch_name =
-    Lwt_mutex.with_lock t.mutex @@ fun () ->
+    Cache.with_lock t.cache branch_name @@ fun () ->
     match Cache.find t.cache branch_name with
     | Some {result = Error (`Pending _); _} -> Lwt.return ()   (* If already building, ignore rebuild request *)
     | _ ->
@@ -248,8 +262,8 @@ module Make(B : CI_s.BUILDER) = struct
     | Some v -> v
 
   let lookup t conn ctx k =
-    Lwt_mutex.with_lock t.mutex @@ fun () ->
     let branch_name = B.branch t.builder k in
+    Cache.with_lock t.cache branch_name @@ fun () ->
     match Cache.find t.cache branch_name with
     | Some v -> Lwt.return v
     | None ->

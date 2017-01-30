@@ -11,7 +11,6 @@ RUN opam install depext -y
 RUN opam pin add -yn prometheus https://github.com/docker/datakit.git && \
     opam pin add -yn prometheus-app https://github.com/docker/datakit.git && \
     opam pin add -yn datakit-client https://github.com/docker/datakit.git && \
-    opam pin add -yn session --dev && \
     opam pin add -yn github --dev && \
     opam pin add -yn datakit-github https://github.com/docker/datakit.git && \
     opam pin add -yn datakit-server https://github.com/docker/datakit.git && \

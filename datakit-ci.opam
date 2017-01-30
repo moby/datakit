@@ -35,7 +35,7 @@ depends: [
   "io-page"
   "pbkdf"
   "webmachine"
-  "session"
+  "session" {>= "0.3.0"}
   "redis"
   "asetmap"
   "github"

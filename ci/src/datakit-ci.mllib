@@ -2,9 +2,11 @@ Datakit_ci
 CI_git
 CI_ACL
 CI_cache
+CI_char_stream
 CI_config
 CI_docker
 CI_engine
+CI_escape_parser
 CI_eval
 CI_form
 CI_live_log

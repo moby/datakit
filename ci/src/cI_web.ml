@@ -161,6 +161,79 @@ class ref_page t = object(self)
         Wm.continue (CI_web_templates.target_page ~csrf_token ~target jobs) rd
 end
 
+let max_escape_length = 20
+
+type graphics_state = {
+  bold : bool;
+  fg : string option;
+  bg : string option;
+}
+
+let default_gfx_state = {
+  bold = false;
+  fg = None;
+  bg = None;
+}
+
+let format_colour = function
+  | `Default -> None
+  | `Black -> Some "black"
+  | `Blue -> Some "blue"
+  | `Cyan -> Some "cyan"
+  | `Green -> Some "green"
+  | `Magenta -> Some "magenta"
+  | `Red -> Some "red"
+  | `White -> Some "white"
+  | `Yellow -> Some "yellow"
+
+let apply_ctrl state = function
+  | `Bold -> { state with bold = true }
+  | `NoBold -> { state with bold = false }
+  | `FgCol c -> { state with fg = format_colour c }
+  | `BgCol c -> { state with bg = format_colour c }
+  | `Italic | `NoItalic | `NoReverse | `NoUnderline | `Reverse  | `Underline -> state
+  | `Reset -> default_gfx_state
+
+let pp_style = Fmt.(list ~sep:(const string " ")) Fmt.string
+
+let with_style s txt =
+  match s with
+  | {bold = false; fg = None; bg = None} -> txt
+  | {bold; fg; bg} ->
+    let cl ty = function
+      | None   when bold && ty = "fg" -> ["fg-bright-white"]
+      | Some c when bold && ty = "fg" -> [Printf.sprintf "fg-bright-%s" c]
+      | Some c -> [Printf.sprintf "%s-%s" ty c]
+      | None -> []
+    in
+    let style = if bold then ["bold"] else [] in
+    let style = cl "fg" fg @ style in
+    let style = cl "bg" bg @ style in
+    Fmt.strf "<span class='%a'>%s</span>" pp_style style txt
+
+(* [buf] is any partial escape sequence we weren't able to fully parse last time. *)
+let process_escapes ~gfx_state ~buf data =
+  let output = Buffer.create (String.length data * 2) in
+  let add = Buffer.add_string output in
+  let module Stream = CI_char_stream in
+  let write (s, first, stop) =
+    let data = String.with_range s ~first ~len:(stop - first) in
+    add (Xml_print.encode_unsafe_char data |> with_style !gfx_state)
+  in
+  let rec aux s =
+    match CI_escape_parser.parse s with
+    | `Literal i when Stream.equal i s -> `Done ""
+    | `Literal i -> write Stream.(s -- i); aux i
+    | `Incomplete when Stream.avail s >= max_escape_length -> add "<b>ESCAPE-TOO-LONG</b>"; aux (Stream.skip s)
+    | `Incomplete -> `Done (Stream.to_string s)
+    | `Invalid i -> aux i
+    | `Escape (`Reset, i) -> gfx_state := default_gfx_state; aux i
+    | `Escape (`Ctrl (`SelectGraphicRendition c), i) -> gfx_state := List.fold_left apply_ctrl !gfx_state c; aux i
+  in
+  let `Done unprocessed = aux (Stream.of_string (!buf ^ data)) in
+  buf := unprocessed;
+  Buffer.contents output
+
 class live_log_page t = object(self)
   inherit CI_web_utils.protected_page t.server
 
@@ -202,6 +275,8 @@ class live_log_page t = object(self)
         let stream, out = Lwt_stream.create_bounded 100 in
         CI_live_log.stream live_log >>= fun src ->
         out#push head >>= fun () ->
+        let buf = ref "" in
+        let gfx_state = ref default_gfx_state in
         Lwt.async (fun () ->
             Lwt.catch
               (fun () ->
@@ -211,7 +286,8 @@ class live_log_page t = object(self)
                      out#close;
                      Lwt.return ()
                    | Some {CI_live_log.data; next} ->
-                     out#push (Xml_print.encode_unsafe_char data) >>= fun () ->
+                     let data = process_escapes ~gfx_state ~buf data in
+                     begin if data = "" then Lwt.return () else out#push data end >>= fun () ->
                      Lazy.force next >>= aux
                  in
                  aux src
@@ -229,20 +305,70 @@ class live_log_page t = object(self)
           }
 end
 
-class saved_log_page t = object
-  inherit CI_web_utils.html_page t.server
+class saved_log_page t = object(self)
+  inherit CI_web_utils.protected_page t.server
+
+  method content_types_provided rd =
+    Wm.continue [
+      "text/html" , self#to_html;
+    ] rd
+
+  method content_types_accepted rd =
+    Wm.continue [] rd
 
   method private required_roles = [`Reader]
 
-  method private render rd =
+  method private to_html rd =
     let branch = Uri.pct_decode (Rd.lookup_path_info_exn "branch" rd) in
     let commit = Rd.lookup_path_info_exn "commit" rd in
+    let user = self#authenticated_user in
+    let web_config = CI_web_utils.web_config t.server in
     CI_engine.dk t.ci >>= fun dk ->
     let tree = DK.Commit.tree (DK.commit dk commit) in
     DK.Tree.read_file tree CI_cache.Path.log >>= function
-    | Error (`Msg e) -> Wm.continue (CI_web_templates.plain_error e) rd
+    | Error (`Msg e) ->
+      let html = CI_web_templates.plain_error e in
+      let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
+      Wm.continue (`String body) rd
     | Ok log_data ->
-      Wm.continue (CI_web_templates.saved_log_frame ~commit ~branch ~log_data) rd
+      let html = CI_web_templates.saved_log_frame ~commit ~branch in
+      let template = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
+      match String.cut ~sep:"@STREAM-GOES-HERE@" template with
+      | None -> CI_utils.failf "Bad template output %S" template
+      | Some (head, tail) ->
+        let stream, out = Lwt_stream.create_bounded 100 in
+        out#push head >>= fun () ->
+        let buf = ref "" in
+        let gfx_state = ref default_gfx_state in
+        Lwt.async (fun () ->
+            Lwt.catch
+              (fun () ->
+                 let rec aux i =
+                   if i = Cstruct.len log_data then (
+                     out#push tail >>= fun () ->
+                     out#close;
+                     Lwt.return ()
+                   ) else (
+                     let len = min 40960 (Cstruct.len log_data - i) in
+                     let data = Cstruct.sub log_data i len |> Cstruct.to_string in
+                     let data = process_escapes ~gfx_state ~buf data in
+                     begin if data = "" then Lwt.return () else out#push data end >>= fun () ->
+                     aux (i + len)
+                   )
+                 in
+                 aux 0
+              )
+              (fun ex ->
+                 Log.warn (fun f -> f "Error streaming log: %a" CI_utils.pp_exn ex);
+                 Lwt.return ()
+              )
+          );
+        Wm.continue
+          (`Stream stream)
+          { rd with
+            (* Otherwise, an nginx reverse proxy will wait for the whole log before sending anything. *)
+            Rd.resp_headers = Cohttp.Header.add rd.Rd.resp_headers "X-Accel-Buffering" "no";
+          }
 end
 
 class rebuild t = object

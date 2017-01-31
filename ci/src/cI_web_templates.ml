@@ -769,7 +769,7 @@ let live_log_frame ~branch ~have_history t ~user:_ =
       ]
     )
 
-let saved_log_frame ~commit ~branch ~log_data t ~user:_ =
+let saved_log_frame ~commit ~branch t ~user:_ =
   let page_title = Fmt.strf "Log from commit %s" commit in
   let history = history_button (log_branch_history_url t branch) in
   let log_url = log_branch_results_url t branch in
@@ -784,7 +784,7 @@ let saved_log_frame ~commit ~branch ~log_data t ~user:_ =
             log_button_group history log_url;
           ];
         ];
-        pre [pcdata (Cstruct.to_string log_data)];
+        pre [pcdata "@STREAM-GOES-HERE@"];
       ]
     )
 

@@ -96,7 +96,6 @@ val live_log_frame :
 val saved_log_frame :
   commit:string ->
   branch:string ->
-  log_data:Cstruct.t ->
   t ->
   page
 

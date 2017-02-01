@@ -542,10 +542,10 @@ let test_live_logs conn =
   in
   let branch = "test/log" in
   let log = CI_live_log.create ~pending:"Building" ~branch ~title:"Test" logs in
-  CI_live_log.printf log "TEST-OUTPUT-1\n";
+  CI_live_log.printf log "TEST-\027[1;31mOUTPUT\027[m-1\n";
   let path = "/log/live/test%2flog" in
   get path >|= Cohttp_lwt_body.to_stream >>= fun log_page ->
-  read_to log_page "TEST-OUTPUT-1" >>= fun () ->
+  read_to log_page "TEST-<span class='fg-bright-red bold'>OUTPUT</span>-1" >>= fun () ->
   CI_live_log.printf log "TEST-OUTPUT-<&2>\n";
   read_to log_page "TEST-OUTPUT-&lt;&amp;2" >>= fun () ->
   CI_live_log.finish log;

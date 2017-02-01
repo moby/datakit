@@ -157,9 +157,15 @@ let create ~web_ui ?canaries connect_dk projects =
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
 let refs t = t.projects |> Repo.Map.map (fun project -> project.refs)
 
+let update_status_lock = Lwt_mutex.create ()
 let update_status t ~message s =
   t.dk >>= fun t ->
   DK.branch t metadata_branch >>*= fun metadata ->
+  (* Because multiple targets can be pointing to the same commit, we may try
+     to update a single commit's status for several targets in parallel,
+     leading to merge conflicts. This is a limitation of GitHub's design, so
+     just let the most recent update to win. *)
+  Lwt_mutex.with_lock update_status_lock @@ fun () ->
   DK.Branch.with_transaction metadata (fun t ->
       Conv.update_elt t (`Status s) >>= fun () ->
       Log.debug (fun f -> f "set_state: %s" message);

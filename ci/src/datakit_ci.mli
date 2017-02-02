@@ -19,7 +19,7 @@
 
 (** {1:core Core} *)
 
-module DK: Datakit_S.CLIENT with type error = Protocol_9p_error.error
+module DK: Datakit_S.CLIENT
 (** Datakit client library. *)
 
 module Live_log: sig
@@ -653,10 +653,10 @@ module Utils: sig
   module Infix: sig
 
     val ( >>*= ):
-      ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+      ('a, DK.error) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
     val ( >|*= ):
-      ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+      ('a, DK.error) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 
   end
 

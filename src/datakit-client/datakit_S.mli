@@ -54,15 +54,18 @@ module type CLIENT = sig
   type t
   (** A [t] is a connection to a Datakit server. *)
 
-  type error
+  type error = private
+    [>`Already_exists           (** Attempt to create something that already exists *)
+    | `Does_not_exist           (** Attempt to access something that does not exist *)
+    | `Is_dir                   (** Attempt to use a directory as a file *)
+    | `Not_dir                  (** Attempt to use a non-directory as a directory *)
+    | `Not_file                 (** Attempt to use a non-file as a file *)
+    | `Not_symlink]             (** Attempt to use a non-symlink as a symlink *)
 
   val pp_error: error Fmt.t
   (** [pp_error] pretty-prints error values. *)
 
   type 'a or_error = ('a, error) result
-
-  val error: ('a, unit, string, 'b or_error Lwt.t) format4 -> 'a
-  (** [error] raises user-defined errors. *)
 
   module Tree: READABLE_TREE with type 'a or_error := 'a or_error
   (** A read-only tree of files, directories and symlinks. *)

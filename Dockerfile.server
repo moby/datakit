@@ -11,12 +11,14 @@ RUN opam install depext -y
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term
 
 # cache opam install of dependencies
+COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
 COPY datakit-server.opam /home/opam/src/datakit/datakit-server.opam
 COPY prometheus.opam /home/opam/src/datakit/prometheus.opam
 COPY prometheus-app.opam /home/opam/src/datakit/prometheus-app.opam
 RUN opam pin add prometheus.dev /home/opam/src/datakit -yn
 RUN opam pin add prometheus-app.dev /home/opam/src/datakit -yn
 RUN opam pin add datakit-server.dev /home/opam/src/datakit -yn
+RUN opam pin add datakit-client.dev /home/opam/src/datakit -yn
 RUN opam depext datakit-server && opam install datakit-server --deps
 
 COPY . /home/opam/src/datakit

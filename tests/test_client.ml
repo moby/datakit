@@ -2,6 +2,8 @@ open Lwt.Infix
 open Test_utils
 open Result
 
+let ( >>*= ) = ( >>**= )
+
 let test_transaction dk =
   DK.branch dk "master" >>*= fun master ->
   DK.Branch.with_transaction master (fun tr ->
@@ -348,7 +350,7 @@ let test_conflicts dk =
     (fun t {DK.Transaction.theirs; _} ->
        DK.Transaction.commit t ~message:"commit" >>= function
        | Ok () -> Alcotest.fail "Commit should have failed due to conflicts"
-       | Error (`Msg _x) ->
+       | Error _ ->
          (* Alcotest.(check string) "Conflict error"
             "conflicts file is not empty" x; *)
          DK.Transaction.read_dir t (p "") >>*= fun items ->
@@ -556,17 +558,17 @@ let test_rename_file dk =
       >>*= fun () ->
       DK.Transaction.rename t (p "new") "dir" >>= function
       | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
-      | Error (`Msg e) ->
-        Alcotest.(check string) "Rename over dir" "Is a directory" e;
-        (* Rename when source has been deleted. Ideally, we should also
-           check it hasn't been replaced by something with the same
-           name. *)
-        DK.Transaction.remove t (p "new") >>*= fun () ->
-        DK.Transaction.rename t (p "new") "reborn" >>= function
-        | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
-        | Error (`Msg e) ->
-          Alcotest.(check string) "Source deleted" "No such file or directory" e;
-          DK.Transaction.commit t ~message:"rename"
+      | Error `Is_dir -> begin
+          (* Rename when source has been deleted. Ideally, we should also
+             check it hasn't been replaced by something with the same
+             name. *)
+          DK.Transaction.remove t (p "new") >>*= fun () ->
+          DK.Transaction.rename t (p "new") "reborn" >>= function
+          | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
+          | Error `Does_not_exist -> DK.Transaction.commit t ~message:"rename"
+          | Error e -> Alcotest.fail (Fmt.to_to_string DK.pp_error e)
+        end
+      | Error e -> Alcotest.fail (Fmt.to_to_string DK.pp_error e)
     ) >>*= fun () ->
   expect_head master >>*= fun head ->
   DK.Tree.read_dir (DK.Commit.tree head) (p "") >>*= fun items ->

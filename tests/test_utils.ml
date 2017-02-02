@@ -30,10 +30,6 @@ let ( >>*= ) x f = x >>= function
   | Ok y -> f y
   | Error (`Msg msg) -> Alcotest.fail ("Msg: " ^ msg)
 
-let ( >>**= ) x f = x >>= function
-  | Ok y -> f y
-  | Error _ as e -> Lwt.return e
-
 let fd_stderr = Unix.descr_of_out_channel stderr
 let real_stderr = Unix.dup fd_stderr
 let () =
@@ -129,6 +125,10 @@ module Log9p = (val Logs.src_log src9p)
 module Client = Protocol_9p.Client.Make(Log9p)(Test_flow)
 module DK = Datakit_client_9p.Make(Client)
 
+let ( >>**= ) x f = x >>= function
+  | Ok y -> f y
+  | Error e -> Alcotest.fail (Fmt.strf "client: %a" DK.pp_error e)
+
 let quiet_9p () =
   Logs.Src.set_level src9p (Some Logs.Info);
   let srcs = Logs.Src.list () in
@@ -155,7 +155,7 @@ let quiet_irmin () =
     ) srcs
 
 let expect_head branch =
-  DK.Branch.head branch >>*= function
+  DK.Branch.head branch >>**= function
   | None      -> Alcotest.fail "Expecting HEAD"
   | Some head -> ok head
 
@@ -260,15 +260,16 @@ let create_file ?(perm=rw_r__r__) conn path leaf contents =
     )
 
 let write_file conn ?(truncate=false) path contents =
+  let ( >>== ) = Protocol_9p_infix.( >>*= ) in
   with_file conn path (fun fid ->
       begin
         if not truncate then Lwt.return_unit
         else Client.LowLevel.update ~length:0L conn fid >>*= Lwt.return
       end >>= fun () ->
       Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.write_only
-      >>**= fun _open ->
+      >>== fun _open ->
       Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
-      >>**= fun _resp ->
+      >>== fun _resp ->
       ok ()
     )
 
@@ -364,8 +365,8 @@ let compare_history_node a b =
 
 (* Get the history starting from [commit] *)
 let rec history_client commit =
-  DK.Commit.parents commit >>*= fun parents ->
-  DK.Commit.message commit >>*= fun msg ->
+  DK.Commit.parents commit >>**= fun parents ->
+  DK.Commit.message commit >>**= fun msg ->
   Lwt_list.map_s history_client parents >|= fun parents ->
   let parents = List.sort compare_history_node parents in
   { id = DK.Commit.id commit; msg = String.trim msg; parents }
@@ -429,11 +430,11 @@ let populate conn ~branch files =
 
 let populate_client branch files =
   DK.Branch.with_transaction branch (fun t ->
-      DK.Transaction.read_dir t (p "") >>*= fun existing ->
+      DK.Transaction.read_dir t (p "") >>**= fun existing ->
       existing |> Lwt_list.iter_s (fun name ->
-          DK.Transaction.remove t (p name) >>*= Lwt.return
+          DK.Transaction.remove t (p name) >>**= Lwt.return
         ) >>= fun () ->
-      DK.Transaction.read_dir t (p "") >>*= fun existing ->
+      DK.Transaction.read_dir t (p "") >>**= fun existing ->
       Alcotest.(check (list string)) "rw is empty" [] existing;
       let dirs = Hashtbl.create 2 in
       let rec ensure_dir d =
@@ -445,7 +446,7 @@ let populate_client branch files =
             ensure_dir parent >>= fun () ->
             Hashtbl.add dirs d ();
             DK.Transaction.create_dir t (Datakit_path.of_steps_exn parent / name)
-            >>*= Lwt.return
+            >>**= Lwt.return
         ) in
       files |> Lwt_list.iter_s (fun (path, value) ->
           match
@@ -456,7 +457,7 @@ let populate_client branch files =
             ensure_dir dir >>= fun () ->
             let dir = Datakit_path.of_steps_exn dir in
             DK.Transaction.create_file t (dir / name) (Cstruct.of_string value)
-            >>*= Lwt.return
+            >>**= Lwt.return
         ) >>= fun () ->
       DK.Transaction.commit t ~message:"init"
     )
@@ -480,20 +481,20 @@ let try_merge conn ~base ~ours ~theirs fn =
     )
 
 let try_merge_client dk ~base ~ours ~theirs fn =
-  DK.branch dk "master" >>*= fun master ->
-  populate_client master base >>*= fun () ->
+  DK.branch dk "master" >>**= fun master ->
+  populate_client master base >>**= fun () ->
   expect_head master >>*= fun base_head ->
-  DK.branch dk "theirs" >>*= fun their_branch ->
-  DK.Branch.fast_forward their_branch base_head >>*= fun () ->
-  populate_client master ours >>*= fun () ->
-  populate_client their_branch theirs >>*= fun () ->
+  DK.branch dk "theirs" >>**= fun their_branch ->
+  DK.Branch.fast_forward their_branch base_head >>**= fun () ->
+  populate_client master ours >>**= fun () ->
+  populate_client their_branch theirs >>**= fun () ->
   DK.Branch.with_transaction master (fun t ->
       expect_head their_branch >>*= fun theirs_head ->
-      DK.Transaction.merge t theirs_head >>*= fun (merge, _conflicts) ->
-      fn t merge >>*= fun () ->
+      DK.Transaction.merge t theirs_head >>**= fun (merge, _conflicts) ->
+      fn t merge >>**= fun () ->
       DK.Transaction.commit t ~message:"try_merge_client"
     )
-  >>*= Lwt.return
+  >>**= Lwt.return
 
 let vfs_error = Alcotest.of_pp Vfs.Error.pp
 let vfs_result ok = Alcotest.result ok vfs_error

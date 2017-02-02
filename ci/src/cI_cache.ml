@@ -122,10 +122,10 @@ module Make(B : CI_s.BUILDER) = struct
   let load_from_tree builder tree key =
     DK.Tree.read_file tree Path.failure >>= function
     | Ok failure -> Lwt.return @@ Ok (`Failure (Cstruct.to_string failure))
-    | Error (`Msg "No such file or directory") ->
+    | Error `Does_not_exist ->
       (* If we failed to load the failure, this result must be successful. *)
       catch (fun () -> B.load builder tree key >|= fun v -> Ok (`Success v))
-    | Error (`Msg msg) -> Lwt.return @@ Error (`Failure msg)
+    | Error e -> Lwt.return @@ Error (`Failure (Fmt.to_to_string DK.pp_error e))
 
   let mark_branch_for_rebuild conn branch =
     conn () >>= fun dk ->

@@ -23,6 +23,7 @@ RUN opam install --deps-only tmp -y
 
 ADD . /home/opam/datakit
 RUN sudo chown opam /home/opam/datakit
+RUN opam pin add -k git datakit-client /home/opam/datakit -y
 RUN opam pin add -k git datakit-ci /home/opam/datakit -y
 
 VOLUME /secrets

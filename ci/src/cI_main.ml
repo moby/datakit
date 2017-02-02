@@ -13,7 +13,11 @@ let connect protocol address =
   (* Connect to 9p server *)
   Log.info (fun f -> f "Connecting to DataKit server on %s:%s" protocol address);
   Lwt.catch
-    (fun () -> Client9p.connect protocol address ~max_fids:Int32.max_int ())
+    (fun () ->
+       Client9p.connect protocol address ~max_fids:Int32.max_int () >|= function
+       | Ok x -> x
+       | Error (`Msg m) -> failwith m
+    )
     (fun ex ->
        failf "Failed to connect to DataKit server at proto=%S addr=%S: %s"
          protocol address (Printexc.to_string ex)
@@ -49,7 +53,7 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend 
   CI_secrets.github_auth secrets >>= fun github ->
   CI_web_utils.Auth.create ~github ~web_ui (CI_secrets.passwords_path secrets) >>= fun auth ->
   let (proto, addr) = pr_store in
-  let connect_dk () = connect proto addr >|*= DK.connect in
+  let connect_dk () = connect proto addr >|= DK.connect in
   let canaries =
     match canaries with
     | [] -> None

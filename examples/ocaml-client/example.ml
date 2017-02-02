@@ -22,7 +22,9 @@ let root = Datakit_path.empty
 
 let main () =
   (* Connect to 9p server *)
-  Client9p.connect server_protocol server_address () >>*= fun conn ->
+  Client9p.connect server_protocol server_address () >>= function
+  | Error (`Msg x) -> Fmt.epr "Failed to connect: %s" x; exit 1
+  | Ok conn ->
   (* Wrap it with the DataKit client *)
   let dk = DK.connect conn in
   (* Make a test branch *)
@@ -52,5 +54,5 @@ let main () =
 let () =
   match Lwt_main.run (main ()) with
   | Ok () -> ()
-  | Error (`Msg msg) ->
-    Fmt.epr "Test program failed: %s@." msg
+  | Error e ->
+    Fmt.epr "Test program failed: %a@." DK.pp_error e

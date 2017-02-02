@@ -520,6 +520,11 @@ let read_to_end stream =
   aux ()
 
 let test_live_logs conn =
+  let ( >>*= ) x f =
+    x >>= function
+    | Ok x -> f x
+    | Error e -> failwith (Fmt.to_to_string CI_utils.DK.pp_error e)
+  in
   let tests = Repo.Map.of_list [
   ] in
   let dk = CI_utils.DK.connect conn in

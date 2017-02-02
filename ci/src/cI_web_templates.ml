@@ -743,6 +743,7 @@ let iframe_page ~page_title =
         link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
         link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
         base ~a:[a_target "_parent"] ();
+        script (pcdata "window.top.highlight_log()");
       ])
 
 let plain_error msg _t ~user:_ =

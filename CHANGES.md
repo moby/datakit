@@ -1,3 +1,63 @@
+### 0.9.0 (2017-02-03)
+
+**prometheus** (new)
+
+- prometheus: split prometheus into its own opam package
+  (#438, @talex5 and @avsm)
+
+**datakit-local-git** (new)
+
+- local-git: add local git bridge (#458, @talex5)
+
+Normally, we use datakit-github to monitor the state of a remote
+repository on GitHub and use that as the input to the CI. When getting
+started with DataKitCI it is more convenient to be able to monitor a
+local Git repository.
+
+**datakit-ci**
+
+- ci: add Redis-backed web sessions (#393, @talex5)
+- ci: don't copy command output to stdout (#394, @talex5)
+- ci: fetch each GitHub user's security information at login  (#398, @talex5)
+- ci: refactor the API to use `datakit-gitub` to manipulate GitHub metadaa.
+  This is a major breaking API change (#384, @samoht)
+- ci: report more metrics: number of tags, branches and open PRs (#408, @talex5)
+- ci: fix race if two people request a rebuild at once (#416, @talex5)
+- ci: fix fetching of tag objects (#417, @talex5)
+- ci: change the url scheme for PRs and references (#411, @samoht)
+- ci: improve form validation (#420, @talex5)
+- ci: migrate self-ci from docker-compose to docker-cloud (#421, @talex5)
+- ci: add support for getting X.509 certificates via certbot (#422, @talex5)
+- ci: add web UI for configuring GitHub authentication (#424, @talex5)
+- ci: allow non-TLS deployments (#425, @talex5)
+- ci: bound the size of Term.wait_for_all status messages (#428, @avsm)
+- ci: clone missing Git repositories automatically (#429, @talex5)
+- ci: expose more functions on `Target.v` (#430, @avsm)
+- ci: don't require a compare function for builders (#435, @talex5)
+- ci: separate rebuilding from cache lookups (#436, @talex5)
+- ci: cope with targets being deleted while we're updating their status
+  (#443, @talex5)
+- ci: add live streaming of logs (#449, @talex5)
+- ci: allow reporting Prometheus metrics on a separate port (#452, @talex5)
+- ci: include the PR's title in the PR status page
+- ci: allow cancelling Docker builds (#462, @talex5)
+- ci: add Docker.run (#462, @talex5)
+- ci: evaluate terms in parallel (#464, @talex5)
+- ci: add ANSI escape sequence parser for coloured logs (#466, @talex5)
+
+**datakit-github**
+
+- github: do not commit empty changes (#397, @samoht)
+- github: use an unlimited number of fids and walk in parallel to speeds-up
+  init time massively (#401, @samoht)
+- github: enable Prometheus monitoring (#452, @talex5)
+
+**datakit-client**
+
+- client: add client-side caching (#400, @samoht)
+- client: improve the memory representation of paths (#399, @samoht)
+- client: replace error strings with variants (#470, @talex5)
+
 ### 0.8.1 (2016-12-02)
 
 **datakit-github**

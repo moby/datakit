@@ -326,8 +326,8 @@ class saved_log_page t = object(self)
     CI_engine.dk t.ci >>= fun dk ->
     let tree = DK.Commit.tree (DK.commit dk commit) in
     DK.Tree.read_file tree CI_cache.Path.log >>= function
-    | Error (`Msg e) ->
-      let html = CI_web_templates.plain_error e in
+    | Error e ->
+      let html = CI_web_templates.plain_error (Fmt.to_to_string DK.pp_error e) in
       let body = Fmt.to_to_string (Tyxml.Html.pp ()) (html ~user web_config) in
       Wm.continue (`String body) rd
     | Ok log_data ->

@@ -11,13 +11,13 @@ module Client9p: sig
     t Protocol_9p_error.t Lwt.t
 end
 module DK: sig
-  include Datakit_S.CLIENT with type error = Protocol_9p_error.error
+  include Datakit_S.CLIENT
   val connect: Client9p.t -> t
 end
 
 module Infix: sig
-  val ( >>*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-  val ( >|*= ): ('a, [< `Msg of string ]) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+  val ( >>*= ): ('a, DK.error) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+  val ( >|*= ): ('a, DK.error) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 end
 
 val chdir_lock: Lwt_mutex.t

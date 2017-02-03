@@ -252,8 +252,9 @@ let rec auto_restart t ?switch label fn =
        | None | Some _ ->
          DK.branch dk "master" >>= function
          | Ok _ -> Lwt.fail ex              (* Database is OK; must be something else *)
-         | Error (`Msg err) ->
-           Log.warn (fun f -> f "%s: database connection failed: %s\n(probable cause of %s)" label err (Printexc.to_string ex));
+         | Error err ->
+           Log.warn (fun f -> f "%s: database connection failed: %a\n(probable cause of %s)"
+                        label DK.pp_error err (Printexc.to_string ex));
            reconnect t;
            auto_restart t label fn
     )

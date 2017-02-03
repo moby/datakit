@@ -68,10 +68,36 @@ exception Err of string
 
 module Make(P9p : Protocol_9p_client.S) = struct
 
-  type error = Protocol_9p_error.error
-  let pp_error ppf (`Msg e) = Fmt.string ppf e
+  type error = [
+    | `Does_not_exist
+    | `Already_exists
+    | `Is_dir
+    | `Not_symlink
+    | `Not_dir
+    | `Not_file
+    | `Internal of string               (* A bug in this library or the server *)
+    | `IO of Protocol_9p_error.error
+  ]
+
+  let pp_error f : error -> unit = function
+    | `Does_not_exist -> Fmt.string f "No such file or directory"
+    | `Already_exists -> Fmt.string f "Already exists"
+    | `Is_dir -> Fmt.string f "Is a directory"
+    | `Not_symlink -> Fmt.string f "Not a symlink"
+    | `Not_dir -> Fmt.string f "Not a directory"
+    | `Not_file -> Fmt.string f "Not a file"
+    | `Internal e -> Fmt.pf f "client-9p internal error: %s" e
+    | `IO (`Msg e) -> Fmt.pf f "9p error: %s" e
+
   type 'a or_error = ('a, error) result
-  let error fmt = Printf.ksprintf (fun str -> Lwt.return (Error (`Msg str))) fmt
+  let bug fmt = Printf.ksprintf (fun str -> Lwt.return (Error (`Internal str))) fmt
+
+  let wrap_9p = function
+    | Ok _ as x -> x
+    | Error (`Msg "No such file or directory") -> Error `Does_not_exist
+    | Error (`Msg "Already exists") -> Error `Already_exists
+    | Error (`Msg "Is a directory") -> Error `Is_dir
+    | Error e -> Error (`IO e)
 
   module Line_reader : sig
     type t
@@ -133,7 +159,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
               | e   -> err e
         ) [] lines
       |> ok
-    with Err e -> Lwt.return (Error (`Msg e))
+    with Err e -> bug "%s" e
 
   module FS = struct
     (* Low-level wrappers for 9p. *)
@@ -144,15 +170,18 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let with_file_full t path fn =
       P9p.with_fid t.conn (fun newfid ->
-          P9p.walk_from_root t.conn newfid path >>*= fn newfid
+          P9p.walk_from_root t.conn newfid path >|= wrap_9p >>*= fn newfid >|= fun x -> Ok x
         )
+      >|= function
+      | Error _ as e -> wrap_9p e       (* Error from [with_fid] itself or [walk_from_root]. *)
+      | Ok x -> x                       (* Error or success from [fn] *)
 
     let with_file t path fn =
       with_file_full t path (fun fid _resp -> fn fid)
 
     let create_dir t ~dir leaf =
       Log.debug (fun f -> f "create_dir %a" pp_path (dir / leaf));
-      P9p.mkdir t.conn dir leaf rwxr_xr_x
+      P9p.mkdir t.conn dir leaf rwxr_xr_x >|= wrap_9p
 
     let write_to_fid t fid ~offset data =
       let maximum_payload =
@@ -176,8 +205,10 @@ module Make(P9p : Protocol_9p_client.S) = struct
       with_file t dir (fun fid ->
           let perm = if executable then rwxr_xr_x else rw_r__r__ in
           P9p.LowLevel.create t.conn fid leaf perm Protocol_9p.Types.OpenMode.write_only
+          >|= wrap_9p
           >>*= fun _open ->
           write_to_fid t fid ~offset:0L data
+          >|= wrap_9p
           >>*= fun _resp ->
           ok ()
         )
@@ -187,6 +218,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       with_file t dir (fun fid ->
           P9p.LowLevel.create ~extension:target
             t.conn fid leaf symlink Protocol_9p.Types.OpenMode.write_only
+          >|= wrap_9p
           >>*= fun _resp ->
           ok ()
         )
@@ -197,10 +229,13 @@ module Make(P9p : Protocol_9p_client.S) = struct
             pp_path (path / leaf) (Cstruct.to_string data));
       with_file t (path / leaf) (fun fid ->
           P9p.LowLevel.update ~length:0L t.conn fid
+          >|= wrap_9p
           >>*= fun () ->
           P9p.LowLevel.openfid t.conn fid Protocol_9p.Types.OpenMode.write_only
+          >|= wrap_9p
           >>*= fun _open ->
           write_to_fid t fid ~offset:0L data
+          >|= wrap_9p
           >>*= fun _resp ->
           ok ()
         )
@@ -210,15 +245,17 @@ module Make(P9p : Protocol_9p_client.S) = struct
         (fun f -> f "write %S to %a" (Cstruct.to_string data) pp_path path);
       with_file t path (fun fid ->
           P9p.LowLevel.openfid t.conn fid Protocol_9p.Types.OpenMode.write_only
+          >|= wrap_9p
           >>*= fun _open ->
           write_to_fid t fid ~offset:0L data
+          >|= wrap_9p
           >>*= fun _resp ->
           ok ()
         )
 
     (* TODO: limited to 2 GB files *)
     let read_all t path =
-      P9p.read t.conn path 0L Int32.max_int >>*= fun data ->
+      P9p.read t.conn path 0L Int32.max_int >|= wrap_9p >>*= fun data ->
       let data = Cstruct.concat data in
       Log.debug
         (fun f -> f "read_all %s -> %S" (String.concat ~sep:"/" path)
@@ -227,28 +264,31 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let remove t path =
       Log.debug (fun f -> f "remove %a" pp_path path);
-      P9p.remove t.conn path
+      P9p.remove t.conn path >|= wrap_9p
 
     let rename t path new_name =
       Log.debug (fun f -> f "rename %a to %s" pp_path path new_name);
       with_file t path (fun fid ->
         P9p.LowLevel.update t.conn ~name:new_name fid
+        >|= wrap_9p
       )
 
     let truncate t path new_length =
       Log.debug (fun f -> f "truncate %a to %Ld" pp_path path new_length);
       with_file t path (fun fid ->
         P9p.LowLevel.update t.conn ~length:new_length fid
+        >|= wrap_9p
       )
 
     let read_node_aux ~link ~file ~dir t path =
       let open Protocol_9p_types in
-      with_file_full t path @@ fun _fid { Protocol_9p_response.Walk.wqids } ->
-      (* Note: would be more efficient to use [_fid] here... *)
-      match last wqids with
-      | Some qid when List.mem Qid.Symlink qid.Qid.flags -> link t path
-      | Some qid when not (List.mem Qid.Directory qid.Qid.flags) -> file t path
-      | _ -> dir t path
+      with_file_full t path (fun _fid { Protocol_9p_response.Walk.wqids } ->
+          (* Note: would be more efficient to use [_fid] here... *)
+          match last wqids with
+          | Some qid when List.mem Qid.Symlink qid.Qid.flags -> link t path
+          | Some qid when not (List.mem Qid.Directory qid.Qid.flags) -> file t path
+          | _ -> dir t path
+        )
 
     let read_link_aux t path =
       read_all t path >>*= fun data ->
@@ -259,7 +299,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       ok (`File data)
 
     let read_dir_aux t path =
-      P9p.readdir t.conn path >>*= fun items ->
+      P9p.readdir t.conn path >|= wrap_9p >>*= fun items ->
       let items =
         List.map (fun item -> item.Protocol_9p_types.Stat.name) items
       in
@@ -269,23 +309,23 @@ module Make(P9p : Protocol_9p_client.S) = struct
       read_node_aux ~link:read_link_aux ~file:read_file_aux ~dir:read_dir_aux
 
     let read_link t path =
-      let err _ _ = error "not a symlink" in
+      let err _ _ = Lwt.return (Error `Not_symlink) in
       read_node_aux ~link:read_link_aux ~file:err ~dir:err t path
       >|*= fun (`Link l) -> l
 
     let read_file t path =
-      let err _ _ = error "not a file" in
+      let err _ _ = Lwt.return (Error `Not_file) in
       read_node_aux ~link:err ~file:read_file_aux ~dir:err t path
       >|*= fun (`File l) -> l
 
     let read_dir t path =
-      let err _ _ = error "not a dir" in
+      let err _ _ = Lwt.return (Error `Not_dir) in
       read_node_aux ~link:err ~file:err ~dir:read_dir_aux t path
       >|*= fun (`Dir l) -> l
 
     let stat t path =
-      P9p.stat t.conn path >>= function
-      | Error (`Msg "No such file or directory") -> ok None
+      P9p.stat t.conn path >|= wrap_9p >>= function
+      | Error `Does_not_exist -> ok None
       | Error _ as e -> Lwt.return e
       | Ok info ->
       let open Protocol_9p_types in
@@ -318,16 +358,16 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let set_executable t path exec =
       Log.debug (fun f -> f "set_executable %a to %b" pp_path path exec);
       let mode = if exec then rwxr_xr_x else rw_r__r__ in
-      with_file t path (fun fid -> P9p.LowLevel.update t.conn ~mode fid)
+      with_file t path (fun fid -> P9p.LowLevel.update t.conn ~mode fid >|= wrap_9p)
 
     let random_subdir t parent =
       let rec aux = function
-        | 0 -> error "Failed to create temporary directory!"
+        | 0 -> bug "Failed to create temporary directory!"
         | n ->
           let leaf = Int64.to_string (Random.int64 Int64.max_int) in
           create_dir t ~dir:parent leaf >>= function
           | Ok () -> ok leaf
-          | Error (`Msg "Already exists") -> aux (n - 1)
+          | Error `Already_exists -> aux (n - 1)
           | Error _ as e -> Lwt.return e
       in
       aux 3
@@ -337,10 +377,11 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let wait_for t ?switch path fn =
       with_file t path @@ fun fid ->
       P9p.LowLevel.openfid t.conn fid Protocol_9p.Types.OpenMode.read_only
+      >|= wrap_9p
       >>*= fun _resp ->
       let stream_offset = ref 0L in
       let read () =
-        P9p.LowLevel.read t.conn fid !stream_offset 4096l >>*= fun resp ->
+        P9p.LowLevel.read t.conn fid !stream_offset 4096l >|= wrap_9p >>*= fun resp ->
         let data = resp.Protocol_9p_response.Read.data in
         let len = Cstruct.len data in
         stream_offset := Int64.add !stream_offset (Int64.of_int len);
@@ -353,7 +394,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       let rec loop () =
         abort_if_off switch @@ fun () ->
         !th >>*= function
-        | `Eof -> error "End-of-file from monitor stream!"
+        | `Eof -> bug "End-of-file from monitor stream!"
         | `Line value ->
           abort_if_off switch @@ fun () ->
           fn (String.trim value) >>*= function
@@ -377,12 +418,12 @@ module Make(P9p : Protocol_9p_client.S) = struct
         | None -> ok ()
         | Some (dir, leaf) ->
           create_dir t ~dir:(base @ dir) leaf >>= function
-          | Ok () | Error (`Msg "Already exists") -> ok ()
-          | Error (`Msg "No such file or directory") ->
+          | Ok () | Error `Already_exists -> ok ()
+          | Error `Does_not_exist ->
             (* Parent is missing too *)
             aux dir >>*= fun () ->
             create_dir t ~dir:(base @ dir) leaf >>= begin function
-            | Ok () | Error (`Msg "Already exists") -> ok ()
+            | Ok () | Error `Already_exists -> ok ()
             | Error _ as e -> Lwt.return e
             end
           | Error _ as e -> Lwt.return e
@@ -399,7 +440,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
   module Tree = struct
 
     type value = [ `Dir of string list | `File of Cstruct.t | `Link of string ]
-    type 'a cache = 'a Protocol_9p.Error.t Datakit_path.Map.t ref
+    type 'a cache = 'a or_error Datakit_path.Map.t ref
 
     type t = {
       fs   : FS.t;
@@ -459,19 +500,19 @@ module Make(P9p : Protocol_9p_client.S) = struct
       read t path >|= function
       | Ok (`File f) -> Ok f
       | Error _ as e -> e
-      | Ok _         -> Error (`Msg "not a file")
+      | Ok _         -> Error `Not_file
 
     let read_dir t path =
       read t path >|= function
       | Ok (`Dir d)  -> Ok d
       | Error _ as e -> e
-      | Ok _         -> Error (`Msg "not a dir")
+      | Ok _         -> Error `Not_dir
 
     let read_link t path =
       read t path >|= function
       | Ok (`Link l) -> Ok l
       | Error _ as e -> e
-      | Ok _         -> Error (`Msg "not a symlink")
+      | Ok _         -> Error `Not_symlink
   end
 
   module Commit = struct
@@ -521,22 +562,22 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
     let split_for_create path =
       match Datakit_path.pop path with
-      | Some x -> ok x
-      | None -> error "Can't create '/'!"
+      | Some x -> x
+      | None -> raise (Invalid_argument "Can't create '/'!")
 
     let create_file t path ?(executable=false) data =
-      split_for_create path >>*= fun (dir, leaf) ->
+      let (dir, leaf) = split_for_create path in
       FS.create_file t.fs ~executable ~dir:(rw_path t dir) leaf data
 
     let create_symlink t path target =
-      split_for_create path >>*= fun (dir, leaf) ->
+      let (dir, leaf) = split_for_create path in
       FS.create_symlink t.fs ~dir:(rw_path t dir) leaf target
 
     let make_dirs t path =
       FS.make_dirs t.fs ~base:(t.path / "rw") path
 
     let create_dir t path =
-      split_for_create path >>*= fun (dir, leaf) ->
+      let (dir, leaf) = split_for_create path in
       FS.create_dir t.fs ~dir:(rw_path t dir) leaf
 
     let set_parents t parents =
@@ -546,7 +587,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       |> FS.replace_file t.fs t.path "parents"
 
     let replace_file t path data =
-      split_for_create path >>*= fun (dir, leaf) ->
+      let (dir, leaf) = split_for_create path in
       FS.replace_file t.fs (rw_path t dir) leaf data
 
     let remove t path =
@@ -569,7 +610,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
         | [] -> Ok []
         | x :: xs ->
           match Datakit_path.of_string x with
-          | Error e -> Error (`Msg e)
+          | Error e -> Error (`Internal (Fmt.strf "Invalid path in conflicts: %s" e))
           | Ok path ->
             match aux xs with
             | Error _ as e -> e
@@ -601,9 +642,9 @@ module Make(P9p : Protocol_9p_client.S) = struct
       else (
         FS.write_stream t.fs (t.path / "ctl") (Cstruct.of_string "close")
         >>= function
-        | Error (`Msg msg) ->
+        | Error e ->
           Log.err
-            (fun f -> f "Error aborting transaction %a: %s" pp_path t.path msg);
+            (fun f -> f "Error aborting transaction %a: %a" pp_path t.path pp_error e);
           t.closed <- true; (* Give up *)
           Lwt.return ()
         | Ok () ->
@@ -618,7 +659,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let exists_dir t path = FS.exists_dir t.fs (t.path / "rw" /@ path)
 
     let create_or_replace_file t path content =
-      split_for_create path >>*= fun (dir, leaf) ->
+      let (dir, leaf) = split_for_create path in
       FS.create_or_replace t.fs ~dir:(t.path / "rw" /@ dir) leaf content
 
     let read_file t path = FS.read_file t.fs (t.path / "rw" /@ path)
@@ -669,12 +710,12 @@ module Make(P9p : Protocol_9p_client.S) = struct
           FS.read_file t.fs ["trees"; line] >>*= fun contents ->
           ok (Some (f contents)) in
         match String.cut ~sep:"-" line with
-        | None -> error "Invalid tree watch line!"
+        | None -> bug "Invalid tree watch line!"
         | Some ("D", _) -> ok (Some (`Dir (Tree.of_id t.fs line)))
         | Some ("F", _) -> file (fun c -> `File c)
         | Some ("X", _) -> file (fun c -> `Exec c)
         | Some ("L", _) -> file (fun c -> `Link (Cstruct.to_string c))
-        | Some (_, _) -> error "Invalid tree kind code"
+        | Some (_, _) -> bug "Invalid tree kind code"
 
     let commit_of_hash t = function
       | "" -> None
@@ -729,7 +770,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     Branch.create t name
 
   let branches t =
-    P9p.readdir t.FS.conn ["branch"] >|*=
+    P9p.readdir t.FS.conn ["branch"] >|= wrap_9p >|*=
     List.map (fun info -> info.Protocol_9p_types.Stat.name)
 
   let remove_branch t name =
@@ -746,8 +787,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
          ok { Commit.fs = t; id = Cstruct.to_string commit_id })
       (fun () ->
          FS.remove t path >|= function
-         | Error (`Msg msg) ->
-           Log.err (fun f -> f "Error removing remote %S: %s" id msg)
+         | Error e ->
+           Log.err (fun f -> f "Error removing remote %S: %a" id pp_error e)
          | Ok () -> ())
 
   let commit t id =

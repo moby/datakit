@@ -10,10 +10,15 @@ let ( / ) = Datakit_path.Infix.( / )
 let ( >>*= ) x f =
   x >>= function
   | Ok x -> f x
-  | Error (`Msg msg) -> Lwt.fail (Failure msg)
+  | Error e -> Lwt.fail (Failure (Fmt.to_to_string DK.pp_error e))
 
 let ( >|*= ) x f =
   x >>*= fun x -> Lwt.return (f x)
+
+let ( >>**= ) x f =
+  x >>= function
+  | Ok x -> f x
+  | Error (`Msg x) -> failwith x
 
 let or_fail msg = function
   | None -> Alcotest.fail msg
@@ -93,14 +98,16 @@ let with_datakit fn =
   Lwt.async (fun () ->
       Lwt_unix.accept for_server >>= fun (client, _addr) ->
       let flow = Flow_lwt_unix.connect client in
-      Server.accept ~root ~msg:"test connection" flow >>*= Lwt.return
+      Server.accept ~root ~msg:"test connection" flow >|= function
+      | Ok x -> x
+      | Error (`Msg m) -> failwith m
     );
   fn for_client
 
 let run fn () =
   Lwt_main.run begin
     with_datakit @@ fun for_client ->
-    Private.Client9p.connect "unix" for_client () >>*= fun conn ->
+    Private.Client9p.connect "unix" for_client () >>**= fun conn ->
     Lwt.finalize
       (fun () -> fn conn)
       (fun () ->
@@ -111,7 +118,7 @@ let run fn () =
 let run_private fn () =
   Lwt_main.run begin
     with_datakit @@ fun for_client ->
-    CI_utils.Client9p.connect "unix" for_client () >>*= fun conn ->
+    CI_utils.Client9p.connect "unix" for_client () >>**= fun conn ->
     Lwt.finalize
       (fun () -> fn conn)
       (fun () ->

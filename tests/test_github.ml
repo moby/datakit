@@ -7,6 +7,8 @@ open Datakit_github
 
 open Result
 
+let ( >>*= ) = ( >>**= )
+
 let src = Logs.Src.create "test" ~doc:"Datakit tests"
 module Log = (val Logs.src_log src)
 
@@ -1484,8 +1486,8 @@ let users = (module Users : Alcotest.TESTABLE with type t = Users.t)
 let opt_read_file tree path =
   DK.Tree.read_file tree path >|= function
   | Ok data -> Some (String.trim (Cstruct.to_string data))
-  | Error (`Msg "No such file or directory") -> None
-  | Error (`Msg x) -> failwith x
+  | Error `Does_not_exist -> None
+  | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
 
 let mapo f = function None -> None | Some x -> Some (f x)
 
@@ -1522,8 +1524,8 @@ let rec read_state ~user ~repo ~commit tree path context =
 let read_opt_dir tree path =
   DK.Tree.read_dir tree path >|= function
   | Ok items -> items
-  | Error (`Msg "No such file or directory") -> []
-  | Error (`Msg x) -> failwith x
+  | Error `Does_not_exist -> []
+  | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
 
 let read_commits tree ~user ~repo =
   let path = Datakit_path.of_steps_exn [user; repo; "commit"] in

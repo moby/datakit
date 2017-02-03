@@ -19,7 +19,7 @@ module Infix = struct
   let ( >>*= ) x f =
     x >>= function
     | Ok x -> f x
-    | Error (`Msg msg) -> Lwt.fail (Failure msg)
+    | Error e -> Lwt.fail (Failure (Fmt.to_to_string DK.pp_error e))
 
   let ( >|*= ) x f =
     x >>*= fun x -> Lwt.return (f x)

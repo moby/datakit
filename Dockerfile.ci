@@ -1,5 +1,5 @@
 FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
-ENV OPAMYES=1
+ENV OPAMYES=1 OPAMERRLOGLEN=0
 RUN sudo apk add tzdata
 
 RUN opam depext -i opam-devel && sudo cp $(opam config var "opam-devel:lib")/opam /usr/bin/opam

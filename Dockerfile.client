@@ -1,5 +1,5 @@
 FROM ocaml/opam:alpine
-ENV OPAMYES=1
+ENV OPAMYES=1 OPAMERRLOGLEN=0
 
 # TMP
 RUN cd /home/opam/opam-repository && git pull && opam update -y

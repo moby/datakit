@@ -52,7 +52,7 @@ local Git repository.
   init time massively (#401, @samoht)
 - github: enable Prometheus monitoring (#452, @talex5)
 
-***datakit-client**
+**datakit-client**
 
 - client: add client-side caching (#400, @samoht)
 - client: improve the memory representation of paths (#399, @samoht)

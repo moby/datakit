@@ -56,6 +56,7 @@ local Git repository.
 
 - client: add client-side caching (#400, @samoht)
 - client: improve the memory representation of paths (#399, @samoht)
+- client: replace error strings with variants (#470, @talex5)
 
 ### 0.8.1 (2016-12-02)
 

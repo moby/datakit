@@ -1,5 +1,5 @@
 FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
-ENV OPAMYES=1 OPAMERRLOGLEN=0
+ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata
 
 RUN opam depext -i opam-devel && sudo cp $(opam config var "opam-devel:lib")/opam /usr/bin/opam
@@ -8,13 +8,11 @@ RUN opam init -y
 RUN opam install ocaml -y
 RUN opam install depext -y
 
-RUN opam pin add -yn prometheus https://github.com/docker/datakit.git && \
-    opam pin add -yn prometheus-app https://github.com/docker/datakit.git && \
-    opam pin add -yn datakit-client https://github.com/docker/datakit.git && \
+RUN opam pin add -yn datakit-client https://github.com/docker/datakit.git && \
     opam pin add -yn github --dev && \
-    opam pin add -yn datakit-github https://github.com/docker/datakit.git && \
-    opam pin add -yn datakit-server https://github.com/docker/datakit.git && \
-    opam pin add -yn datakit https://github.com/docker/datakit.git
+    opam pin add -yn datakit-github https://github.com/talex5/datakit.git#split-prometheus && \
+    opam pin add -yn datakit-server https://github.com/talex5/datakit.git#split-prometheus && \
+    opam pin add -yn datakit https://github.com/talex5/datakit.git#split-prometheus
 
 ADD datakit-ci.opam /tmp/deps/opam
 RUN opam pin add -y tmp /tmp/deps/opam -n
@@ -25,5 +23,8 @@ ADD . /home/opam/datakit
 RUN sudo chown opam /home/opam/datakit
 RUN opam pin add -k git datakit-client /home/opam/datakit -y
 RUN opam pin add -k git datakit-ci /home/opam/datakit -y
+
+# Needed if we decide to run the tests
+RUN opam pin add -k git datakit-github /home/opam/datakit -yn
 
 VOLUME /secrets

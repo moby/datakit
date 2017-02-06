@@ -11,7 +11,6 @@ module Dockerfile = struct
     let label = label |> Utils.default file in
     Docker.create ~logs ~pool ~timeout ~label file
 
-  let prometheus  = v ~timeout:(30. *. minute) "Dockerfile.prometheus"
   let client      = v ~timeout:(30. *. minute) "Dockerfile.client"
   let ci          = v ~timeout:(30. *. minute) "Dockerfile.ci"
   let self_ci     = v ~timeout:(30. *. minute) "ci/self-ci/Dockerfile" ~label:"Dockerfile.self-ci"
@@ -39,7 +38,6 @@ let opam_test ?depexts pkg =
 
 let opam_test_ci = opam_test "datakit-ci" ~depexts:["conf-autoconf"; "conf-libpcre"]
 let opam_test_datakit = opam_test "datakit" ~depexts:["conf-gmp"; "conf-libpcre"; "conf-perl"; "conf-autoconf"]
-let opam_test_prometheus = opam_test "prometheus-app"
 
 module Tests = struct
   open Term.Infix
@@ -59,7 +57,6 @@ module Tests = struct
       method client      = build Dockerfile.client
       method client_4_02 = build Dockerfile.client     ~from:alpine_4_02
       method local_git   = build Dockerfile.local_git  ~from:self#client
-      method prometheus  = build Dockerfile.prometheus
       method ci          = build Dockerfile.ci
       method self_ci     = build Dockerfile.self_ci    ~from:self#ci
       method server      = build Dockerfile.server
@@ -87,7 +84,6 @@ module Tests = struct
         "local-git",   check_builds images#local_git;
         "libraries",   Term.wait_for_all [
           "server",      check_builds images#server;
-          "prometheus",  run_tests    images#prometheus   opam_test_prometheus;
           "client",      check_builds images#client;
           "client-4.02", check_builds images#client_4_02;
         ] >|= fun () -> "Library tests succeeded"

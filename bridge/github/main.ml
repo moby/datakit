@@ -86,7 +86,7 @@ type datakit_config = {
 
 let start () no_listen listen_urls datakit cap webhook resync_interval prometheus =
   quiet ();
-  let prometheus_threads = Prometheus_app.serve prometheus in
+  let prometheus_threads = Prometheus_unix.serve prometheus in
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
       (* On Win32 we receive this signal on every failed Hyper-V
@@ -276,7 +276,7 @@ let term =
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log $ no_listen $ listen_urls
-        $ datakit $ capabilities $ webhook $ resync $ Prometheus_app.opts),
+        $ datakit $ capabilities $ webhook $ resync $ Prometheus_unix.opts),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

@@ -22,11 +22,11 @@ module Metrics = struct
 
   let inc_messages =
     let help = "Total number of messages logged" in
-    let c = Counter.v_labels ~label_names:[| "level"; "src" |]
+    let c = Counter.v_labels ~label_names:["level"; "src"]
         ~help ~namespace ~subsystem "messages_total" in
     fun lvl src ->
       let lvl = Logs.level_to_string (Some lvl) in
-      Counter.inc_one @@ Counter.labels c [| lvl; src |]
+      Counter.inc_one @@ Counter.labels c [lvl; src]
 end
 
 let report src level ~over k msgf =

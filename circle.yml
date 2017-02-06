@@ -17,8 +17,6 @@ dependencies:
   - opam init --comp system -n https://github.com/ocaml/opam-repository.git
   - opam switch system
   - opam update && opam upgrade
-  - opam pin add prometheus . -n
-  - opam pin add prometheus-app . -n
   - opam pin add datakit-server . -n
   - opam pin add datakit . -n
   - opam install depext && opam depext osx-fsevents datakit

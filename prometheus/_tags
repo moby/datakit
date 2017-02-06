@@ -1,7 +1,0 @@
-true: warn(A-4-58)
-true: strict_sequence, safe_string, annot, bin_annot
-true: package(lwt, astring, asetmap, fmt, str)
-<app/*> or <tests/*>: package(cohttp.lwt)
-<tests/*>: package(alcotest)
-<src>: include
-<app>: include

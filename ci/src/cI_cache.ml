@@ -218,7 +218,7 @@ module Make(B : CI_s.BUILDER) = struct
               conn () >>= fun dk ->
               DK.branch dk branch_name >>*= fun branch ->
               Prometheus.Gauge.track_inprogress (Metrics.builds_in_progress (B.name t.builder)) @@ fun () ->
-              Prometheus.Summary.time (Metrics.build_time (B.name t.builder)) @@ fun () ->
+              Prometheus.Summary.time (Metrics.build_time (B.name t.builder)) Unix.gettimeofday @@ fun () ->
               DK.Branch.with_transaction branch (fun trans ->
                   ensure_removed trans Path.rebuild >>= fun () ->
                   ensure_removed trans Path.value >>= fun () ->

@@ -1,7 +1,7 @@
 true: -traverse
 true : bin_annot, safe_string
 not <ci/**> and not <bridge/local/**>: warn_error(+1..49-3), warn(A-4-41-44)
-not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
+true: package(bytes lwt astring logs result cstruct fmt rresult)
 <ci/static/**>: traverse
 
 ### datakit-client
@@ -20,7 +20,7 @@ not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
 #### irmin-io
 <src/datakit/*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
 
-<src/datakit/*>: package(prometheus-app)
+<src/datakit/*>: package(prometheus-app.unix)
 <src/datakit/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt asetmap)
 <src/datakit/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
 <src/datakit/main.*>: package(irmin.http cohttp.lwt irmin-watcher), thread
@@ -38,7 +38,7 @@ not <prometheus/**>: package(bytes lwt astring logs result cstruct fmt rresult)
 ### datakit-bridge
 
 <bridge/github/*>: package(uri datakit-client datakit-server.vfs asetmap prometheus)
-<bridge/github/main.*>: package(datakit-server.fs9p prometheus-app)
+<bridge/github/main.*>: package(datakit-server.fs9p prometheus-app.unix)
 <bridge/github/datakit_github_*>: package(github github-hooks.unix)
 <bridge/github/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt)
 <bridge/github/main.*>: package(github.unix github-hooks.unix)

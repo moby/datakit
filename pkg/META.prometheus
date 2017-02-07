@@ -1,7 +1,0 @@
-description = "Prometheus metrics reporting (client)"
-version = "%%VERSION%%"
-requires = "astring asetmap fmt lwt str unix"
-archive(byte)   = "prometheus.cma"
-archive(native) = "prometheus.cmxa"
-plugin(byte)    = "prometheus.cma"
-plugin(native)  = "prometheus.cmxs"

@@ -14,17 +14,13 @@ module Metrics = struct
 
   let record_request =
     let help = "HTTP requests to web UI" in
-    let family = Counter.v_labels ~help ~label_names:[|"method"|] ~namespace ~subsystem "requests_total" in
-    fun req ->
-      let c = Counter.labels family [| Cohttp.(Code.string_of_method (Request.meth req)) |] in
-      Counter.inc_one c
+    let metric = Counter.v_label ~help ~label_name:"method" ~namespace ~subsystem "requests_total" in
+    fun req -> Counter.inc_one (metric (Cohttp.(Code.string_of_method (Request.meth req))))
 
   let record_response =
     let help = "HTTP responses from web UI" in
-    let family = Counter.v_labels ~help ~label_names:[|"code"|] ~namespace ~subsystem "responses_total" in
-    fun code ->
-      let c = Counter.labels family [| Cohttp.(Code.string_of_status code) |] in
-      Counter.inc_one c
+    let metric = Counter.v_label ~help ~label_name:"code" ~namespace ~subsystem "responses_total" in
+    fun code -> Counter.inc_one (metric (Cohttp.(Code.string_of_status code)))
 
   let requests_in_progress =
     let help = "HTTP requests currently being handled by the web UI" in
@@ -636,7 +632,7 @@ let pp_path =
 
 let callback ~routes _conn request body =
   Metrics.record_request request;
-  Prometheus.Summary.time Metrics.response_time_seconds @@ fun () ->
+  Prometheus.Summary.time Metrics.response_time_seconds Unix.gettimeofday @@ fun () ->
   Prometheus.Gauge.track_inprogress Metrics.requests_in_progress @@ fun () ->
   Wm.dispatch' routes ~body ~request
   >|= begin function

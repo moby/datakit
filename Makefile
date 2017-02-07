@@ -5,14 +5,12 @@ PINOPTS=-y -k git
 
 TESTS = true
 
-.PHONY: all clean test bundle COMMIT exe prometheus ci
+.PHONY: all clean test bundle COMMIT exe ci
 
 all: datakit
 	@
 
 depends:
-	opam pin add ${PINOPTS} prometheus .
-	opam pin add ${PINOPTS} prometheus-app .
 	opam pin add ${PINOPTS} datakit-client .
 	opam pin add ${PINOPTS} datakit-server .
 	opam pin add ${PINOPTS} datakit-github .
@@ -33,13 +31,6 @@ github:
 
 bridge-local-git:
 	ocaml pkg/pkg.ml build -n datakit-bridge-local-git -q
-
-prometheus-app:
-	ocaml pkg/pkg.ml build -n prometheus-app -q --tests true
-	ocaml pkg/pkg.ml test _build/prometheus/tests/test.native
-
-prometheus:
-	ocaml pkg/pkg.ml build -n prometheus -q
 
 ci:
 	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true

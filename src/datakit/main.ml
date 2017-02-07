@@ -163,7 +163,7 @@ let start ~listen_9p ~listen_http prometheus git =
   Log.app (fun l ->
       l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v
     );
-  let prometheus_threads = Prometheus_app.serve prometheus in
+  let prometheus_threads = Prometheus_unix.serve prometheus in
   let serve_http = match listen_http with
     | None     -> []
     | Some uri -> [http_server (Uri.of_string uri) git]
@@ -291,7 +291,7 @@ let term =
     `S "DESCRIPTION";
     `P "$(tname) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ setup_log $ listen_9p $ listen_http $ Prometheus_app.opts
+  Term.(pure start $ setup_log $ listen_9p $ listen_http $ Prometheus_unix.opts
         $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 

@@ -2,13 +2,7 @@ open CI_utils
 
 type 'a status = {
   result: ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result;
-  output: CI_output.t
-}
-
-type state = {
-  status: Datakit_github.Status_state.t;
-  logs  : CI_output.t;
-  descr : string;
+  output: CI_output.logs
 }
 
 type job_id = CI_target.t * string

@@ -1,5 +1,4 @@
 open Datakit_github
-open CI_s
 open CI_utils
 open CI_utils.Infix
 open Result
@@ -46,7 +45,7 @@ type job = {
   term_lock : Lwt_mutex.t;         (* Held while evaluating term *)
   mutable term : string CI_term.t;
   mutable cancel : unit -> unit;   (* Cancel the previous evaluation, if any *)
-  mutable state : string * state;  (* The last result of evaluating [term] (commit, state) *)
+  mutable state : string * string CI_output.t;  (* The last result of evaluating [term] (commit, state) *)
 }
 and target = {
   mutable v : CI_target.v;
@@ -199,7 +198,9 @@ let monitor t ?switch fn =
 
 let datakit_ci x = ["ci"; "datakit"; x]
 
-let set_status t target name ~status ~descr =
+let set_status t target name result =
+  let status = CI_result.status result in
+  let descr = CI_result.descr result in
   Prometheus.Counter.inc_one Metrics.status_updates;
   let commit, url =
     match target with
@@ -287,24 +288,18 @@ let rec recalculate t job =
       | ex ->
         Lwt.return (Error (`Failure (Printexc.to_string ex)), CI_output.Empty)
     )
-  >>= fun (result, logs) ->
-  let status, descr =
-    match result with
-    | Ok descr -> `Success, descr
-    | Error (`Pending descr) -> `Pending, descr
-    | Error (`Failure descr) -> `Failure, descr
-  in
-  let (old_head, old_state) = job.state in
+  >>= fun new_output ->
+  let (old_head, old_output) = job.state in
   let new_hash = Commit.hash (CI_target.head head) in
-  begin if (old_head, old_state.status, old_state.descr) <>
-           (new_hash, status, descr) then (
-      set_status t head job.name ~status ~descr
+  let old_result = CI_output.result old_output in
+  let new_result = CI_output.result new_output in
+  begin if (old_head, old_result) <> (new_hash, new_result) then (
+      set_status t head job.name new_result
     ) else (
       Lwt.return ()
     )
   end >|= fun () ->
-  let state = (new_hash, { status; descr; logs }) in
-  job.state <- state
+  job.state <- (new_hash, new_output)
 
 let make_job t ~parent name term =
   let snapshot = snapshot t in
@@ -313,11 +308,13 @@ let make_job t ~parent name term =
   Conv.status snapshot id >|= fun status ->
   let state = match status with None -> None | Some s -> Some (Status.state s) in
   let descr = match status with None -> None | Some s -> Status.description s in
-  let state =
+  let result =
     match state, descr with
-    | Some status, Some descr -> { status; descr; logs = CI_output.Empty }
-    | _ -> { status = `Pending; descr = "(new)"; logs = CI_output.Empty }
+    | Some `Error, Some descr -> CI_result.v `Failure descr
+    | Some (`Pending | `Success | `Failure as status), Some descr -> CI_result.v status descr
+    | _ -> Error (`Pending "(new)")
   in
+  let state = (result, CI_output.Empty) in
   let hash = Commit.hash head_commit in
   { name;
     parent;
@@ -514,7 +511,7 @@ let rebuild t ~branch_name =
   in
   let check_job job =
     let _, state = job.state in
-    if check_logs state.logs then
+    if check_logs (CI_output.logs state) then
       jobs_needing_recalc := job :: !jobs_needing_recalc
   in
   let check_target target = List.iter check_job target.jobs in

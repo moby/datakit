@@ -11,3 +11,18 @@ let pp_error f = function
 let pp ok f = function
   | Ok x -> ok f x
   | Error e -> pp_error f e
+
+let descr = function
+  | Ok x -> x
+  | Error (`Failure x | `Pending x) -> x
+
+let v status descr =
+  match status with
+  | `Success -> Ok descr
+  | `Pending -> Error (`Pending descr)
+  | `Failure -> Error (`Failure descr)
+
+let status = function
+  | Ok _ -> `Success
+  | Error (`Pending _) -> `Pending
+  | Error (`Failure _) -> `Failure

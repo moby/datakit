@@ -6,8 +6,15 @@ type saved = {
   rebuild : unit Lwt.t Lazy.t;
 }
 
-type t =
+type logs =
   | Empty
   | Live of CI_live_log.t
   | Saved of saved
-  | Pair of t * t
+  | Pair of logs * logs
+
+type 'a t = 'a CI_result.t * logs
+
+val result : 'a t -> 'a CI_result.t
+val logs : 'a t -> logs
+val status : _ t -> [`Success | `Pending | `Failure]
+val descr : string t -> string

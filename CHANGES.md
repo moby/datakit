@@ -1,10 +1,5 @@
 ### 0.9.0 (2017-02-03)
 
-**prometheus** (new)
-
-- prometheus: split prometheus into its own opam package
-  (#438, @talex5 and @avsm)
-
 **datakit-local-git** (new)
 
 - local-git: add local git bridge (#458, @talex5)
@@ -16,6 +11,7 @@ local Git repository.
 
 **datakit-ci**
 
+- ci: split prometheus into its own opam package (#438, @talex5 and @avsm)
 - ci: add Redis-backed web sessions (#393, @talex5)
 - ci: don't copy command output to stdout (#394, @talex5)
 - ci: fetch each GitHub user's security information at login  (#398, @talex5)

@@ -763,6 +763,5 @@ let () =
   Alcotest.run "datakit" [
     "server" , test_set;
     "client" , Test_client.test_set;
-    "github" , Test_github.test_set;
     "conduit", [ "basic", `Quick, test_conduit ];
   ]

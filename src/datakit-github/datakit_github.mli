@@ -183,6 +183,8 @@ module PR: sig
   end
   (** Sets of pull requests. *)
 
+  module IdSet: SET with type elt = id
+
   module Index: MAP with type key = id
   (** Maps indexed by pull-request IDs. *)
 
@@ -330,6 +332,8 @@ module Ref: sig
   end
   (** Sets of Git references. *)
 
+  module IdSet: SET with type elt = id
+
   type event = [`Created of t | `Updated of t | `Removed of id]
   (** The type for reference events' state. *)
 
@@ -392,9 +396,18 @@ module Elt: sig
   val pp_id: id Fmt.t
   val compare_id: id -> id -> int
 
-  module Set: SET with type elt = t
+  module Set: sig
+    include SET with type elt = t
+    val prs: t -> PR.Set.t
+    val refs: t -> Ref.Set.t
+    val status: t -> Status.Set.t
+  end
+
   module IdSet: sig
     include SET with type elt = id
+    val repos: t -> Repo.Set.t
+    val prs: t -> PR.IdSet.t
+    val refs: t -> Ref.IdSet.t
     val of_repos: Repo.Set.t -> t
     val of_prs: PR.Set.t -> t
     val of_refs: Ref.Set.t -> t
@@ -469,6 +482,9 @@ module Snapshot: sig
   val with_elts: Elt.Set.t -> t -> t
   (** [with_elts] is like {!with_elt} but for a collection of
       elements. *)
+
+  val without_repos: Repo.Set.t -> t -> t
+  val with_events: Event.t list -> t -> t
 
   val find: Elt.id -> t -> Elt.t option
   (** [find id t] finds the element with ID [id] in [t]. *)
@@ -592,6 +608,8 @@ module Capabilities: sig
       subset of operations [op] over the capabilities defined by
       [t]. *)
 
+  val filter_elt: t -> op -> Elt.t -> bool
+
 end
 
 (** Signature for the GitHub API. *)
@@ -680,49 +698,5 @@ module type API = sig
     (** [clear t] clears the list of events stored in [t]. *)
 
   end
-
-end
-
-(** API State: TODO find a better name? *)
-module State (API: API): sig
-
-  (** {1 Token} *)
-
-  type token
-  (** The type for state token. *)
-
-  val token: API.token -> Capabilities.t -> token
-  (** [token t c] is the token using the GitHub API token [t] limited
-      by the capabilities [c]. *)
-
-  val capabilities: token -> Capabilities.t
-  (** [capabilities t] is the token [t]'s capabilities. *)
-
-  val with_capabilities: Capabilities.t -> token -> token
-  (** [with_capabilities c t] is [t] with the capabilities [c]. *)
-
-  (** {1 Synchronisation} *)
-
-  val import: token -> Snapshot.t -> Elt.IdSet.t -> Snapshot.t Lwt.t
-  (** [import token t r] imports the state of GitHub for the elements
-      in [r] into [t]. API calls use the token [token]. *)
-
-  val apply: token -> Diff.t -> unit Lwt.t
-  (** [apply token d] applies the snapshot diff [d] as a series of
-      GitHub API calls, using the token [token]. *)
-
-  (** {1 Webhooks} *)
-
-  val add_webhooks:
-    token -> watch:(Repo.t -> unit Lwt.t) -> Repo.Set.t -> unit Lwt.t
-  (** [add_webhooks t rs] adds webhooks for the repositories [rs]. *)
-
-  val import_webhook_events:
-    token -> events:(unit ->  Event.t list) -> Snapshot.t -> Snapshot.t Lwt.t
-  (** [import_webhook_events t ~events s] applies [events ()] on top
-      of [s]. Note: it ensure that all the metadata are correctly
-      updated by inserting (possibly) missing events in the mix. For
-      instance, GitHub never sends {{!Event.Status}status} events, so
-      [import_events] has to reconstruct them. *)
 
 end

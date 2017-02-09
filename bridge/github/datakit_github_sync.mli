@@ -1,5 +1,3 @@
-(** Virtual filesystem for the GitHub API. *)
-
 open Datakit_github
 
 module Make (API: API) (DK: Datakit_S.CLIENT): sig

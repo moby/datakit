@@ -110,7 +110,8 @@ module Contents_string = struct
   module Path = Ivfs_tree.Path
 end
 
-module Store = Irmin_git.Memory(Ir_io.Sync)(Ir_io.Zlib)
+module Store =
+  Irmin_git.Memory(Datakit_io.Sync)(Datakit_io.Zlib)
     (Contents_string)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 
 module Tree = Ivfs_tree.Make(Store)

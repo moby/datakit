@@ -62,8 +62,9 @@ module Contents_string = struct
 end
 module Git_fs_store = struct
   open Irmin
+  open Datakit_io
   module Store =
-    Irmin_git.FS(Ir_io.Sync)(Ir_io.Zlib)(Ir_io.Lock)(Ir_io.FS)
+    Irmin_git.FS(Sync)(Zlib)(Lock)(FS)
       (Contents_string)(Ref.String)(Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
@@ -84,8 +85,9 @@ end
 
 module In_memory_store = struct
   open Irmin
+  open Datakit_io
   module Store = Irmin_git.Memory
-      (Ir_io.Sync)(Ir_io.Zlib)(Contents_string)(Ref.String) (Hash.SHA1)
+      (Sync)(Zlib)(Contents_string)(Ref.String) (Hash.SHA1)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
 

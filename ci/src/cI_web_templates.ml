@@ -682,6 +682,20 @@ let target_repo = function
   | `PR pr -> PR.repo pr
   | `Ref r -> Ref.repo r
 
+let commit_page ~commit targets t =
+  let title = Fmt.strf "Commit %s" commit in
+  let target_link target =
+    li [
+      a ~a:[a_href (CI_target.path target)] [
+        pcdata (Fmt.to_to_string CI_target.pp target)
+      ]
+    ]
+  in
+  page title Nav.Home [
+    p [pcdata (Fmt.strf "Builds of commit %s" commit)];
+    ul (List.map target_link targets);
+  ] t
+
 let target_page_url = CI_target.path_v
 
 let target_page ~csrf_token ~target jobs t =

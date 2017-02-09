@@ -80,6 +80,12 @@ val tags_page :
   t ->
   page
 
+val commit_page :
+  commit:string ->
+  CI_target.t list ->
+  t ->
+  page
+
 val target_page :
   csrf_token:string ->
   target:CI_engine.target ->

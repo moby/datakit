@@ -49,6 +49,9 @@ val state : job -> string CI_output.t
 val target : target -> CI_target.v
 (** [target target] is the GitHub metadata about this target. *)
 
+val targets_of_commit : t -> Repo.t -> string -> CI_target.t list
+(** [targets_of_commit t repo c] is the list of targets in [repo] with head commit [c]. *)
+
 val repo : target -> Repo.t
 (** [repo t] is the GitHub repository that contains [target]. *)
 

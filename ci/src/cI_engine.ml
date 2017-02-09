@@ -87,6 +87,7 @@ type project = {
   canaries : CI_target.Set.t option;
   mutable open_prs : target PR.Index.t;
   mutable refs : target Ref.Index.t;
+  mutable targets_of_commit : CI_target.t list String.Map.t;
 }
 
 type t = {
@@ -141,6 +142,7 @@ let create ~web_ui ?canaries connect_dk projects =
         { make_terms;
           open_prs = PR.Index.empty;
           refs = Ref.Index.empty;
+          targets_of_commit = String.Map.empty;
           canaries }
       ) projects
   in
@@ -202,22 +204,14 @@ let set_status t target name result =
   let status = CI_result.status result in
   let descr = CI_result.descr result in
   Prometheus.Counter.inc_one Metrics.status_updates;
-  let commit, url =
-    match target with
-    | `PR pr ->
-      Log.info (fun f -> f "Job %a:%s -> %s" PR.pp_id (PR.id pr) name descr);
-      let url = Uri.with_path t.web_ui (CI_target.path_v target) in
-      let commit = PR.commit pr in
-      (commit, url)
-    | `Ref r ->
-      Log.info (fun f -> f "Job ref %a:%s -> %s" Ref.pp_id (Ref.id r) name descr);
-      let url = Uri.with_path t.web_ui (CI_target.path_v target) in
-      let commit = Ref.commit r in
-      (commit, url)
-  in
+  Log.info (fun f -> f "Job %a:%s -> %s" CI_target.pp_v target name descr);
+  let commit = CI_target.head target in
+  let { Repo.user; repo } = CI_target.repo_v target in
+  let hash = Commit.hash commit in
+  let url = Uri.with_path t.web_ui (Fmt.strf "/%s/%s/commit/%s" user repo hash) in
   let message =
     Fmt.strf "Set state of %a: %s = %a"
-      Commit.pp_hash (Commit.hash @@ CI_target.head target)
+      Commit.pp_hash hash
       name Status_state.pp status
   in
   let status =
@@ -390,6 +384,18 @@ end = struct
     else Lwt_condition.wait t.cond >>= fun () -> wait t
 end
 
+let index_targets ~prs ~refs =
+  let targets_of_commit = ref String.Map.empty in
+  let add commit target =
+    let hash = Datakit_github.Commit.hash commit in
+    let existing = String.Map.find hash !targets_of_commit |> CI_utils.default [] in
+    let targets = target :: existing in
+    targets_of_commit := String.Map.add hash targets !targets_of_commit
+  in
+  refs |> Ref.Index.iter (fun id x -> add (Datakit_github.Ref.commit x) (`Ref id));
+  prs  |> PR.Index.iter  (fun id x -> add (Datakit_github.PR.commit x)  (`PR id));
+  !targets_of_commit
+
 let listen ?switch t =
   auto_restart t ?switch "monitor" @@ fun () ->
   let pool_size = 50 in
@@ -454,6 +460,7 @@ let listen ?switch t =
             | None   ->  Ref.Index.empty
             | Some i -> i
           in
+          project.targets_of_commit <- index_targets ~prs ~refs;
           let prs, refs = apply_canaries project.canaries prs refs in
           (* PRs *)
           let is_current id open_pr =
@@ -524,3 +531,8 @@ let rebuild t ~branch_name =
   | triggers, jobs_needing_recalc ->
     Lwt.join triggers >>= fun () ->
     Lwt_list.iter_s (recalculate t) jobs_needing_recalc
+
+let targets_of_commit t repo c =
+  match Repo.Map.find repo t.projects with
+  | None -> []
+  | Some p -> String.Map.find c p.targets_of_commit |> CI_utils.default []

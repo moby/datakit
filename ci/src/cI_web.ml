@@ -161,6 +161,22 @@ class ref_page t = object(self)
         Wm.continue (CI_web_templates.target_page ~csrf_token ~target jobs) rd
 end
 
+class commit_page t = object
+  inherit CI_web_utils.html_page t.server
+
+  method private required_roles = [`Reader]
+
+  method private render rd =
+    let user = Rd.lookup_path_info_exn "user" rd in
+    let repo = Rd.lookup_path_info_exn "repo" rd in
+    let commit = Rd.lookup_path_info_exn "id" rd in
+    let repo = Datakit_github.Repo.v ~user ~repo in
+    match CI_engine.targets_of_commit t.ci repo commit with
+    | [] -> Wm.respond 404 rd ~body:(`String "No active targets for this commit")
+    | [t] -> Wm.respond 307 (Rd.redirect (CI_target.path t) rd)
+    | ts -> Wm.continue (CI_web_templates.commit_page ~commit ts) rd
+end
+
 let max_escape_length = 20
 
 type graphics_state = {
@@ -443,6 +459,7 @@ let routes ~logs ~ci ~server ~dashboards =
     (* Individual targets *)
     (":user/:repo/pr/:id",     fun () -> new pr_page t);
     (":user/:repo/ref/*",      fun () -> new ref_page t);
+    (":user/:repo/commit/:id", fun () -> new commit_page t);
     (* Logs *)
     ("log/live/:branch",                        fun () -> new live_log_page t);
     ("log/saved/:branch/:commit",               fun () -> new saved_log_page t);

@@ -24,7 +24,11 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let safe_remove t path =
     DK.Transaction.remove t path >|= function
-    | Error _ | Ok () -> ()
+    | Ok () -> ()
+    | Error _ ->
+      Log.warn (fun l ->
+          l "trying to remove %a, but it does not exist" Datakit_path.pp path
+        )
 
   let safe_read_dir t dir =
     DK.Tree.read_dir t dir >|= function

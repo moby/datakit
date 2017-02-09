@@ -18,8 +18,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Index of types</title>
 </head>
 <body>
@@ -28,6 +26,8 @@
 <h1>Index of types</h1>
 <table>
 <tr><td align="left"><br>C</td></tr>
+<tr><td><a href="Datakit_ci.Docker.html#TYPEcommand">command</a> [<a href="Datakit_ci.Docker.html">Datakit_ci.Docker</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_ci.Git.html#TYPEcommand">command</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
 <td><div class="info">
 A cache of executions of a shell command.
@@ -71,7 +71,10 @@ The type for generic errors.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.html#TYPEerror">error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
-<td></td></tr>
+<td><div class="info">
+Attempt to use a non-symlink as a symlink
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Ref.html#TYPEevent">event</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
 <td><div class="info">
 The type for reference events' state.
@@ -128,6 +131,12 @@ The type for job IDs.
 <tr><td><a href="Vfs.Inode.html#TYPEkind">kind</a> [<a href="Vfs.Inode.html">Vfs.Inode</a>]</td>
 <td><div class="info">
 The type for inode kinds.
+</div>
+</td></tr>
+<tr><td align="left"><br>L</td></tr>
+<tr><td><a href="Datakit_ci.Output.html#TYPElogs">logs</a> [<a href="Datakit_ci.Output.html">Datakit_ci.Output</a>]</td>
+<td><div class="info">
+The type for <code class="code">term</code>'s output.
 </div>
 </td></tr>
 <tr><td align="left"><br>M</td></tr>
@@ -281,11 +290,6 @@ The type for computation terms.
 The type for computation targets.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_ci.Output.html#TYPEt">t</a> [<a href="Datakit_ci.Output.html">Datakit_ci.Output</a>]</td>
-<td><div class="info">
-The type for <code class="code">term</code>'s output.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_ci.Live_log.html#TYPEt">t</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
 <td><div class="info">
 The type for live-logs.
@@ -415,16 +419,9 @@ The type for FS errors.
 The type for individual tests.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github_api.html#TYPEtoken">token</a> [<a href="Datakit_github_api.html">Datakit_github_api</a>]</td>
-<td></td></tr>
 <tr><td><a href="Datakit_github.API.html#TYPEtoken">token</a> [<a href="Datakit_github.API.html">Datakit_github.API</a>]</td>
 <td><div class="info">
 API tokens
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.State.html#TYPEtoken">token</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-The type for state token.
 </div>
 </td></tr>
 <tr><td align="left"><br>V</td></tr>

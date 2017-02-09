@@ -17,8 +17,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.BUILDER</title>
 </head>
 <body>
@@ -33,14 +31,13 @@
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;switch:<span class="constructor">Lwt_switch</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;log:<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Transaction</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.context&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.<span class="constructor">Key</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.value,&nbsp;[&nbsp;<span class="keywordsign">`</span><span class="constructor">Failure</span>&nbsp;<span class="keyword">of</span>&nbsp;string&nbsp;])&nbsp;<span class="constructor">Pervasives</span>.result<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Lwt</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;load&nbsp;:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.<span class="constructor">Tree</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.<span class="constructor">Key</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.value&nbsp;<span class="constructor">Lwt</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">DK</span>.<span class="constructor">Tree</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.<span class="constructor">Key</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.value&nbsp;<span class="constructor">Lwt</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;branch&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">BUILDER</span>.<span class="constructor">Key</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string<br>
 <span class="keyword">end</span></code></body></html>

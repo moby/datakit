@@ -20,8 +20,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Utils.Infix</title>
 </head>
 <body>
@@ -31,5 +29,5 @@
 
 <pre><span class="keyword">module</span> Infix: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_ci.Utils.Infix.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
-<pre><span id="VAL(>>*=)"><span class="keyword">val</span> (&gt;&gt;*=)</span> : <code class="type">('a, [< `Msg of string ]) Pervasives.result Lwt.t -><br>       ('a -> 'b Lwt.t) -> 'b Lwt.t</code></pre>
-<pre><span id="VAL(>|*=)"><span class="keyword">val</span> (&gt;|*=)</span> : <code class="type">('a, [< `Msg of string ]) Pervasives.result Lwt.t -> ('a -> 'b) -> 'b Lwt.t</code></pre></body></html>
+<pre><span id="VAL(>>*=)"><span class="keyword">val</span> (&gt;&gt;*=)</span> : <code class="type">('a, DK.error) Pervasives.result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t</code></pre>
+<pre><span id="VAL(>|*=)"><span class="keyword">val</span> (&gt;|*=)</span> : <code class="type">('a, DK.error) Pervasives.result Lwt.t -> ('a -> 'b) -> 'b Lwt.t</code></pre></body></html>

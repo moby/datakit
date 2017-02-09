@@ -22,8 +22,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="Computation Output" rel="Section" href="#output">
 <title>Datakit_ci.Output</title>
 </head>
@@ -44,33 +42,33 @@ The type for <code class="code">term</code> output saved in Datakit.<br>
 </div>
 
 
-<pre><code><span id="TYPEt"><span class="keyword">type</span> <code class="type"></code>t</span> = </code></pre><table class="typetable">
+<pre><code><span id="TYPElogs"><span class="keyword">type</span> <code class="type"></code>logs</span> = </code></pre><table class="typetable">
 <tr>
 <td align="left" valign="top" >
 <code><span class="keyword">|</span></code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.Empty"><span class="constructor">Empty</span></span></code></td>
+<code><span id="TYPEELTlogs.Empty"><span class="constructor">Empty</span></span></code></td>
 
 </tr>
 <tr>
 <td align="left" valign="top" >
 <code><span class="keyword">|</span></code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.Live"><span class="constructor">Live</span></span> <span class="keyword">of</span> <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a></code></code></td>
+<code><span id="TYPEELTlogs.Live"><span class="constructor">Live</span></span> <span class="keyword">of</span> <code class="type"><a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a></code></code></td>
 
 </tr>
 <tr>
 <td align="left" valign="top" >
 <code><span class="keyword">|</span></code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.Saved"><span class="constructor">Saved</span></span> <span class="keyword">of</span> <code class="type"><a href="Datakit_ci.Output.html#TYPEsaved">saved</a></code></code></td>
+<code><span id="TYPEELTlogs.Saved"><span class="constructor">Saved</span></span> <span class="keyword">of</span> <code class="type"><a href="Datakit_ci.Output.html#TYPEsaved">saved</a></code></code></td>
 
 </tr>
 <tr>
 <td align="left" valign="top" >
 <code><span class="keyword">|</span></code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTt.Pair"><span class="constructor">Pair</span></span> <span class="keyword">of</span> <code class="type"><a href="Datakit_ci.Output.html#TYPEt">t</a> * <a href="Datakit_ci.Output.html#TYPEt">t</a></code></code></td>
+<code><span id="TYPEELTlogs.Pair"><span class="constructor">Pair</span></span> <span class="keyword">of</span> <code class="type"><a href="Datakit_ci.Output.html#TYPElogs">logs</a> * <a href="Datakit_ci.Output.html#TYPElogs">logs</a></code></code></td>
 
 </tr></table>
 

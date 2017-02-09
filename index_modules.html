@@ -18,8 +18,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Index of modules</title>
 </head>
 <body>
@@ -76,16 +74,6 @@ A DataKit client that connects to the server over a 9p connection.
 Main object types used by the GitHub bridge.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github_api.html">Datakit_github_api</a> </td>
-<td><div class="info">
-<code class="code"><span class="constructor">API</span></code> implementation using <code class="code">ocaml-github</code> bindings.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github_vfs.html">Datakit_github_vfs</a> </td>
-<td><div class="info">
-Expose the GitHub API over VFS.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_path.html">Datakit_path</a> </td>
 <td><div class="info">
 Locate files and directories within a DataKit tree.
@@ -130,6 +118,10 @@ Expose a VFS directory over 9p.
 <td></td></tr>
 <tr><td align="left"><br>I</td></tr>
 <tr><td><a href="Datakit_github.Elt.IdSet.html">IdSet</a> [<a href="Datakit_github.Elt.html">Datakit_github.Elt</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Ref.IdSet.html">IdSet</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.PR.IdSet.html">IdSet</a> [<a href="Datakit_github.PR.html">Datakit_github.PR</a>]</td>
 <td></td></tr>
 <tr><td><a href="Datakit_ci.Docker.Image.html">Image</a> [<a href="Datakit_ci.Docker.html">Datakit_ci.Docker</a>]</td>
 <td></td></tr>
@@ -195,8 +187,6 @@ Input describing what is to be built.
 <td></td></tr>
 <tr><td align="left"><br>M</td></tr>
 <tr><td><a href="Datakit_ci.Cache.Make.html">Make</a> [<a href="Datakit_ci.Cache.html">Datakit_ci.Cache</a>]</td>
-<td></td></tr>
-<tr><td><a href="Datakit_github_vfs.Make.html">Make</a> [<a href="Datakit_github_vfs.html">Datakit_github_vfs</a>]</td>
 <td></td></tr>
 <tr><td><a href="Ivfs_remote.Make.html">Make</a> [<a href="Ivfs_remote.html">Ivfs_remote</a>]</td>
 <td></td></tr>
@@ -282,11 +272,6 @@ Sets of paths.
 </td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html">Snapshot</a> [<a href="Datakit_github.html">Datakit_github</a>]</td>
 <td></td></tr>
-<tr><td><a href="Datakit_github.State.html">State</a> [<a href="Datakit_github.html">Datakit_github</a>]</td>
-<td><div class="info">
-API State: TODO find a better name?
-</div>
-</td></tr>
 <tr><td><a href="Datakit_github.Status.html">Status</a> [<a href="Datakit_github.html">Datakit_github</a>]</td>
 <td></td></tr>
 <tr><td><a href="Datakit_github.Status_state.html">Status_state</a> [<a href="Datakit_github.html">Datakit_github</a>]</td>

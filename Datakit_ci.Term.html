@@ -22,8 +22,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="Computation Terms" rel="Section" href="#term">
 <link title="Datakit Connection" rel="Section" href="#1_DatakitConnection">
 <link title="GitHub Integration" rel="Section" href="#1_GitHubIntegration">
@@ -141,7 +139,7 @@ The type for computation terms. A <code class="code"><span class="keywordsign">'
 <br>
 <h1 id="1_DatakitConnection">Datakit Connection</h1><br>
 
-<pre><span id="VALdk"><span class="keyword">val</span> dk</span> : <code class="type">(unit -> Datakit_ci.DK.t Lwt.t) <a href="Datakit_ci.Term.html#TYPEt">t</a></code></pre><div class="info ">
+<pre><span id="VALdk"><span class="keyword">val</span> dk</span> : <code class="type">(unit -> DK.t Lwt.t) <a href="Datakit_ci.Term.html#TYPEt">t</a></code></pre><div class="info ">
 <code class="code">dk</code> is a function for getting the current DataKit
       connection.<br>
 </div>

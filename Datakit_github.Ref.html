@@ -22,8 +22,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_github.Ref</title>
 </head>
 <body>
@@ -124,6 +122,7 @@ The type for Git reference IDs.<br>
 Sets of Git references.
 </div>
 
+<pre><span class="keyword">module</span> <a href="Datakit_github.Ref.IdSet.html">IdSet</a>: <code class="type"><a href="Datakit_github.SET.html">Datakit_github.SET</a></code><code class="type">  with type elt = id</code></pre>
 <pre><span id="TYPEevent"><span class="keyword">type</span> <code class="type"></code>event</span> = <code class="type">[ `Created of <a href="Datakit_github.Ref.html#TYPEt">t</a><br>       | `Removed of <a href="Datakit_github.Ref.html#TYPEid">id</a><br>       | `Updated of <a href="Datakit_github.Ref.html#TYPEt">t</a> ]</code> </pre>
 <div class="info ">
 The type for reference events' state.<br>

@@ -21,8 +21,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Cache.Make</title>
 </head>
 <body>
@@ -58,7 +56,7 @@ A <code class="code">t</code> is a cache of values created by <code class="code"
         <code class="code"><span class="constructor">B</span>.<span class="constructor">Key</span>.t</code> to values of type <code class="code"><span class="constructor">B</span>.value</code>.<br>
 </div>
 
-<pre><span id="VALlookup"><span class="keyword">val</span> lookup</span> : <code class="type"><a href="Datakit_ci.Cache.Make.html#TYPEt">t</a> -><br>       (unit -> Datakit_ci.DK.t Lwt.t) -><br>       B.context -> B.Key.t -> B.value <a href="Datakit_ci.html#TYPEstatus">Datakit_ci.status</a> Lwt.t</code></pre><div class="info ">
+<pre><span id="VALlookup"><span class="keyword">val</span> lookup</span> : <code class="type"><a href="Datakit_ci.Cache.Make.html#TYPEt">t</a> -><br>       (unit -> DK.t Lwt.t) -><br>       B.context -> B.Key.t -> B.value <a href="Datakit_ci.html#TYPEstatus">Datakit_ci.status</a> Lwt.t</code></pre><div class="info ">
 <code class="code">lookup&nbsp;t&nbsp;conn&nbsp;~rebuild&nbsp;ctx&nbsp;key</code> returns the cached value of
         <code class="code">key</code>, or uses <code class="code"><span class="constructor">B</span>.generate&nbsp;ctx&nbsp;key</code> to start the process of
         calculating the value if this is the first time <code class="code">key</code> has been

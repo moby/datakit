@@ -17,8 +17,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Private</title>
 </head>
 <body>
@@ -147,10 +145,10 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?aname:string&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;?max_fids:int32&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;t&nbsp;<span class="constructor">Protocol_9p_error</span>.t&nbsp;<span class="constructor">Lwt</span>.t<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">end</span><br>
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;connect&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Private</span>.<span class="constructor">Client9p</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;connect&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Private</span>.<span class="constructor">Client9p</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">DK</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;test_engine&nbsp;:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;web_ui:<span class="constructor">Uri</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.t&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">DK</span>.t&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="keywordsign">-&gt;</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;(<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t&nbsp;<span class="constructor">Astring</span>.<span class="constructor">String</span>.<span class="constructor">Map</span>.t)<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Repo</span>.<span class="constructor">Map</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Private</span>.engine<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;listen&nbsp;:<br>
@@ -161,8 +159,6 @@
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.manager&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.t&nbsp;option<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;cancel&nbsp;:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;(unit,&nbsp;string)&nbsp;<span class="constructor">Pervasives</span>.result&nbsp;<span class="constructor">Lwt</span>.t<br>
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;read_log&nbsp;:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.t&nbsp;<span class="keywordsign">-&gt;</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.saved&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.or_error&nbsp;<span class="constructor">Lwt</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;read_log&nbsp;:&nbsp;<span class="constructor">DK</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.saved&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;string&nbsp;<span class="constructor">DK</span>.or_error&nbsp;<span class="constructor">Lwt</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;rebuild&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.saved&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Lwt</span>.t<br>
 <span class="keyword">end</span></code></body></html>

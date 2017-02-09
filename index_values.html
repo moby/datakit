@@ -18,8 +18,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Index of values</title>
 </head>
 <body>
@@ -77,11 +75,6 @@
       and returns when the connection has beenn closed.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.State.html#VALadd_webhooks">add_webhooks</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">add_webhooks&nbsp;t&nbsp;rs</code> adds webhooks for the repositories <code class="code">rs</code>.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_github.Capabilities.html#VALall">all</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
 <td><div class="info">
 <code class="code">all</code> is the capability to do everything.
@@ -97,12 +90,6 @@
 <td><div class="info">
 <code class="code">any&nbsp;l</code> is the ACL granting access to an user iff there is at
       least one ACL in <code class="code">l</code> granting access to that user.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.State.html#VALapply">apply</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">apply&nbsp;token&nbsp;d</code> applies the snapshot diff <code class="code">d</code> as a series of
-      GitHub API calls, using the token <code class="code">token</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Diff.html#VALapply">apply</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
@@ -159,11 +146,6 @@ The name of the DataKit branch on which to store the result for
 <td></td></tr>
 <tr><td><a href="Datakit_ci.Utils.html#VALcancel_when_off">cancel_when_off</a> [<a href="Datakit_ci.Utils.html">Datakit_ci.Utils</a>]</td>
 <td></td></tr>
-<tr><td><a href="Datakit_github.State.html#VALcapabilities">capabilities</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">capabilities&nbsp;t</code> is the token <code class="code">t</code>'s capabilities.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_ci.Term.html#VALcatch">catch</a> [<a href="Datakit_ci.Term.html">Datakit_ci.Term</a>]</td>
 <td><div class="info">
 <code class="code">catch&nbsp;x</code> successfully returns a result showing whether <code class="code">x</code>
@@ -221,6 +203,11 @@ The name of the DataKit branch on which to store the result for
 <td><div class="info">
 <code class="code">closed&nbsp;t</code> is true if <code class="code">t</code> is closed and thus it is not valid
         to read/write on it anymore.
+</div>
+</td></tr>
+<tr><td><a href="Datakit_ci.Docker.html#VALcommand">command</a> [<a href="Datakit_ci.Docker.html">Datakit_ci.Docker</a>]</td>
+<td><div class="info">
+<code class="code">create&nbsp;~logs&nbsp;~pool&nbsp;~timeout&nbsp;~label&nbsp;args</code> is a cache of Docker run results.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_ci.Git.html#VALcommand">command</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
@@ -630,11 +617,6 @@ Errors
 </td></tr>
 <tr><td><a href="Vfs.File.html#VALerr_read_only">err_read_only</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td></td></tr>
-<tr><td><a href="Datakit_S.CLIENT.html#VALerror">error</a> [<a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a>]</td>
-<td><div class="info">
-<code class="code">error</code> raises user-defined errors.
-</div>
-</td></tr>
 <tr><td><a href="Vfs.html#VALerror">error</a> [<a href="Vfs.html">Vfs</a>]</td>
 <td><div class="info">
 <code class="code">error&nbsp;fmt</code> is <code class="code"><span class="constructor">Lwt</span>.return&nbsp;(<span class="constructor">Error</span>&nbsp;&lt;fmt&gt;)</code>.
@@ -714,6 +696,8 @@ Errors
       <code class="code">t</code>.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Capabilities.html#VALfilter_elt">filter_elt</a> [<a href="Datakit_github.Capabilities.html">Datakit_github.Capabilities</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_ci.Cache.Make.html#VALfind">find</a> [<a href="Datakit_ci.Cache.Make.html">Datakit_ci.Cache.Make</a>]</td>
 <td><div class="info">
 <code class="code">find&nbsp;t&nbsp;key</code> is the terms which evaluates to the result of
@@ -819,18 +803,6 @@ Look up a sub-directory node.
 <tr><td><a href="Datakit_S.CLIENT.Commit.html#VALid">id</a> [<a href="Datakit_S.CLIENT.Commit.html">Datakit_S.CLIENT.Commit</a>]</td>
 <td><div class="info">
 <code class="code">id&nbsp;t</code> is the unique ID of this commit.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.State.html#VALimport">import</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">import&nbsp;token&nbsp;t&nbsp;r</code> imports the state of GitHub for the elements
-      in <code class="code">r</code> into <code class="code">t</code>.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github.State.html#VALimport_webhook_events">import_webhook_events</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">import_webhook_events&nbsp;t&nbsp;~events&nbsp;s</code> applies <code class="code">events&nbsp;()</code> on top
-      of <code class="code">s</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_github.Ref.html#VALindex">index</a> [<a href="Datakit_github.Ref.html">Datakit_github.Ref</a>]</td>
@@ -1092,6 +1064,11 @@ A unique name for this builder.
 <td></td></tr>
 <tr><td><a href="Datakit_github.Elt.IdSet.html#VALof_prs">of_prs</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
 <td></td></tr>
+<tr><td><a href="Datakit_ci.Docker.Image.html#VALof_published">of_published</a> [<a href="Datakit_ci.Docker.Image.html">Datakit_ci.Docker.Image</a>]</td>
+<td><div class="info">
+<code class="code">of_published&nbsp;name</code> refers to the image <code class="code">name</code> (as published on Docker Hub or similar).
+</div>
+</td></tr>
 <tr><td><a href="Datakit_github.Event.html#VALof_ref">of_ref</a> [<a href="Datakit_github.Event.html">Datakit_github.Event</a>]</td>
 <td></td></tr>
 <tr><td><a href="Datakit_github.Elt.IdSet.html#VALof_refs">of_refs</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
@@ -1413,6 +1390,10 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <code class="code">prs&nbsp;t</code> are <code class="code">t</code>'s pull-requests.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Elt.IdSet.html#VALprs">prs</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Elt.Set.html#VALprs">prs</a> [<a href="Datakit_github.Elt.Set.html">Datakit_github.Elt.Set</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Snapshot.html#VALprune">prune</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
 <td><div class="info">
 <code class="code">prune&nbsp;t</code> is <code class="code">t</code> where all the objects related to closed PRs
@@ -1488,6 +1469,10 @@ Converts a path of the form <code class="code"><span class="string">"a/b/c"</spa
 <code class="code">refs&nbsp;t</code> are <code class="code">t</code>'s Git references.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Elt.IdSet.html#VALrefs">refs</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
+<td></td></tr>
+<tr><td><a href="Datakit_github.Elt.Set.html#VALrefs">refs</a> [<a href="Datakit_github.Elt.Set.html">Datakit_github.Elt.Set</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Diff.html#VALremove">remove</a> [<a href="Datakit_github.Diff.html">Datakit_github.Diff</a>]</td>
 <td><div class="info">
 <code class="code">remove&nbsp;d</code> are the elements in <code class="code">d</code> which needs to be deleted.
@@ -1608,6 +1593,8 @@ The list of watched repository.
 <code class="code">repos&nbsp;t</code> are <code class="code">t</code>'s repository.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Elt.IdSet.html#VALrepos">repos</a> [<a href="Datakit_github.Elt.IdSet.html">Datakit_github.Elt.IdSet</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_github.Ref.Set.html#VALrepos">repos</a> [<a href="Datakit_github.Ref.Set.html">Datakit_github.Ref.Set</a>]</td>
 <td></td></tr>
 <tr><td><a href="Datakit_github.Status.Set.html#VALrepos">repos</a> [<a href="Datakit_github.Status.Set.html">Datakit_github.Status.Set</a>]</td>
@@ -1628,10 +1615,9 @@ The list of watched repository.
 <code class="code">ro_of_string&nbsp;s</code> is the static file containing <code class="code">s</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github_vfs.Make.html#VALroot">root</a> [<a href="Datakit_github_vfs.Make.html">Datakit_github_vfs.Make</a>]</td>
+<tr><td><a href="Datakit_ci.Docker.html#VALrun">run</a> [<a href="Datakit_ci.Docker.html">Datakit_ci.Docker</a>]</td>
 <td><div class="info">
-<code class="code">root&nbsp;token</code> is the root of the virtual filesystem in which
-      GitHub API calls are replaced by filesystem accesses.
+<code class="code">run&nbsp;command&nbsp;image</code> runs "docker run image command-args".
 </div>
 </td></tr>
 <tr><td><a href="Datakit_ci.Git.html#VALrun">run</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
@@ -1789,6 +1775,8 @@ Convert a branch, which may update while we read it, to a fixed
 <code class="code">status&nbsp;t</code> are <code class="code">t</code>'s build status.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Elt.Set.html#VALstatus">status</a> [<a href="Datakit_github.Elt.Set.html">Datakit_github.Elt.Set</a>]</td>
+<td></td></tr>
 <tr><td><a href="Vfs.File.html#VALstatus">status</a> [<a href="Vfs.File.html">Vfs.File</a>]</td>
 <td><div class="info">
 <code class="code">status&nbsp;f</code> is the file containing the result of <code class="code">f</code>.
@@ -1844,14 +1832,6 @@ Convert to a string, in the same format as <code class="code">pp</code>.
 <tr><td><a href="Ivfs_blob.html#VALto_string">to_string</a> [<a href="Ivfs_blob.html">Ivfs_blob</a>]</td>
 <td><div class="info">
 <code class="code">to_string&nbsp;t</code> is a string containing the same data as <code class="code">t</code>.
-</div>
-</td></tr>
-<tr><td><a href="Datakit_github_api.html#VALtoken">token</a> [<a href="Datakit_github_api.html">Datakit_github_api</a>]</td>
-<td></td></tr>
-<tr><td><a href="Datakit_github.State.html#VALtoken">token</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">token&nbsp;t&nbsp;c</code> is the token using the GitHub API token <code class="code">t</code> limited
-      by the capabilities <code class="code">c</code>.
 </div>
 </td></tr>
 <tr><td><a href="Datakit_S.CLIENT.Branch.html#VALtransaction">transaction</a> [<a href="Datakit_S.CLIENT.Branch.html">Datakit_S.CLIENT.Branch</a>]</td>
@@ -2021,11 +2001,6 @@ Build results are stored in this directory
 <code class="code">watch&nbsp;t&nbsp;r</code> makes <code class="code">t</code> watch the repo <code class="code">r</code>.
 </div>
 </td></tr>
-<tr><td><a href="Datakit_github.State.html#VALwith_capabilities">with_capabilities</a> [<a href="Datakit_github.State.html">Datakit_github.State</a>]</td>
-<td><div class="info">
-<code class="code">with_capabilities&nbsp;c&nbsp;t</code> is <code class="code">t</code> with the capabilities <code class="code">c</code>.
-</div>
-</td></tr>
 <tr><td><a href="Datakit_ci.Git.html#VALwith_checkout">with_checkout</a> [<a href="Datakit_ci.Git.html">Datakit_ci.Git</a>]</td>
 <td><div class="info">
 <code class="code">with_checkout&nbsp;~log&nbsp;~job_id&nbsp;commit&nbsp;fn</code> is <code class="code">fn&nbsp;path</code>, where <code class="code">path</code>
@@ -2055,6 +2030,8 @@ Build results are stored in this directory
       elements.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALwith_events">with_events</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_ci.Live_log.html#VALwith_pending_reason">with_pending_reason</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
 <td><div class="info">
 <code class="code">with_pending_reason&nbsp;t&nbsp;msg&nbsp;fn</code> calls <code class="code">fn&nbsp;()</code>.
@@ -2094,6 +2071,8 @@ Build results are stored in this directory
       not link to its logs.
 </div>
 </td></tr>
+<tr><td><a href="Datakit_github.Snapshot.html#VALwithout_repos">without_repos</a> [<a href="Datakit_github.Snapshot.html">Datakit_github.Snapshot</a>]</td>
+<td></td></tr>
 <tr><td><a href="Datakit_ci.Live_log.html#VALwrite">write</a> [<a href="Datakit_ci.Live_log.html">Datakit_ci.Live_log</a>]</td>
 <td><div class="info">
 <code class="code">write&nbsp;t&nbsp;msg</code> appends <code class="code">msg</code> to the log.

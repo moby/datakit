@@ -22,8 +22,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="GitHub snapshot" rel="Section" href="#1_GitHubsnapshot">
 <link title="Diffs" rel="Section" href="#1_Diffs">
 <link title="Elements" rel="Section" href="#1_Elements">
@@ -124,6 +122,8 @@ The type for snapshot diffs.<br>
       elements.<br>
 </div>
 
+<pre><span id="VALwithout_repos"><span class="keyword">val</span> without_repos</span> : <code class="type">Datakit_github.Repo.Set.t -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre>
+<pre><span id="VALwith_events"><span class="keyword">val</span> with_events</span> : <code class="type"><a href="Datakit_github.Event.html#TYPEt">Datakit_github.Event.t</a> list -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> <a href="Datakit_github.Snapshot.html#TYPEt">t</a></code></pre>
 <pre><span id="VALfind"><span class="keyword">val</span> find</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEid">Datakit_github.Elt.id</a> -><br>       <a href="Datakit_github.Snapshot.html#TYPEt">t</a> -> <a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> option</code></pre><div class="info ">
 <code class="code">find&nbsp;id&nbsp;t</code> finds the element with ID <code class="code">id</code> in <code class="code">t</code>.<br>
 </div>

@@ -5,7 +5,7 @@
 <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="Start" href="index.html">
-<link rel="previous" href="Datakit_github_vfs.html">
+<link rel="previous" href="Datakit_github.html">
 <link rel="Up" href="index.html">
 <link title="Index of types" rel=Appendix href="index_types.html">
 <link title="Index of values" rel=Appendix href="index_values.html">
@@ -21,8 +21,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="Core" rel="Section" href="#core">
 <link title="Extensions" rel="Section" href="#extensions">
 <link title="Cache" rel="Section" href="#cache">
@@ -30,7 +28,7 @@
 <title>Datakit_ci</title>
 </head>
 <body>
-<div class="navbar"><a class="pre" href="Datakit_github_vfs.html" title="Datakit_github_vfs">Previous</a>
+<div class="navbar"><a class="pre" href="Datakit_github.html" title="Datakit_github">Previous</a>
 &nbsp;<a class="up" href="index.html" title="Index">Up</a>
 &nbsp;</div>
 <h1>Module <a href="type_Datakit_ci.html">Datakit_ci</a></h1>
@@ -61,7 +59,7 @@ Datakit CI
 <br>
 <h1 id="core">Core</h1><br>
 
-<pre><span class="keyword">module</span> <a href="Datakit_ci.DK.html">DK</a>: <code class="type"><a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></code><code class="type">  with type error = Protocol_9p_error.error</code></pre><div class="info">
+<pre><span class="keyword">module</span> <a href="Datakit_ci.DK.html">DK</a>: <code class="type"><a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></code><code class="type"> </code></pre><div class="info">
 Datakit client library.
 </div>
 
@@ -79,7 +77,7 @@ Datakit client library.
 <td align="left" valign="top" >
 <code>&nbsp;&nbsp;</code></td>
 <td align="left" valign="top" >
-<code><span id="TYPEELTstatus.output">output</span>&nbsp;: <code class="type"><a href="Datakit_ci.Output.html#TYPEt">Output.t</a></code>;</code></td>
+<code><span id="TYPEELTstatus.output">output</span>&nbsp;: <code class="type"><a href="Datakit_ci.Output.html#TYPElogs">Output.logs</a></code>;</code></td>
 
 </tr></table>
 }
@@ -88,7 +86,7 @@ Datakit client library.
 The type for term status. It is a mix between the usual error
     monad, but where we also keep a local log for every
     computation. Morever, computation can be long-running, so there is
-    a new <code class="code"><span class="keywordsign">`</span><span class="constructor">Pending</span></code> state and a continuation to run when the term
+    a new <code class="code"><span class="keywordsign">`</span><span class="constructor">Pending</span></code> state with an indication of when the term is
     complete.<br>
 </div>
 

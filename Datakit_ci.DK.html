@@ -21,8 +21,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.DK</title>
 </head>
 <body>
@@ -31,7 +29,7 @@
 </div>
 <h1>Module <a href="type_Datakit_ci.DK.html">Datakit_ci.DK</a></h1>
 
-<pre><span class="keyword">module</span> DK: <code class="type"><a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></code><code class="type">  with type error = Protocol_9p_error.error</code></pre><div class="info module top">
+<pre><span class="keyword">module</span> DK: <code class="type"><a href="Datakit_S.CLIENT.html">Datakit_S.CLIENT</a></code><code class="type"> </code></pre><div class="info module top">
 Datakit client library.<br>
 </div>
 <hr width="100%">
@@ -42,7 +40,10 @@ A <code class="code">t</code> is a connection to a Datakit server.<br>
 </div>
 
 
-<pre><span id="TYPEerror"><span class="keyword">type</span> <code class="type"></code>error</span> </pre>
+<pre><span id="TYPEerror"><span class="keyword">type</span> <code class="type"></code>error</span> = private <code class="type">[> `Already_exists<br>        | `Does_not_exist<br>        | `Is_dir<br>        | `Not_dir<br>        | `Not_file<br>        | `Not_symlink ]</code> </pre>
+<div class="info ">
+Attempt to use a non-symlink as a symlink<br>
+</div>
 
 
 <pre><span id="VALpp_error"><span class="keyword">val</span> pp_error</span> : <code class="type"><a href="Datakit_S.CLIENT.html#TYPEerror">error</a> Fmt.t</code></pre><div class="info ">
@@ -51,10 +52,6 @@ A <code class="code">t</code> is a connection to a Datakit server.<br>
 
 <pre><span id="TYPEor_error"><span class="keyword">type</span> <code class="type">'a</code> or_error</span> = <code class="type">('a, <a href="Datakit_S.CLIENT.html#TYPEerror">error</a>) Result.result</code> </pre>
 
-
-<pre><span id="VALerror"><span class="keyword">val</span> error</span> : <code class="type">('a, unit, string, 'b <a href="Datakit_S.CLIENT.html#TYPEor_error">or_error</a> Lwt.t) Pervasives.format4 -><br>       'a</code></pre><div class="info ">
-<code class="code">error</code> raises user-defined errors.<br>
-</div>
 
 <pre><span class="keyword">module</span> <a href="Datakit_S.CLIENT.Tree.html">Tree</a>: <code class="type"><a href="Datakit_S.READABLE_TREE.html">Datakit_S.READABLE_TREE</a></code><code class="type">  with type 'a or_error := 'a or_error</code></pre><div class="info">
 A read-only tree of files, directories and symlinks.

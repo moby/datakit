@@ -21,8 +21,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_github.Elt.Set</title>
 </head>
 <body>
@@ -31,8 +29,10 @@
 </div>
 <h1>Module <a href="type_Datakit_github.Elt.Set.html">Datakit_github.Elt.Set</a></h1>
 
-<pre><span class="keyword">module</span> Set: <code class="type"><a href="Datakit_github.SET.html">Datakit_github.SET</a></code><code class="type">  with type elt = t</code></pre><hr width="100%">
+<pre><span class="keyword">module</span> Set: <code class="code"><span class="keyword">sig</span></code> <a href="Datakit_github.Elt.Set.html">..</a> <code class="code"><span class="keyword">end</span></code></pre><hr width="100%">
 
-<pre><span class="keyword">include</span> Asetmap.Set.S</pre>
+<pre><span class="keyword">include</span> <a href="Datakit_github.SET.html">Datakit_github.SET</a></pre>
 
-<pre><span id="VALpp"><span class="keyword">val</span> pp</span> : <code class="type">t Fmt.t</code></pre></body></html>
+<pre><span id="VALprs"><span class="keyword">val</span> prs</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> -> Datakit_github.PR.Set.t</code></pre>
+<pre><span id="VALrefs"><span class="keyword">val</span> refs</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> -> Datakit_github.Ref.Set.t</code></pre>
+<pre><span id="VALstatus"><span class="keyword">val</span> status</span> : <code class="type"><a href="Datakit_github.Elt.html#TYPEt">Datakit_github.Elt.t</a> -> Datakit_github.Status.Set.t</code></pre></body></html>

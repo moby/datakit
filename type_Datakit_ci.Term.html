@@ -17,8 +17,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Term</title>
 </head>
 <body>
@@ -68,7 +66,7 @@
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;wait_for_all&nbsp;:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;(string&nbsp;*&nbsp;<span class="keywordsign">'</span>a&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t)&nbsp;list&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;unit&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;job_id&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.job_id&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
-&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;dk&nbsp;:&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">DK</span>.t&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
+&nbsp;&nbsp;<span class="keyword">val</span>&nbsp;dk&nbsp;:&nbsp;(unit&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">DK</span>.t&nbsp;<span class="constructor">Lwt</span>.t)&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;target&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.v&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;head&nbsp;:&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Target</span>.t&nbsp;<span class="keywordsign">-&gt;</span>&nbsp;<span class="constructor">Datakit_github</span>.<span class="constructor">Commit</span>.t&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Term</span>.t<br>
 &nbsp;&nbsp;<span class="keyword">val</span>&nbsp;branch_head&nbsp;:<br>

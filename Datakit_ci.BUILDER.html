@@ -20,8 +20,6 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><link title="Builder" rel="Section" href="#1_Builder">
 <title>Datakit_ci.BUILDER</title>
 </head>
@@ -70,7 +68,7 @@ A unique name for this builder. This is used for metric
       the pending state and as the title of the log.<br>
 </div>
 
-<pre><span id="VALgenerate"><span class="keyword">val</span> generate</span> : <code class="type"><a href="Datakit_ci.BUILDER.html#TYPEt">t</a> -><br>       switch:Lwt_switch.t -><br>       log:<a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -><br>       Datakit_ci.DK.Transaction.t -><br>       <a href="Datakit_ci.BUILDER.html#TYPEcontext">context</a> -><br>       <a href="Datakit_ci.BUILDER.Key.html#TYPEt">Key.t</a> -><br>       (<a href="Datakit_ci.BUILDER.html#TYPEvalue">value</a>, [ `Failure of string ]) Pervasives.result Lwt.t</code></pre><div class="info ">
+<pre><span id="VALgenerate"><span class="keyword">val</span> generate</span> : <code class="type"><a href="Datakit_ci.BUILDER.html#TYPEt">t</a> -><br>       switch:Lwt_switch.t -><br>       log:<a href="Datakit_ci.Live_log.html#TYPEt">Datakit_ci.Live_log.t</a> -><br>       DK.Transaction.t -><br>       <a href="Datakit_ci.BUILDER.html#TYPEcontext">context</a> -><br>       <a href="Datakit_ci.BUILDER.Key.html#TYPEt">Key.t</a> -><br>       (<a href="Datakit_ci.BUILDER.html#TYPEvalue">value</a>, [ `Failure of string ]) Pervasives.result Lwt.t</code></pre><div class="info ">
 <code class="code">generate&nbsp;t&nbsp;~log&nbsp;trans&nbsp;ctx&nbsp;key</code> generates the value for <code class="code">key</code>
       and stores it in <code class="code">trans</code> under the "value" directory. It is
       called when the value is not in the cache, or when a rebuild has
@@ -80,7 +78,7 @@ A unique name for this builder. This is used for metric
       then it is caught and treated as an error result.<br>
 </div>
 
-<pre><span id="VALload"><span class="keyword">val</span> load</span> : <code class="type"><a href="Datakit_ci.BUILDER.html#TYPEt">t</a> -><br>       Datakit_ci.DK.Tree.t -><br>       <a href="Datakit_ci.BUILDER.Key.html#TYPEt">Key.t</a> -> <a href="Datakit_ci.BUILDER.html#TYPEvalue">value</a> Lwt.t</code></pre><div class="info ">
+<pre><span id="VALload"><span class="keyword">val</span> load</span> : <code class="type"><a href="Datakit_ci.BUILDER.html#TYPEt">t</a> -><br>       DK.Tree.t -> <a href="Datakit_ci.BUILDER.Key.html#TYPEt">Key.t</a> -> <a href="Datakit_ci.BUILDER.html#TYPEvalue">value</a> Lwt.t</code></pre><div class="info ">
 <code class="code">load&nbsp;t&nbsp;tr&nbsp;key</code> is the value <code class="code">v</code> previously saved by
       <code class="code">generate</code>.<br>
 </div>

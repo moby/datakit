@@ -17,16 +17,14 @@
 <link title="Ivfs_remote" rel="Chapter" href="Ivfs_remote.html">
 <link title="Ivfs_blob" rel="Chapter" href="Ivfs_blob.html">
 <link title="Datakit_github" rel="Chapter" href="Datakit_github.html">
-<link title="Datakit_github_api" rel="Chapter" href="Datakit_github_api.html">
-<link title="Datakit_github_vfs" rel="Chapter" href="Datakit_github_vfs.html">
 <link title="Datakit_ci" rel="Chapter" href="Datakit_ci.html"><title>Datakit_ci.Output</title>
 </head>
 <body>
 <code class="code"><span class="keyword">sig</span><br>
 &nbsp;&nbsp;<span class="keyword">type</span>&nbsp;saved<br>
-&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;t&nbsp;=<br>
+&nbsp;&nbsp;<span class="keyword">type</span>&nbsp;logs&nbsp;=<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="constructor">Empty</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Live</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Live_log</span>.t<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Saved</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.saved<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Pair</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.t&nbsp;*&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.t<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keywordsign">|</span>&nbsp;<span class="constructor">Pair</span>&nbsp;<span class="keyword">of</span>&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.logs&nbsp;*&nbsp;<span class="constructor">Datakit_ci</span>.<span class="constructor">Output</span>.logs<br>
 <span class="keyword">end</span></code></body></html>

@@ -8,11 +8,11 @@ RUN opam init -y
 RUN opam install ocaml -y
 RUN opam install depext -y
 
-RUN opam pin add -yn datakit-client https://github.com/docker/datakit.git && \
+RUN opam pin add -yn datakit-client.dev https://github.com/docker/datakit.git && \
     opam pin add -yn github --dev && \
-    opam pin add -yn datakit-github https://github.com/talex5/datakit.git#split-prometheus && \
-    opam pin add -yn datakit-server https://github.com/talex5/datakit.git#split-prometheus && \
-    opam pin add -yn datakit https://github.com/talex5/datakit.git#split-prometheus
+    opam pin add -yn datakit-github.dev https://github.com/talex5/datakit.git#split-prometheus && \
+    opam pin add -yn datakit-server.dev https://github.com/talex5/datakit.git#split-prometheus && \
+    opam pin add -yn datakit.dev https://github.com/talex5/datakit.git#split-prometheus
 
 ADD datakit-ci.opam /tmp/deps/opam
 RUN opam pin add -y tmp /tmp/deps/opam -n
@@ -21,10 +21,10 @@ RUN opam install --deps-only tmp -y
 
 ADD . /home/opam/datakit
 RUN sudo chown opam /home/opam/datakit
-RUN opam pin add -k git datakit-client /home/opam/datakit -y
-RUN opam pin add -k git datakit-ci /home/opam/datakit -y
+RUN opam pin add -k git datakit-client.dev /home/opam/datakit -y
+RUN opam pin add -k git datakit-ci.dev /home/opam/datakit -y
 
 # Needed if we decide to run the tests
-RUN opam pin add -k git datakit-github /home/opam/datakit -yn
+RUN opam pin add -k git datakit-github.dev /home/opam/datakit -yn
 
 VOLUME /secrets

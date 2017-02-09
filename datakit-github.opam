@@ -22,5 +22,5 @@ depends: [
   "logs"
   "fmt"
   "result"
-  "datakit-client" {>= "0.7.0"}
+  "datakit-client" {>= "0.9.0"}
 ]

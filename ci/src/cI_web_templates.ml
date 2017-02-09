@@ -277,6 +277,10 @@ let page ?logs page_title active children t ~user =
       div ~a:[a_class ["container"]] [
         div ~a:[a_class ["content"]] children;
       ];
+      script ~a:[a_mime_type "text/javascript"; a_src "/js/ci.js"] (pcdata "");
+      script ~a:[a_mime_type "text/javascript";
+                 a_src "https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"] (pcdata "");
+      script ~a:[a_mime_type "text/javascript"; a_src "/js/bootstrap.min.js"] (pcdata "");
     ]
   in
   let body =
@@ -301,7 +305,6 @@ let page ?logs page_title active children t ~user =
         meta ~a:[a_http_equiv "X-UA-Compatible"; a_content "IE=edge"] ();
         meta ~a:[a_name "viewport"; a_content "width=device-width, initial-scale=1"] ();
         link ~rel:[`Icon] ~a:[a_mime_type "image/png"] ~href:"/images/favicon.png" ();
-        script ~a:[a_mime_type "text/javascript"; a_src "/js/ci.js"] (pcdata "");
         link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
         link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
       ])

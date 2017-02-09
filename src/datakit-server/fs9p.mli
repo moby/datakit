@@ -14,4 +14,4 @@ module type S = sig
 end
 
 (** Server builder. *)
-module Make (Flow: V1_LWT.FLOW): S with type flow = Flow.flow
+module Make (Flow: Mirage_flow_lwt.S): S with type flow = Flow.flow

@@ -22,8 +22,9 @@ depends: [
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.9.3"}
   "mirage-tc" "uri"
-  "mirage-types" {< "3.0.0"}
+  "mirage-types" {>= "3.0.0"}
   "irmin"       {>= "0.12.0"}
+  "irmin-http"  {>= "1.0.0"}
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result"

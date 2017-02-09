@@ -317,17 +317,13 @@ module Status = struct
       compare_state;
     ]
 
-  let pp_opt k ppf v = match v with
-    | None   -> ()
-    | Some v -> k ppf v
-
   let map f = function None -> None | Some v -> Some (f v)
 
   let pp ppf t =
     Fmt.pf ppf "%a/%a[%a%a%a]"
       Commit.pp (commit t) pp_path t.context Status_state.pp t.state
-      (pp_opt Fmt.string) (map Uri.to_string t.url)
-      (pp_opt @@ Fmt.fmt "%S") t.description
+      Fmt.(option string) (map Uri.to_string t.url)
+      Fmt.(option @@ fmt "%S") t.description
 
   let pp_id ppf (c, s) = Fmt.pf ppf "%a/%a" Commit.pp c pp_path s
 

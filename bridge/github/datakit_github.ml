@@ -131,9 +131,9 @@ module Commit = struct
 
   type t = { repo: Repo.t; hash : string }
 
-  let v repo hash = {repo; hash = String.trim hash }
-  let pp ppf t = Fmt.pf ppf "{%a %s}" Repo.pp t.repo t.hash
   let pp_hash f h = Fmt.string f (String.with_range ~len:6 h)
+  let v repo hash = {repo; hash = String.trim hash }
+  let pp ppf t = Fmt.pf ppf "%a/commit/%a" Repo.pp t.repo pp_hash t.hash
   let hash t = t.hash
   let repo t = t.repo
   let compare_repo x y = Repo.compare x.repo y.repo
@@ -204,10 +204,12 @@ module PR = struct
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %d[%s] %s %a %S}"
-      Repo.pp (repo t) t.number (commit_hash t) t.base pp_state t.state t.title
+    Fmt.pf ppf "%a/pr/%d[%a %s %a %S]"
+      Repo.pp (repo t) t.number
+      Commit.pp_hash (commit_hash t)
+      t.base pp_state t.state t.title
 
-  let pp_id ppf (r, n) = Fmt.pf ppf "{%a %d}" Repo.pp r n
+  let pp_id ppf (r, n) = Fmt.pf ppf "%a/pr/%d" Repo.pp r n
 
   let compare_id =
     let compare_repo x y = Repo.compare (fst x) (fst y) in
@@ -317,19 +319,17 @@ module Status = struct
 
   let pp_opt k ppf v = match v with
     | None   -> ()
-    | Some v -> Fmt.pf ppf " %s=%s" k v
+    | Some v -> k ppf v
 
   let map f = function None -> None | Some v -> Some (f v)
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %s:%a[%a]%a%a}"
-      Repo.pp (repo t) (commit_hash t)
-      pp_path t.context
-      Status_state.pp t.state
-      (pp_opt "url") (map Uri.to_string t.url)
-      (pp_opt "descr") t.description
+    Fmt.pf ppf "%a/%a[%a%a%a]"
+      Commit.pp (commit t) pp_path t.context Status_state.pp t.state
+      (pp_opt Fmt.string) (map Uri.to_string t.url)
+      (pp_opt @@ Fmt.fmt "%S") t.description
 
-  let pp_id ppf (c, s) = Fmt.pf ppf "{%a %a}" Commit.pp c pp_path s
+  let pp_id ppf (c, s) = Fmt.pf ppf "%a/%a" Commit.pp c pp_path s
 
   let compare_id =
     let compare_commit x y = Commit.compare (fst x) (fst y) in
@@ -400,9 +400,9 @@ module Ref = struct
   let pp_name = pp_path
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %a[%s]}" Repo.pp (repo t) pp_path t.name (commit_hash t)
+    Fmt.pf ppf "%a/ref/%a[%s]" Repo.pp (repo t) pp_path t.name (commit_hash t)
 
-  let pp_id ppf (r, p) = Fmt.pf ppf "{%a %a}" Repo.pp r pp_path p
+  let pp_id ppf (r, p) = Fmt.pf ppf "%a/ref/%a" Repo.pp r pp_path p
 
   let compare_id =
     let compare_repo x y = Repo.compare (fst x) (fst y) in
@@ -465,11 +465,11 @@ module Event = struct
   let of_other x y = Other (x, y)
 
   let pp ppf = function
-    | Repo(s,r) -> Fmt.pf ppf "Repo: %a%a" Repo.pp_state s Repo.pp r
-    | PR pr     -> Fmt.pf ppf "PR: %a" PR.pp pr
-    | Status s  -> Fmt.pf ppf "Status: %a" Status.pp s
-    | Ref r     -> Fmt.pf ppf "Ref: %a" Ref.pp_event r
-    | Other o   -> Fmt.pf ppf "Other: %s" @@ snd o
+    | Repo(s,r) -> Fmt.pf ppf "%a%a" Repo.pp_state s Repo.pp r
+    | PR pr     -> Fmt.pf ppf "%a" PR.pp pr
+    | Status s  -> Fmt.pf ppf "%a" Status.pp s
+    | Ref r     -> Fmt.pf ppf "%a" Ref.pp_event r
+    | Other o   -> Fmt.pf ppf "other/%s" @@ snd o
 
   let repo = function
     | Repo r   -> snd r

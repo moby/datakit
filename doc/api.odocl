@@ -10,8 +10,6 @@ src/datakit/Ivfs_tree
 src/datakit/Ivfs_remote
 src/datakit/Ivfs_blob
 
-bridge/github/Datakit_github
-bridge/github/Datakit_github_api
-bridge/github/Datakit_github_vfs
+src/datakit-github/Datakit_github
 
 ci/src/Datakit_ci

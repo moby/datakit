@@ -15,7 +15,7 @@ let ok x = Lwt.return (Ok x)
 
 module Make (API: API) (DK: Datakit_S.CLIENT) = struct
 
-  module State = Datakit_github.State(API)
+  module State = Datakit_github_state.Make(API)
   module Conv  = Datakit_github_conv.Make(DK)
 
   (*              [bridge]     [datakit]

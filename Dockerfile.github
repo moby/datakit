@@ -1,10 +1,13 @@
 FROM docker/datakit:server
 
 COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
+COPY datakit-bridge-github.opam /home/opam/src/datakit/datakit-bridge-github.opam
+
 RUN opam pin add github --dev -n
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
-RUN opam depext datakit-github && opam install datakit-github --deps
+RUN opam pin add datakit-bridge-github.dev /home/opam/src/datakit -n
+RUN opam depext datakit-bridge-github && opam install datakit-bridge-github --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
@@ -13,16 +16,16 @@ RUN cd /home/opam/src/datakit && \
     git checkout . && scripts/watermark.sh && \
     git status --porcelain
 
-RUN opam update datakit-github
-RUN opam install datakit-github -vv -y
+RUN opam update datakit-bridge-github
+RUN opam install datakit-bridge-github -vv -y
 
 EXPOSE 5641
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
-    sudo cp $(opam config exec -- which datakit-github) /usr/bin/
+    sudo cp $(opam config exec -- which datakit-bridge-github) /usr/bin/
 
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 
 USER root
-ENTRYPOINT ["/usr/bin/datakit-github"]
+ENTRYPOINT ["/usr/bin/datakit-bridge-github"]
 CMD ["--listen=tcp://0.0.0.0:5641", "-v", "--datakit=tcp:127.0.0.1:5640"]

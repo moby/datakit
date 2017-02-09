@@ -9,7 +9,7 @@ dev-repo:     "https://github.com/docker/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
 build: [
-  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" "datakit-client"
+  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" name
 ]
 
 depends: [

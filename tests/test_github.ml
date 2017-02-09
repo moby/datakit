@@ -1,7 +1,6 @@
 open Astring
 open Test_utils
 open Lwt.Infix
-(*open Datakit_github*)
 open Datakit_path.Infix
 open Datakit_github
 
@@ -572,7 +571,7 @@ module API = struct
 end
 
 module Bridge = Datakit_github_sync.Make(API)(DK)
-module State = Datakit_github.State(API)
+module State = Datakit_github_state.Make(API)
 
 let user = "test"
 let repo = "test"
@@ -1793,3 +1792,8 @@ let test_set = [
   "random-datakit"  , `Quick, runx (test_random_datakit ~quick:true);
   "random-datakit-*", `Slow , runx (test_random_datakit ~quick:false);
 ]
+
+let () =
+  Alcotest.run "datakit-github" [
+    "github" , test_set;
+  ]

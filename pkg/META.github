@@ -1,30 +1,8 @@
 description = "Use Datakit to interact with the GitHub API"
 version = "%%VERSION%%"
-requires = "github.unix github-hooks.unix lwt.unix datakit-github.client datakit-github.server prometheus-app"
+requires = "astring cstruct datakit-client fmt logs uri asetmap"
 archive(byte)   = "datakit-github.cma"
 archive(native) = "datakit-github.cmxa"
 plugin(byte)    = "datakit-github.cma"
 plugin(native)  = "datakit-github.cmxs"
 exists_if       = "datakit-github.cma"
-
-package "client" (
-  description = "Client abstraction for the GitHub API, using datakit"
-  version = "%%VERSION%%"
-  requires = "astring cstruct datakit-client fmt logs result rresult uri asetmap"
-  archive(byte)   = "datakit-github-client.cma"
-  archive(native) = "datakit-github-client.cmxa"
-  plugin(byte)    = "datakit-github-client.cma"
-  plugin(native)  = "datakit-github-client.cmxs"
-  exists_if       = "datakit-github-client.cma"
-)
-
-package "server" (
-  description = "Server abstraction for the GitHub API, using datakit"
-  version = "%%VERSION%%"
-  requires = "datakit-server.vfs datakit-github.client"
-  archive(byte)   = "datakit-github-server.cma"
-  archive(native) = "datakit-github-server.cmxa"
-  plugin(byte)    = "datakit-github-server.cma"
-  plugin(native)  = "datakit-github-server.cmxs"
-  exists_if       = "datakit-github-server.cma"
-)

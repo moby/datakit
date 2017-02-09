@@ -6,47 +6,61 @@ open Topkg
 let includes = function
   | "datakit-ci" -> ["ci"]
   | "datakit" -> ["src"; "src/datakit"]
-  | "datakit-server" -> ["src"; "src/datakit-server"]
-  | "datakit-github" -> ["src"; "src/datakit"]
-  | "datakit-bridge-local-git" -> ["bridge/local"]
   | "datakit-client" -> ["src"; "src/datakit-client"]
+  | "datakit-server" -> ["src"; "src/datakit-server"]
+  | "datakit-github" -> ["src/datakit"]
+  | "datakit-bridge-local-git" -> ["bridge/local"]
+  | "datakit-bridge-github"    -> ["src"; "bridge/github"]
+  | x -> failwith ("Unknown includes for package: " ^ x)
+
+
+let extra_deps c =
+  let tests = Conf.build_tests c in
+  match Conf.pkg_name c with
+  | "datakit-ci" -> []
+  | "datakit" ->
+    ["datakit-server.vfs"; "datakit-server.fs9p"]
+    @ if tests then ["datakit-client"] else []
+  | "datakit-client" -> []
+  | "datakit-server" -> []
+  | "datakit-github" -> ["datakit-client"]
+  | "datakit-bridge-local-git" -> ["datakit-github"; "datakit-client"]
+  | "datakit-bridge-github"    ->
+    ["datakit-client"; "datakit-server.vfs"; "datakit-server.fs9p";
+     "datakit-github"] @ if tests then ["datakit.ivfs"] else []
   | x -> failwith ("Unknown includes for package: " ^ x)
 
 let build =
-  let build_with_visible_warnings c os =
-    let ocamlbuild = Conf.tool "ocamlbuild" os in
-    let build_dir = Conf.build_dir c in
-    let debug = Cmd.(on (Conf.debug c) (v "-tag" % "debug")) in
-    let profile = Cmd.(on (Conf.profile c) (v "-tag" % "profile")) in
-    let includes =
-      match includes (Conf.pkg_name c) with
+  let cmd c os =
+    let includes = match includes (Conf.pkg_name c) with
       | [] -> Cmd.empty
       | is -> Cmd.(v "-Is" % String.concat "," is)
     in
-    Cmd.(ocamlbuild % "-use-ocamlfind" %% debug %% profile %% includes % "-build-dir" % build_dir)
+    let extra_deps = match extra_deps c with
+      | [] -> Cmd.empty
+      | ed -> Cmd.(v "-package" % String.concat "," ed)
+    in
+    Cmd.(Pkg.build_cmd c os %% includes %% extra_deps)
   in
-  let cmd c os files =
-    OS.Cmd.run @@ Cmd.(build_with_visible_warnings c os %% of_list files)
-  in
+  let cmd c os files = OS.Cmd.run @@ Cmd.(cmd c os %% of_list files) in
   Pkg.build ~cmd ()
 
-let metas = [
-  Pkg.meta_file ~install:false "pkg/META";
-  Pkg.meta_file ~install:false "pkg/META.client";
-  Pkg.meta_file ~install:false "pkg/META.server";
-  Pkg.meta_file ~install:false "pkg/META.github";
-  Pkg.meta_file ~install:false "pkg/META.ci";
-]
+let metas = List.map (Pkg.meta_file ~install:false) [
+    "pkg/META";
+    "pkg/META.client";
+    "pkg/META.server";
+    "pkg/META.github";
+    "pkg/META.ci";
+  ]
 
-let opams =
-  let lint_deps_excluding = None in
-  let install = false in
-  [
-    Pkg.opam_file "opam" ~lint_deps_excluding ~install;
-    Pkg.opam_file "datakit-client.opam" ~lint_deps_excluding ~install;
-    Pkg.opam_file "datakit-server.opam" ~lint_deps_excluding ~install;
-    Pkg.opam_file "datakit-github.opam" ~lint_deps_excluding ~install;
-    Pkg.opam_file "datakit-ci.opam" ~lint_deps_excluding ~install;
+let opams = List.map (Pkg.opam_file ~lint_deps_excluding:None ~install:false) [
+    "opam";
+    "datakit-client.opam";
+    "datakit-server.opam";
+    "datakit-github.opam";
+    "datakit-ci.opam";
+    "datakit-bridge-github.opam";
+    "datakit-bridge-local-git.opam"
   ]
 
 let () =
@@ -78,16 +92,14 @@ let () =
   | "datakit-github" -> Ok [
       Pkg.lib   "pkg/META.github"     ~dst:"META";
       Pkg.lib   "datakit-github.opam" ~dst:"opam";
-      Pkg.mllib "bridge/github/datakit-github.mllib";
-      Pkg.mllib "bridge/github/datakit-github-client.mllib";
-      Pkg.mllib "bridge/github/datakit-github-server.mllib";
-      Pkg.bin   "bridge/github/main" ~dst:"datakit-github" ;
+      Pkg.mllib "src/datakit-github/datakit-github.mllib";
     ]
   | "datakit-bridge-local-git" -> Ok [
-      Pkg.lib   "pkg/META.bridge-local-git"     ~dst:"META";
-      Pkg.lib   "datakit-bridge-local-git.opam" ~dst:"opam";
-      Pkg.mllib "bridge/local/datakit-bridge-local-git.mllib";
       Pkg.bin   "bridge/local/main" ~dst:"datakit-bridge-local-git" ;
+    ]
+  | "datakit-bridge-github" -> Ok [
+      Pkg.bin   "bridge/github/main" ~dst:"datakit-bridge-github";
+      Pkg.test  "tests/test_github" ~args:(Cmd.v "-q");
     ]
   | "datakit-ci" -> Ok [
       Pkg.lib   "pkg/META.ci"     ~dst:"META";

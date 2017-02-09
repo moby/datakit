@@ -1,8 +1,0 @@
-description = "Local alternative to datakit-github (for testing)"
-version = "%%VERSION%%"
-requires = "lwt.unix datakit-github.client"
-archive(byte)   = "datakit-bridge-local-git.cma"
-archive(native) = "datakit-bridge-local-git.cmxa"
-plugin(byte)    = "datakit-bridge-local-git.cma"
-plugin(native)  = "datakit-bridge-local-git.cmxs"
-exists_if       = "datakit-bridge-local-git.cma"

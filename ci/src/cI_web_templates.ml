@@ -1,7 +1,6 @@
 open Datakit_github
 open! Astring
 open! Tyxml.Html
-open CI_s
 
 type t = {
   name : string;
@@ -111,20 +110,18 @@ let dash_map f map targets =
 
 let status state =
   let colour, icon, status =
-    match state.status with
-    | `Pending -> "label-warning", "glyphicon-hourglass", "Pending"
+    match state with
     | `Success -> "label-success", "glyphicon-ok","Success"
-    | `Error -> "label-danger", "glyphicon-warning-sign", "Error"
+    | `Pending -> "label-warning", "glyphicon-hourglass", "Pending"
     | `Failure -> "label-danger", "glyphicon-remove", "Failure"
   in
   span ~a:[a_class ["label"; colour;]] [span ~a:[a_class ["glyphicon"; icon]] []; pcdata status]
 
-let status_flag ?label status =
+let status_flag ?label stat =
   let cl, icon, status =
-    match status with
-    | `Pending -> "label-warning", "glyphicon-hourglass", "pending"
+    match stat with
     | `Success -> "label-success", "glyphicon-ok","success"
-    | `Error -> "label-danger", "glyphicon-warning-sign", "error"
+    | `Pending -> "label-warning", "glyphicon-hourglass", "pending"
     | `Failure -> "label-danger", "glyphicon-remove", "failure"
   in
   let tooltip =
@@ -140,40 +137,39 @@ let status_list jobs =
       jobs |> List.map (fun job ->
           let state = CI_engine.state job in
           let label = CI_engine.job_name job in
-          td [status_flag ~label state.status];
+          td [status_flag ~label (CI_output.status state)];
         )
     )
   ]
 
 let summarise jobs =
-  let states = List.map (fun j -> CI_engine.job_name j, CI_engine.state j) jobs in
-  let combine status states =
+  let outputs = List.map (fun j -> CI_engine.job_name j, CI_engine.state j) jobs in
+  let combine status outputs =
     let results = ref String.Map.empty in
-    states |> List.iter (fun (name, state) ->
-        let descr = state.descr in
+    outputs |> List.iter (fun (name, output) ->
+        let descr = CI_output.descr output in
         let old_names = String.Map.find descr !results |> CI_utils.default [] in
         results := String.Map.add descr (name :: old_names) !results
       );
     let results = String.Map.bindings !results in
     let pp_group f (descr, g) = Fmt.pf f "%s (%a)" descr (Fmt.(list ~sep:(const string ", ") Fmt.string)) (List.rev g) in
     let descr = Fmt.strf "%a" Fmt.(list ~sep:(const string "; ") pp_group) results in
-    { status; descr; logs = CI_output.Empty }
+    CI_result.v status descr
   in
-  let pending, states = List.partition (fun (_, x) -> x.status = `Pending) states in
+  let pending, outputs = List.partition (fun (_, s) -> CI_output.status s = `Pending) outputs in
   if pending <> [] then combine `Pending pending
   else (
-    let failed, states = List.partition (fun (_, x) -> x.status = `Failure) states in
+    let failed, outputs = List.partition (fun (_, s) -> CI_output.status s = `Failure) outputs in
     if failed <> [] then combine `Failure failed
-    else combine `Success states
+    else combine `Success outputs
   )
 
 let dashboard_widget (_repo, id) ref =
   let state = CI_engine.jobs ref |> summarise in
   let cls, icon, status, comment =
-    match state.status with
-    | `Pending -> "dashboard-pending", "glyphicon-hourglass", "Pending", "... WAITING ..."
+    match CI_result.status state with
     | `Success -> "dashboard-success", "glyphicon-ok", "Succeeding", "YAY! The build is fine... Nothing to see here..."
-    | `Error -> "dashboard-error", "glyphicon-warning-sign", "Erroring", "OH NO! Something has gone terribly wrong"
+    | `Pending -> "dashboard-pending", "glyphicon-hourglass", "Pending", "... WAITING ..."
     | `Failure -> "dashboard-failure", "glyphicon-remove", "Failing", "SOUND THE ALARM!!! The build has been broken!"
   in
   let title = match id with
@@ -197,7 +193,7 @@ let ref_job (_repo, id) ref =
       tr [
         td [a ~a:[a_href ref_url] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
         td [status_list jobs];
-        td [pcdata summary.descr];
+        td [pcdata (CI_result.descr summary)];
       ]
     ]
 
@@ -212,7 +208,7 @@ let pr_job (_repo, id) open_pr =
         td [a ~a:[a_href pr_url] [pcdata (string_of_int id)]];
         td [pcdata (CI_engine.title open_pr)];
         td [status_list jobs];
-        td [pcdata summary.descr];
+        td [pcdata (CI_result.descr summary)];
       ]
     ]
 
@@ -589,11 +585,11 @@ let score_logs ~best job =
     | Saved saved -> LogScore.update best (`Saved saved);
     | Pair (a, b) -> aux a; aux b
   in
-  aux (CI_engine.state job).logs
+  aux (CI_engine.state job |> CI_output.logs)
 
 let logs ~csrf_token ~page_url ~selected state =
   let open CI_output in
-  let logs = state.logs in
+  let logs = CI_output.logs state in
   let last_title = ref None in
   let seen = ref String.Set.empty in
   let selected_branch =
@@ -657,15 +653,18 @@ let logs ~csrf_token ~page_url ~selected state =
   let items = aux logs in
   (* Don't show the overall status if it's the same as the last log title. *)
   match !last_title with
-  | Some shown when shown = state.descr -> items
-  | _ -> items @ [p [status_flag state.status; pcdata state.descr]]
+  | Some shown when shown = CI_output.descr state -> items
+  | _ ->
+    let status = CI_output.status state in
+    let descr = CI_output.descr state in
+    items @ [p [status_flag status; pcdata descr]]
 
 let job_row ~csrf_token ~page_url ~best_log job =
   let state = CI_engine.state job in
   let job_name = CI_engine.job_name job in
   tr [
     th [pcdata job_name];
-    td [status state];
+    td [status (CI_output.status state)];
     td (
       logs ~csrf_token ~page_url ~selected:best_log (CI_engine.state job)
     );

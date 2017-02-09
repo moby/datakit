@@ -83,22 +83,21 @@ module Output: sig
   type saved
 
   (** The type for {!term}'s output. *)
-  type t =
+  type logs =
     | Empty
     | Live of Live_log.t
     | Saved of saved
-    | Pair of t * t
-
+    | Pair of logs * logs
 end
 
 type 'a status = {
   result: ('a, [`Pending of string * unit Lwt.t | `Failure of string]) result;
-  output: Output.t;
+  output: Output.logs;
 }
 (** The type for term status. It is a mix between the usual error
     monad, but where we also keep a local log for every
     computation. Morever, computation can be long-running, so there is
-    a new [`Pending] state and a continuation to run when the term
+    a new [`Pending] state with an indication of when the term is
     complete. *)
 
 type job_id

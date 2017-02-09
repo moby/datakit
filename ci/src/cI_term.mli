@@ -18,4 +18,4 @@ val run :
   job_id:CI_s.job_id ->
   recalc:(unit -> unit) ->
   dk:(unit -> CI_utils.DK.t Lwt.t) ->
-  'a t -> ('a CI_result.t * CI_output.t) Lwt.t * (unit -> unit)
+  'a t -> ('a CI_result.t * CI_output.logs) Lwt.t * (unit -> unit)

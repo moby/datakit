@@ -8,7 +8,7 @@ module Make (C: CI_s.CONTEXT) = struct
   type context = C.t
   type 'a key = C.t -> 'a
 
-  type 'a t = C.t -> ('a or_error * L.t) Lwt.t
+  type 'a t = C.t -> ('a or_error * L.logs) Lwt.t
 
   let return x _ = Lwt.return (Ok x, L.Empty)
 

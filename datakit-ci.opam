@@ -20,8 +20,8 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "multipart-form-data"
-  "datakit-client"
-  "datakit-github"
+  "datakit-client" {>= "0.9.0"}
+  "datakit-github" {>= "0.9.0"}
   "protocol-9p" {>= "0.8.0"}
   "astring"
   "cmdliner"

@@ -38,8 +38,8 @@ depends: [
   "mtime"
   "irmin-watcher" {>= "0.2.0"}
   "prometheus-app"
-  "datakit-server" {>= "0.8.0"}
-  "datakit-client" {test & >= "0.8.0"}
+  "datakit-server" {>= "0.9.0"}
+  "datakit-client" {test & >= "0.9.0"}
   "datakit-github" {test & >= "0.9.0"}
   "alcotest"       {test & >= "0.7.0"}
 ]

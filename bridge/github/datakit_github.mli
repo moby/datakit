@@ -514,6 +514,19 @@ module Diff: sig
   val with_remove: Elt.id -> t -> t
   (** [with_remove e d] is [d] augmented with the removal of [e]. *)
 
+  type id = [
+    | `Repo of Repo.t
+    | `Commit of Commit.t
+    | `PR of PR.id
+    | `Ref of Ref.id
+  ]
+  (** The type for diff IDs .*)
+
+  module Index: MAP with type key = id
+
+  val index: t -> t Index.t
+  (** [index diff] indexes a diff by IDs. *)
+
 end
 
 

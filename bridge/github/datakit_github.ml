@@ -919,22 +919,84 @@ module Diff = struct
 
   let pp = Snapshot.pp_diff
 
+  type id = [
+    | `Repo of Repo.t
+    | `Commit of Commit.t
+    | `PR of PR.id
+    | `Ref of Ref.id
+  ]
+
+  module Index = Map(struct
+      type t = id
+      let compare (x:t) (y:t) = Elt.compare_id (x :> Elt.id) (y :> Elt.id)
+      let pp ppf (x:t) = Elt.pp_id ppf (x :> Elt.id)
+    end)
+
+  let index t =
+    let find id index = match Index.find id index with
+      | None   -> empty
+      | Some x -> x
+    in
+    let update (e:Elt.t) index =
+      let id = match e with
+        | `Repo _ | `Commit _ as e -> e
+        | `PR pr    -> `PR (PR.id pr)
+        | `Ref r    -> `Ref (Ref.id r)
+        | `Status s -> `Commit (Status.commit s)
+    in
+    let v = find id index in
+    Index.add id { v with update = Elt.Set.add e v.update } index
+    in
+    let remove (e:Elt.id) index =
+      let id = match e with
+        | `Repo _ | `Commit _ | `PR _ | `Ref _ as e -> e
+        | `Status (c,_) -> `Commit c
+      in
+      let v = find id index in
+      Index.add id { v with remove = Elt.IdSet.add e v.remove } index
+    in
+    Index.empty
+    |> Elt.Set.fold update t.update
+    |> Elt.IdSet.fold remove t.remove
+
   let commit_message t =
-    let updates = Elt.Set.cardinal t.update in
-    let removes = Elt.IdSet.cardinal t.remove in
-    if updates = 0 && removes = 0 then Fmt.strf "No changes!"
-    else if updates = 0 && removes = 1 then
-      Fmt.strf "1 item removed@;@;@[<2>%a@]" Elt.IdSet.pp t.remove
-    else if updates = 0 && removes > 1 then
-      Fmt.strf "%d items removed@;@;@[<2>%a@]" removes Elt.IdSet.pp t.remove
-    else if removes = 0 && updates = 1 then
-      Fmt.strf "1 item updated@;@;@[<2>%a@]" Elt.Set.pp t.update
-    else if removes = 0 && updates > 1 then
-      Fmt.strf "%d items updated@;@;@[<2>%a@]" updates Elt.Set.pp t.update
+    let index = index t in
+    if Index.cardinal index = 1 then
+      let id, _ = match Index.choose index with
+        | None   -> assert false
+        | Some x -> x
+      in
+      match id with
+      | `Repo r   -> Fmt.strf "Repository %a changed" Repo.pp r
+      | `Commit c -> Fmt.strf "Commit %a changed" Commit.pp c
+      | `PR pr    -> Fmt.strf "Pull-request %a changed" PR.pp_id pr
+      | `Ref r    -> Fmt.strf "Reference %a changed" Ref.pp_id r
     else
-      Fmt.strf "%d items modified@;@;@[Updated@;<2>%a@]@;@;\
-                @[Removed@;<2>%a@]"
-        (updates+removes) Elt.Set.pp t.update Elt.IdSet.pp t.remove
+      let repos = Index.fold (fun k _ repos ->
+          match k with
+          | `Repo r | `PR (r, _) | `Ref (r, _) -> Repo.Set.add r repos
+          | `Commit c -> Repo.Set.add (Commit.repo c) repos
+        ) index Repo.Set.empty
+      in
+      match Repo.Set.cardinal repos with
+      | 0 -> "No changes!"
+      | 1 ->
+        let r = match Repo.Set.choose repos with
+          | None -> assert false
+          | Some r -> r
+        in
+        Fmt.strf "Repository %a changed" Repo.pp r
+      | _ ->
+        let repos = Repo.Set.elements repos in
+        let repos = List.rev_map (Fmt.to_to_string Repo.pp) repos in
+        let repos = List.mapi (fun i r -> match i with
+            | 0 -> r
+            | 1 -> r ^ " and "
+            | _ -> r ^ ", "
+          ) repos
+        in
+        let repos = List.rev repos in
+        Fmt.strf "Repositories %s changed" (String.concat ~sep:"" repos)
 
   let is_empty t = Elt.IdSet.is_empty t.remove && Elt.Set.is_empty t.update
   let with_update s t = { t with update = Elt.Set.add s t.update }

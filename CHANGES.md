@@ -1,21 +1,32 @@
 ### 0.9.0 (2017-02-03)
 
-**prometheus** (new)
-
-- prometheus: split prometheus into its own opam package
-  (#438, @talex5 and @avsm)
-
 **datakit-local-git** (new)
 
-- local-git: add local git bridge (#458, @talex5)
+- bridge-local-git: add local git bridge (#458, @talex5)
 
 Normally, we use datakit-github to monitor the state of a remote
 repository on GitHub and use that as the input to the CI. When getting
 started with DataKitCI it is more convenient to be able to monitor a
 local Git repository.
 
+**datakit-bridge-github** (new)
+
+- bridge-github: split the `datakit-github` package into 2: `datakit-github`
+  (see next section) and `datakit-bridge-github` which match
+  `datakit-bridge-local-git` (#480, @samoht)
+- bridge-github: do not commit empty changes (#397, @samoht)
+- bridge-github: use an unlimited number of fids and walk in parallel to speeds-up
+  init time massively (#401, @samoht)
+- bridge-github: enable Prometheus monitoring (#452, @talex5)
+
+**datakit-github**
+
+- github: standalone library which just defines `Datakit_github`, an abstract
+  representation of the GitHub types and API (#480, @samoht)
+
 **datakit-ci**
 
+- ci: split prometheus into its own opam package (#438, @talex5 and @avsm)
 - ci: add Redis-backed web sessions (#393, @talex5)
 - ci: don't copy command output to stdout (#394, @talex5)
 - ci: fetch each GitHub user's security information at login  (#398, @talex5)
@@ -44,13 +55,6 @@ local Git repository.
 - ci: add Docker.run (#462, @talex5)
 - ci: evaluate terms in parallel (#464, @talex5)
 - ci: add ANSI escape sequence parser for coloured logs (#466, @talex5)
-
-**datakit-github**
-
-- github: do not commit empty changes (#397, @samoht)
-- github: use an unlimited number of fids and walk in parallel to speeds-up
-  init time massively (#401, @samoht)
-- github: enable Prometheus monitoring (#452, @talex5)
 
 **datakit-client**
 

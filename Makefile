@@ -75,3 +75,22 @@ exe:
 	mkdir -p $(EXE)
 	cp _build/src/datakit/main.native $(EXE)/datakit.exe
 	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)
+
+REPO=../opam-repository
+PACKAGES=$(REPO)/packages
+
+# until we have https://github.com/ocaml/opam-publish/issues/38
+pkg-%:
+	topkg opam pkg -n $*
+	mkdir -p $(PACKAGES)/$*
+	cp -r _build/$*.* $(PACKAGES)/$*/
+	cd $(PACKAGES) && git add $*
+
+opam-pkg:
+	$(MAKE) pkg-datakit
+	$(MAKE) pkg-datakit-client
+	$(MAKE) pkg-datakit-server
+	$(MAKE) pkg-datakit-ci
+	$(MAKE) pkg-datakit-github
+	$(MAKE) pkg-datakit-bridge-github
+	$(MAKE) pkg-datakit-bridge-local-git

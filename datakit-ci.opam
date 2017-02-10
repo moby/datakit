@@ -37,7 +37,7 @@ depends: [
   "session" {>= "0.3.0"}
   "redis"
   "asetmap"
-  "github"
+  "github" {>= "2.2.0"}
   "prometheus-app"
   "lwt" {>= "2.7.0"}
   "ppx_sexp_conv" {build}

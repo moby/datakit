@@ -17,7 +17,9 @@ depends: [
   "ocamlbuild" {build}
   "topkg"      {build}
   "base-bytes"
-  "astring" "logs" "uri" "rresult" "cstruct" "fmt"
+  "astring" "logs" "uri" "rresult" "fmt"
+  "cstruct" {>= "2.2.0"}
   "protocol-9p" {>= "0.7.4"}
-  "sexplib" "mirage-types-lwt"
+  "sexplib"
+  "mirage-types-lwt" {< "3.0.0"}
 ]

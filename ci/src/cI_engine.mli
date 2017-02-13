@@ -37,13 +37,16 @@ val prs: t -> target PR.Index.t Repo.Map.t
 val refs: t -> target Ref.Index.t Repo.Map.t
 (** [targets t] is a snapshot of the current state of all branches. *)
 
+val latest_state : t -> target -> CI_history.commit option Lwt.t
+(** [latest_state t target] is the current state of [target]. *)
+
 val jobs : target -> job list
 (** [jobs t] is the list of jobs for a target. *)
 
 val job_name : job -> string
 (** [job_name j] is the name of the GitHub status that this job computes. *)
 
-val state : job -> string CI_output.t
+val state : job -> string CI_output.t option
 (** [state job] is the current state of [job]. *)
 
 val target : target -> CI_target.v

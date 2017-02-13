@@ -45,7 +45,9 @@ type job = {
   term_lock : Lwt_mutex.t;         (* Held while evaluating term *)
   mutable term : string CI_term.t;
   mutable cancel : unit -> unit;   (* Cancel the previous evaluation, if any *)
-  mutable state : string * string CI_output.t;  (* The last result of evaluating [term] (commit, state) *)
+
+  mutable state : string * string CI_output.t option;
+  (* The last result of evaluating [term] (src_commit, history_commit) *)
 }
 and target = {
   mutable v : CI_target.v;
@@ -94,8 +96,9 @@ type t = {
   web_ui : Uri.t;
   connect_dk : unit -> DK.t Lwt.t;
   projects : project Repo.Map.t;
+  history : CI_history.t;
   mutable dk : DK.t Lwt.t;
-  mutable snapshot : DK.Tree.t option;
+  mutable snapshot : DK.Commit.t option;
 }
 
 let dk t = t.dk
@@ -152,6 +155,7 @@ let create ~web_ui ?canaries connect_dk projects =
     connect_dk;
     dk;
     projects;
+    history = CI_history.create ();
     snapshot = None;
   }
 
@@ -192,7 +196,7 @@ let monitor t ?switch fn =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.wait_for_head metadata ?switch (function
       | None   -> ok `Again
-      | Some c -> fn (DK.Commit.tree c) >>= fun () -> ok `Again
+      | Some c -> fn c >>= fun () -> ok `Again
     )
   >|*= function
   | `Abort -> `Abort
@@ -270,7 +274,7 @@ let rec recalculate t job =
   Lwt.catch
     (fun () ->
        let r, cancel =
-         CI_term.run ~snapshot ~job_id:(job_id job) ~recalc ~dk:(fun () -> t.dk)
+         CI_term.run ~snapshot:(DK.Commit.tree snapshot) ~job_id:(job_id job) ~recalc ~dk:(fun () -> t.dk)
            job.term
        in
        job.cancel <- cancel;
@@ -284,38 +288,34 @@ let rec recalculate t job =
     )
   >>= fun new_output ->
   let (old_head, old_output) = job.state in
+  t.dk >>= fun dk ->
+  CI_history.lookup t.history dk job.parent.v >>= fun history ->
+  CI_history.record history dk job.name snapshot new_output >>= fun () ->
   let new_hash = Commit.hash (CI_target.head head) in
-  let old_result = CI_output.result old_output in
   let new_result = CI_output.result new_output in
-  begin if (old_head, old_result) <> (new_hash, new_result) then (
-      set_status t head job.name new_result
-    ) else (
-      Lwt.return ()
-    )
+  begin match old_output with
+  | Some old_commit when (old_head, CI_output.result old_commit) = (new_hash, new_result) -> Lwt.return ()
+  | _ -> set_status t head job.name new_result
   end >|= fun () ->
-  job.state <- (new_hash, new_output)
+  job.state <- (new_hash, Some new_output)
 
 let make_job t ~parent name term =
-  let snapshot = snapshot t in
   let head_commit = CI_target.head parent.v in
-  let id = head_commit, datakit_ci name in
-  Conv.status snapshot id >|= fun status ->
-  let state = match status with None -> None | Some s -> Some (Status.state s) in
-  let descr = match status with None -> None | Some s -> Status.description s in
-  let result =
-    match state, descr with
-    | Some `Error, Some descr -> CI_result.v `Failure descr
-    | Some (`Pending | `Success | `Failure as status), Some descr -> CI_result.v status descr
-    | _ -> Error (`Pending "(new)")
+  t.dk >>= fun dk ->
+  CI_history.lookup t.history dk parent.v >>= fun history ->
+  let history =
+    match CI_history.head history with
+    | None -> None
+    | Some head -> String.Map.find name (CI_history.jobs head)
   in
-  let state = (result, CI_output.Empty) in
   let hash = Commit.hash head_commit in
-  { name;
+  Lwt.return {
+    name;
     parent;
     term_lock = Lwt_mutex.create ();
     term;
     cancel = ignore;
-    state = (hash, state);
+    state = (hash, history);
   }
 
 let apply_canaries canaries prs refs =
@@ -450,8 +450,9 @@ let listen ?switch t =
 
       t.projects |> Repo.Map.bindings |> Lwt_list.iter_p (fun (repo, project) ->
           Log.debug (fun f -> f "Monitor iter");
-          Conv.prs snapshot ~repos:(Repo.Set.singleton repo) >>= fun prs ->
-          Conv.refs snapshot ~repos:(Repo.Set.singleton repo) >>= fun refs ->
+          let snapshot_tree = DK.Commit.tree snapshot in
+          Conv.prs snapshot_tree ~repos:(Repo.Set.singleton repo) >>= fun prs ->
+          Conv.refs snapshot_tree ~repos:(Repo.Set.singleton repo) >>= fun refs ->
           let prs = match Repo.Map.find repo (PR.index prs) with
             | None   -> PR.Index.empty
             | Some i -> i
@@ -517,9 +518,10 @@ let rebuild t ~branch_name =
     | Live _ -> false
   in
   let check_job job =
-    let _, state = job.state in
-    if check_logs (CI_output.logs state) then
+    match job.state with
+    | _, Some state when check_logs (CI_output.logs state) ->
       jobs_needing_recalc := job :: !jobs_needing_recalc
+    | _ -> ()
   in
   let check_target target = List.iter check_job target.jobs in
   t.projects |> Repo.Map.iter (fun _ project ->
@@ -536,3 +538,7 @@ let targets_of_commit t repo c =
   match Repo.Map.find repo t.projects with
   | None -> []
   | Some p -> String.Map.find c p.targets_of_commit |> CI_utils.default []
+
+let latest_state t target =
+  t.dk >>= fun dk ->
+  CI_history.lookup t.history dk target.v >|= CI_history.head

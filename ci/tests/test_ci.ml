@@ -55,11 +55,11 @@ let test_simple conn =
   (* PinataCI adds a pending status *)
   wait_for ~commit:"123" "ci/datakit/test/state" "pending" >>= fun () ->
   Test_utils.assert_file hooks "user/project/commit/123/status/ci/datakit/test/description" "Waiting for ci/circleci status to appear" >>= fun () ->
-  with_handler ~logs "http://cirlce/build/50" ~pending:"CircleCI ready; enqueued pitfall job" (fun ~switch:_ _log ->
+  with_handler ~logs "http://circle/build/50" ~pending:"CircleCI ready; enqueued pitfall job" (fun ~switch:_ _log ->
       (* A pending CircleCI build appears *)
       Test_utils.update_pr hooks ~message:"CircleCI pending" ~id:3907 ~head:"123" ~states:[
         "ci/circleci/state", "pending";
-        "ci/circleci/target_url", "http://cirlce/build/50";
+        "ci/circleci/target_url", "http://circle/build/50";
       ] >>= fun () ->
       wait_for ~commit:"123" "ci/datakit/test/description" ~old:"Waiting for ci/circleci status to appear" "Waiting for ci/circleci to complete" >>= fun () ->
       (* CircleCI finishes the build *)
@@ -72,6 +72,24 @@ let test_simple conn =
   >>= fun () ->
   (* PinataCI updates the status to success *)
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "success"
+  >>= fun () ->
+  DK.branch dk "status-user-project-pr-3907" >>*= DK.Branch.head >>*= function
+  | None -> Alcotest.fail "Missing status branch!"
+  | Some head ->
+    let tree = DK.Commit.tree head in
+    DK.Tree.read_file tree (Datakit_path.of_string_exn "test/output") >>*= fun data ->
+    Alcotest.check Test_utils.json "Status JSON" (
+      `Assoc [
+        "result", `Assoc [
+          "status", `String "success";
+          "descr", `String "Pitfall tests passed!";
+        ];
+        "logs", `Assoc [
+          "branch", `String "log-branch-for-http://circle/build/50";
+        ]
+      ]
+    ) (Yojson.Basic.from_string (Cstruct.to_string data));
+    Lwt.return ()
 
 let test_branch conn =
   Test_utils.with_ci conn Workflows.pass @@ fun ~logs ~switch dk with_handler ->

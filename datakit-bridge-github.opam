@@ -25,6 +25,7 @@ depends: [
   "lwt" {>= "2.7.0"}
   "datakit-github"
   "logs" "fmt" "mtime" "asl" "win-eventlog"
+  "uri" {>= "1.8.0"}
   "hvsock" {>= "0.8.1"}
   "hex" "nocrypto" "conduit"
   "prometheus-app"

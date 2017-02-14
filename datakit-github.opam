@@ -18,6 +18,7 @@ depends: [
   "topkg"      {build}
   "cmdliner"
   "lwt" {>= "2.7.0"}
+  "uri" {>= "1.8.0"}
   "asetmap"
   "logs"
   "fmt"

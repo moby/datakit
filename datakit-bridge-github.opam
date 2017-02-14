@@ -24,7 +24,8 @@ depends: [
   "cmdliner"
   "lwt" {>= "2.7.0"}
   "datakit-github"
-  "logs" "fmt" "mtime" "asl" "win-eventlog" "hvsock"
+  "logs" "fmt" "mtime" "asl" "win-eventlog"
+  "hvsock" {>= "0.8.1"}
   "hex" "nocrypto" "conduit"
   "prometheus-app"
   "protocol-9p" {>= "0.8.0"}

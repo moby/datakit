@@ -42,6 +42,9 @@ let state_repo_url t fmt =
   | Some base -> Fmt.strf "%a/%s" Uri.pp_hum base path
   | None -> Error.(uri_path no_state_repo)
 
+let status_history_url t target =
+  state_repo_url t "commits/%s" (CI_target.status_branch_v target)
+
 let log_commit_url t commit =
   state_repo_url t "commit/%s" commit
 
@@ -720,12 +723,17 @@ let rec intersperse sep = function
   | [x] -> [x]
   | x :: xs -> x :: sep :: intersperse sep xs
 
-let history_nav state =
-  let latest = span [pcdata " [ "; a ~a:[a_href "?"] [pcdata "latest"]; pcdata " ]"] in
+let history_nav t target state =
+  let history_link = status_history_url t target in
+  let links = [
+      pcdata " [ "; a ~a:[a_href "?"] [pcdata "latest"]; pcdata " | ";
+      a ~a:[a_href history_link] [pcdata "history"]; pcdata " ]";
+    ]
+  in
   match CI_history.parents state with
-  | [] -> p [pcdata "No previous states"; latest]
-  | [x] -> p [pcdata "Previous state: "; state_link x; latest]
-  | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ [latest])
+  | [] -> p (pcdata "No previous states" :: links)
+  | [x] -> p (pcdata "Previous state: " :: state_link x :: links)
+  | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
 
 let target_page ~csrf_token ~target state t =
   let jobs = CI_history.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
@@ -768,7 +776,7 @@ let target_page ~csrf_token ~target state t =
       a ~a:[a_href (commit_history_url t target)] [pcdata "status history for this head"];
       pcdata " ]";
     ]
-    :: history_nav state
+    :: history_nav t target state
     :: state_summary
   ) t
 

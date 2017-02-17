@@ -98,15 +98,10 @@ type t = {
   projects : project Repo.Map.t;
   history : CI_history.t;
   mutable dk : DK.t Lwt.t;
-  mutable snapshot : DK.Commit.t option;
+  recalculate : unit Lwt_condition.t;   (* Fires when [snapshot] changes or a rebuild is triggered. *)
 }
 
 let dk t = t.dk
-
-let snapshot t =
-  match t.snapshot with
-  | None -> CI_utils.failf "CI engine not yet initialised!"
-  | Some s -> s
 
 let rec connect connect_dk =
   Lwt.catch
@@ -156,7 +151,7 @@ let create ~web_ui ?canaries connect_dk projects =
     dk;
     projects;
     history = CI_history.create ();
-    snapshot = None;
+    recalculate = Lwt_condition.create ();
   }
 
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
@@ -258,17 +253,12 @@ let rec auto_restart t ?switch label fn =
            auto_restart t label fn
     )
 
-let rec recalculate t job =
+let recalculate t ~snapshot job =
   Log.debug (fun f -> f "Recalculate %a" pp_job job);
   (* Need to avoid either recalculating the same term twice at the same time,
      or doing a second calculation with an earlier snapshot. *)
   Lwt_mutex.with_lock job.term_lock @@ fun () ->
-  let snapshot = snapshot t in
-  let recalc () =
-    Lwt.async (fun () ->
-        recalculate t job
-      )
-  in
+  let recalc () = Lwt_condition.broadcast t.recalculate () in
   job.cancel ();        (* Stop any previous evaluation *)
   let head = job.parent.v in
   Lwt.catch
@@ -396,12 +386,11 @@ let index_targets ~prs ~refs =
   prs  |> PR.Index.iter  (fun id x -> add (Datakit_github.PR.commit x)  (`PR id));
   !targets_of_commit
 
-let listen ?switch t =
-  auto_restart t ?switch "monitor" @@ fun () ->
+(* A thread that rebuilds after [t.recalculate] is triggered. *)
+let recalc_loop t ~snapshot_ref =
   let pool_size = 50 in
   let pool = Pool.create pool_size in
-  Log.info (fun f -> f "Starting monitor loop");
-  let check_pr project (id, pr) =
+  let check_pr ~snapshot project (id, pr) =
     Log.debug (fun f -> f "Checking for work on %a" PR.pp_id id);
     begin match PR.Index.find id project.open_prs with
       | None ->
@@ -419,9 +408,9 @@ let listen ?switch t =
                                    XXX: so compare is very misleading here! *)
         Lwt.return open_pr
     end >>= fun open_pr ->
-    Lwt_list.iter_p (recalculate t) open_pr.jobs
+    Lwt_list.iter_p (recalculate t ~snapshot) open_pr.jobs
   in
-  let check_ref project (id, r) =
+  let check_ref ~snapshot project (id, r) =
     Log.debug (fun f -> f "Checking for work on %a" Ref.pp_id id);
     begin match Ref.Index.find id project.refs with
       | None ->
@@ -438,12 +427,15 @@ let listen ?switch t =
         target.v <- `Ref r;
         Lwt.return target
     end >>= fun target ->
-    Lwt_list.iter_p (recalculate t) target.jobs
+    Lwt_list.iter_p (recalculate t ~snapshot) target.jobs
   in
-  enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
-  monitor ?switch t (fun snapshot ->
-      t.snapshot <- Some snapshot;
-      Prometheus.Counter.inc_one Metrics.update_notifications;
+  let rec loop () =
+    let recalc_needed = Lwt_condition.wait t.recalculate in
+    match !snapshot_ref with
+    | None ->
+      Log.info (fun f -> f "recalc_thread got abort request");
+      Lwt.return `Abort
+    | Some snapshot ->
       let active_tags = ref 0 in
       let active_braches = ref 0 in
       let active_prs = ref 0 in
@@ -475,7 +467,7 @@ let listen ?switch t =
           project.open_prs <- PR.Index.filter is_current project.open_prs;
           PR.Index.bindings prs |> Pool.iter pool (fun pr ->
               incr active_prs;
-              check_pr project pr
+              check_pr ~snapshot project pr
             )
           >>= fun () ->
           (* Refs *)
@@ -490,37 +482,59 @@ let listen ?switch t =
           project.refs <- Ref.Index.filter is_current project.refs;
           Ref.Index.bindings refs |> Pool.iter pool (fun r ->
               if is_tag (fst r) then incr active_tags else incr active_braches;
-              check_ref project r
+              check_ref ~snapshot project r
             )
         )
       >>= fun () ->
       Metrics.set_active_targets `Tag !active_tags;
       Metrics.set_active_targets `Branch !active_braches;
       Metrics.set_active_targets `PR !active_prs;
-      Pool.wait pool
-    )
+      Pool.wait pool >>= fun () ->
+      (* Wait until something changes (which might already have happened) *)
+      recalc_needed >>= loop
+  in
+  loop ()
+
+let listen ?switch t =
+  Log.info (fun f -> f "Starting monitor loop");
+  let snapshot_ref = ref None in
+  let ready = Lwt_condition.wait t.recalculate in
+  let recalc_thread =
+    ready >>= fun () ->       (* Wait for [snapshot_ref] *)
+    auto_restart t ?switch "recalc" @@ fun () ->
+    recalc_loop t ~snapshot_ref in
+  enable_monitoring t (List.map fst (Repo.Map.bindings t.projects)) >>= fun () ->
+  let monitor_thread =
+    auto_restart t ?switch "monitor" @@ fun () ->
+    monitor ?switch t (fun snapshot ->
+        Prometheus.Counter.inc_one Metrics.update_notifications;
+        snapshot_ref := Some snapshot;
+        Lwt_condition.broadcast t.recalculate ();
+        Lwt.return ()
+      )
+    >>= fun `Abort ->
+    snapshot_ref := None;
+    Lwt_condition.broadcast t.recalculate ();    (* Ask [recalc_thread] to stop. *)
+    Log.info (fun f -> f "Monitor thread done; waiting for recalc_thread to finish");
+    recalc_thread
+  in
+  Lwt.choose [recalc_thread; monitor_thread]
 
 let rebuild t ~branch_name =
-  let jobs_needing_recalc = ref [] in
   let triggers = ref [] in
   let rec check_logs =
     let open CI_output in
     function
     | Saved {branch; rebuild; _} when branch = branch_name ->
-      if not (Lazy.is_val rebuild) then triggers := Lazy.force rebuild :: !triggers;
-      true
-    | Saved _ -> false
-    | Empty -> false
-    | Pair (a, b) ->
-      let a = check_logs a in
-      let b = check_logs b in
-      a || b
-    | Live _ -> false
+      if not (Lazy.is_val rebuild) then triggers := Lazy.force rebuild :: !triggers
+    | Pair (a, b) -> check_logs a; check_logs b
+    | Empty
+    | Saved _
+    | Live _ -> ()
   in
   let check_job job =
     match job.state with
-    | _, Some state when check_logs (CI_output.logs state) ->
-      jobs_needing_recalc := job :: !jobs_needing_recalc
+    | _, Some state -> check_logs (CI_output.logs state)
     | _ -> ()
   in
   let check_target target = List.iter check_job target.jobs in
@@ -528,11 +542,11 @@ let rebuild t ~branch_name =
       project.open_prs |> PR.Index.iter (fun _ x -> check_target x);
       project.refs |> Ref.Index.iter (fun _ x -> check_target x);
     );
-  match !triggers, !jobs_needing_recalc with
-  | [], [] -> CI_utils.failf "No job depends on %S, so can't rebuild anything" branch_name
-  | triggers, jobs_needing_recalc ->
-    Lwt.join triggers >>= fun () ->
-    Lwt_list.iter_s (recalculate t) jobs_needing_recalc
+  match !triggers with
+  | [] -> CI_utils.failf "No job depends on %S, so can't rebuild anything" branch_name
+  | triggers ->
+    Lwt.join triggers >|= fun () ->
+    Lwt_condition.broadcast t.recalculate ()
 
 let targets_of_commit t repo c =
   match Repo.Map.find repo t.projects with

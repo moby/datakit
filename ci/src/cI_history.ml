@@ -4,6 +4,8 @@ open Astring
 
 module DK = CI_utils.DK
 
+let metadata_commit_path = Datakit_path.of_string_exn "metadata-commit"
+
 type commit = {
   parents : string list;
   jobs : string CI_output.t String.Map.t;
@@ -37,14 +39,18 @@ let load commit =
   let tree = DK.Commit.tree commit in
   DK.Commit.parents commit >>*= fun parents ->
   let parents = List.map DK.Commit.id parents in
-  DK.Tree.read_dir tree Datakit_path.empty >>*=
-  Lwt_list.filter_map_p (fun job_name ->
-      let path = Datakit_path.of_steps_exn [job_name; "output"] in
-      DK.Tree.read_file tree path >|= function
-      | Ok data -> Some (job_name, Saved_output.of_cstruct data)
-      | Error `Does_not_exist -> None
-      | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
-    )
+  begin DK.Tree.read_dir tree (Datakit_path.of_steps_exn ["job"]) >>= function
+    | Ok items ->
+      items |> Lwt_list.filter_map_p (fun job_name ->
+          let path = Datakit_path.of_steps_exn ["job"; job_name; "output"] in
+          DK.Tree.read_file tree path >|= function
+          | Ok data -> Some (job_name, Saved_output.of_cstruct data)
+          | Error `Does_not_exist -> None
+          | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
+        )
+    | Error `Does_not_exist -> Lwt.return []
+    | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
+  end
   >>= fun jobs ->
   let jobs = String.Map.of_list jobs in
   Lwt.return { parents; jobs }
@@ -68,33 +74,64 @@ let lookup t dk target =
     >>= fun () ->
     Lwt.return target
 
-let record t dk job input output =
+let diff _id prev next =
+  match prev, next with
+  | Some prev, Some next when CI_output.equal prev next -> None
+  | _, Some next -> Some (`Write next)
+  | Some _, None -> Some `Delete
+  | None, None -> assert false
+
+let record t dk input jobs =
   Lwt_mutex.with_lock t.lock @@ fun () ->
   let state = t.commit |> CI_utils.default empty in
-  match String.Map.find job state.jobs with
-  | Some prev when CI_output.equal prev output -> Lwt.return ()
-  | _ ->
+  let patch = String.Map.merge diff state.jobs jobs in
+  if String.Map.is_empty patch then Lwt.return ()
+  else (
     let open! Datakit_path.Infix in
+    let messages = ref [] in
+    let add_msg fmt =
+      fmt |> Fmt.kstrf @@ fun msg ->
+      CI_utils.Log.info (fun f -> f "Record: %s" msg);
+      messages := msg :: !messages
+    in
     DK.branch dk t.branch_name >>*= fun branch ->
-    let dir = Datakit_path.of_steps_exn [job] in
     let metadata_commit = Cstruct.of_string (DK.Commit.id input) in
-    let json = CI_output.json_of output in
-    let data = Saved_output.to_cstruct json in
-    let message = Fmt.strf "%s -> %s" job (CI_output.descr output) in
     DK.Branch.with_transaction branch (fun tr ->
-        DK.Transaction.make_dirs tr dir >>*= fun () ->
-        DK.Transaction.create_or_replace_file tr (dir / "metadata-commit") metadata_commit >>*= fun () ->
-        DK.Transaction.create_or_replace_file tr (dir / "output") data >>*= fun () ->
+        DK.Transaction.create_or_replace_file tr metadata_commit_path metadata_commit >>*= fun () ->
+        String.Map.bindings patch |> Lwt_list.iter_s (function
+            | (job, `Delete) ->
+              let dir = Datakit_path.of_steps_exn ["job"; job] in
+              add_msg "Remove old job %s" job;
+              DK.Transaction.remove tr dir >>*= Lwt.return
+            | (job, `Write output) ->
+              let dir = Datakit_path.of_steps_exn ["job"; job] in
+              add_msg "%s -> %s" job (CI_output.descr output);
+              let json = CI_output.json_of output in
+              let data = Saved_output.to_cstruct json in
+              DK.Transaction.make_dirs tr dir >>*= fun () ->
+              DK.Transaction.create_or_replace_file tr (dir / "output") data >>*= Lwt.return
+          )
+        >>= fun () ->
         DK.Transaction.parents tr >>*= fun parents ->
-        DK.Transaction.commit tr ~message >>*= fun  () ->
+        begin match !messages with
+          | [message] ->
+            DK.Transaction.commit tr ~message
+          | ms ->
+            let message =
+              Fmt.strf "%d updates@.@.%a"
+                (List.length ms)
+                Fmt.(vbox (list ~sep:(const cut ()) string)) ms
+            in
+            DK.Transaction.commit tr ~message
+        end >>*= fun () ->
         let parents = List.map DK.Commit.id parents in
         Lwt.return (Ok parents)
       )
     >>*= fun parents ->
-    let jobs = String.Map.add job output state.jobs in
     let state = { jobs; parents } in
     t.commit <- Some state;
     Lwt.return ()
+  )
 
 let jobs c = c.jobs
 let parents c = c.parents

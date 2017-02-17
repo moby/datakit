@@ -239,11 +239,8 @@ let recalculate t ~snapshot job =
       | ex ->
         Lwt.return (Error (`Failure (Printexc.to_string ex)), CI_output.Empty)
     )
-  >>= fun new_output ->
+  >|= fun new_output ->
   let (old_head, old_output) = job.state in
-  t.dk >>= fun dk ->
-  CI_history.lookup t.history dk job.parent.v >>= fun history ->
-  CI_history.record history dk job.name snapshot new_output >|= fun () ->
   let new_hash = Commit.hash (CI_target.head head) in
   let new_result = CI_output.result new_output in
   job.state <- (new_hash, Some new_output);
@@ -375,7 +372,23 @@ let set_status t tr job =
     in
     Conv.update_elt tr (`Status status)
 
-let flush_states t =
+let flush_states t snapshot =
+  t.dk >>= fun dk ->
+  (* Update build histories *)
+  let record_target (_id, target) =
+    CI_history.lookup t.history dk target.v >>= fun history ->
+    let jobs = target.jobs |> List.map (fun j ->
+        match j.state with
+        | _, None -> assert false
+        | _, Some output -> j.name, output
+      ) in
+    CI_history.record history dk snapshot (String.Map.of_list jobs)
+  in
+  t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (_repo, project) ->
+      project.open_prs |> PR.Index.bindings |> Lwt_list.iter_s record_target >>= fun () ->
+      project.refs |> Ref.Index.bindings |> Lwt_list.iter_s record_target
+    )
+  >>= fun () ->
   (* Find targets that need to be flushed *)
   let dirty_targets = ref [] in
   let check_target _id target =
@@ -397,7 +410,6 @@ let flush_states t =
   in
   Lwt.catch
     (fun () ->
-       t.dk >>= fun dk ->
        DK.branch dk metadata_branch >>*= fun metadata ->
        DK.Branch.with_transaction metadata (fun tr ->
            dirty_targets |> Lwt_list.iter_s (fun (target, jobs) ->
@@ -417,7 +429,7 @@ let flush_states t =
              let message =
                Fmt.strf "%d updates@.@.%a"
                  (List.length ms)
-                 (Fmt.list ~sep:Fmt.(const cut ()) Fmt.string) ms
+                 Fmt.(vbox (list ~sep:(const cut ()) string)) ms
              in
              DK.Transaction.commit tr ~message
          )
@@ -545,7 +557,7 @@ let recalc_loop t ~snapshot_ref =
       Metrics.set_active_targets `Branch !active_braches;
       Metrics.set_active_targets `PR !active_prs;
       Pool.wait pool >>= fun () ->
-      flush_states t >>= fun () ->
+      flush_states t snapshot >>= fun () ->
       (* Wait until something changes (which might already have happened) *)
       recalc_needed >>= loop
   in

@@ -14,9 +14,9 @@ val create : unit -> t
 
 val lookup : t -> DK.t -> CI_target.v -> target Lwt.t
 
-val record : target -> DK.t -> string -> DK.Commit.t -> string CI_output.t -> unit Lwt.t
-(** [record target dk job input output] records [job/output] as a new commit of [target], and
-    records that it was calculated using metadata snapshot [input]. *)
+val record : target -> DK.t -> DK.Commit.t -> string CI_output.t String.Map.t -> unit Lwt.t
+(** [record target dk input jobs] records the new output of each job in [jobs]
+    as a new commit of [target], and records that it was calculated using metadata snapshot [input]. *)
 
 val load : DK.Commit.t -> commit Lwt.t
 (** [load commit] loads a saved commit from the database. *)

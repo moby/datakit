@@ -77,7 +77,7 @@ let test_simple conn =
   | None -> Alcotest.fail "Missing status branch!"
   | Some head ->
     let tree = DK.Commit.tree head in
-    DK.Tree.read_file tree (Datakit_path.of_string_exn "test/output") >>*= fun data ->
+    DK.Tree.read_file tree (Datakit_path.of_string_exn "job/test/output") >>*= fun data ->
     Alcotest.check Test_utils.json "Status JSON" (
       `Assoc [
         "result", `Assoc [

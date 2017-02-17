@@ -48,6 +48,8 @@ type job = {
 
   mutable state : string * string CI_output.t option;
   (* The last result of evaluating [term] (src_commit, history_commit) *)
+
+  mutable dirty : bool;            (* [state] needs writing to DB *)
 }
 and target = {
   mutable v : CI_target.v;
@@ -72,6 +74,11 @@ let repo t = match t.v with
 
 let pp_job f j =
   Fmt.pf f "%a:%s" pp_target j.parent j.name
+
+let pp_job_state f job =
+  match job.state with
+  | (_, None) -> Fmt.string f "None"
+  | (_, Some o) -> Fmt.string f (CI_output.descr o)
 
 let state job = snd job.state
 let target job = job.v
@@ -157,21 +164,6 @@ let create ~web_ui ?canaries connect_dk projects =
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
 let refs t = t.projects |> Repo.Map.map (fun project -> project.refs)
 
-let update_status_lock = Lwt_mutex.create ()
-let update_status t ~message s =
-  t.dk >>= fun t ->
-  DK.branch t metadata_branch >>*= fun metadata ->
-  (* Because multiple targets can be pointing to the same commit, we may try
-     to update a single commit's status for several targets in parallel,
-     leading to merge conflicts. This is a limitation of GitHub's design, so
-     just let the most recent update to win. *)
-  Lwt_mutex.with_lock update_status_lock @@ fun () ->
-  DK.Branch.with_transaction metadata (fun t ->
-      Conv.update_elt t (`Status s) >>= fun () ->
-      Log.debug (fun f -> f "set_state: %s" message);
-      DK.Transaction.commit t ~message
-    ) >>*= Lwt.return
-
 let enable_monitoring t repos =
   t.dk >>= fun t ->
   DK.branch t metadata_branch >>*= fun metadata_branch ->
@@ -198,35 +190,6 @@ let monitor t ?switch fn =
   | `Finish `Never -> assert false
 
 let datakit_ci x = ["ci"; "datakit"; x]
-
-let set_status t target name result =
-  let status = CI_result.status result in
-  let descr = CI_result.descr result in
-  Prometheus.Counter.inc_one Metrics.status_updates;
-  Log.info (fun f -> f "Job %a:%s -> %s" CI_target.pp_v target name descr);
-  let commit = CI_target.head target in
-  let { Repo.user; repo } = CI_target.repo_v target in
-  let hash = Commit.hash commit in
-  let url = Uri.with_path t.web_ui (Fmt.strf "/%s/%s/commit/%s" user repo hash) in
-  let message =
-    Fmt.strf "Set state of %a: %s = %a"
-      Commit.pp_hash hash
-      name Status_state.pp status
-  in
-  let status =
-    let ci = datakit_ci name in
-    Status.v ~description:descr ~url commit ci status
-  in
-  Lwt.catch
-    (fun () -> update_status t ~message status)
-    (fun ex ->
-       (* Most likely the bridge has deleted the commit because the target was deleted.
-          Ideally we'd get the commit it tried to merge with and check, but for now just
-          log a warning. *)
-       Log.warn (fun f -> f "Failed to update status of %a: %a" CI_target.pp_v target CI_utils.pp_exn ex);
-       Lwt.return ()
-    )
-
 
 let reconnect t =
   match Lwt.state t.dk with
@@ -280,14 +243,15 @@ let recalculate t ~snapshot job =
   let (old_head, old_output) = job.state in
   t.dk >>= fun dk ->
   CI_history.lookup t.history dk job.parent.v >>= fun history ->
-  CI_history.record history dk job.name snapshot new_output >>= fun () ->
+  CI_history.record history dk job.name snapshot new_output >|= fun () ->
   let new_hash = Commit.hash (CI_target.head head) in
   let new_result = CI_output.result new_output in
-  begin match old_output with
-  | Some old_commit when (old_head, CI_output.result old_commit) = (new_hash, new_result) -> Lwt.return ()
-  | _ -> set_status t head job.name new_result
-  end >|= fun () ->
-  job.state <- (new_hash, Some new_output)
+  job.state <- (new_hash, Some new_output);
+  match old_output with
+  | Some old_commit when (old_head, CI_output.result old_commit) = (new_hash, new_result) -> ()
+  | _ ->
+    Log.debug (fun f -> f "%a -> %a (marked for flush)" pp_job job pp_job_state job);
+    job.dirty <- true
 
 let make_job t ~parent name term =
   let head_commit = CI_target.head parent.v in
@@ -306,6 +270,7 @@ let make_job t ~parent name term =
     term;
     cancel = ignore;
     state = (hash, history);
+    dirty = false;
   }
 
 let apply_canaries canaries prs refs =
@@ -385,6 +350,96 @@ let index_targets ~prs ~refs =
   refs |> Ref.Index.iter (fun id x -> add (Datakit_github.Ref.commit x) (`Ref id));
   prs  |> PR.Index.iter  (fun id x -> add (Datakit_github.PR.commit x)  (`PR id));
   !targets_of_commit
+
+let set_status t tr job =
+  match job.state with
+  | (_, None) -> assert false
+  | (_hash, Some output) ->
+    let result = CI_output.result output in
+    let target = job.parent in
+    let status = CI_result.status result in
+    let descr = CI_result.descr result in
+    Prometheus.Counter.inc_one Metrics.status_updates;
+    let commit = CI_target.head target.v in
+    let { Repo.user; repo } = CI_target.repo_v target.v in
+    let hash = Commit.hash commit in
+    let url = Uri.with_path t.web_ui (Fmt.strf "/%s/%s/commit/%s" user repo hash) in
+    Log.debug (fun f -> f "Set state of %a: %s = %a"
+                  Commit.pp_hash hash
+                  job.name
+                  Status_state.pp status
+              );
+    let status =
+      let ci = datakit_ci job.name in
+      Status.v ~description:descr ~url commit ci status
+    in
+    Conv.update_elt tr (`Status status)
+
+let flush_states t =
+  (* Find targets that need to be flushed *)
+  let dirty_targets = ref [] in
+  let check_target _id target =
+    let dirty = List.filter (fun job -> job.dirty) target.jobs in
+    if dirty <> [] then dirty_targets := (target, dirty) :: !dirty_targets
+  in
+  t.projects |> Repo.Map.iter (fun _repo project ->
+      project.open_prs |> PR.Index.iter check_target;
+      project.refs |> Ref.Index.iter check_target;
+    );
+  let dirty_targets = !dirty_targets in
+  Log.debug (fun f -> f "flush_states: %d dirty" (List.length dirty_targets));
+  (* Commit changed targets *)
+  let messages = ref [] in
+  let add_msg fmt =
+    fmt |> Fmt.kstrf @@ fun msg ->
+    Log.info (fun f -> f "Flush: %s" msg);
+    messages := msg :: !messages
+  in
+  Lwt.catch
+    (fun () ->
+       t.dk >>= fun dk ->
+       DK.branch dk metadata_branch >>*= fun metadata ->
+       DK.Branch.with_transaction metadata (fun tr ->
+           dirty_targets |> Lwt_list.iter_s (fun (target, jobs) ->
+               match jobs with
+               | [job] ->
+                 add_msg "Set %a to %a" pp_job job pp_job_state job;
+                 set_status t tr job
+               | jobs ->
+                 add_msg "Update %d jobs in %a" (List.length jobs) pp_target target;
+                 jobs |> Lwt_list.iter_s (set_status t tr)
+             )
+           >>= fun () ->
+           match !messages with
+           | [] -> DK.Transaction.abort tr >|= fun () -> Ok ()
+           | [message] -> DK.Transaction.commit tr ~message
+           | ms ->
+             let message =
+               Fmt.strf "%d updates@.@.%a"
+                 (List.length ms)
+                 (Fmt.list ~sep:Fmt.(const cut ()) Fmt.string) ms
+             in
+             DK.Transaction.commit tr ~message
+         )
+       >>*= fun () ->
+       (* Mark flushed targets as clean *)
+       dirty_targets |> List.iter (fun (_target, jobs) ->
+           jobs |> List.iter (fun job -> job.dirty <- false)
+         );
+       Lwt.return ()
+    )
+    (fun ex ->
+       (* Most likely the bridge has deleted the commit because the target was deleted.
+          Ideally we'd get the commit it tried to merge with and check, but for now just
+          log a warning.
+          If there is a conflict, then the branch must have moved since we started
+          calculating so we'll do a recalculation and try again soon. *)
+       Log.warn (fun f -> f "Failed to update statuses: %a@.%a"
+                    CI_utils.pp_exn ex
+                    Fmt.(Dump.list string) !messages
+                );
+       Lwt.return ()
+    )
 
 (* A thread that rebuilds after [t.recalculate] is triggered. *)
 let recalc_loop t ~snapshot_ref =
@@ -490,6 +545,7 @@ let recalc_loop t ~snapshot_ref =
       Metrics.set_active_targets `Branch !active_braches;
       Metrics.set_active_targets `PR !active_prs;
       Pool.wait pool >>= fun () ->
+      flush_states t >>= fun () ->
       (* Wait until something changes (which might already have happened) *)
       recalc_needed >>= loop
   in

@@ -401,57 +401,60 @@ let flush_states t snapshot =
     );
   let dirty_targets = !dirty_targets in
   Log.debug (fun f -> f "flush_states: %d dirty" (List.length dirty_targets));
-  (* Commit changed targets *)
-  let messages = ref [] in
-  let add_msg fmt =
-    fmt |> Fmt.kstrf @@ fun msg ->
-    Log.info (fun f -> f "Flush: %s" msg);
-    messages := msg :: !messages
-  in
-  Lwt.catch
-    (fun () ->
-       DK.branch dk metadata_branch >>*= fun metadata ->
-       DK.Branch.with_transaction metadata (fun tr ->
-           dirty_targets |> Lwt_list.iter_s (fun (target, jobs) ->
-               match jobs with
-               | [job] ->
-                 add_msg "Set %a to %a" pp_job job pp_job_state job;
-                 set_status t tr job
-               | jobs ->
-                 add_msg "Update %d jobs in %a" (List.length jobs) pp_target target;
-                 jobs |> Lwt_list.iter_s (set_status t tr)
-             )
-           >>= fun () ->
-           match !messages with
-           | [] -> DK.Transaction.abort tr >|= fun () -> Ok ()
-           | [message] -> DK.Transaction.commit tr ~message
-           | ms ->
-             let message =
-               Fmt.strf "%d updates@.@.%a"
-                 (List.length ms)
-                 Fmt.(vbox (list ~sep:(const cut ()) string)) ms
-             in
-             DK.Transaction.commit tr ~message
-         )
-       >>*= fun () ->
-       (* Mark flushed targets as clean *)
-       dirty_targets |> List.iter (fun (_target, jobs) ->
-           jobs |> List.iter (fun job -> job.dirty <- false)
-         );
-       Lwt.return ()
-    )
-    (fun ex ->
-       (* Most likely the bridge has deleted the commit because the target was deleted.
-          Ideally we'd get the commit it tried to merge with and check, but for now just
-          log a warning.
-          If there is a conflict, then the branch must have moved since we started
-          calculating so we'll do a recalculation and try again soon. *)
-       Log.warn (fun f -> f "Failed to update statuses: %a@.%a"
-                    CI_utils.pp_exn ex
-                    Fmt.(Dump.list string) !messages
-                );
-       Lwt.return ()
-    )
+  if dirty_targets = [] then Lwt.return ()
+  else (
+    (* Commit changed targets *)
+    let messages = ref [] in
+    let add_msg fmt =
+      fmt |> Fmt.kstrf @@ fun msg ->
+      Log.info (fun f -> f "Flush: %s" msg);
+      messages := msg :: !messages
+    in
+    Lwt.catch
+      (fun () ->
+         DK.branch dk metadata_branch >>*= fun metadata ->
+         DK.Branch.with_transaction metadata (fun tr ->
+             dirty_targets |> Lwt_list.iter_s (fun (target, jobs) ->
+                 match jobs with
+                 | [job] ->
+                   add_msg "Set %a to %a" pp_job job pp_job_state job;
+                   set_status t tr job
+                 | jobs ->
+                   add_msg "Update %d jobs in %a" (List.length jobs) pp_target target;
+                   jobs |> Lwt_list.iter_s (set_status t tr)
+               )
+             >>= fun () ->
+             match !messages with
+             | [] -> DK.Transaction.abort tr >|= fun () -> Ok ()
+             | [message] -> DK.Transaction.commit tr ~message
+             | ms ->
+               let message =
+                 Fmt.strf "%d updates@.@.%a"
+                   (List.length ms)
+                   Fmt.(vbox (list ~sep:(const cut ()) string)) ms
+               in
+               DK.Transaction.commit tr ~message
+           )
+         >>*= fun () ->
+         (* Mark flushed targets as clean *)
+         dirty_targets |> List.iter (fun (_target, jobs) ->
+             jobs |> List.iter (fun job -> job.dirty <- false)
+           );
+         Lwt.return ()
+      )
+      (fun ex ->
+         (* Most likely the bridge has deleted the commit because the target was deleted.
+            Ideally we'd get the commit it tried to merge with and check, but for now just
+            log a warning.
+            If there is a conflict, then the branch must have moved since we started
+            calculating so we'll do a recalculation and try again soon. *)
+         Log.warn (fun f -> f "Failed to update statuses: %a@.%a"
+                      CI_utils.pp_exn ex
+                      Fmt.(Dump.list string) !messages
+                  );
+         Lwt.return ()
+      )
+  )
 
 (* A thread that rebuilds after [t.recalculate] is triggered. *)
 let recalc_loop t ~snapshot_ref =

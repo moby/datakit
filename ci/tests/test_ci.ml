@@ -611,7 +611,8 @@ let test_history conn =
   (* Initially empty *)
   Alcotest.check (Alcotest.option state_t) "Empty head" None (CI_history.head master_h);
   let live = CI_live_log.create ~pending:"Pending" ~branch:"log-123" ~title:"Build" logs in
-  let saved = { CI_output.title = "Build"; commit = "567"; branch = "build-of-123"; failed = false; rebuild = lazy Lwt.return_unit } in
+  let saved = { CI_output.title = "Build"; commit = "567"; branch = "build-of-123"; failed = false;
+                rebuild = `Rebuildable (lazy Lwt.return_unit) } in
   let s1 = String.Map.of_list [
       "one", (Ok "Success", CI_output.Empty);
       "two", (Error (`Failure "Failed"), CI_output.Saved saved);

@@ -596,8 +596,9 @@ let rebuild t ~branch_name =
   let rec check_logs =
     let open CI_output in
     function
-    | Saved {branch; rebuild; _} when branch = branch_name ->
-      if not (Lazy.is_val rebuild) then triggers := Lazy.force rebuild :: !triggers
+    | Saved ({branch; rebuild = `Rebuildable trigger; _} as s) when branch = branch_name ->
+      triggers := Lazy.force trigger :: !triggers;
+      s.rebuild <- `Rebuilding
     | Pair (a, b) -> check_logs a; check_logs b
     | Empty
     | Saved _

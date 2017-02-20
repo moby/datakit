@@ -641,7 +641,7 @@ let logs ~csrf_token ~page_url ~selected state =
           log_link ~branch ~title (`Live live_log);
         ];
       ]
-    | Saved ({commit = _; branch; title; rebuild = _; failed} as saved) ->
+    | Saved ({commit = _; branch; title; rebuild; failed} as saved) ->
       seen := String.Set.add branch !seen;
       let query = [
         "CSRFToken", [csrf_token];
@@ -649,12 +649,19 @@ let logs ~csrf_token ~page_url ~selected state =
       ] in
       let action = Printf.sprintf "/log/rebuild/%s?%s" branch (Uri.encoded_of_query query) in
       let status = if failed then `Failure else `Success in
+      let rebuild_button =
+        match rebuild with
+        | `Rebuildable _ -> 
+          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
+            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+        | `Rebuilding -> pcdata "(rebuild queued) "
+        | `Archived -> pcdata "(archived) "
+      in
       last_title := Some title;
       [
         form ~a:[a_action action; a_method `Post] [
           status_flag status;
-          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
-            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+          rebuild_button;
           log_link ~branch ~title (`Saved saved);
         ]
       ]

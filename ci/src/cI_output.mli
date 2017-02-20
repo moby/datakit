@@ -3,7 +3,7 @@ type saved = {
   commit : string;
   branch : string;
   failed : bool;
-  rebuild : unit Lwt.t Lazy.t;
+  mutable rebuild : [`Rebuildable of unit Lwt.t Lazy.t | `Rebuilding | `Archived];
 }
 
 type logs =

@@ -39,7 +39,10 @@ module Private = struct
   let lookup_log = CI_live_log.lookup
   let cancel = CI_live_log.cancel
   let read_log = CI_cache.read_log
-  let rebuild saved = Lazy.force saved.Output.rebuild
+  let rebuild saved =
+    match saved.Output.rebuild with
+    | `Rebuildable x -> Lazy.force x
+    | _ -> assert false
 end
 
 module Config = struct

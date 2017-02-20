@@ -102,8 +102,11 @@ let record t dk input jobs =
   Lwt_mutex.with_lock t.lock @@ fun () ->
   let state = t.commit |> CI_utils.default State.empty in
   let patch = String.Map.merge diff state.State.jobs jobs in
-  if String.Map.is_empty patch then Lwt.return ()
-  else (
+  if String.Map.is_empty patch then (
+    (* Update state to include live logs and non-archived saved logs. *)
+    t.commit <- Some {state with State.jobs};
+    Lwt.return ()
+  ) else (
     let open! Datakit_path.Infix in
     let messages = ref [] in
     let add_msg fmt =

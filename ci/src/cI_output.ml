@@ -3,7 +3,7 @@ type saved = {
   commit : string;
   branch : string;
   failed : bool;
-  rebuild : unit Lwt.t Lazy.t;
+  mutable rebuild : [`Rebuildable of unit Lwt.t Lazy.t | `Rebuilding | `Archived];
 }
 
 type logs =
@@ -50,7 +50,7 @@ let rec logs_of_json = function
       "branch", `String branch;
       "commit", `String commit;
       "failed", `Bool failed;
-    ] -> Saved { title; commit; branch; failed; rebuild = lazy Lwt.return_unit }
+    ] -> Saved { title; commit; branch; failed; rebuild = `Archived }
   | `List [a; b] -> Pair (logs_of_json a, logs_of_json b)
   | json -> CI_utils.failf "Invalid logs JSON: %a" (Yojson.Basic.pretty_print ?std:None) json
 

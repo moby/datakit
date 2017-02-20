@@ -6,17 +6,34 @@ module DK = CI_utils.DK
 
 let metadata_commit_path = Datakit_path.of_string_exn "metadata-commit"
 
-type commit = {
-  parents : string list;
-  jobs : string CI_output.t String.Map.t;
-}
+module State = struct
+  type t = {
+    parents : string list;
+    jobs : string CI_output.t String.Map.t;
+  }
 
-let empty = { parents = []; jobs = String.Map.empty }
+  let empty = { parents = []; jobs = String.Map.empty }
+
+  let jobs c = c.jobs
+
+  let parents c = c.parents
+
+  let equal {parents; jobs} b =
+    parents = b.parents &&
+    String.Map.equal CI_output.equal jobs b.jobs
+
+  let pp =
+    Fmt.braces (fun f {parents; jobs} ->
+        Fmt.pf f "parents = %a;@ jobs = %a"
+          (Fmt.Dump.list Fmt.string) parents
+          (String.Map.dump (CI_output.pp Fmt.string)) jobs
+      )
+end
 
 type target = {
   branch_name : string;
   lock : Lwt_mutex.t;
-  mutable commit : commit option;
+  mutable commit : State.t option;
 }
 
 module Saved_output = struct
@@ -53,7 +70,7 @@ let load commit =
   end
   >>= fun jobs ->
   let jobs = String.Map.of_list jobs in
-  Lwt.return { parents; jobs }
+  Lwt.return { State.parents; jobs }
 
 let lookup t dk target =
   let branch_name = CI_target.status_branch_v target in
@@ -83,15 +100,15 @@ let diff _id prev next =
 
 let record t dk input jobs =
   Lwt_mutex.with_lock t.lock @@ fun () ->
-  let state = t.commit |> CI_utils.default empty in
-  let patch = String.Map.merge diff state.jobs jobs in
+  let state = t.commit |> CI_utils.default State.empty in
+  let patch = String.Map.merge diff state.State.jobs jobs in
   if String.Map.is_empty patch then Lwt.return ()
   else (
     let open! Datakit_path.Infix in
     let messages = ref [] in
     let add_msg fmt =
       fmt |> Fmt.kstrf @@ fun msg ->
-      CI_utils.Log.info (fun f -> f "Record: %s" msg);
+      CI_utils.Log.info (fun f -> f "Record: %s: %s" t.branch_name msg);
       messages := msg :: !messages
     in
     DK.branch dk t.branch_name >>*= fun branch ->
@@ -114,12 +131,14 @@ let record t dk input jobs =
         >>= fun () ->
         DK.Transaction.parents tr >>*= fun parents ->
         begin match !messages with
+          | [] -> assert false
           | [message] ->
             DK.Transaction.commit tr ~message
-          | ms ->
+          | m :: _ as ms ->
             let message =
-              Fmt.strf "%d updates@.@.%a"
+              Fmt.strf "%d updates (%s, ...)@.@.%a"
                 (List.length ms)
+                m
                 Fmt.(vbox (list ~sep:(const cut ()) string)) ms
             in
             DK.Transaction.commit tr ~message
@@ -128,11 +147,9 @@ let record t dk input jobs =
         Lwt.return (Ok parents)
       )
     >>*= fun parents ->
-    let state = { jobs; parents } in
+    let state = { State.jobs; parents } in
     t.commit <- Some state;
     Lwt.return ()
   )
 
-let jobs c = c.jobs
-let parents c = c.parents
 let head t = t.commit

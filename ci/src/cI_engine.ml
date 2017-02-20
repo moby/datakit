@@ -47,7 +47,7 @@ type job = {
   mutable cancel : unit -> unit;   (* Cancel the previous evaluation, if any *)
 
   mutable state : string * string CI_output.t option;
-  (* The last result of evaluating [term] (src_commit, history_commit) *)
+  (* The last result of evaluating [term] (src_commit, last output) *)
 
   mutable dirty : bool;            (* [state] needs writing to DB *)
 }
@@ -257,7 +257,7 @@ let make_job t ~parent name term =
   let history =
     match CI_history.head history with
     | None -> None
-    | Some head -> String.Map.find name (CI_history.jobs head)
+    | Some head -> String.Map.find name (CI_history.State.jobs head)
   in
   let hash = Commit.hash head_commit in
   Lwt.return {

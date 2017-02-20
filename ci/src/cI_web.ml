@@ -117,7 +117,7 @@ end
 let load_jobs t target rd =
   match Uri.get_query_param rd.Rd.uri "history" with
   | None ->
-    CI_engine.latest_state t.ci target >|= default CI_history.empty
+    CI_engine.latest_state t.ci target >|= default CI_history.State.empty
   | Some commit ->
     CI_engine.dk t.ci >>= fun dk ->
     CI_history.load (DK.commit dk commit)

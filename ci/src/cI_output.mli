@@ -25,3 +25,5 @@ val equal : string t -> string t -> bool
 
 val json_of : string t -> Yojson.Basic.json
 val of_json : Yojson.Basic.json -> string t
+
+val pp : 'a Fmt.t -> 'a t Fmt.t

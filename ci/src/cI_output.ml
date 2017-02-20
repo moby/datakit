@@ -20,17 +20,6 @@ let logs = snd
 let status t = CI_result.status (result t)
 let descr t = CI_result.descr (result t)
 
-let rec logs_equal a b =
-  match a, b with
-  | Empty, Empty -> true
-  | Live a, Live b -> a == b
-  | Saved a, Saved b -> a.commit = b.commit
-  | Pair (a1, a2), Pair (b1, b2) -> logs_equal a1 b1 && logs_equal a2 b2
-  | _ -> false
-
-let equal a b =
-  result a = result b && logs_equal (logs a) (logs b)
-
 let rec json_of_logs : logs -> Yojson.Basic.json = function
   | Empty -> `Null
   | Live x ->
@@ -77,3 +66,13 @@ let of_json = function
       "logs", logs;
     ] -> (CI_result.of_json result, logs_of_json logs)
   | json -> CI_utils.failf "Invalid output JSON: %a" (Yojson.Basic.pretty_print ?std:None) json
+
+let pp_logs f logs = Yojson.Basic.pretty_print f (json_of_logs logs)
+
+let equal a b =
+  json_of a = json_of b
+
+let pp fv f (result, logs) =
+  Fmt.pf f "%a:@[%a@]"
+    (CI_result.pp fv) result
+    pp_logs logs

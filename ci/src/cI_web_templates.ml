@@ -730,13 +730,13 @@ let history_nav t target state =
       a ~a:[a_href history_link] [pcdata "history"]; pcdata " ]";
     ]
   in
-  match CI_history.parents state with
+  match CI_history.State.parents state with
   | [] -> p (pcdata "No previous states" :: links)
   | [x] -> p (pcdata "Previous state: " :: state_link x :: links)
   | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
 
 let target_page ~csrf_token ~target state t =
-  let jobs = CI_history.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
+  let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
   let target = CI_engine.target target in
   let title = target_title target in
   let repo = target_repo target in

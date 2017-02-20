@@ -592,6 +592,55 @@ let test_live_logs conn =
       Alcotest.fail ("Missing saved data in: " ^body);
     Lwt.return ()
 
+module Jobs = struct
+  type t = string CI_output.t String.Map.t
+  let equal = String.Map.equal CI_output.equal
+  let pp = String.Map.dump (CI_output.pp String.pp)
+end
+
+let test_history conn =
+  let logs = CI_live_log.create_manager () in
+  let state_t = (module CI_history.State : Alcotest.TESTABLE with type t = CI_history.State.t) in
+  let jobs_t = (module Jobs : Alcotest.TESTABLE with type t = Jobs.t) in
+  let h = CI_history.create () in
+  let dk = CI_utils.DK.connect conn in
+  let repo = Repo.v ~user:"me" ~repo:"repo" in
+  let head = Commit.v repo "123" in
+  let master = `Ref (Ref.v head ["heads"; "master"]) in
+  CI_history.lookup h dk master >>= fun master_h ->
+  (* Initially empty *)
+  Alcotest.check (Alcotest.option state_t) "Empty head" None (CI_history.head master_h);
+  let live = CI_live_log.create ~pending:"Pending" ~branch:"log-123" ~title:"Build" logs in
+  let saved = { CI_output.title = "Build"; commit = "567"; branch = "build-of-123"; failed = false; rebuild = lazy Lwt.return_unit } in
+  let s1 = String.Map.of_list [
+      "one", (Ok "Success", CI_output.Empty);
+      "two", (Error (`Failure "Failed"), CI_output.Saved saved);
+      "three", (Error (`Pending "Testing"), CI_output.Live live);
+    ]
+  in
+  let metadata_commit = CI_utils.DK.commit dk "abc" in
+  CI_history.record master_h dk metadata_commit s1 >>= fun () ->
+  CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.jobs |> Alcotest.check jobs_t "Initial commit" s1;
+  CI_history.record master_h dk metadata_commit s1 >>= fun () ->
+  CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.parents |> Alcotest.(check (list string)) "No changes" [];
+  let s2 = String.Map.of_list [
+      "one", (Ok "Success", CI_output.Empty);
+      "two", (Error (`Failure "Failed2"), CI_output.Saved saved);
+    ]
+  in
+  CI_history.record master_h dk metadata_commit s2 >>= fun () ->
+  let head2 = CI_history.head master_h |> Test_utils.or_fail "No head state!" in
+  let head1 =
+    match CI_history.State.parents head2 with
+    | [p] -> p
+    | x -> Alcotest.fail (Fmt.strf "Expected one parent, not %a" (Fmt.Dump.list Fmt.string) x)
+  in
+  Alcotest.check jobs_t "Updated commit" s2 (CI_history.State.jobs head2);
+  CI_history.load (CI_utils.DK.commit dk head1) >>= fun loaded1 ->
+  let s1_expected = s1 |> String.Map.add "three" (Error (`Pending "Testing"), CI_output.Empty) in
+  Alcotest.check jobs_t "Loaded" s1_expected (CI_history.State.jobs loaded1);
+  Lwt.return ()
+
 let test_set = [
   "Simple",         `Quick, Test_utils.run test_simple;
   "Branch",         `Quick, Test_utils.run test_branch;
@@ -608,6 +657,7 @@ let test_set = [
   "Auth",           `Quick, test_auth;
   "Roles",          `Quick, Test_utils.run_private test_roles;
   "Live logs",      `Quick, Test_utils.run_private test_live_logs;
+  "History",        `Quick, Test_utils.run_private test_history;
 ]
 
 let () =

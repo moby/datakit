@@ -89,7 +89,7 @@ val commit_page :
 val target_page :
   csrf_token:string ->
   target:CI_engine.target ->
-  CI_engine.job list ->
+  CI_history.State.t ->
   t ->
   page
 

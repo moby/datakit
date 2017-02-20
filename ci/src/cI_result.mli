@@ -10,3 +10,5 @@ val pp: 'a Fmt.t -> 'a t Fmt.t
 val v : [< `Success | `Pending | `Failure] -> string -> string t
 val status : _ t -> [> `Success | `Pending | `Failure]
 val descr : string t -> string
+val json_of : string t -> Yojson.Basic.json
+val of_json : Yojson.Basic.json -> string t

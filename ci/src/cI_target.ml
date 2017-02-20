@@ -104,3 +104,32 @@ let path_v = function
 let repo_v = function
   | `PR pr -> PR.repo pr
   | `Ref r -> Ref.repo r
+
+module Branch_escape = struct
+  (* We need to escape all invalid characters, plus '_' (which is our escape character)
+     and '-' (which is our field separator). *)
+  let re_needs_replace = Str.regexp "[^a-zA-Z0-9.]"
+
+  let escape s =
+    let replace s =
+      let c = (Str.matched_string s).[0] in
+      Printf.sprintf "_%02x" (Char.to_int c)
+    in
+    Str.global_substitute re_needs_replace replace s
+
+  let pp_repo f { Repo.user; repo } =
+    Fmt.pf f "%s-%s" (escape user) (escape repo)
+
+  let pp_v f v =
+    match v with
+    | `PR pr -> Fmt.pf f "%a-pr-%d" pp_repo (PR.repo pr) (PR.number pr)
+    | `Ref r ->
+      (* We special case the first component to avoid ugly escaping. *)
+      match Ref.name r with
+      | [] -> assert false
+      | x :: xs ->
+        let xs = String.concat ~sep:"/" xs in   (* '/' isn't valid in branch components. *)
+        Fmt.pf f "%a-ref-%s-%s" pp_repo (Ref.repo r) (escape x) (escape xs)
+end
+
+let status_branch_v v = Fmt.strf "status-%a" Branch_escape.pp_v v

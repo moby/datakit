@@ -19,3 +19,5 @@ val path_v: v -> string
 val repo_v : v -> Repo.t
 val unescape_ref: string -> Ref.name
 val pp_v : v Fmt.t
+val status_branch_v : v -> string
+(** [status_branch_v target] is the DataKit branch in which to store the status of [target]'s jobs. *)

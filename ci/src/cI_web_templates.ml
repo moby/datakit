@@ -23,6 +23,11 @@ module Error = struct
   let uri id = Uri.of_string (uri_path id)
 end
 
+let job_state job =
+  match CI_engine.state job with
+  | None -> (Error (`Pending "(new)"), CI_output.Empty)
+  | Some o -> o
+
 let config ?(name="datakit-ci") ?state_repo ?metrics_token ?(listen_addr=`HTTPS 8443) ~can_read ~can_build () =
   let metrics_token =
     match metrics_token with
@@ -36,6 +41,9 @@ let state_repo_url t fmt =
   match t.state_repo with
   | Some base -> Fmt.strf "%a/%s" Uri.pp_hum base path
   | None -> Error.(uri_path no_state_repo)
+
+let status_history_url t target =
+  state_repo_url t "commits/%s" (CI_target.status_branch_v target)
 
 let log_commit_url t commit =
   state_repo_url t "commit/%s" commit
@@ -135,7 +143,7 @@ let status_list jobs =
   table ~a:[a_class ["ci-status-list"]] [
     tr (
       jobs |> List.map (fun job ->
-          let state = CI_engine.state job in
+          let state = job_state job in
           let label = CI_engine.job_name job in
           td [status_flag ~label (CI_output.status state)];
         )
@@ -143,7 +151,7 @@ let status_list jobs =
   ]
 
 let summarise jobs =
-  let outputs = List.map (fun j -> CI_engine.job_name j, CI_engine.state j) jobs in
+  let outputs = List.map (fun j -> CI_engine.job_name j, job_state j) jobs in
   let combine status outputs =
     let results = ref String.Map.empty in
     outputs |> List.iter (fun (name, output) ->
@@ -580,15 +588,17 @@ let logs_frame_link = function
   | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
   | `Saved {CI_output.branch; commit; _} -> saved_log_frame_link ~branch ~commit
 
-let score_logs ~best job =
-  let open CI_output in
-  let rec aux = function
-    | Empty -> ()
-    | Live live_log -> LogScore.update best (`Live live_log);
-    | Saved saved -> LogScore.update best (`Saved saved);
-    | Pair (a, b) -> aux a; aux b
-  in
-  aux (CI_engine.state job |> CI_output.logs)
+let score_logs ~best = function
+  | (_name, None) -> ()
+  | (_name, Some state) ->
+    let open CI_output in
+    let rec aux = function
+      | Empty -> ()
+      | Live live_log -> LogScore.update best (`Live live_log);
+      | Saved saved -> LogScore.update best (`Saved saved);
+      | Pair (a, b) -> aux a; aux b
+    in
+    aux (CI_output.logs state)
 
 let logs ~csrf_token ~page_url ~selected state =
   let open CI_output in
@@ -631,7 +641,7 @@ let logs ~csrf_token ~page_url ~selected state =
           log_link ~branch ~title (`Live live_log);
         ];
       ]
-    | Saved ({commit = _; branch; title; rebuild = _; failed} as saved) ->
+    | Saved ({commit = _; branch; title; rebuild; failed} as saved) ->
       seen := String.Set.add branch !seen;
       let query = [
         "CSRFToken", [csrf_token];
@@ -639,12 +649,19 @@ let logs ~csrf_token ~page_url ~selected state =
       ] in
       let action = Printf.sprintf "/log/rebuild/%s?%s" branch (Uri.encoded_of_query query) in
       let status = if failed then `Failure else `Success in
+      let rebuild_button =
+        match rebuild with
+        | `Rebuildable _ -> 
+          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
+            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+        | `Rebuilding -> pcdata "(rebuild queued) "
+        | `Archived -> pcdata "(archived) "
+      in
       last_title := Some title;
       [
         form ~a:[a_action action; a_method `Post] [
           status_flag status;
-          button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
-            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+          rebuild_button;
           log_link ~branch ~title (`Saved saved);
         ]
       ]
@@ -662,14 +679,17 @@ let logs ~csrf_token ~page_url ~selected state =
     let descr = CI_output.descr state in
     items @ [p [status_flag status; pcdata descr]]
 
-let job_row ~csrf_token ~page_url ~best_log job =
-  let state = CI_engine.state job in
-  let job_name = CI_engine.job_name job in
+let job_row ~csrf_token ~page_url ~best_log (job_name, state) =
+  let output =
+    match state with
+    | None -> (Error (`Pending "(new)"), CI_output.Empty)
+    | Some state -> state
+  in
   tr [
     th [pcdata job_name];
-    td [status (CI_output.status state)];
+    td [status (CI_output.status output)];
     td (
-      logs ~csrf_token ~page_url ~selected:best_log (CI_engine.state job)
+      logs ~csrf_token ~page_url ~selected:best_log output
     );
   ]
 
@@ -701,11 +721,33 @@ let commit_page ~commit targets t =
 
 let target_page_url = CI_target.path_v
 
-let target_page ~csrf_token ~target jobs t =
+let state_link commit =
+  let url = Fmt.strf "?history=%s" commit in
+  a ~a:[a_href url] [pcdata commit]
+
+let rec intersperse sep = function
+  | [] -> []
+  | [x] -> [x]
+  | x :: xs -> x :: sep :: intersperse sep xs
+
+let history_nav t target state =
+  let history_link = status_history_url t target in
+  let links = [
+      pcdata " [ "; a ~a:[a_href "?"] [pcdata "latest"]; pcdata " | ";
+      a ~a:[a_href history_link] [pcdata "history"]; pcdata " ]";
+    ]
+  in
+  match CI_history.State.parents state with
+  | [] -> p (pcdata "No previous states" :: links)
+  | [x] -> p (pcdata "Previous state: " :: state_link x :: links)
+  | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
+
+let target_page ~csrf_token ~target state t =
+  let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
   let target = CI_engine.target target in
   let title = target_title target in
   let repo = target_repo target in
-  let commit = target_commit target in
+  let commit = target_commit target in  (* XXX: get from state *)
   let page_url = target_page_url target in
   let best_log =
     let best = LogScore.create () in
@@ -741,6 +783,7 @@ let target_page ~csrf_token ~target jobs t =
       a ~a:[a_href (commit_history_url t target)] [pcdata "status history for this head"];
       pcdata " ]";
     ]
+    :: history_nav t target state
     :: state_summary
   ) t
 

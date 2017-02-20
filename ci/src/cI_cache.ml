@@ -157,7 +157,7 @@ module Make(B : CI_s.BUILDER) = struct
       | true -> Lwt.return None (* Results exist, but are flagged for rebuild *)
       | false ->
         let title = B.title t.builder key in
-        let rebuild = lazy (mark_for_rebuild t conn branch_name) in
+        let rebuild = `Rebuildable (lazy (mark_for_rebuild t conn branch_name)) in
         let logs ~failed = CI_output.(Saved { title; commit = DK.Commit.id commit; branch = branch_name; rebuild; failed }) in
         load_from_tree t.builder tree key >|= function
         | Ok (`Success data)   -> Some { result = Ok data; output = logs ~failed:false }
@@ -245,7 +245,7 @@ module Make(B : CI_s.BUILDER) = struct
               | None -> failf "Branch deleted as we saved it!"
               | Some commit ->
                 let failed = match result with Ok _ -> false | Error _ -> true in
-                let rebuild = lazy (mark_for_rebuild t conn branch_name) in
+                let rebuild = `Rebuildable (lazy (mark_for_rebuild t conn branch_name)) in
                 let saved = { CI_output.commit = DK.Commit.id commit; branch = branch_name; title; rebuild; failed } in
                 finish { result; output = CI_output.Saved saved }
                 (* At this point, the entry is no longer pending and other people can update it. *)

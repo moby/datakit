@@ -241,18 +241,42 @@ let with_ci ?(repo=Repo.v ~user:"user" ~repo:"project") conn workflow fn =
   let ci = Private.test_engine ~web_ui (fun () -> Lwt.return dk)
       (Repo.Map.singleton repo (fun t -> String.Map.singleton "test" (workflow check_build t)))
   in
-  Utils.with_switch @@ fun switch ->
-  Lwt.async (fun () -> Private.listen ci ~switch);
-  DK.branch dk "github-metadata" >>*= fun hooks ->
-  (* Work-around for https://github.com/mirage/irmin/issues/373 *)
-  DK.Branch.wait_for_path hooks (repo_root repo / ".monitor") (function
-      | None -> Lwt.return (Ok `Again)
-      | Some _ -> Lwt.return (Ok (`Finish ()))
+  let switch = Lwt_switch.create () in
+  let engine_thread =
+    Lwt.catch
+      (fun () ->
+         Private.listen ci ~switch >>= fun `Abort ->
+         Lwt.return ()
+      )
+      (fun ex ->
+         Logs.err (fun f -> f "Error from engine: %a" CI_utils.pp_exn ex);
+         Lwt.fail ex
+      )
+  in
+  Lwt.finalize
+    (fun () ->
+       DK.branch dk "github-metadata" >>*= fun hooks ->
+       (* Work-around for https://github.com/mirage/irmin/issues/373 *)
+       DK.Branch.wait_for_path hooks (repo_root repo / ".monitor") (function
+           | None -> Lwt.return (Ok `Again)
+           | Some _ -> Lwt.return (Ok (`Finish ()))
+         )
+       >>*= fun _ ->
+       let set_handler key value = handlers := String.Map.add key value !handlers in
+       fn ~logs ~switch dk (with_handler set_handler)
     )
-  >>*= fun _ ->
-  let set_handler key value = handlers := String.Map.add key value !handlers in
-  fn ~logs ~switch dk (with_handler set_handler)
+    (fun () ->
+       Lwt_switch.turn_off switch >>= fun () ->
+       engine_thread
+    )
 
 let re_timestamp = Str.regexp "^\\[....-..-.. ..:.....\\] "
 let strip_times log =
   Str.global_replace re_timestamp "" log
+
+module Json = struct
+  type t = Yojson.Basic.json
+  let pp f v = Yojson.Basic.pretty_print f v
+  let equal = (=)
+end
+let json = (module Json : Alcotest.TESTABLE with type t = Json.t)

@@ -26,3 +26,20 @@ let status = function
   | Ok _ -> `Success
   | Error (`Pending _) -> `Pending
   | Error (`Failure _) -> `Failure
+
+let string_of_status = function
+  | `Pending -> "pending"
+  | `Success -> "success"
+  | `Failure -> "failure"
+
+let json_of t =
+  `Assoc [
+    "status", `String (status t |> string_of_status);
+    "descr", `String (descr t);
+  ]
+
+let of_json = function
+  | `Assoc ["status", `String "success"; "descr", `String d] -> Ok d
+  | `Assoc ["status", `String "pending"; "descr", `String d] -> Error (`Pending d)
+  | `Assoc ["status", `String "failure"; "descr", `String d] -> Error (`Failure d)
+  | json -> CI_utils.failf "Invalid results JSON: %a" (Yojson.Basic.pretty_print ?std:None) json

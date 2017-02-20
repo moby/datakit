@@ -114,6 +114,14 @@ class tag_list t = object
   method private render rd = Wm.continue (CI_web_templates.tags_page ~ci:t.ci) rd
 end
 
+let load_jobs t target rd =
+  match Uri.get_query_param rd.Rd.uri "history" with
+  | None ->
+    CI_engine.latest_state t.ci target >|= default CI_history.State.empty
+  | Some commit ->
+    CI_engine.dk t.ci >>= fun dk ->
+    CI_history.load (DK.commit dk commit)
+
 class pr_page t = object(self)
   inherit CI_web_utils.html_page t.server
 
@@ -132,10 +140,10 @@ class pr_page t = object(self)
       match PR.Index.find (repo, id) prs with
       | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
       | Some target ->
-        let jobs = CI_engine.jobs target in
+        load_jobs t target rd >>= fun commit ->
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.target_page ~csrf_token ~target jobs) rd
+        Wm.continue (CI_web_templates.target_page ~csrf_token ~target commit) rd
 end
 
 class ref_page t = object(self)
@@ -155,10 +163,10 @@ class ref_page t = object(self)
       match Ref.Index.find (repo, id) refs with
       | None        -> Wm.respond 404 rd ~body:(`String "No such ref")
       | Some target ->
-        let jobs = CI_engine.jobs target in
+        load_jobs t target rd >>= fun state ->
         self#session rd >>= fun session_data ->
         let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.target_page ~csrf_token ~target jobs) rd
+        Wm.continue (CI_web_templates.target_page ~csrf_token ~target state) rd
 end
 
 class commit_page t = object

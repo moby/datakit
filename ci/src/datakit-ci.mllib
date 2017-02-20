@@ -9,6 +9,7 @@ CI_engine
 CI_escape_parser
 CI_eval
 CI_form
+CI_history
 CI_live_log
 CI_log_reporter
 CI_main

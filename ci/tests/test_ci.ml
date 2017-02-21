@@ -598,18 +598,35 @@ module Jobs = struct
   let pp = String.Map.dump (CI_output.pp String.pp)
 end
 
+module DK_Commit = struct
+  include CI_utils.DK.Commit
+  let equal a b = (id a = id b)
+end
+
 let test_history conn =
+  let module DK = CI_utils.DK in
+  let ( >>*= ) x f =
+    x >>= function
+    | Ok x -> f x
+    | Error e -> failwith (Fmt.to_to_string DK.pp_error e)
+  in
   let logs = CI_live_log.create_manager () in
   let state_t = (module CI_history.State : Alcotest.TESTABLE with type t = CI_history.State.t) in
   let jobs_t = (module Jobs : Alcotest.TESTABLE with type t = Jobs.t) in
+  let target_t = (module CI_target : Alcotest.TESTABLE with type t = CI_target.t) in
+  let commit_t = (module DK_Commit : Alcotest.TESTABLE with type t = DK_Commit.t) in
   let h = CI_history.create () in
-  let dk = CI_utils.DK.connect conn in
+  let dk = DK.connect conn in
   let repo = Repo.v ~user:"me" ~repo:"repo" in
-  let head = Commit.v repo "123" in
-  let master = `Ref (Ref.v head ["heads"; "master"]) in
+  let source_commit = "123" in
+  let head = Commit.v repo source_commit in
+  let master = `Ref (repo, ["heads"; "master"]) in
   CI_history.lookup h dk master >>= fun master_h ->
   (* Initially empty *)
   Alcotest.check (Alcotest.option state_t) "Empty head" None (CI_history.head master_h);
+  CI_history.builds_of_commit dk head >|= CI_target.Map.bindings >>= fun builds ->
+  Alcotest.(check (list (pair target_t commit_t))) "Empty index" [] builds;
+  (* Record s1 *)
   let live = CI_live_log.create ~pending:"Pending" ~branch:"log-123" ~title:"Build" logs in
   let saved = { CI_output.title = "Build"; commit = "567"; branch = "build-of-123"; failed = false;
                 rebuild = `Rebuildable (lazy Lwt.return_unit) } in
@@ -619,17 +636,20 @@ let test_history conn =
       "three", (Error (`Pending "Testing"), CI_output.Live live);
     ]
   in
-  let metadata_commit = CI_utils.DK.commit dk "abc" in
-  CI_history.record master_h dk metadata_commit s1 >>= fun () ->
+  let metadata_commit = DK.commit dk "abc" in
+  CI_history.record master_h dk ~source_commit metadata_commit s1 >>= fun () ->
+  (* Check s1 *)
   CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.jobs |> Alcotest.check jobs_t "Initial commit" s1;
-  CI_history.record master_h dk metadata_commit s1 >>= fun () ->
+  CI_history.record master_h dk ~source_commit metadata_commit s1 >>= fun () ->
   CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.parents |> Alcotest.(check (list string)) "No changes" [];
+  (* Record s2 *)
   let s2 = String.Map.of_list [
       "one", (Ok "Success", CI_output.Empty);
       "two", (Error (`Failure "Failed2"), CI_output.Saved saved);
     ]
   in
-  CI_history.record master_h dk metadata_commit s2 >>= fun () ->
+  CI_history.record master_h dk ~source_commit metadata_commit s2 >>= fun () ->
+  (* Check s2 *)
   let head2 = CI_history.head master_h |> Test_utils.or_fail "No head state!" in
   let head1 =
     match CI_history.State.parents head2 with
@@ -637,9 +657,16 @@ let test_history conn =
     | x -> Alcotest.fail (Fmt.strf "Expected one parent, not %a" (Fmt.Dump.list Fmt.string) x)
   in
   Alcotest.check jobs_t "Updated commit" s2 (CI_history.State.jobs head2);
-  CI_history.load (CI_utils.DK.commit dk head1) >>= fun loaded1 ->
+  (* Check saved s1 *)
+  CI_history.load (DK.commit dk head1) >>= fun loaded1 ->
+  Alcotest.(check (option string)) "Source commit" (Some "123") (CI_history.State.source_commit loaded1);
   let s1_expected = s1 |> String.Map.add "three" (Error (`Pending "Testing"), CI_output.Empty) in
   Alcotest.check jobs_t "Loaded" s1_expected (CI_history.State.jobs loaded1);
+  (* Check index *)
+  CI_history.builds_of_commit dk head >|= CI_target.Map.bindings >>= fun builds ->
+  DK.branch dk (CI_target.status_branch master) >>*= DK.Branch.head >>*= fun expected_head ->
+  let expected_head = expected_head |> Test_utils.or_fail "Missing status branch" in
+  Alcotest.(check (list (pair target_t commit_t))) "Non-empty index" [master, expected_head] builds;
   Lwt.return ()
 
 let test_set = [

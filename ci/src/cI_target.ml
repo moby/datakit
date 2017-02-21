@@ -1,5 +1,5 @@
 open Datakit_github
-open Astring
+open! Astring
 open !Asetmap
 
 type t = [ `PR of PR.id | `Ref of Ref.id ]
@@ -20,10 +20,14 @@ let compare a b = match a, b with
   | `PR _, _ -> 1
   | _ -> -1
 
-module Set = Set.Make(struct
-    type nonrec t = t
-    let compare = compare
-  end)
+let equal a b = (compare a b) = 0
+
+module Key = struct
+  type nonrec t = t
+  let compare = compare
+end
+module Set = Set.Make(Key)
+module Map = Map.Make(Key)
 
 let parse s =
   let ( >>= ) x f =
@@ -110,6 +114,8 @@ module Branch_escape = struct
      and '-' (which is our field separator). *)
   let re_needs_replace = Str.regexp "[^a-zA-Z0-9.]"
 
+  let re_escape = Str.regexp "_.."
+
   let escape s =
     let replace s =
       let c = (Str.matched_string s).[0] in
@@ -117,19 +123,65 @@ module Branch_escape = struct
     in
     Str.global_substitute re_needs_replace replace s
 
+  let unescape s =
+    let replace s =
+      let s = Str.matched_string s in
+      let c = int_of_string ("0x" ^ String.with_range ~first:1 s) in
+      String.of_char (Char.of_byte c)
+    in
+    Str.global_substitute re_escape replace s
+
   let pp_repo f { Repo.user; repo } =
     Fmt.pf f "%s-%s" (escape user) (escape repo)
 
-  let pp_v f v =
+  let parse_repo ~user ~repo =
+    Repo.v ~user:(unescape user) ~repo:(unescape repo)
+
+  let pp_sub f (v:t) =
     match v with
-    | `PR pr -> Fmt.pf f "%a-pr-%d" pp_repo (PR.repo pr) (PR.number pr)
-    | `Ref r ->
+    | `PR (_, id) -> Fmt.pf f "pr-%d" id
+    | `Ref (_, r) ->
       (* We special case the first component to avoid ugly escaping. *)
-      match Ref.name r with
+      match r with
       | [] -> assert false
       | x :: xs ->
         let xs = String.concat ~sep:"/" xs in   (* '/' isn't valid in branch components. *)
-        Fmt.pf f "%a-ref-%s-%s" pp_repo (Ref.repo r) (escape x) (escape xs)
+        Fmt.pf f "ref-%s-%s" (escape x) (escape xs)
+
+  let pp f t =
+    Fmt.pf f "%a-%a" pp_repo (repo t) pp_sub t
+
+  let parse_sub ~repo = function
+    | ["pr"; id] -> Some (`PR (repo, int_of_string id))
+    | ["ref"; x; xs] ->
+      let x = unescape x in
+      let xs = String.cuts ~sep:"/" (unescape xs) in
+      Some (`Ref (repo, (x :: xs)))
+    | _ -> None
+
+  let parse = function
+    | user :: repo :: sub ->
+      let repo = parse_repo ~user ~repo in
+      parse_sub ~repo sub
+    | _ -> None
+
+  let parse_sub ~repo x = parse_sub ~repo (String.cuts ~sep:"-" x)
 end
 
-let status_branch_v v = Fmt.strf "status-%a" Branch_escape.pp_v v
+let of_v = function
+  | `Ref r -> `Ref (Ref.id r)
+  | `PR pr -> `PR (PR.id pr)
+
+let status_branch t = Fmt.strf "status-%a" Branch_escape.pp t
+
+let of_status_branch name =
+  try
+    match String.cuts ~sep:"-" name with
+    | "status" :: rest ->
+      begin match Branch_escape.parse rest with
+        | Some target -> target
+        | None -> CI_utils.failf "Invalid target part"
+      end
+    | _ -> CI_utils.failf "Does not start 'status-'"
+  with ex ->
+    CI_utils.failf "Invalid status branch name %S: %a" name CI_utils.pp_exn ex

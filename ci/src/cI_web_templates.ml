@@ -43,7 +43,7 @@ let state_repo_url t fmt =
   | None -> Error.(uri_path no_state_repo)
 
 let status_history_url t target =
-  state_repo_url t "commits/%s" (CI_target.status_branch_v target)
+  state_repo_url t "commits/%s" (CI_target.status_branch target)
 
 let log_commit_url t commit =
   state_repo_url t "commit/%s" commit
@@ -55,35 +55,26 @@ let log_branch_results_url t branch =
   state_repo_url t "tree/%s" branch
 
 let gh_target_url = function
-  | `PR pr ->
-    let { Repo.user; repo } = PR.repo pr in
-    let id = PR.number pr in
+  | `PR (repo, id) ->
+    let { Repo.user; repo } = repo in
     Printf.sprintf "https://github.com/%s/%s/pull/%d" user repo id
-  | `Ref r ->
-    let { Repo.user; repo } = Ref.repo r in
-    let id = Ref.name r in
+  | `Ref (repo, id) ->
+    let { Repo.user; repo } = repo in
     match id with
     | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user repo (String.concat ~sep:"/" id)
     | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user repo Ref.pp_name id
 
 let metadata_url t = function
-  | `PR pr ->
-    let { Repo.user; repo } = PR.repo pr in
-    let id = PR.number pr in
+  | `PR (repo, id) ->
+    let { Repo.user; repo } = repo in
     state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user repo id
-  | `Ref r ->
-    let { Repo.user; repo } = Ref.repo r in
-    let id = Ref.name r in
+  | `Ref (repo, id) ->
+    let { Repo.user; repo } = repo in
     state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user repo
       Ref.pp_name id
 
-let commit_history_url t target =
-  let { Repo.user; repo }, commit =
-    match target with
-    | `PR pr -> PR.repo pr, PR.commit pr
-    | `Ref r -> Ref.repo r, Ref.commit r
-  in
-  let hash = Commit.hash commit in
+let commit_history_url t target ~hash =
+  let { Repo.user; repo } = CI_target.repo target in
   state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user repo hash
 
 let commit_url ~repo commit =
@@ -693,19 +684,15 @@ let job_row ~csrf_token ~page_url ~best_log (job_name, state) =
     );
   ]
 
-let target_title = function
-  | `PR pr -> Printf.sprintf "PR %d (%s)" (PR.number pr) (PR.title pr)
-  | `Ref r -> Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
+let target_title ~title = function
+  | `PR (_, pr) -> Printf.sprintf "PR %d (%s)" pr title
+  | `Ref (_, r) -> Fmt.strf "Ref %a" Ref.pp_name r
 
-let target_commit = function
-  | `PR pr -> PR.commit_hash pr
-  | `Ref r -> Ref.commit_hash r
+let map_or_none f = function
+  | [] -> [li [pcdata "(none)"]]
+  | xs -> List.map f xs
 
-let target_repo = function
-  | `PR pr -> PR.repo pr
-  | `Ref r -> Ref.repo r
-
-let commit_page ~commit targets t =
+let commit_page ~commit ~archived_targets targets t =
   let title = Fmt.strf "Commit %s" commit in
   let target_link target =
     li [
@@ -714,12 +701,23 @@ let commit_page ~commit targets t =
       ]
     ]
   in
+  let archive_target_link (target, commit) =
+    let commit = CI_utils.DK.Commit.id commit in
+    li [
+      a ~a:[a_href (Fmt.strf "%s?history=%s" (CI_target.path target) commit)] [
+        pcdata (Fmt.to_to_string CI_target.pp target)
+      ]
+    ]
+  in
   page title Nav.Home [
-    p [pcdata (Fmt.strf "Builds of commit %s" commit)];
-    ul (List.map target_link targets);
+    h2 [pcdata (Fmt.strf "Commit %s" commit)];
+    p [pcdata "Current builds:"];
+    ul (map_or_none target_link targets);
+    p [pcdata "Archived builds:"];
+    ul (map_or_none archive_target_link archived_targets);
   ] t
 
-let target_page_url = CI_target.path_v
+let target_page_url = CI_target.path
 
 let state_link commit =
   let url = Fmt.strf "?history=%s" commit in
@@ -742,12 +740,12 @@ let history_nav t target state =
   | [x] -> p (pcdata "Previous state: " :: state_link x :: links)
   | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
 
-let target_page ~csrf_token ~target state t =
+let target_page ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t =
   let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
-  let target = CI_engine.target target in
-  let title = target_title target in
-  let repo = target_repo target in
-  let commit = target_commit target in  (* XXX: get from state *)
+  let title = target_title ~title target in
+  let repo = CI_target.repo target in
+  let commit = CI_history.State.source_commit state in
+  let metadata_commit = CI_history.State.metadata_commit state |> CI_utils.default "MISSING-COMMIT" in
   let page_url = target_page_url target in
   let best_log =
     let best = LogScore.create () in
@@ -760,8 +758,8 @@ let target_page ~csrf_token ~target state t =
   let nav =
     match target with
     | `PR _ -> Nav.PRs
-    | `Ref r ->
-      match Ref.name r with
+    | `Ref (_, r) ->
+      match r with
       | "heads" :: _ -> Nav.Branches
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false
@@ -772,18 +770,21 @@ let target_page ~csrf_token ~target state t =
     | Some best -> Some (logs_frame_link best)
   in
   page ~logs title nav (
-    p [
+    history_nav t target state
+    :: p [
       a ~a:[a_href (gh_target_url target)] [pcdata title];
       pcdata " has head commit ";
-      a ~a:[a_href (commit_url ~repo commit)] [pcdata commit];
+      (match commit with
+       | None -> pcdata "(missing commit info)"
+       | Some commit -> a ~a:[a_href (commit_url ~repo commit)] [pcdata commit]
+      );
       pcdata " [ ";
       a ~a:[a_href (metadata_url t target)] [pcdata "head history"];
       pcdata " ]";
       pcdata " [ ";
-      a ~a:[a_href (commit_history_url t target)] [pcdata "status history for this head"];
+      a ~a:[a_href (commit_history_url t target ~hash:metadata_commit)] [pcdata "status history for this head"];
       pcdata " ]";
     ]
-    :: history_nav t target state
     :: state_summary
   ) t
 

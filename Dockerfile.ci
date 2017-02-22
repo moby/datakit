@@ -1,12 +1,6 @@
-FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
+FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata
-
-RUN opam depext -i opam-devel && sudo cp $(opam config var "opam-devel:lib")/opam /usr/bin/opam
-RUN rm -rf ~/.opam
-RUN opam init -y
-RUN opam install ocaml -y
-RUN opam install depext -y
 
 RUN opam pin add -yn datakit-client.dev https://github.com/docker/datakit.git
 

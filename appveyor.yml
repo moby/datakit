@@ -6,11 +6,11 @@ environment:
   CYG_BASH: "%CYG_ROOT%\\bin\\bash -lc"
   TESTS: "false"
   OPAM_SWITCH: "4.03.0+mingw64c"
-  PINS: "prometheus:https://github.com/mirage/prometheus.git prometheus-app:https://github.com/mirage/prometheus.git datakit-server.dev:. irmin.0.12.0:--dev hvsock:https://github.com/mirage/ocaml-hvsock.git#v0.11.1"
+  PINS: "hvsock:https://github.com/mirage/ocaml-hvsock.git#v0.11.1"
 
 install:
   - appveyor DownloadFile https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/appveyor-opam.sh
-  - "%CYG_ROOT%\\setup-x86.exe -qnNdO -R %CYG_ROOT% -s http://cygwin.mirror.constant.com -l C:/cygwin/var/cache/setup -P rsync -P patch -P diffutils.3.5-1 -P make -P unzip -P git -P perl -P mingw64-x86_64-gcc-core"
+  - "%CYG_ROOT%\\setup-x86.exe -qnNdO -R %CYG_ROOT% -s http://cygwin.mirror.constant.com -l C:/cygwin/var/cache/setup -P rsync -P patch -P diffutils.3.5-1 -P make -P git -P perl -P mingw64-x86_64-gcc-core"
 
 build_script:
   - "%CYG_BASH% '${APPVEYOR_BUILD_FOLDER}/appveyor-opam.sh'"

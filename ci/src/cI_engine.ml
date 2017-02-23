@@ -253,7 +253,7 @@ let recalculate t ~snapshot job =
 let make_job t ~parent name term =
   let head_commit = CI_target.head parent.v in
   t.dk >>= fun dk ->
-  CI_history.lookup t.history dk parent.v >>= fun history ->
+  CI_history.lookup t.history dk (CI_target.of_v parent.v) >>= fun history ->
   let history =
     match CI_history.head history with
     | None -> None
@@ -376,13 +376,14 @@ let flush_states t snapshot =
   t.dk >>= fun dk ->
   (* Update build histories *)
   let record_target (_id, target) =
-    CI_history.lookup t.history dk target.v >>= fun history ->
+    CI_history.lookup t.history dk (CI_target.of_v target.v) >>= fun history ->
     let jobs = target.jobs |> List.map (fun j ->
         match j.state with
         | _, None -> assert false
         | _, Some output -> j.name, output
       ) in
-    CI_history.record history dk snapshot (String.Map.of_list jobs)
+    let source_commit = Commit.hash (CI_target.head target.v) in
+    CI_history.record history dk ~source_commit snapshot (String.Map.of_list jobs)
   in
   t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (_repo, project) ->
       project.open_prs |> PR.Index.bindings |> Lwt_list.iter_s record_target >>= fun () ->
@@ -627,4 +628,4 @@ let targets_of_commit t repo c =
 
 let latest_state t target =
   t.dk >>= fun dk ->
-  CI_history.lookup t.history dk target.v >|= CI_history.head
+  CI_history.lookup t.history dk target >|= CI_history.head

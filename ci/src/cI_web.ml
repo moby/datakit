@@ -134,16 +134,22 @@ class pr_page t = object(self)
     let id = int_of_string id in
     let repo = Repo.v ~user ~repo in
     let prs = CI_engine.prs t.ci in
+    let target = `PR (repo, id) in
     match Repo.Map.find repo prs with
     | None  -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some prs ->
-      match PR.Index.find (repo, id) prs with
-      | None -> Wm.respond 404 rd ~body:(`String "No such open PR")
-      | Some target ->
-        load_jobs t target rd >>= fun commit ->
-        self#session rd >>= fun session_data ->
-        let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.target_page ~csrf_token ~target commit) rd
+      load_jobs t target rd >>= fun commit ->
+      self#session rd >>= fun session_data ->
+      let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
+      let title =
+        match PR.Index.find (repo, id) prs with
+        | None -> None
+        | Some engine_target ->
+          match CI_engine.target engine_target with
+          | `PR pr -> Some (PR.title pr)
+          | _ -> assert false
+      in
+      Wm.continue (CI_web_templates.target_page ~csrf_token ?title ~target commit) rd
 end
 
 class ref_page t = object(self)
@@ -156,17 +162,11 @@ class ref_page t = object(self)
     let repo = Rd.lookup_path_info_exn "repo" rd in
     let id = CI_target.unescape_ref rd.Rd.dispatch_path in
     let repo = Repo.v ~user ~repo in
-    let refs = CI_engine.refs t.ci in
-    match Repo.Map.find repo refs with
-    | None -> Wm.respond 404 rd ~body:(`String "No such project")
-    | Some refs ->
-      match Ref.Index.find (repo, id) refs with
-      | None        -> Wm.respond 404 rd ~body:(`String "No such ref")
-      | Some target ->
-        load_jobs t target rd >>= fun state ->
-        self#session rd >>= fun session_data ->
-        let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-        Wm.continue (CI_web_templates.target_page ~csrf_token ~target state) rd
+    let target = `Ref (repo, id) in
+    load_jobs t target rd >>= fun state ->
+    self#session rd >>= fun session_data ->
+    let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
+    Wm.continue (CI_web_templates.target_page ~csrf_token ~target state) rd
 end
 
 class commit_page t = object
@@ -179,10 +179,19 @@ class commit_page t = object
     let repo = Rd.lookup_path_info_exn "repo" rd in
     let commit = Rd.lookup_path_info_exn "id" rd in
     let repo = Datakit_github.Repo.v ~user ~repo in
-    match CI_engine.targets_of_commit t.ci repo commit with
-    | [] -> Wm.respond 404 rd ~body:(`String "No active targets for this commit")
-    | [t] -> Wm.respond 307 (Rd.redirect (CI_target.path t) rd)
-    | ts -> Wm.continue (CI_web_templates.commit_page ~commit ts) rd
+    let live_targets = CI_engine.targets_of_commit t.ci repo commit in
+    CI_engine.dk t.ci >>= fun dk ->
+    let src_commit = Datakit_github.Commit.v repo commit in
+    CI_history.builds_of_commit dk src_commit >>= fun archived_targets ->
+    let archived_targets =
+      live_targets |> List.fold_left (fun acc target ->
+          CI_target.Map.remove target acc
+        ) archived_targets
+      |> CI_target.Map.bindings
+    in
+    match live_targets, archived_targets with
+    | [t], [] -> Wm.respond 307 (Rd.redirect (CI_target.path t) rd)
+    | _ -> Wm.continue (CI_web_templates.commit_page ~commit ~archived_targets live_targets) rd
 end
 
 let max_escape_length = 20

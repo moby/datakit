@@ -37,7 +37,7 @@ val prs: t -> target PR.Index.t Repo.Map.t
 val refs: t -> target Ref.Index.t Repo.Map.t
 (** [targets t] is a snapshot of the current state of all branches. *)
 
-val latest_state : t -> target -> CI_history.State.t option Lwt.t
+val latest_state : t -> CI_target.t -> CI_history.State.t option Lwt.t
 (** [latest_state t target] is the current state of [target]. *)
 
 val jobs : target -> job list

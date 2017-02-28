@@ -12,7 +12,7 @@ module Workflows = struct
   module T = Term
   open T.Infix
 
-  let circle_success_url = T.ci_success_target_url ["ci"; "circleci"]
+  let circle_success_url = T.ci_success_target_url (Status.context_of_path_exn ["ci"; "circleci"])
 
   let test_circleci_artifact check_build target =
     circle_success_url target >>= fun url ->
@@ -593,9 +593,9 @@ let test_live_logs conn =
     Lwt.return ()
 
 module Jobs = struct
-  type t = string CI_output.t String.Map.t
-  let equal = String.Map.equal CI_output.equal
-  let pp = String.Map.dump (CI_output.pp String.pp)
+  type t = string CI_output.t CI_utils.Job_map.t
+  let equal = CI_utils.Job_map.equal CI_output.equal
+  let pp = CI_utils.Job_map.dump (Fmt.Dump.pair Datakit_path.Step.pp (CI_output.pp String.pp))
 end
 
 module DK_Commit = struct
@@ -605,6 +605,8 @@ end
 
 let test_history conn =
   let module DK = CI_utils.DK in
+  let module Job_map = CI_utils.Job_map in
+  let j = Datakit_path.Step.of_string_exn in
   let ( >>*= ) x f =
     x >>= function
     | Ok x -> f x
@@ -630,10 +632,10 @@ let test_history conn =
   let live = CI_live_log.create ~pending:"Pending" ~branch:"log-123" ~title:"Build" logs in
   let saved = { CI_output.title = "Build"; commit = "567"; branch = "build-of-123"; failed = false;
                 rebuild = `Rebuildable (lazy Lwt.return_unit) } in
-  let s1 = String.Map.of_list [
-      "one", (Ok "Success", CI_output.Empty);
-      "two", (Error (`Failure "Failed"), CI_output.Saved saved);
-      "three", (Error (`Pending "Testing"), CI_output.Live live);
+  let s1 = Job_map.of_list [
+      j "one", (Ok "Success", CI_output.Empty);
+      j "two", (Error (`Failure "Failed"), CI_output.Saved saved);
+      j "three", (Error (`Pending "Testing"), CI_output.Live live);
     ]
   in
   let metadata_commit = DK.commit dk "abc" in
@@ -643,9 +645,9 @@ let test_history conn =
   CI_history.record master_h dk ~source_commit metadata_commit s1 >>= fun () ->
   CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.parents |> Alcotest.(check (list string)) "No changes" [];
   (* Record s2 *)
-  let s2 = String.Map.of_list [
-      "one", (Ok "Success", CI_output.Empty);
-      "two", (Error (`Failure "Failed2"), CI_output.Saved saved);
+  let s2 = Job_map.of_list [
+      j "one", (Ok "Success", CI_output.Empty);
+      j "two", (Error (`Failure "Failed2"), CI_output.Saved saved);
     ]
   in
   CI_history.record master_h dk ~source_commit metadata_commit s2 >>= fun () ->
@@ -660,7 +662,7 @@ let test_history conn =
   (* Check saved s1 *)
   CI_history.load (DK.commit dk head1) >>= fun loaded1 ->
   Alcotest.(check (option string)) "Source commit" (Some "123") (CI_history.State.source_commit loaded1);
-  let s1_expected = s1 |> String.Map.add "three" (Error (`Pending "Testing"), CI_output.Empty) in
+  let s1_expected = s1 |> Job_map.add (j "three") (Error (`Pending "Testing"), CI_output.Empty) in
   Alcotest.check jobs_t "Loaded" s1_expected (CI_history.State.jobs loaded1);
   (* Check index *)
   CI_history.builds_of_commit dk head >|= CI_target.Map.bindings >>= fun builds ->

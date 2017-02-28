@@ -20,8 +20,6 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   (* conversion between GitHub and DataKit states. *)
 
-  let path s = Datakit_path.of_steps_exn s
-
   let safe_remove t path =
     DK.Transaction.remove t path >|= function
     | Error _ | Ok () -> ()
@@ -97,7 +95,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
             | ["commit"; id] -> Some (`Commit (Commit.v repo id))
             | "commit" :: id :: "status" :: (_ :: _ :: _ as tl) ->
               let _, last = rdecons tl in
-              Some (`Status ((Commit.v repo id), last))
+              Some (`Status ((Commit.v repo id), Status.context_of_path_exn last))
             | "ref" :: ( _ :: _ :: _ as tl)  ->
               let f, last = rdecons tl in
               let r = `Ref (repo, last) in
@@ -130,7 +128,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
           safe_exists_file tree (dir / file) >>= function
           | false -> aux acc todo
           | true ->
-            fn (Datakit_path.unwrap ctx) >>= function
+            fn ctx >>= function
             | None   -> aux acc todo
             | Some e -> aux (Set.add e acc) todo
     in
@@ -311,7 +309,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let update_status t s =
     let dir = root (Status.repo s) / "commit" / (Status.commit_hash s)
-              / "status" /@ path (Status.context s)
+              / "status" /@ Status.context s
     in
     Log.debug (fun l -> l "update_status %a" Datakit_path.pp dir);
     lift_errors "update_status" (DK.Transaction.make_dirs t dir) >>= fun () ->
@@ -333,7 +331,6 @@ module Make (DK: Datakit_S.CLIENT) = struct
       ) kvs
 
   let status tree (commit, context) =
-    let context = Datakit_path.of_steps_exn context in
     let dir =
       root (Commit.repo commit) / "commit" / Commit.hash commit / "status"
       /@ context
@@ -351,10 +348,9 @@ module Make (DK: Datakit_S.CLIENT) = struct
           `Failure
       in
       Log.debug (fun l -> l "status %a -> %a"
-                    Datakit_path.pp context Status_state.pp state);
+                    Status.pp_context context Status_state.pp state);
       safe_read_file tree (dir / "description") >>= fun description ->
       safe_read_file tree (dir / "target_url")  >|= fun url ->
-      let context = Datakit_path.unwrap context in
       let url = mapo Uri.of_string url in
       Some (Status.v ?description ?url commit context state)
 
@@ -399,7 +395,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let refs_of_repo tree repo =
     let dir = root repo / "ref" in
-    walk (module Ref.Set) tree dir ("head", fun n -> ref tree (repo, n)) >|=
+    walk (module Ref.Set) tree dir ("head", fun n -> ref tree (repo, Datakit_path.unwrap n)) >|=
     fun refs ->
     Log.debug (fun l ->
         l "refs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Ref.Set.pp refs);
@@ -486,7 +482,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let dirty_refs tree repo =
     let dir = root repo / "ref" in
-    let r name = Lwt.return (Some (`Ref (repo, name))) in
+    let r name = Lwt.return (Some (`Ref (repo, Datakit_path.unwrap name))) in
     walk (module Elt.IdSet) tree dir (".dirty", r)
 
   let dirty_of_commit c: dirty Lwt.t =
@@ -647,8 +643,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | `Ref r     -> remove_ref tr r
     | `Status (h, c) ->
       let dir =
-        root (Commit.repo h) / "commit" / Commit.hash h / "status"
-        /@ path c
+        root (Commit.repo h) / "commit" / Commit.hash h / "status" /@ c
       in
       safe_remove tr dir
     | `Commit c ->

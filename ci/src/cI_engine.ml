@@ -40,7 +40,7 @@ module Metrics = struct
 end
 
 type job = {
-  name : string;
+  name : Datakit_path.Step.t;
   parent : target;
   term_lock : Lwt_mutex.t;         (* Held while evaluating term *)
   mutable term : string CI_term.t;
@@ -61,7 +61,7 @@ let job_id job =
     | `PR pr -> `PR (PR.id pr)
     | `Ref r -> `Ref (Ref.id r)
   in
-  target, job.name
+  target, (job.name :> string)
 
 let pp_target f target =
   match target.v with
@@ -73,7 +73,7 @@ let repo t = match t.v with
   | `Ref r -> Ref.repo r
 
 let pp_job f j =
-  Fmt.pf f "%a:%s" pp_target j.parent j.name
+  Fmt.pf f "%a:%s" pp_target j.parent (j.name :> string)
 
 let pp_job_state f job =
   match job.state with
@@ -89,10 +89,10 @@ let title pr =
   | `Ref r -> Fmt.strf "Ref %a" Ref.pp_name (Ref.name r)
 
 let jobs pr = pr.jobs
-let job_name j = j.name
+let job_name j = (j.name :> string)
 
 type project = {
-  make_terms : CI_target.t -> string CI_term.t String.Map.t;
+  make_terms : CI_target.t -> string CI_term.t Job_map.t;
   canaries : CI_target.Set.t option;
   mutable open_prs : target PR.Index.t;
   mutable refs : target Ref.Index.t;
@@ -189,7 +189,8 @@ let monitor t ?switch fn =
   | `Abort -> `Abort
   | `Finish `Never -> assert false
 
-let datakit_ci x = ["ci"; "datakit"; x]
+let datakit_ci_prefix = Datakit_path.of_steps_exn ["ci"; "datakit"]
+let datakit_ci x = datakit_ci_prefix @ [x]
 
 let reconnect t =
   match Lwt.state t.dk with
@@ -257,7 +258,7 @@ let make_job t ~parent name term =
   let history =
     match CI_history.head history with
     | None -> None
-    | Some head -> String.Map.find name (CI_history.State.jobs head)
+    | Some head -> Job_map.find name (CI_history.State.jobs head)
   in
   let hash = Commit.hash head_commit in
   Lwt.return {
@@ -361,14 +362,13 @@ let set_status t tr job =
     let { Repo.user; repo } = CI_target.repo_v target.v in
     let hash = Commit.hash commit in
     let url = Uri.with_path t.web_ui (Fmt.strf "/%s/%s/commit/%s" user repo hash) in
-    Log.debug (fun f -> f "Set state of %a: %s = %a"
+    Log.debug (fun f -> f "Set state of %a: %a = %a"
                   Commit.pp_hash hash
-                  job.name
+                  Datakit_path.Step.pp job.name
                   Status_state.pp status
               );
     let status =
-      let ci = datakit_ci job.name in
-      Status.v ~description:descr ~url commit ci status
+      Status.v ~description:descr ~url commit (datakit_ci job.name) status
     in
     Conv.update_elt tr (`Status status)
 
@@ -383,7 +383,7 @@ let flush_states t snapshot =
         | _, Some output -> j.name, output
       ) in
     let source_commit = Commit.hash (CI_target.head target.v) in
-    CI_history.record history dk ~source_commit snapshot (String.Map.of_list jobs)
+    CI_history.record history dk ~source_commit snapshot (Job_map.of_list jobs)
   in
   t.projects |> Repo.Map.bindings |> Lwt_list.iter_s (fun (_repo, project) ->
       project.open_prs |> PR.Index.bindings |> Lwt_list.iter_s record_target >>= fun () ->
@@ -467,7 +467,7 @@ let recalc_loop t ~snapshot_ref =
       | None ->
         let open_pr = { v = `PR pr; jobs = [] } in
         let terms = project.make_terms (`PR id) in
-        String.Map.bindings terms
+        Job_map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
             make_job t ~parent:open_pr name term)
         >>= fun jobs ->
@@ -487,7 +487,7 @@ let recalc_loop t ~snapshot_ref =
       | None ->
         let target = { v = `Ref r; jobs = []; } in
         let terms = project.make_terms @@ `Ref id in
-        String.Map.bindings terms
+        Job_map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
             make_job t ~parent:target name term)
         >>= fun jobs ->

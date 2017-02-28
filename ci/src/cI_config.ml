@@ -5,7 +5,7 @@ type test = string CI_term.t
 
 type project = {
   dashboards : CI_target.Set.t;
-  tests : CI_target.t -> test String.Map.t;
+  tests : CI_target.t -> test CI_utils.Job_map.t;
 }
 
 type t = {
@@ -20,7 +20,14 @@ let project ~id ?(dashboards=["master"]) tests =
     | None -> CI_utils.failf "Invalid repo ID %S" id
     | Some r -> r
   in
-  let tests x = String.Map.of_list (tests x) in
+  let tests x =
+    tests x
+    |> List.map (fun (name, term) ->
+        match Datakit_path.Step.of_string name with
+        | Ok name -> name, term
+        | Error msg -> Datakit_path.Step.of_string_exn "invalid-name", CI_term.fail "Invalid job name: %s" msg
+      )
+    |> CI_utils.Job_map.of_list in
   let dashboards = CI_target.Set.of_list (List.map (id_of_branch id) dashboards) in
   id, {tests; dashboards}
 

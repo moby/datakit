@@ -2,6 +2,8 @@ open Datakit_github
 open! Astring
 open! Tyxml.Html
 
+module Job_map = CI_utils.Job_map
+
 type t = {
   name : string;
   state_repo : Uri.t option;
@@ -677,7 +679,7 @@ let job_row ~csrf_token ~page_url ~best_log (job_name, state) =
     | Some state -> state
   in
   tr [
-    th [pcdata job_name];
+    th [pcdata (Datakit_path.Step.to_string job_name)];
     td [status (CI_output.status output)];
     td (
       logs ~csrf_token ~page_url ~selected:best_log output
@@ -741,7 +743,7 @@ let history_nav t target state =
   | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
 
 let target_page ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t =
-  let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
+  let jobs = CI_history.State.jobs state |> Job_map.bindings |> List.map (fun (name, s) -> name, Some s) in
   let title = target_title ~title target in
   let repo = CI_target.repo target in
   let commit = CI_history.State.source_commit state in

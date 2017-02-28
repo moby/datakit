@@ -248,21 +248,24 @@ end
 
 module Status = struct
 
-  type context = string list
+  type context = Datakit_path.t
 
   type t = {
     commit: Commit.t;
-    context: string list;
+    context: context;
     url: Uri.t option;
     description: string option;
     state: Status_state.t;
   }
 
-  type id = Commit.t * string list
+  type id = Commit.t * context
 
   let context t = match t.context with
-    | [] -> ["default"]
+    | [] -> Datakit_path.of_steps_exn ["default"]
     | l  -> l
+
+  let context_of_path = Datakit_path.of_steps
+  let context_of_path_exn = Datakit_path.of_steps_exn
 
   let id t = t.commit, t.context
   let repo t = t.commit.Commit.repo
@@ -270,7 +273,7 @@ module Status = struct
   let description t = t.description
   let state t = t.state
   let url t = t.url
-  let pp_context = pp_path
+  let pp_context = Datakit_path.pp
   let commit_hash t = t.commit.Commit.hash
   let same_id x y = commit x = commit y && context x = context y
   let compare_repo x y = Repo.compare (repo x) (repo y)
@@ -323,16 +326,16 @@ module Status = struct
   let pp ppf t =
     Fmt.pf ppf "{%a %s:%a[%a]%a%a}"
       Repo.pp (repo t) (commit_hash t)
-      pp_path t.context
+      pp_context t.context
       Status_state.pp t.state
       (pp_opt "url") (map Uri.to_string t.url)
       (pp_opt "descr") t.description
 
-  let pp_id ppf (c, s) = Fmt.pf ppf "{%a %a}" Commit.pp c pp_path s
+  let pp_id ppf (c, s) = Fmt.pf ppf "{%a %a}" Commit.pp c Datakit_path.pp s
 
   let compare_id =
     let compare_commit x y = Commit.compare (fst x) (fst y) in
-    let compare_context x y = Pervasives.compare (snd x) (snd y) in
+    let compare_context x y = Datakit_path.compare (snd x) (snd y) in
     compare_fold [ compare_commit; compare_context ]
 
   module Set = struct
@@ -947,7 +950,7 @@ module Capabilities = struct
     | `Repo of string list
     | `PR
     | `Commit
-    | `Status of string list
+    | `Status of Status.context
     | `Ref
     | `Webhook
   ]
@@ -960,7 +963,7 @@ module Capabilities = struct
     | `PR        -> Fmt.string ppf "pr"
     | `Commit    -> Fmt.string ppf "commit"
     | `Status [] -> Fmt.string ppf "status"
-    | `Status p  -> Fmt.pf ppf "status[%a]" pp_path p
+    | `Status p  -> Fmt.pf ppf "status[%a]" Datakit_path.pp p
     | `Ref       -> Fmt.string ppf "ref"
     | `Webhook   -> Fmt.string ppf "webhook"
 
@@ -984,7 +987,7 @@ module Capabilities = struct
     | "*"       -> `Default
     | s         ->
       match parse_kv s with
-      | Some ("status", l) -> `Status l
+      | Some ("status", l) -> `Status (Datakit_path.of_steps_exn l)
       | Some ("repo"  , l) -> `Repo l
       | _                  -> raise (Error (s, "invalid resource"))
 

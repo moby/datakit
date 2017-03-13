@@ -2,6 +2,9 @@ FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata
 
+# Hack: help the opam solver out a bit...
+RUN opam pin add cmdliner 0.9.8
+
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term
 
 # cache opam install of dependencies

@@ -18,7 +18,7 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "cmdliner"
+  "cmdliner"    {<"1.0.0"}
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.9.3"}
   "mirage-tc" "uri"

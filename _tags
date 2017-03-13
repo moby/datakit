@@ -11,7 +11,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 
 ### datakit-server
 
-<src/datakit-server/*>: package(protocol-9p.unix)
+<src/datakit-server/*>: package(protocol-9p.unix, mirage-types)
 
 ### datakit
 

@@ -16,6 +16,8 @@ val active : t -> int
 
 val capacity : t -> int
 
+val qlen : t -> int
+
 val users : t -> ((CI_s.job_id * string option) * CI_live_log.t option) list
 (** [users t] is the list of reasons why resources are being used, one per resource, and (optionally) its
     log (through which it may be possible to cancel the job). *)

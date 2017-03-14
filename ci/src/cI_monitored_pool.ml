@@ -30,6 +30,7 @@ end
 type t = {
   label: string;
   capacity: int;
+  mutable qlen : int;
   mutable active: int;
   pool: unit Lwt_pool.t;
   mutable users : ((CI_s.job_id * string option) * CI_live_log.t option) list;
@@ -39,7 +40,7 @@ let registered_pools = ref String.Map.empty
 
 let create label capacity =
   let pool = Lwt_pool.create capacity Lwt.return in
-  let t = { label; capacity; active = 0; pool; users = [] } in
+  let t = { label; capacity; qlen = 0; active = 0; pool; users = [] } in
   assert (not (String.Map.mem label !registered_pools));
   registered_pools := String.Map.add label t !registered_pools;
   Prometheus.Gauge.set (Metrics.capacity label) (float_of_int capacity);
@@ -53,24 +54,33 @@ let rec remove_first msg = function
 let use ?log t ~reason fn =
   let qlen = Metrics.qlen t.label in
   Prometheus.Gauge.inc_one qlen;
+  t.qlen <- t.qlen + 1;
+  let dec = lazy (
+    Prometheus.Gauge.dec_one qlen;
+    t.qlen <- t.qlen - 1;
+  ) in
   let start_wait = Unix.gettimeofday () in
-  Lwt_pool.use t.pool
-    (fun v ->
-       Prometheus.Gauge.dec_one qlen;
-       let stop_wait = Unix.gettimeofday () in
-       Prometheus.Summary.observe (Metrics.wait_time t.label) (stop_wait -. start_wait);
-       t.active <- t.active + 1;
-       t.users <- (reason, log) :: t.users;
-       Prometheus.Gauge.track_inprogress (Metrics.resources_in_use t.label) @@ fun () ->
-       Lwt.finalize
-         (fun () -> fn v)
-         (fun () ->
-            let stop_use = Unix.gettimeofday () in
-            Prometheus.Summary.observe (Metrics.use_time t.label) (stop_use -. stop_wait);
-            t.active <- t.active - 1;
-            t.users <- remove_first reason t.users;
-            Lwt.return_unit)
+  Lwt.finalize
+    (fun () ->
+       Lwt_pool.use t.pool
+         (fun v ->
+            Lazy.force dec;
+            let stop_wait = Unix.gettimeofday () in
+            Prometheus.Summary.observe (Metrics.wait_time t.label) (stop_wait -. start_wait);
+            t.active <- t.active + 1;
+            t.users <- (reason, log) :: t.users;
+            Prometheus.Gauge.track_inprogress (Metrics.resources_in_use t.label) @@ fun () ->
+            Lwt.finalize
+              (fun () -> fn v)
+              (fun () ->
+                 let stop_use = Unix.gettimeofday () in
+                 Prometheus.Summary.observe (Metrics.use_time t.label) (stop_use -. stop_wait);
+                 t.active <- t.active - 1;
+                 t.users <- remove_first reason t.users;
+                 Lwt.return_unit)
+         )
     )
+    (fun () -> Lazy.force dec; Lwt.return ())
 
 let use t ?log ?label job_id fn =
   let reason = (job_id, label) in
@@ -82,5 +92,6 @@ let use t ?log ?label job_id fn =
 
 let active t = t.active
 let capacity t = t.capacity
+let qlen t = t.qlen
 let pools () = !registered_pools
 let users t = t.users

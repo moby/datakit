@@ -405,10 +405,15 @@ let html_of_user ~csrf_token ((job, label), log) =
 
 let resource_pools ~csrf_token =
   let items =
-    let open CI_monitored_pool in
-    String.Map.bindings (pools ()) |> List.map (fun (name, pool) ->
-        let used = Fmt.strf "%d / %d" (active pool) (capacity pool) in
-        let uses = users pool |> List.map (html_of_user ~csrf_token) |> List.concat in
+    String.Map.bindings (CI_monitored_pool.pools ()) |> List.map (fun (name, pool) ->
+        let active = CI_monitored_pool.active pool in
+        let capacity = CI_monitored_pool.capacity pool in
+        let qlen = CI_monitored_pool.qlen pool in
+        let used =
+          if active < capacity then Fmt.strf "%d / %d" active capacity
+          else Fmt.strf "%d / %d [%d queued]" active capacity qlen
+        in
+        let uses = CI_monitored_pool.users pool |> List.map (html_of_user ~csrf_token) |> List.concat in
         tr [th [pcdata name]; td (pcdata used :: uses)];
       )
   in

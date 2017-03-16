@@ -21,11 +21,12 @@ type Record struct {
 	schemaF   *IntField
 	fields    []*StringRefField // registered fields, for schema upgrades
 	overrideB string            // name of the branch containing user-specified overrides
+	defaultsB string            // name of the branch containing built-in defaults
 	w         *Watch
 	onUpdate  [](func(*Snapshot, Version))
 }
 
-func NewRecord(ctx context.Context, client *Client, overrideB string, path []string) (*Record, error) {
+func NewRecord(ctx context.Context, client *Client, overrideB string, defaultsB string, path []string) (*Record, error) {
 	if err := client.Mkdir(ctx, "branch", overrideB); err != nil {
 		return nil, err
 	}
@@ -41,6 +42,7 @@ func NewRecord(ctx context.Context, client *Client, overrideB string, path []str
 		version:   InitialVersion,
 		fields:    fields,
 		overrideB: overrideB,
+		defaultsB: defaultsB,
 		w:         w,
 		onUpdate:  onUpdate,
 	}
@@ -71,7 +73,7 @@ func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
 	r.schemaF.raw.defaultValue = &defaultString
 	// Create defaults branch
 	log.Printf("Performing schema upgrade to version %d\n", schemaVersion)
-	t, err := NewTransaction(ctx, r.client, "master", "defaults")
+	t, err := NewTransaction(ctx, r.client, r.defaultsB, r.defaultsB+".Upgrade")
 	if err != nil {
 		return err
 	}
@@ -88,7 +90,7 @@ func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
 		}
 	}
 
-	// Merge branch to master
+	// Merge to the defaults branch
 	err = t.Commit(ctx, fmt.Sprintf("Upgrade to schema version %d", schemaVersion))
 	if err != nil {
 		return err
@@ -108,7 +110,7 @@ func (r *Record) fillInDefault(path []string, valueref *string) error {
 	}
 	value := *valueref
 	ctx := context.Background()
-	head, err := Head(ctx, r.client, "master")
+	head, err := Head(ctx, r.client, r.defaultsB)
 	if err != nil {
 		return err
 	}
@@ -123,7 +125,7 @@ func (r *Record) fillInDefault(path []string, valueref *string) error {
 		// there is a value already
 		return nil
 	}
-	t, err := NewTransaction(ctx, r.client, "master", "fill-in-default")
+	t, err := NewTransaction(ctx, r.client, r.defaultsB, r.defaultsB+".fillInDefault")
 	if err != nil {
 		return err
 	}
@@ -140,7 +142,7 @@ func (r *Record) SetMultiple(description string, fields []*StringField, values [
 		return fmt.Errorf("Length of fields and values is not equal")
 	}
 	ctx := context.Background()
-	t, err := NewTransaction(ctx, r.client, "master", description)
+	t, err := NewTransaction(ctx, r.client, r.overrideB, description)
 	if err != nil {
 		return err
 	}
@@ -170,7 +172,7 @@ func (f *StringRefField) Set(description string, value *string) error {
 	ctx := context.Background()
 	p := append(f.record.path, f.path...)
 	log.Printf("Setting value in store: %#v=%#v\n", p, value)
-	t, err := NewTransaction(ctx, f.record.client, "master", description)
+	t, err := NewTransaction(ctx, f.record.client, f.record.overrideB, description)
 	if err != nil {
 		return err
 	}

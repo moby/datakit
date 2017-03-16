@@ -20,19 +20,23 @@ type Record struct {
 	version   Version
 	schemaF   *IntField
 	fields    []*StringRefField // registered fields, for schema upgrades
-	overrideB string            // name of the branch containing user-specified overrides
+	lookupB   []string          // priority ordered list of branches to look up values in
 	defaultsB string            // name of the branch containing built-in defaults
-	w         *Watch
+	ws        []*Watch
 	onUpdate  [](func(*Snapshot, Version))
 }
 
-func NewRecord(ctx context.Context, client *Client, overrideB string, defaultsB string, path []string) (*Record, error) {
-	if err := client.Mkdir(ctx, "branch", overrideB); err != nil {
-		return nil, err
-	}
-	w, err := NewWatch(ctx, client, overrideB, path)
-	if err != nil {
-		return nil, err
+func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB string, path []string) (*Record, error) {
+	ws := make([]*Watch, 0)
+	for _, b := range lookupB {
+		if err := client.Mkdir(ctx, "branch", b); err != nil {
+			return nil, err
+		}
+		w, err := NewWatch(ctx, client, b, path)
+		if err != nil {
+			return nil, err
+		}
+		ws = append(ws, w)
 	}
 	onUpdate := make([](func(*Snapshot, Version)), 0)
 	fields := make([]*StringRefField, 0)
@@ -41,9 +45,9 @@ func NewRecord(ctx context.Context, client *Client, overrideB string, defaultsB 
 		path:      path,
 		version:   InitialVersion,
 		fields:    fields,
-		overrideB: overrideB,
+		lookupB:   lookupB,
 		defaultsB: defaultsB,
-		w:         w,
+		ws:        ws,
 		onUpdate:  onUpdate,
 	}
 	r.schemaF = r.IntField("schema-version", 1)
@@ -51,7 +55,7 @@ func NewRecord(ctx context.Context, client *Client, overrideB string, defaultsB 
 }
 
 func (r *Record) Wait(ctx context.Context) error {
-	snapshot, err := r.w.Next(ctx)
+	snapshot, err := r.ws[0].Next(ctx)
 	if err != nil {
 		return err
 	}
@@ -142,7 +146,7 @@ func (r *Record) SetMultiple(description string, fields []*StringField, values [
 		return fmt.Errorf("Length of fields and values is not equal")
 	}
 	ctx := context.Background()
-	t, err := NewTransaction(ctx, r.client, r.overrideB, description)
+	t, err := NewTransaction(ctx, r.client, r.lookupB[0], description)
 	if err != nil {
 		return err
 	}
@@ -172,7 +176,7 @@ func (f *StringRefField) Set(description string, value *string) error {
 	ctx := context.Background()
 	p := append(f.record.path, f.path...)
 	log.Printf("Setting value in store: %#v=%#v\n", p, value)
-	t, err := NewTransaction(ctx, f.record.client, f.record.overrideB, description)
+	t, err := NewTransaction(ctx, f.record.client, f.record.lookupB[0], description)
 	if err != nil {
 		return err
 	}

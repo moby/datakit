@@ -29,6 +29,18 @@ type Record struct {
 func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB string, path []string) (*Record, error) {
 	event := make(chan (interface{}), 0)
 	for _, b := range lookupB {
+		// Create the branch if it doesn't exist
+		t, err := NewTransaction(ctx, client, b, b+".init")
+		if err != nil {
+			log.Fatalf("Failed to open a new transaction: %#v", err)
+		}
+		if err = t.Write(ctx, []string{"branch-created"}, ""); err != nil {
+			log.Fatalf("Failed to write branch-created: %#v", err)
+		}
+		if err = t.Commit(ctx, "Creating branch"); err != nil {
+			log.Fatalf("Failed to commit transaction: %#v", err)
+		}
+
 		if err := client.Mkdir(ctx, "branch", b); err != nil {
 			return nil, err
 		}

@@ -22,12 +22,12 @@ type Record struct {
 	fields    []*StringRefField // registered fields, for schema upgrades
 	lookupB   []string          // priority ordered list of branches to look up values in
 	defaultsB string            // name of the branch containing built-in defaults
-	ws        []*Watch
-	onUpdate  [](func(*Snapshot, Version))
+	event     chan (interface{})
+	onUpdate  [](func([]*Snapshot, Version))
 }
 
 func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB string, path []string) (*Record, error) {
-	ws := make([]*Watch, 0)
+	event := make(chan (interface{}), 0)
 	for _, b := range lookupB {
 		if err := client.Mkdir(ctx, "branch", b); err != nil {
 			return nil, err
@@ -36,9 +36,18 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 		if err != nil {
 			return nil, err
 		}
-		ws = append(ws, w)
+		go func() {
+			for {
+				_, err := w.Next(ctx)
+				if err != nil {
+					return
+				}
+				log.Printf("Snapshot has changed\n")
+				event <- 0
+			}
+		}()
 	}
-	onUpdate := make([](func(*Snapshot, Version)), 0)
+	onUpdate := make([](func([]*Snapshot, Version)), 0)
 	fields := make([]*StringRefField, 0)
 	r := &Record{
 		client:    client,
@@ -47,7 +56,7 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 		fields:    fields,
 		lookupB:   lookupB,
 		defaultsB: defaultsB,
-		ws:        ws,
+		event:     event,
 		onUpdate:  onUpdate,
 	}
 	r.schemaF = r.IntField("schema-version", 1)
@@ -55,13 +64,19 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 }
 
 func (r *Record) Wait(ctx context.Context) error {
-	snapshot, err := r.ws[0].Next(ctx)
-	if err != nil {
-		return err
+	<-r.event
+	snapshots := make([]*Snapshot, 0)
+	for _, b := range r.lookupB {
+		head, err := Head(ctx, r.client, b)
+		if err != nil {
+			return err
+		}
+		snap := NewSnapshot(ctx, r.client, COMMIT, head)
+		snapshots = append(snapshots, snap)
 	}
 	r.version = r.version + 1
 	for _, fn := range r.onUpdate {
-		fn(snapshot, r.version)
+		fn(snapshots, r.version)
 	}
 	return nil
 }
@@ -209,25 +224,27 @@ func (f *StringRefField) HasChanged(version Version) bool {
 // key and default value
 func (f *Record) StringRefField(key string, value *string) *StringRefField {
 	path := strings.Split(key, "/")
-
 	field := &StringRefField{path: path, value: value, defaultValue: value, version: InitialVersion, record: f}
 	// If the value is not in the database, write the default Value.
 	err := f.fillInDefault(path, value)
 	if err != nil {
 		log.Println("Failed to write default value", key, "=", value)
 	}
-	fn := func(snap *Snapshot, version Version) {
+	fn := func(snaps []*Snapshot, version Version) {
 		ctx := context.Background()
 		var newValue *string
-		v, err := snap.Read(ctx, path)
-		if err != nil {
-			if err != enoent {
-				log.Println("Failed to read key", key, "from directory snapshot", snap)
-				return
+		for _, snap := range snaps {
+			v, err := snap.Read(ctx, append(f.path, path...))
+			if err != nil {
+				if err != enoent {
+					log.Println("Failed to read key", key, "from directory snapshot", snap)
+					return
+				}
+				// if enoent then newValue == nil
+			} else {
+				newValue = &v
+				break
 			}
-			// if enoent then newValue == nil
-		} else {
-			newValue = &v
 		}
 		if (field.value == nil && newValue != nil) || (field.value != nil && newValue == nil) || (field.value != nil && newValue != nil && *field.value != *newValue) {
 			field.value = newValue

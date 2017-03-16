@@ -15,27 +15,35 @@ var InitialVersion = Version(0)
 
 // Record is a typed view on top of a database branch
 type Record struct {
-	client   *Client
-	path     []string // directory inside the store
-	version  Version
-	schemaF  *IntField
-	fields   []*StringRefField // registered fields, for schema upgrades
-	branch   string
-	w        *Watch
-	onUpdate [](func(*Snapshot, Version))
+	client    *Client
+	path      []string // directory inside the store
+	version   Version
+	schemaF   *IntField
+	fields    []*StringRefField // registered fields, for schema upgrades
+	overrideB string            // name of the branch containing user-specified overrides
+	w         *Watch
+	onUpdate  [](func(*Snapshot, Version))
 }
 
-func NewRecord(ctx context.Context, client *Client, branch string, path []string) (*Record, error) {
-	if err := client.Mkdir(ctx, "branch", branch); err != nil {
+func NewRecord(ctx context.Context, client *Client, overrideB string, path []string) (*Record, error) {
+	if err := client.Mkdir(ctx, "branch", overrideB); err != nil {
 		return nil, err
 	}
-	w, err := NewWatch(ctx, client, branch, path)
+	w, err := NewWatch(ctx, client, overrideB, path)
 	if err != nil {
 		return nil, err
 	}
 	onUpdate := make([](func(*Snapshot, Version)), 0)
 	fields := make([]*StringRefField, 0)
-	r := &Record{client: client, path: path, version: InitialVersion, fields: fields, w: w, onUpdate: onUpdate}
+	r := &Record{
+		client:    client,
+		path:      path,
+		version:   InitialVersion,
+		fields:    fields,
+		overrideB: overrideB,
+		w:         w,
+		onUpdate:  onUpdate,
+	}
 	r.schemaF = r.IntField("schema-version", 1)
 	return r, nil
 }

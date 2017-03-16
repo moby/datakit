@@ -69,7 +69,7 @@ func (s *Snapshot) Read(ctx context.Context, path []string) (string, error) {
 		return "", err
 	}
 	defer file.Close(ctx)
-	reader := file.NewFileReader(ctx)
+	reader := file.NewIOReader(ctx, 0)
 	buf := bytes.NewBuffer(nil)
 	io.Copy(buf, reader)
 	return string(buf.Bytes()), nil

@@ -88,7 +88,8 @@ func (t *transaction) Write(ctx context.Context, path []string, value string) er
 		return err
 	}
 	defer file.Close(ctx)
-	_, err = file.Write(ctx, []byte(value), 0)
+	writer := file.NewIOWriter(ctx, 0)
+	_, err = writer.Write([]byte(value))
 	if err != nil {
 		log.Println("Failed to Write", path, "=", value, ":", err)
 		return err

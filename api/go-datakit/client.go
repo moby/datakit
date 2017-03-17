@@ -181,7 +181,10 @@ func (c *Client) Create(ctx context.Context, path ...string) (*File, error) {
 	dir := path[0 : len(path)-1]
 	_, err = c.session.Walk(ctx, fid, fid, dir...)
 	if err != nil {
-		log.Println("Failed to Walk to", path, err)
+		if err != enoent {
+			// This is a common error
+			log.Println("Failed to Walk to", path, err)
+		}
 		c.freeFid(ctx, fid)
 		return nil, err
 	}
@@ -202,7 +205,10 @@ func (c *Client) Open(ctx context.Context, mode p9p.Flag, path ...string) (*File
 	}
 	_, err = c.session.Walk(ctx, fid, fid, path...)
 	if err != nil {
-		log.Println("Failed to Walk to", path, err)
+		if err != enoent {
+			// This is a common error
+			log.Println("Failed to Walk to", path, err)
+		}
 		c.freeFid(ctx, fid)
 		return nil, err
 	}

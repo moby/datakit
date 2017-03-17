@@ -22,13 +22,14 @@ type Record struct {
 	fields    []*StringRefField // registered fields, for schema upgrades
 	lookupB   []string          // priority ordered list of branches to look up values in
 	defaultsB string            // name of the branch containing built-in defaults
+	stateB    string            // name of the branch containing run-time state
 	event     chan (interface{})
 	onUpdate  [](func([]*Snapshot, Version))
 }
 
-func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB string, path []string) (*Record, error) {
+func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB string, stateB string, path []string) (*Record, error) {
 	event := make(chan (interface{}), 0)
-	for _, b := range lookupB {
+	for _, b := range append(lookupB, stateB) {
 		// Create the branch if it doesn't exist
 		t, err := NewTransaction(ctx, client, b, b+".init")
 		if err != nil {
@@ -40,7 +41,8 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 		if err = t.Commit(ctx, "Creating branch"); err != nil {
 			log.Fatalf("Failed to commit transaction: %#v", err)
 		}
-
+	}
+	for _, b := range lookupB {
 		if err := client.Mkdir(ctx, "branch", b); err != nil {
 			return nil, err
 		}
@@ -68,6 +70,7 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 		fields:    fields,
 		lookupB:   lookupB,
 		defaultsB: defaultsB,
+		stateB:    stateB,
 		event:     event,
 		onUpdate:  onUpdate,
 	}
@@ -75,8 +78,7 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 	return r, nil
 }
 
-func (r *Record) Wait(ctx context.Context) error {
-	<-r.event
+func (r *Record) updateAll(ctx context.Context) error {
 	snapshots := make([]*Snapshot, 0)
 	for _, b := range r.lookupB {
 		head, err := Head(ctx, r.client, b)
@@ -86,11 +88,20 @@ func (r *Record) Wait(ctx context.Context) error {
 		snap := NewSnapshot(ctx, r.client, COMMIT, head)
 		snapshots = append(snapshots, snap)
 	}
-	r.version = r.version + 1
 	for _, fn := range r.onUpdate {
 		fn(snapshots, r.version)
 	}
 	return nil
+}
+
+func (r *Record) Seal(ctx context.Context) error {
+	return r.updateAll(ctx)
+}
+
+func (r *Record) Wait(ctx context.Context) error {
+	<-r.event
+	r.version = r.version + 1
+	return r.updateAll(ctx)
 }
 
 func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
@@ -262,6 +273,29 @@ func (f *Record) StringRefField(key string, value *string) *StringRefField {
 			field.value = newValue
 			field.version = version
 		}
+
+		// Update the value in memory and in the state branch
+		t, err := NewTransaction(ctx, f.client, f.stateB, "update-state")
+		if err != nil {
+			log.Fatalf("Failed to create transaction for updating state branch: %#v", err)
+		}
+		existingValue, err := t.Read(ctx, append(f.path, path...))
+		if (newValue == nil && err != nil) || (newValue != nil && *newValue == existingValue && err == nil) {
+			return
+		}
+		if newValue != nil {
+			if err = t.Write(ctx, append(f.path, path...), *newValue); err != nil {
+				log.Fatalf("Failed to write state %#v = %s: %#v", path, newValue, err)
+			}
+		} else {
+			if err = t.Remove(ctx, append(f.path, path...)); err != nil {
+				log.Fatalf("Failed to remove state %#v: %#v", path, err)
+			}
+		}
+		if err = t.Commit(ctx, "Updating state branch"); err != nil {
+			log.Fatalf("Failed to commit transaction: %#v", err)
+		}
+
 	}
 	f.onUpdate = append(f.onUpdate, fn)
 	//fn(f.version)

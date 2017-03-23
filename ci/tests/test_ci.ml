@@ -669,6 +669,24 @@ let test_history conn =
   Alcotest.(check (list (pair target_t commit_t))) "Non-empty index" [master, expected_head] builds;
   Lwt.return ()
 
+let test_process () =
+  Lwt_main.run begin
+    let out = Buffer.create 40 in
+    let err = Buffer.create 40 in
+    let cmd = "/bin/sh", [| "/bin/sh"; "-c"; "echo output; echo error >&2" |] in
+    Datakit_ci.Process.run cmd
+      ~output:(Buffer.add_string out)
+      ~stderr:(Buffer.add_string err)
+    >>= fun () ->
+    Alcotest.(check string) "stdout" "output\n" (Buffer.contents out);
+    Alcotest.(check string) "stderr" "error\n" (Buffer.contents err);
+    Datakit_ci.Process.run cmd
+      ~output:(Buffer.add_string out)
+    >>= fun () ->
+    Alcotest.(check string) "stdout" "output\noutput\nerror\n" (Buffer.contents out);
+    Lwt.return ()
+  end
+
 let test_set = [
   "Simple",         `Quick, Test_utils.run test_simple;
   "Branch",         `Quick, Test_utils.run test_branch;
@@ -686,6 +704,7 @@ let test_set = [
   "Roles",          `Quick, Test_utils.run_private test_roles;
   "Live logs",      `Quick, Test_utils.run_private test_live_logs;
   "History",        `Quick, Test_utils.run_private test_history;
+  "Process",        `Quick, test_process;
 ]
 
 let () =

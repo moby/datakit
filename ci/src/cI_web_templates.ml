@@ -245,7 +245,7 @@ let build_navbar active =
     item Settings "/settings";
   ]
 
-let page ?logs page_title active children t ~user =
+let page page_title active children t ~user =
   let navbar = build_navbar active in
   let user = user |> CI_utils.default "not logged in" in
   let nav_header =
@@ -282,22 +282,7 @@ let page ?logs page_title active children t ~user =
       script ~a:[a_mime_type "text/javascript"; a_src "/js/bootstrap.min.js"] (pcdata "");
     ]
   in
-  let body =
-    match logs with
-    | Some init ->
-      let attrs =
-        match init with
-        | None -> []
-        | Some init -> [a_src init]
-      in
-      body ~a:[a_class ["split-page"]] [
-        nav_header;
-        div ~a:[a_class ["upper"]] content;
-        iframe ~a:(a_id "iframe_log" :: a_class ["log"] :: a_onload "highlight_log()" :: a_name "iframe_log" :: attrs) [];
-      ]
-    | None ->
-      body (nav_header :: content)
-  in
+  let body = body (nav_header :: content) in
   html
     (head (title (pcdata page_title)) [
         meta ~a:[a_charset "utf-8"] ();
@@ -542,76 +527,19 @@ let log_button_group history log_url =
 
 let encode = Uri.pct_encode ~scheme:"http"
 
-module LogScore : sig
-  type t
-  type log = [`Live of CI_live_log.t | `Saved of CI_output.saved]
-
-  val create : unit -> t
-  val update : t -> log -> unit
-  val best : t -> log option
-end = struct
-  type score = int
-  type log = [`Live of CI_live_log.t | `Saved of CI_output.saved]
-  type t = (score * log) option ref
-
-  let ok = 1
-  let pending = 2
-  let failed = 3
-
-  let create () = ref None
-
-  let update (best:t) (x:log) =
-    let new_score =
-      match x with
-      | `Live _ -> pending
-      | `Saved {CI_output.failed = true; _} -> failed
-      | `Saved _ -> ok
-    in
-    match !best with
-    | None -> best := Some (new_score, x)
-    | Some (score, _) when score < new_score -> best := Some (new_score, x)
-    | _ -> ()
-
-  let best t =
-    match !t with
-    | None -> None
-    | Some (_, x) -> Some x
-end
-
 let saved_log_frame_link ~branch ~commit = Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
 
 let logs_frame_link = function
   | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
   | `Saved {CI_output.branch; commit; _} -> saved_log_frame_link ~branch ~commit
 
-let score_logs ~best = function
-  | (_name, None) -> ()
-  | (_name, Some state) ->
-    let open CI_output in
-    let rec aux = function
-      | Empty -> ()
-      | Live live_log -> LogScore.update best (`Live live_log);
-      | Saved saved -> LogScore.update best (`Saved saved);
-      | Pair (a, b) -> aux a; aux b
-    in
-    aux (CI_output.logs state)
-
-let logs ~csrf_token ~page_url ~selected state =
+let logs ~csrf_token ~page_url state =
   let open CI_output in
   let logs = CI_output.logs state in
   let last_title = ref None in
   let seen = ref String.Set.empty in
-  let selected_branch =
-    match selected with
-    | Some (`Live x) -> Some (CI_live_log.branch x)
-    | Some (`Saved x) -> Some x.branch
-    | None -> None
-  in
-  let log_link ~branch ~title log =
-    let cl =
-      if Some branch = selected_branch then ["log-link"; "selected-log"]
-      else ["log-link"]
-    in
+  let log_link ~title log =
+    let cl = ["log-link"] in
     let href = logs_frame_link log in
     span [
       pcdata "[ ";
@@ -634,7 +562,7 @@ let logs ~csrf_token ~page_url ~selected state =
           status_flag `Pending;
           button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
-          log_link ~branch ~title (`Live live_log);
+          log_link ~title (`Live live_log);
         ];
       ]
     | Saved ({commit = _; branch; title; rebuild; failed} as saved) ->
@@ -647,7 +575,7 @@ let logs ~csrf_token ~page_url ~selected state =
       let status = if failed then `Failure else `Success in
       let rebuild_button =
         match rebuild with
-        | `Rebuildable _ -> 
+        | `Rebuildable _ ->
           button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
             span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
         | `Rebuilding -> pcdata "(rebuild queued) "
@@ -658,7 +586,7 @@ let logs ~csrf_token ~page_url ~selected state =
         form ~a:[a_action action; a_method `Post] [
           status_flag status;
           rebuild_button;
-          log_link ~branch ~title (`Saved saved);
+          log_link ~title (`Saved saved);
         ]
       ]
     | Pair (a, b) ->
@@ -675,7 +603,7 @@ let logs ~csrf_token ~page_url ~selected state =
     let descr = CI_output.descr state in
     items @ [p [status_flag status; pcdata descr]]
 
-let job_row ~csrf_token ~page_url ~best_log (job_name, state) =
+let job_row ~csrf_token ~page_url (job_name, state) =
   let output =
     match state with
     | None -> (Error (`Pending "(new)"), CI_output.Empty)
@@ -685,7 +613,7 @@ let job_row ~csrf_token ~page_url ~best_log (job_name, state) =
     th [pcdata job_name];
     td [status (CI_output.status output)];
     td (
-      logs ~csrf_token ~page_url ~selected:best_log output
+      logs ~csrf_token ~page_url output
     );
   ]
 
@@ -752,13 +680,8 @@ let target_page ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t 
   let commit = CI_history.State.source_commit state in
   let metadata_commit = CI_history.State.metadata_commit state |> CI_utils.default "MISSING-COMMIT" in
   let page_url = target_page_url target in
-  let best_log =
-    let best = LogScore.create () in
-    List.iter (score_logs ~best) jobs;
-    LogScore.best best
-  in
   let state_summary = [
-    table ~a:[a_class ["table"; "table-bordered"; "results"]] (List.map (job_row ~csrf_token ~page_url ~best_log) jobs)
+    table ~a:[a_class ["table"; "table-bordered"; "results"]] (List.map (job_row ~csrf_token ~page_url) jobs)
   ] in
   let nav =
     match target with
@@ -769,12 +692,7 @@ let target_page ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t 
       | "tags" :: _ -> Nav.Tags
       | _ -> assert false
   in
-  let logs =
-    match best_log with
-    | None -> None
-    | Some best -> Some (logs_frame_link best)
-  in
-  page ~logs title nav (
+  page title nav (
     history_nav t target state
     :: p [
       a ~a:[a_href (gh_target_url target)] [pcdata title];

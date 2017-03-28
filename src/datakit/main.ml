@@ -1,6 +1,16 @@
 open Lwt.Infix
 open Result
 
+module Metrics = struct
+  open Prometheus
+
+  let namespace = "DataKit"
+
+  let push_duration_seconds =
+    let help = "Time spent auto-pushing branches to remote" in
+    Summary.v ~help ~namespace ~subsystem:"git" "push_duration_seconds"
+end
+
 let src = Logs.Src.create "Datakit" ~doc:"Datakit 9p server"
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -211,12 +221,12 @@ let start () listen_9p listen_http prometheus git auto_push =
             Log.info (fun l -> l "Pushing %s to %s:%s" path remote br);
             Lwt.catch
               (fun () ->
-                 let cmd =
-                   Lwt_process.shell @@
-                   Printf.sprintf "cd %S && git push %S %S --force" path remote br
-                 in
+                 let cmd = ("", [| "git"; "-C"; path; "push"; "--force"; "--"; remote; br |]) in
                  let name = Fmt.strf "auto-push to %s" remote in
-                 exec ~name cmd
+                 let t0 = Unix.gettimeofday () in
+                 exec ~name cmd >|= fun () ->
+                 let t1 = Unix.gettimeofday () in
+                 Prometheus.Summary.observe Metrics.push_duration_seconds (t1 -. t0)
               )
               (fun ex ->
                  Log.err (fun l -> l "git push failed: %s" (Printexc.to_string ex));

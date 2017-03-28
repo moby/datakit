@@ -1,16 +1,6 @@
 open Lwt.Infix
 open Result
 
-module Metrics = struct
-  open Prometheus
-
-  let namespace = "DataKit"
-
-  let push_duration_seconds =
-    let help = "Time spent auto-pushing branches to remote" in
-    Summary.v ~help ~namespace ~subsystem:"git" "push_duration_seconds"
-end
-
 let src = Logs.Src.create "Datakit" ~doc:"Datakit 9p server"
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -192,53 +182,23 @@ let start ~listen_9p ~listen_http prometheus git =
   serve_9p >>= fun serve_9p ->
   Lwt.choose (serve_http @ serve_9p @ prometheus_threads)
 
-let exec ~name cmd =
-  Lwt_process.exec cmd >|= function
-  | Unix.WEXITED 0   -> ()
-  | Unix.WEXITED i   ->
-    Log.err (fun l -> l "%s exited with code %d" name i)
-  | Unix. WSIGNALED i ->
-    Log.err (fun l -> l "%s killed by signal %d)" name i)
-  | Unix.WSTOPPED i  ->
-    Log.err (fun l -> l "%s stopped by signal %d" name i)
-
 let start () listen_9p listen_http prometheus git auto_push =
   let start () = start ~listen_9p ~listen_http prometheus git in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()
     | Some remote ->
-      Log.info (fun l -> l "Auto-push to %s enabled" remote);
-      let watch () = match git with
-        | None      ->
-          In_memory_store.repo () >>= fun repo ->
-          In_memory_store.Store.Repo.watch_branches repo (fun _ _ ->
-              Lwt.fail_with "TOTO"
-            )
-        | Some path ->
-          Lazy.force Git_fs_store.listener;
-          let push br =
-            Log.info (fun l -> l "Pushing %s to %s:%s" path remote br);
-            Lwt.catch
-              (fun () ->
-                 let cmd = ("", [| "git"; "-C"; path; "push"; "--force"; "--"; remote; br |]) in
-                 let name = Fmt.strf "auto-push to %s" remote in
-                 let t0 = Unix.gettimeofday () in
-                 exec ~name cmd >|= fun () ->
-                 let t1 = Unix.gettimeofday () in
-                 Prometheus.Summary.observe Metrics.push_duration_seconds (t1 -. t0)
-              )
-              (fun ex ->
-                 Log.err (fun l -> l "git push failed: %s" (Printexc.to_string ex));
-                 Lwt.return ()
-              )
-          in
-          Git_fs_store.repo path >>= fun repo ->
-          Git_fs_store.Store.Repo.watch_branches repo (fun br _ -> push br)
-      in
-      watch () >>= fun unwatch ->
-      start () >>= fun () ->
-      unwatch ()
+      match git with
+      | None      -> Lwt.fail_with "TODO: push in-memory repositories"
+      | Some local ->
+        Lazy.force Git_fs_store.listener;
+        Git_fs_store.repo local >>= fun repo ->
+        let pusher = Autopush.create ~local ~remote in
+        Git_fs_store.Store.Repo.watch_branches repo
+          (fun branch _ -> Autopush.push pusher ~branch; Lwt.return_unit)
+        >>= fun unwatch ->
+        start () >>= fun () ->
+        unwatch ()
   end
 
 open Cmdliner

@@ -81,6 +81,14 @@ let commit_url ~repo commit =
   let { Repo.user; repo } = repo in
   Printf.sprintf "https://github.com/%s/%s/commit/%s" user repo commit
 
+let encode = Uri.pct_encode ~scheme:"http"
+
+let saved_log_frame_link ~branch ~commit = Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
+
+let logs_link = function
+  | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
+  | `Saved {CI_output.branch; commit; _} -> saved_log_frame_link ~branch ~commit
+
 let tag_map f map =
   Ref.Index.fold (fun key value acc ->
       match snd key with
@@ -370,6 +378,11 @@ let html_of_user ~csrf_token ((job, label), log) =
     | Some log when CI_live_log.can_cancel log -> [], CI_live_log.branch log
     | _ -> [a_disabled ()], ""
   in
+  let log_link =
+    match log with
+    | Some log -> [pcdata "[ "; a ~a:[a_href (logs_link (`Live log))] [pcdata "log"]; pcdata " ] "]
+    | None -> []
+  in
   let branch = Uri.pct_encode ~scheme:"http" branch in
   let query = [
     "CSRFToken", [csrf_token];
@@ -385,6 +398,7 @@ let html_of_user ~csrf_token ((job, label), log) =
         span ~a:[a_class ["glyphicon"; "glyphicon-remove"]] []; pcdata "Cancel"
       ];
     ];
+  ] @ log_link @ [
     a ~a:[a_href link] [pcdata reason];
   ]
 
@@ -525,14 +539,6 @@ let log_button_group history log_url =
     a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href log_url;] [span ~a:[a_class["glyphicon"; "glyphicon-book"]] []; pcdata "Artefacts"];
   ]
 
-let encode = Uri.pct_encode ~scheme:"http"
-
-let saved_log_frame_link ~branch ~commit = Printf.sprintf "/log/saved/%s/%s" (encode branch) (encode commit)
-
-let logs_frame_link = function
-  | `Live live_log -> Printf.sprintf "/log/live/%s" (encode (CI_live_log.branch live_log))
-  | `Saved {CI_output.branch; commit; _} -> saved_log_frame_link ~branch ~commit
-
 let logs ~csrf_token ~page_url state =
   let open CI_output in
   let logs = CI_output.logs state in
@@ -540,7 +546,7 @@ let logs ~csrf_token ~page_url state =
   let seen = ref String.Set.empty in
   let log_link ~title log =
     let cl = ["log-link"] in
-    let href = logs_frame_link log in
+    let href = logs_link log in
     span [
       pcdata "[ ";
       a ~a:[a_href href; a_target "iframe_log"; a_class cl] [pcdata "logs"];

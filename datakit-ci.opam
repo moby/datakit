@@ -33,7 +33,7 @@ depends: [
   "conduit"
   "io-page"
   "pbkdf"
-  "webmachine" {>= "0.3.2"}
+  "webmachine" {>= "0.4.0"}
   "session" {>= "0.3.0"}
   "redis"
   "asetmap"

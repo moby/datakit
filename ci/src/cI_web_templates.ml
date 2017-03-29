@@ -195,7 +195,7 @@ let ref_job (_repo, id) ref =
   | [] -> []
   | jobs ->
     let summary = summarise jobs in
-    let ref_url = CI_target.path_v (CI_engine.target ref) in
+    let ref_url = Uri.to_string (CI_target.path_v (CI_engine.target ref)) in
     [
       tr [
         td [a ~a:[a_href ref_url] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
@@ -209,7 +209,7 @@ let pr_job (_repo, id) open_pr =
   | [] -> []
   | jobs ->
     let summary = summarise jobs in
-    let pr_url = CI_target.path_v (CI_engine.target open_pr) in
+    let pr_url = Uri.to_string (CI_target.path_v (CI_engine.target open_pr)) in
     [
       tr [
         td [a ~a:[a_href pr_url] [pcdata (string_of_int id)]];
@@ -389,7 +389,7 @@ let html_of_user ~csrf_token ((job, label), log) =
   ] in
   let action = Printf.sprintf "/cancel/%s?%s" branch (Uri.encoded_of_query query) in
   let target, job_name = job in
-  let link = CI_target.path target in
+  let link = Uri.to_string (CI_target.path target) in
   let reason = Fmt.strf "%a:%s%a" CI_target.pp target job_name pp_opt_label label in
   [
     br ();
@@ -575,7 +575,7 @@ let logs ~csrf_token ~page_url state =
       seen := String.Set.add branch !seen;
       let query = [
         "CSRFToken", [csrf_token];
-        "redirect", [page_url];
+        "redirect", [Uri.to_string page_url];
       ] in
       let action = Printf.sprintf "/log/rebuild/%s?%s" branch (Uri.encoded_of_query query) in
       let status = if failed then `Failure else `Success in
@@ -609,13 +609,17 @@ let logs ~csrf_token ~page_url state =
     let descr = CI_output.descr state in
     items @ [p [status_flag status; pcdata descr]]
 
-let job_row ~csrf_token ~page_url (job_name, state) =
+let job_row ?selected ~csrf_token ~page_url (job_name, state) =
   let output =
     match state with
     | None -> (Error (`Pending "(new)"), CI_output.Empty)
     | Some state -> state
   in
-  tr [
+  let attrs =
+    if selected = Some job_name then [a_class ["selected-job"]]
+    else []
+  in
+  tr ~a:attrs [
     th [pcdata job_name];
     td [status (CI_output.status output)];
     td (
@@ -631,19 +635,21 @@ let map_or_none f = function
   | [] -> [li [pcdata "(none)"]]
   | xs -> List.map f xs
 
-let commit_page ~commit ~archived_targets targets t =
+let commit_page ?test ~commit ~archived_targets targets t =
   let title = Fmt.strf "Commit %s" commit in
   let target_link target =
+    let uri = Uri.to_string (CI_target.path ?test target) in
     li [
-      a ~a:[a_href (CI_target.path target)] [
+      a ~a:[a_href uri] [
         pcdata (Fmt.to_to_string CI_target.pp target)
       ]
     ]
   in
   let archive_target_link (target, commit) =
     let commit = CI_utils.DK.Commit.id commit in
+    let uri = Uri.to_string (Uri.add_query_param' (CI_target.path ?test target) ("history", commit)) in
     li [
-      a ~a:[a_href (Fmt.strf "%s?history=%s" (CI_target.path target) commit)] [
+      a ~a:[a_href uri] [
         pcdata (Fmt.to_to_string CI_target.pp target)
       ]
     ]
@@ -679,7 +685,7 @@ let history_nav t target state =
   | [x] -> p (pcdata "Previous state: " :: state_link x :: links)
   | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
 
-let target_page ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t =
+let target_page ?test ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t =
   let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
   let title = target_title ~title target in
   let repo = CI_target.repo target in
@@ -687,7 +693,7 @@ let target_page ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t 
   let metadata_commit = CI_history.State.metadata_commit state |> CI_utils.default "MISSING-COMMIT" in
   let page_url = target_page_url target in
   let state_summary = [
-    table ~a:[a_class ["table"; "table-bordered"; "results"]] (List.map (job_row ~csrf_token ~page_url) jobs)
+    table ~a:[a_class ["table"; "table-bordered"; "results"]] (List.map (job_row ?selected:test ~csrf_token ~page_url) jobs)
   ] in
   let nav =
     match target with

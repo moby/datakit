@@ -10,9 +10,9 @@ val head : CI_target.t -> Commit.t t
 val branch_head : Repo.t -> string -> Commit.t t
 val tag : Repo.t -> string -> Commit.t t
 val dk : (unit -> CI_utils.DK.t Lwt.t) t
-val ci_status : string list -> CI_target.t -> Status_state.t option t
-val ci_target_url : string list -> CI_target.t -> Uri.t option t
-val ci_success_target_url : string list -> CI_target.t -> Uri.t t
+val ci_status : Status.context -> CI_target.t -> Status_state.t option t
+val ci_target_url : Status.context -> CI_target.t -> Uri.t option t
+val ci_success_target_url : Status.context -> CI_target.t -> Uri.t t
 val run :
   snapshot:CI_utils.DK.Tree.t ->
   job_id:CI_s.job_id ->

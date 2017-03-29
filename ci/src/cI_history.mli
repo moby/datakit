@@ -1,4 +1,3 @@
-open Astring
 open CI_utils
 
 type t
@@ -14,7 +13,7 @@ module State : sig
   val parents : t -> string list
   (** [parents t] is the list of hashes of [t]'s parent commits. *)
 
-  val jobs : t -> string CI_output.t String.Map.t
+  val jobs : t -> string CI_output.t Job_map.t
   (** [jobs t] returns the list of jobs and their outputs at [t]. *)
 
   val metadata_commit : t -> string option
@@ -35,7 +34,7 @@ val create : unit -> t
 
 val lookup : t -> DK.t -> CI_target.t -> target Lwt.t
 
-val record : target -> DK.t -> source_commit:string -> DK.Commit.t -> string CI_output.t String.Map.t -> unit Lwt.t
+val record : target -> DK.t -> source_commit:string -> DK.Commit.t -> string CI_output.t Job_map.t -> unit Lwt.t
 (** [record target dk ~source_commit input jobs] records the new output of each job in [jobs]
     as a new commit of [target], and records that it was calculated using metadata snapshot [input].
     The commit index of [source_commit] is updated to include the new result (for [builds_of_commit]). *)

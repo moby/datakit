@@ -1,8 +1,8 @@
 open CI_utils.Infix
 open Lwt.Infix
-open Astring
 
 module DK = CI_utils.DK
+module Job_map = CI_utils.Job_map
 
 let metadata_commit_path = Datakit_path.of_string_exn "metadata-commit"
 let source_commit_path = Datakit_path.of_string_exn "source-commit"
@@ -14,12 +14,12 @@ let ( / ) = Datakit_path.Infix.( / )
 module State = struct
   type t = {
     parents : string list;
-    jobs : string CI_output.t String.Map.t;
+    jobs : string CI_output.t Job_map.t;
     metadata_commit : string option;
     source_commit : string option;     (* The Git source commit that led to the build *)
   }
 
-  let empty = { parents = []; jobs = String.Map.empty; source_commit = None; metadata_commit = None }
+  let empty = { parents = []; jobs = Job_map.empty; source_commit = None; metadata_commit = None }
 
   let jobs c = c.jobs
 
@@ -33,13 +33,16 @@ module State = struct
     parents = b.parents &&
     source_commit = b.source_commit &&
     metadata_commit = b.metadata_commit &&
-    String.Map.equal CI_output.equal jobs b.jobs
+    Job_map.equal CI_output.equal jobs b.jobs
+
+  let dump_jobs fv =
+    Job_map.dump (Fmt.Dump.pair Datakit_path.Step.pp fv)
 
   let pp =
     Fmt.braces (fun f {parents; jobs; source_commit; metadata_commit} ->
         Fmt.pf f "parents = %a;@ jobs = %a;@ source = %a;@ meta = %a"
           (Fmt.Dump.list Fmt.string) parents
-          (String.Map.dump (CI_output.pp Fmt.string)) jobs
+          (dump_jobs (CI_output.pp Fmt.string)) jobs
           (Fmt.Dump.option Fmt.string) source_commit
           (Fmt.Dump.option Fmt.string) metadata_commit
       )
@@ -84,7 +87,7 @@ let load commit =
       items |> Lwt_list.filter_map_p (fun job_name ->
           let path = Datakit_path.of_steps_exn ["job"; job_name; "output"] in
           DK.Tree.read_file tree path >|= function
-          | Ok data -> Some (job_name, Saved_output.of_cstruct data)
+          | Ok data -> Some (Datakit_path.Step.of_string_exn job_name, Saved_output.of_cstruct data)
           | Error `Does_not_exist -> None
           | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
         )
@@ -92,7 +95,7 @@ let load commit =
     | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
   end
   >>= fun jobs ->
-  let jobs = String.Map.of_list jobs in
+  let jobs = Job_map.of_list jobs in
   Lwt.return { State.parents; jobs; source_commit; metadata_commit }
 
 let lookup t dk target =
@@ -125,11 +128,13 @@ let index_dir ~repo ~source_commit =
   let {Datakit_github.Repo.user; repo} = repo in
   Datakit_path.of_steps_exn [user; repo; "commit"; source_commit]
 
+let job_step = Datakit_path.Step.of_string_exn "job"
+
 let record t dk ~source_commit input jobs =
   Lwt_mutex.with_lock t.lock @@ fun () ->
   let state = t.commit |> CI_utils.default State.empty in
-  let patch = String.Map.merge diff state.State.jobs jobs in
-  if String.Map.is_empty patch && state.State.source_commit = Some source_commit then (
+  let patch = Job_map.merge diff state.State.jobs jobs in
+  if Job_map.is_empty patch && state.State.source_commit = Some source_commit then (
     (* Update state to include live logs and non-archived saved logs. *)
     t.commit <- Some {state with State.jobs};
     Lwt.return ()
@@ -148,14 +153,14 @@ let record t dk ~source_commit input jobs =
         let metadata_commit = Cstruct.of_string metadata_commit in
         DK.Transaction.create_or_replace_file tr source_commit_path source_commit >>*= fun () ->
         DK.Transaction.create_or_replace_file tr metadata_commit_path metadata_commit >>*= fun () ->
-        String.Map.bindings patch |> Lwt_list.iter_s (function
+        Job_map.bindings patch |> Lwt_list.iter_s (function
             | (job, `Delete) ->
-              let dir = Datakit_path.of_steps_exn ["job"; job] in
-              add_msg "Remove old job %s" job;
+              let dir = [job_step; job] in
+              add_msg "Remove old job %a" Datakit_path.Step.pp job;
               DK.Transaction.remove tr dir >>*= Lwt.return
             | (job, `Write output) ->
-              let dir = Datakit_path.of_steps_exn ["job"; job] in
-              add_msg "%s -> %s" job (CI_output.descr output);
+              let dir = [job_step; job] in
+              add_msg "%a -> %s" Datakit_path.Step.pp job (CI_output.descr output);
               let json = CI_output.json_of output in
               let data = Saved_output.to_cstruct json in
               DK.Transaction.make_dirs tr dir >>*= fun () ->

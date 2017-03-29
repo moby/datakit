@@ -195,7 +195,7 @@ end
 
 module Status: sig
 
-  type context = string list
+  type context = Datakit_path.t
   (** The type build build status contexts. ["ci/datakit"] is stored
       as ["ci"; "datakit"]. *)
 
@@ -209,7 +209,7 @@ module Status: sig
   (** The type for status values. *)
 
   val v: ?description:string -> ?url:Uri.t ->
-    Commit.t -> string list -> Status_state.t -> t
+    Commit.t -> context -> Status_state.t -> t
   (** [v c n] is the status with commit [c] and name [n]. *)
 
   val pp: t Fmt.t
@@ -232,6 +232,13 @@ module Status: sig
 
   val context: t -> context
   (** [context t] is [t]'s context. *)
+
+  val context_of_path : string list -> (context, string) result
+  (** [context_of_path p] is the context [p], if it is a valid context. *)
+
+  val context_of_path_exn : string list -> context
+  (** [context_of_path_exn p] is the context [path].
+      It raises an exception if [p] is invalid. *)
 
   val state: t -> Status_state.t
   (** [state t] is [t]'s state. *)
@@ -576,7 +583,7 @@ module Capabilities: sig
     | `Repo of string list
     | `PR
     | `Commit
-    | `Status of string list
+    | `Status of Status.context
     | `Ref
     | `Webhook
   ]

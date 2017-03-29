@@ -29,6 +29,7 @@ module Web = struct
 end
 
 module Private = struct
+  module Job_map = Utils.Job_map
   module Client9p = Utils.Client9p
   type engine = CI_engine.t
   let connect = DK.connect

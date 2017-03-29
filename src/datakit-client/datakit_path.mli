@@ -2,7 +2,19 @@
 
 open Result
 
-type t
+module Step : sig
+  type t = private string
+  (** One component in a path *)
+
+  val of_string : string -> (t, string) result
+  val of_string_exn : string -> t
+  val to_string : t -> string
+
+  val compare : t -> t -> int
+  val pp : t Fmt.t
+end
+
+type t = Step.t list
 (** A [path] identifies a file or directory (relative to some other directory).
     No component may be empty or contain a '/' character. "." and ".." steps
     are not permitted in a path. *)

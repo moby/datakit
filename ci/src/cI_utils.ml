@@ -143,3 +143,5 @@ let cancel_when_off switch fn =
     (fun () -> Lwt.cancel th; Lwt.return ())
   >>= fun () ->
   th
+
+module Job_map = Asetmap.Map.Make(struct type t = Datakit_path.Step.t let compare = compare end)

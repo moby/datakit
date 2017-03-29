@@ -223,6 +223,8 @@ let with_handler set_handler ~logs ?pending key fn =
 
 let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)
 
+let test_job_id = Datakit_path.Step.of_string_exn "test"
+
 (* [with_ci conn workflow fn] is [fn ~logs ~switch dk with_handler], where:
    - switch is turned off when [fn] ends and will stop the CI
    - dk is a DataKit connection which never fails
@@ -239,7 +241,7 @@ let with_ci ?(repo=Repo.v ~user:"user" ~repo:"project") conn workflow fn =
   let web_ui = Uri.of_string "https://localhost/" in
   let dk = Private.connect conn in
   let ci = Private.test_engine ~web_ui (fun () -> Lwt.return dk)
-      (Repo.Map.singleton repo (fun t -> String.Map.singleton "test" (workflow check_build t)))
+      (Repo.Map.singleton repo (fun t -> Private.Job_map.singleton test_job_id (workflow check_build t)))
   in
   let switch = Lwt_switch.create () in
   let engine_thread =

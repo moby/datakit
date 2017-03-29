@@ -84,13 +84,13 @@ let pp_opt_descr f = function
 
 let ci_success_target_url ci target =
   ci_status ci target >>= function
-  | None -> pending "Waiting for %a status to appear" Ref.pp_name ci
-  | Some `Pending -> ci_descr ci target >>= pending "Waiting for %a to complete%a" Ref.pp_name ci pp_opt_descr
-  | Some `Failure -> ci_descr ci target >>= fail "%a failed%a" Ref.pp_name ci pp_opt_descr
-  | Some `Error   -> ci_descr ci target >>= fail "%a errored%a" Ref.pp_name ci pp_opt_descr
+  | None -> pending "Waiting for %a status to appear" Status.pp_context ci
+  | Some `Pending -> ci_descr ci target >>= pending "Waiting for %a to complete%a" Status.pp_context ci pp_opt_descr
+  | Some `Failure -> ci_descr ci target >>= fail "%a failed%a" Status.pp_context ci pp_opt_descr
+  | Some `Error   -> ci_descr ci target >>= fail "%a errored%a" Status.pp_context ci pp_opt_descr
   | Some `Success ->
     ci_state Status.url ci target >>= function
-    | None     -> fail "%a succeeded, but has no URL!" Ref.pp_name ci
+    | None     -> fail "%a succeeded, but has no URL!" Status.pp_context ci
     | Some url -> return url
 
 let run ~snapshot ~job_id ~recalc ~dk term =

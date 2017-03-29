@@ -1,20 +1,35 @@
 open Result
 
-type t = string list
+module Step = struct
+  type t = string
+
+  let of_string = function
+    | "" | "." | ".." as x -> Error (Fmt.strf "Invalid path component %S" x)
+    | x when String.contains x '/' -> Error (Fmt.strf "'/' in path step %S" x)
+    | x -> Ok x
+
+  let of_string_exn s =
+    match of_string s with
+    | Ok x -> x
+    | Error msg -> raise (Invalid_argument msg)
+
+  let to_string x = x
+
+  let compare = String.compare
+
+  let pp = Fmt.string
+end
+
+type t = Step.t list
 
 let empty = []
-
-let validate = function
-  | "" | "." | ".." as x -> Error (Fmt.strf "Invalid path component %S" x)
-  | x when String.contains x '/' -> Error (Fmt.strf "'/' in path step %S" x)
-  | _ -> Ok ()
 
 let of_steps steps =
   let rec aux = function
     | [] -> Ok steps
     | x :: xs ->
-      match validate x with
-      | Ok () -> aux xs
+      match Step.of_string x with
+      | Ok _ -> aux xs
       | Error _ as e -> e in
   aux steps
 
@@ -63,8 +78,8 @@ module Map = Map.Make(struct type t = string list let compare = compare end)
 module Infix = struct
 
   let ( / ) path s =
-    match validate s with
-    | Ok () -> path @ [s]
+    match Step.of_string s with
+    | Ok s -> path @ [s]
     | Error msg -> raise (Invalid_argument msg)
 
   let ( /@ ) = ( @ )

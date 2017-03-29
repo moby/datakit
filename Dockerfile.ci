@@ -1,7 +1,7 @@
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 FROM ocaml/opam-dev@sha256:573b5d71e94104590a8282a9ae67b63a6144b15bafdacb9980391c84ca730615
 ENV OPAMERRLOGLEN=0 OPAMYES=1
-RUN sudo apk add tzdata
+RUN sudo apk add tzdata aspcud
 
 RUN opam pin add -yn datakit-client.dev https://github.com/docker/datakit.git
 

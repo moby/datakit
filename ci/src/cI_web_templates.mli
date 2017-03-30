@@ -81,6 +81,7 @@ val tags_page :
   page
 
 val commit_page :
+  ?test:string ->
   commit:string ->
   archived_targets:(CI_target.t * CI_utils.DK.Commit.t) list ->
   CI_target.t list ->
@@ -88,6 +89,7 @@ val commit_page :
   page
 
 val target_page :
+  ?test:string ->
   csrf_token:string ->
   ?title:string ->
   target:CI_target.t ->

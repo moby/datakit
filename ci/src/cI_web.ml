@@ -14,6 +14,11 @@ type t = {
   dashboards : CI_target.Set.t Repo.Map.t;
 }
 
+let opt_query_decode name rd =
+  match Uri.get_query_param rd.Rd.uri name with
+  | None -> None
+  | Some x -> Some (Uri.pct_decode x)
+
 class user_page t = object(self)
   inherit CI_web_utils.html_page t.server
 
@@ -135,6 +140,7 @@ class pr_page t = object(self)
     let repo = Repo.v ~user ~repo in
     let prs = CI_engine.prs t.ci in
     let target = `PR (repo, id) in
+    let test = opt_query_decode "test" rd in
     match Repo.Map.find repo prs with
     | None  -> Wm.respond 404 rd ~body:(`String "No such project")
     | Some prs ->
@@ -149,7 +155,7 @@ class pr_page t = object(self)
           | `PR pr -> Some (PR.title pr)
           | _ -> assert false
       in
-      Wm.continue (CI_web_templates.target_page ~csrf_token ?title ~target commit) rd
+      Wm.continue (CI_web_templates.target_page ?test ~csrf_token ?title ~target commit) rd
 end
 
 class ref_page t = object(self)
@@ -163,10 +169,11 @@ class ref_page t = object(self)
     let id = CI_target.unescape_ref rd.Rd.dispatch_path in
     let repo = Repo.v ~user ~repo in
     let target = `Ref (repo, id) in
+    let test = opt_query_decode "test" rd in
     load_jobs t target rd >>= fun state ->
     self#session rd >>= fun session_data ->
     let csrf_token = CI_web_utils.Session_data.csrf_token session_data in
-    Wm.continue (CI_web_templates.target_page ~csrf_token ~target state) rd
+    Wm.continue (CI_web_templates.target_page ?test ~csrf_token ~target state) rd
 end
 
 class commit_page t = object
@@ -178,6 +185,7 @@ class commit_page t = object
     let user = Rd.lookup_path_info_exn "user" rd in
     let repo = Rd.lookup_path_info_exn "repo" rd in
     let commit = Rd.lookup_path_info_exn "id" rd in
+    let test = opt_query_decode "test" rd in
     let repo = Datakit_github.Repo.v ~user ~repo in
     let live_targets = CI_engine.targets_of_commit t.ci repo commit in
     CI_engine.dk t.ci >>= fun dk ->
@@ -190,8 +198,8 @@ class commit_page t = object
       |> CI_target.Map.bindings
     in
     match live_targets, archived_targets with
-    | [t], [] -> Wm.respond 307 (Rd.redirect (CI_target.path t) rd)
-    | _ -> Wm.continue (CI_web_templates.commit_page ~commit ~archived_targets live_targets) rd
+    | [t], [] -> Wm.respond 307 (Rd.redirect (Uri.to_string (CI_target.path ?test t)) rd)
+    | _ -> Wm.continue (CI_web_templates.commit_page ~commit ~archived_targets ?test live_targets) rd
 end
 
 let max_escape_length = 20

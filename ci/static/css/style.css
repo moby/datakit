@@ -110,6 +110,10 @@ a.selected-log {
   background: yellow;
 }
 
+tr.selected-job {
+  background: #ffffd0;
+}
+
 span.status {
   border: 1px solid black;
   padding: 1px;

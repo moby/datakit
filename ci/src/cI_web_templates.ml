@@ -73,13 +73,16 @@ let metadata_url t = function
     state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user repo
       Ref.pp_name id
 
-let commit_history_url t target ~hash =
+let commit_history_url t target ~metadata_commit ~src_commit =
   let { Repo.user; repo } = CI_target.repo target in
-  state_repo_url t "commits/github-metadata/%s/%s/commit/%s" user repo hash
+  state_repo_url t "commits/%s/%s/%s/commit/%s" metadata_commit user repo src_commit
 
 let commit_url ~repo commit =
   let { Repo.user; repo } = repo in
   Printf.sprintf "https://github.com/%s/%s/commit/%s" user repo commit
+
+let short_commit x =
+  String.with_range ~len:8 x
 
 let encode = Uri.pct_encode ~scheme:"http"
 
@@ -666,7 +669,7 @@ let target_page_url = CI_target.path
 
 let state_link commit =
   let url = Fmt.strf "?history=%s" commit in
-  a ~a:[a_href url] [pcdata commit]
+  a ~a:[a_href url] [pcdata (short_commit commit)]
 
 let rec intersperse sep = function
   | [] -> []
@@ -689,7 +692,7 @@ let target_page ?test ~csrf_token ?(title="(no title)") ~(target:CI_target.t) st
   let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
   let title = target_title ~title target in
   let repo = CI_target.repo target in
-  let commit = CI_history.State.source_commit state in
+  let src_commit = CI_history.State.source_commit state |> CI_utils.default "MISSING-COMMIT" in
   let metadata_commit = CI_history.State.metadata_commit state |> CI_utils.default "MISSING-COMMIT" in
   let page_url = target_page_url target in
   let state_summary = [
@@ -709,15 +712,12 @@ let target_page ?test ~csrf_token ?(title="(no title)") ~(target:CI_target.t) st
     :: p [
       a ~a:[a_href (gh_target_url target)] [pcdata title];
       pcdata " has head commit ";
-      (match commit with
-       | None -> pcdata "(missing commit info)"
-       | Some commit -> a ~a:[a_href (commit_url ~repo commit)] [pcdata commit]
-      );
+      a ~a:[a_href (commit_url ~repo src_commit)] [pcdata (short_commit src_commit)];
       pcdata " [ ";
       a ~a:[a_href (metadata_url t target)] [pcdata "head history"];
       pcdata " ]";
       pcdata " [ ";
-      a ~a:[a_href (commit_history_url t target ~hash:metadata_commit)] [pcdata "status history for this head"];
+      a ~a:[a_href (commit_history_url t target ~metadata_commit ~src_commit)] [pcdata "status history for this head"];
       pcdata " ]";
     ]
     :: state_summary

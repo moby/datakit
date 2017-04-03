@@ -1,6 +1,6 @@
 The CI configuration for testing DataKit itself, using DataKitCI.
 The `docker-compose.yml` file describes a configuration for testing the CI locally with `docker-compose`.
-The `datakit-ci.yml` file describes the configuration we use to run <https://datakit.datakit.ci>, managed by `docker-cloud`.
+The `datakit-ci.yml` file describes the configuration we use to run <https://datakit.datakit.ci>, managed by `docker stack`.
 
 # Local testing
 
@@ -24,7 +24,7 @@ In this configuration:
 This mode is useful for testing changes to the CI itself, or for testing your changes before making a public PR.
 
 
-# Docker Cloud configuration
+# Docker Cloud / Swarm Mode configuration
 
 To use this as a template for your own projects:
 
@@ -39,9 +39,9 @@ To use this as a template for your own projects:
 
 2. Edit `selfCI.ml` to specify the tests you require. See the [DataKitCI][] README for details.
 
-3. Use `docker-cloud` to run the stack. Note that the bridge will probably fail to start as we haven't configured its GitHub token yet, but this will still create the volume in which we'll place the key.
+3. Use `docker stack deploy self-ci -c datakit-ci.yml` to run the stack. Note that the bridge will probably fail to start as we haven't configured its GitHub token yet, but this will still create the volume in which we'll place the key.
 
-4. Check the logs for the `ci` service. You should see a configuration URL displayed near the start.
+4. Check the logs for the `datakit-ci` service. You should see a configuration URL displayed near the start.
    Open this in a browser (you'll probably have to click through a security warning, as the server
    generates itself a self-signed X.509 certificate by default).
 

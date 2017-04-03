@@ -1,45 +1,36 @@
-bridge:
-  restart: always
-  command: '--listen-prometheus=9090 --datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81 --log-destination timestamp'
-  image: 'docker/datakit:github'
-  links:
-    - datakit
-  ports:
-    - '81:81'
-  tags:
-    - nodecluster-name=datakit-ci-cluster
-  volumes:
-    - /root/.github
-ci:
-  restart: always
-  command: '--listen-prometheus=9090 --metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
-  image: 'editions/datakit-self-ci:latest'
-  environment:
-    - DOCKER_HOST=unix:///var/run/builder/docker.sock
-  links:
-    - datakit
-    - redis
-  tags:
-    - nodecluster-name=datakit-ci-cluster
-  volumes:
-    - '/etc/letsencrypt'
-    - '/data/repos'
-    - '/secrets'
-    - '/root/.ssh:/root/.ssh'
-    - '/var/run/datakit:/var/run/builder'
-datakit:
-  restart: always
-  user: 'root'
-  command: '--git /data --listen-prometheus=9090 --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:docker/datakit.logs'
-  image: 'docker/datakit:latest'
-  tags:
-    - nodecluster-name=datakit-ci-cluster
-  volumes:
-    - /data
-    - /root/.ssh
-redis:
-  restart: always
-  command: redis-server --save 60 1
-  image: 'redis:latest'
-  tags:
-    - nodecluster-name=datakit-ci-cluster
+version: '3.1'
+
+services:
+  bridge:
+    command: '--listen-prometheus=9090 --datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://54.72.173.83:81 --log-destination timestamp'
+    image: 'docker/datakit:github'
+    ports:
+      - '81:81'
+    volumes:
+      - 'bridge-github-creds:/root/.github'
+  datakit-ci:
+    command: '--listen-prometheus=9090 --metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
+    image: 'editions/datakit-self-ci:latest'
+    environment:
+      - DOCKER_HOST=unix:///var/run/builder/docker.sock
+    volumes:
+      - 'self-ci-cache:/data/repos'
+      - 'self-ci-secrets:/secrets'
+      - '/var/run/datakit:/var/run/builder'
+  datakit:
+    user: 'root'
+    command: '--git /data --listen-prometheus=9090 --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:docker/datakit.logs'
+    image: 'docker/datakit:latest'
+    volumes:
+      - datakit-public-data:/data
+      - datakit-ssh:/root/.ssh
+  redis:
+    command: redis-server --save 60 1
+    image: 'redis:latest'
+
+volumes:
+  self-ci-secrets:
+  self-ci-cache:
+  datakit-public-data:
+  datakit-ssh:
+  bridge-github-creds:

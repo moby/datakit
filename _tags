@@ -32,7 +32,7 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 <src/datakit_conduit.*>: package(protocol-9p.unix)
 
 ### datakit-log
-<src/datakit_log.*>: package(asl win-eventlog cmdliner logs.cli mtime.os)
+<src/datakit_log.*>: package(asl win-eventlog cmdliner logs.cli mtime.os prometheus)
 
 ### Tests
 

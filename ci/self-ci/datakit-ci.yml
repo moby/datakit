@@ -8,14 +8,14 @@ services:
       - '81:81'
     volumes:
       - 'bridge-github-creds:/root/.github'
-  datakit-ci:
+  ci:
     command: '--listen-prometheus=9090 --metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
     image: 'editions/datakit-self-ci:latest'
     environment:
       - DOCKER_HOST=unix:///var/run/builder/docker.sock
     volumes:
-      - 'self-ci-cache:/data/repos'
-      - 'self-ci-secrets:/secrets'
+      - 'ci-cache:/data/repos'
+      - 'ci-secrets:/secrets'
       - '/var/run/datakit:/var/run/builder'
   datakit:
     user: 'root'
@@ -29,8 +29,8 @@ services:
     image: 'redis:latest'
 
 volumes:
-  self-ci-secrets:
-  self-ci-cache:
+  ci-secrets:
+  ci-cache:
   datakit-public-data:
   datakit-ssh:
   bridge-github-creds:

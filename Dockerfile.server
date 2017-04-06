@@ -8,7 +8,7 @@ RUN opam pin add cmdliner 0.9.8
 
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term
 
-RUN opam pin add -yn protocol-9p.0.8.0 'https://github.com/talex5/ocaml-9p.git#log-errors'
+RUN opam pin add -yn protocol-9p.0.8.0 'https://github.com/talex5/ocaml-9p.git#tcp-keepalive'
 
 # cache opam install of dependencies
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam

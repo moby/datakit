@@ -580,7 +580,10 @@ let logs ~csrf_token ~page_url state =
         "CSRFToken", [csrf_token];
         "redirect", [Uri.to_string page_url];
       ] in
-      let action = Printf.sprintf "/log/rebuild/%s?%s" branch (Uri.encoded_of_query query) in
+      let action =
+        let path = "/log/rebuild/" ^ Uri.pct_encode ~scheme:"http" branch in
+        Uri.make ~path ~query () |> Uri.to_string
+      in
       let status = if failed then `Failure else `Success in
       let rebuild_button =
         match rebuild with

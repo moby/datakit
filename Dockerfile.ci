@@ -3,6 +3,7 @@ FROM ocaml/opam-dev@sha256:573b5d71e94104590a8282a9ae67b63a6144b15bafdacb9980391
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud
 
+RUN opam pin add -yn protocol-9p.0.8.0 'https://github.com/talex5/ocaml-9p.git#tcp-keepalive'
 RUN opam pin add -yn datakit-client.dev https://github.com/docker/datakit.git
 
 ADD datakit-ci.opam /tmp/deps/opam

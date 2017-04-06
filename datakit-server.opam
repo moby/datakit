@@ -21,6 +21,7 @@ depends: [
   "cstruct" {>= "2.2.0"}
   "protocol-9p" {>= "0.7.4" & < "0.9.0"}
   "sexplib"
+  "prometheus"
   "mirage-types-lwt" {< "3.0.0"}
   "cmdliner" {< "1.0.0"}
 ]

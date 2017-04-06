@@ -1,5 +1,20 @@
 open Cmdliner
 
+module Metrics = struct
+  open Prometheus
+
+  let namespace = "ocaml"
+  let subsystem = "logs"
+
+  let inc_messages =
+    let help = "Total number of messages logged" in
+    let c = Counter.v_labels ~label_names:["level"; "src"]
+        ~help ~namespace ~subsystem "messages_total" in
+    fun lvl src ->
+      let lvl = Logs.level_to_string (Some lvl) in
+      Counter.inc_one @@ Counter.labels c [lvl; src]
+end
+
 type t =
   | Quiet
   | Timestamp
@@ -31,13 +46,15 @@ let reporter log_clock =
   let report src level ~over k msgf =
     let k _ = over (); k () in
     let ppf = match level with Logs.App -> Fmt.stdout | _ -> Fmt.stderr in
+    let src = Logs.Src.name src in
     let with_stamp h _tags k fmt =
       Fmt.kpf k ppf ("\r%a %a %a @[" ^^ fmt ^^ "@]@.")
         pp_time ()
-        Fmt.(styled `Magenta string) (Printf.sprintf "%10s" @@ Logs.Src.name src)
+        Fmt.(styled `Magenta string) (Printf.sprintf "%10s" src)
         Logs_fmt.pp_header (level, h)
     in
     msgf @@ fun ?header ?tags fmt ->
+    Metrics.inc_messages level src;
     with_stamp header tags k fmt
   in
   { Logs.report = report }

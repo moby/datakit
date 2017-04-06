@@ -22,29 +22,50 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let path s = Datakit_path.of_steps_exn s
 
+  (* TODO: Lots of these functions used to ignore errors silently. This can lead
+     to bugs in the users of the library (e.g. we lost our 9p connection but
+     we think instead that the file we wanted doesn't exist). For now, I've
+     converted it to log errors in these cases but continue with the old
+     behaviour. Assuming we don't see these errors being logged, we can
+     change the code to raise exceptions instead. *)
+
   let safe_remove t path =
     DK.Transaction.remove t path >|= function
-    | Error _ | Ok () -> ()
+    | Error `Does_not_exist | Ok () -> ()
+    | Error e ->
+      Log.err (fun f -> f "safe_remove(%a): %a" Datakit_path.pp path DK.pp_error e)
 
   let safe_read_dir t dir =
     DK.Tree.read_dir t dir >|= function
-    | Error _ -> []
     | Ok dirs -> dirs
+    | Error (`Does_not_exist | `Not_dir) -> []
+    | Error e ->
+      Log.err (fun f -> f "safe_read_dir(%a): %a" Datakit_path.pp dir DK.pp_error e);
+      []
 
   let safe_exists_dir t dir =
     DK.Tree.exists_dir t dir >|= function
-    | Error _ -> false
     | Ok b    -> b
+    | Error `Not_dir -> false      (* Some parent doesn't exist or isn't a directory *)
+    | Error e ->
+      Log.err (fun f -> f "safe_exists_dir(%a): %a" Datakit_path.pp dir DK.pp_error e);
+      false
 
   let safe_exists_file t file =
     DK.Tree.exists_file t file >|= function
-    | Error _ -> false
     | Ok b    -> b
+    | Error `Not_dir -> false      (* Some parent doesn't exist or isn't a directory *)
+    | Error e ->
+      Log.err (fun f -> f "safe_exists_file(%a): %a" Datakit_path.pp file DK.pp_error e);
+      false
 
   let safe_read_file t file =
     DK.Tree.read_file t file >|= function
-    | Error _ -> None
     | Ok b    -> Some (String.trim (Cstruct.to_string b))
+    | Error (`Does_not_exist | `Not_dir) -> None
+    | Error e ->
+      Log.err (fun f -> f "safe_read_file(%a): %a" Datakit_path.pp file DK.pp_error e);
+      None
 
   let safe_create_file tr file contents =
     match Datakit_path.basename file with
@@ -65,7 +86,9 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let safe_tr_diff tr c =
     DK.Transaction.diff tr c >|= function
     | Ok d    -> d
-    | Error _ -> []
+    | Error e ->
+      Log.err (fun f -> f "safe_tr_diff: %a" DK.pp_error e);
+      []
 
   let lift_errors name f = f >>= function
     | Error e -> Lwt.fail_with @@ Fmt.strf "%s: %a" name DK.pp_error e
@@ -112,7 +135,9 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let safe_diff x y =
     DK.Commit.diff x y >|= function
-    | Error _ -> Elt.IdSet.empty, Elt.IdSet.empty
+    | Error e ->
+      Log.err (fun f -> f "safe_diff: %a" DK.pp_error e);
+      Elt.IdSet.empty, Elt.IdSet.empty
     | Ok d    -> changes d
 
   let walk

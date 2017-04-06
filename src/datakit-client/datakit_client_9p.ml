@@ -97,6 +97,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     | Error (`Msg "No such file or directory") -> Error `Does_not_exist
     | Error (`Msg "Already exists") -> Error `Already_exists
     | Error (`Msg "Is a directory") -> Error `Is_dir
+    | Error (`Msg "Can't walk from a file") -> Error `Not_dir
     | Error e -> Error (`IO e)
 
   module Line_reader : sig

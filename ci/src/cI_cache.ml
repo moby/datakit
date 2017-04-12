@@ -225,7 +225,12 @@ module Make(B : CI_s.BUILDER) = struct
                   DK.Transaction.create_dir trans Path.value >>*= fun () ->
                   ensure_removed trans Path.failure >>= fun () ->
                   let return x = Lwt.return (Ok x) in
-                  catch (fun () -> B.generate t.builder ~switch ~log trans ctx k) >>= function
+                  let build () =
+                    Lwt.finalize
+                      (fun () -> B.generate t.builder ~switch ~log trans ctx k)
+                      (fun () -> Lwt_switch.turn_off switch)
+                  in
+                  catch build >>= function
                   | Ok x ->
                     CI_live_log.log log "Success";
                     Prometheus.Counter.inc_one @@ Metrics.builds_succeeded_total (B.name t.builder);

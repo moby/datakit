@@ -6,8 +6,9 @@ services:
     image: 'docker/datakit:github'
     ports:
       - '81:81'
-    volumes:
-      - 'bridge-github-creds:/root/.github'
+    secrets:
+      - source: 'datakit-github-cookie'
+        mode: 0600
   ci:
     command: '--listen-prometheus=9090 --metadata-store tcp:datakit:5640 --web-ui=https://datakit.datakit.ci/ --sessions-backend=redis://redis'
     image: 'editions/datakit-self-ci:latest'
@@ -33,4 +34,7 @@ volumes:
   ci-cache:
   datakit-public-data:
   datakit-ssh:
-  bridge-github-creds:
+
+secrets:
+  datakit-github-cookie:
+    external: true

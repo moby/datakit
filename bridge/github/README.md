@@ -42,12 +42,15 @@ Start a DataKit server running somewhere:
 To run it:
 
     docker run -it --rm \
-      -v /path/to/jar:/root/.github/jar \
+      -v /path/to/jar/datakit:/run/secrets/datakit-github-cookie \
       datakit-github \
       --datakit=tcp:x.x.x.x:6640 \
       --no-listen \
       --verbose \
       --webhook=http://my-ip
+
+Note: `/path/to/jar/datakit` MUST NOT have any "other" permissions set in its Unix permissions.
+Otherwise, the bridge will refuse to start, saying that the file doesn't exist.
 
 Replace:
 - `/path/to/jar` with the path of your jar directory.

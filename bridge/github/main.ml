@@ -1,5 +1,4 @@
 open Lwt.Infix
-open Astring
 open Result
 
 let src = Logs.Src.create "gh-bridge" ~doc:"Github bridge for Datakit"
@@ -7,6 +6,8 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 let src9p = Logs.Src.create "g9p" ~doc:"Github bridge for Datakit (9p)"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
+
+let jar_path = "/run/secrets"
 
 let quiet_9p () =
   Logs.Src.set_level src9p (Some Logs.Info);
@@ -48,12 +49,13 @@ end
 let serviceid = "C378280D-DA14-42C8-A24E-0DE92A1028E3"
 
 let token () =
-  let cookie = "datakit" in
-  let error_msg = "Missing cookie: use `git-jar make -s repo <user> " ^ cookie ^"`" in
+  let cookie = "datakit-github-cookie" in
+  let error_msg =
+    Fmt.strf "Missing cookie %s/%s: use `git-jar make -s repo <user> %s`" jar_path cookie cookie in
   Lwt_main.run (
     Lwt.catch (fun () ->
         let open Lwt.Infix in
-        Github_cookie_jar.init () >>= fun jar ->
+        Github_cookie_jar.init ~jar_path () >>= fun jar ->
         Github_cookie_jar.get jar ~name:cookie >|= function
         | Some t -> Ok (Github.Token.of_string t.Github_t.auth_token)
         | None   -> Error (`Msg error_msg)

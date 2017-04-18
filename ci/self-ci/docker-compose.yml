@@ -4,14 +4,14 @@ services:
   # Also, we use --canary to test only the master branch.
   # For production use datakit-ci.yml, which tests against GitHub.
   bridge:
-    command: '--metadata-store tcp:datakit:5640 -v docker/datakit:/data/repos/datakit'
+    command: '--metadata-store tcp:datakit:5640 -v moby/datakit:/data/repos/datakit'
     image: 'docker/datakit:bridge-local-git'
     links:
       - datakit
     volumes:
       - '../../.git:/data/repos/datakit/.git:ro'
   ci:
-    command: '--profile=localhost --metadata-store tcp:datakit:5640 --web-ui=http://localhost:8080/ --canary=docker/datakit/heads/master'
+    command: '--profile=localhost --metadata-store tcp:datakit:5640 --web-ui=http://localhost:8080/ --canary=moby/datakit/heads/master'
     build: .
     links:
       - datakit

@@ -17,7 +17,7 @@ Visit the URL shown to configure an admin user.
 In this configuration:
 
 - The bridge that normally syncs the CI state with GitHub is replaced by `docker/datakit:bridge-local-git`, which tracks the local DataKit Git repository (`../../.git`).
-- Only the master branch is tested (`--canary=docker/datakit/heads/master`).
+- Only the master branch is tested (`--canary=moby/datakit/heads/master`).
 - Plain HTTP connections are used, to avoid browser warnings about self-signed certificates when testing.
 - The main executable is called with `--profile=localhost`, which affects some settings in `selfCI.ml` (search for `Localhost` to find the changes).
 
@@ -73,6 +73,6 @@ The `bridge` service should then start populating the branch with information ab
 
 All the DataKit services are run with `--listen-prometheus=9090`, which means that they will provide Prometheus metrics on port 9090 at `/metrics`. You can configure a Prometheus server to monitor these ports.
 
-[DataKitCI]: https://github.com/docker/datakit/tree/master/ci/self-ci
+[DataKitCI]: https://github.com/moby/datakit/tree/master/ci/self-ci
 [ocaml-github]: https://github.com/mirage/ocaml-github
 [certbot]: https://certbot.eff.org/

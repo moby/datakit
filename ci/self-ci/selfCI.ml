@@ -91,7 +91,7 @@ module Tests = struct
 end
 
 let projects repo = [
-  Config.project ~id:"docker/datakit" (Tests.datakit repo)
+  Config.project ~id:"moby/datakit" (Tests.datakit repo)
 ]
 
 let make_config ?state_repo ~listen_addr ~remote () =
@@ -110,8 +110,8 @@ let make_config ?state_repo ~listen_addr ~remote () =
 let config_for = function
   | `Production ->
     make_config
-      ~remote:"https://github.com/docker/datakit.git"
-      ~state_repo:(Uri.of_string "https://github.com/docker/datakit.logs")
+      ~remote:"https://github.com/moby/datakit.git"
+      ~state_repo:(Uri.of_string "https://github.com/moby/datakit.logs")
       ~listen_addr:(`HTTP 8080) (* We live behind an nginx proxy. *)
       ()
   | `Localhost ->

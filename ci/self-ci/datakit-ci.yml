@@ -20,7 +20,7 @@ services:
       - '/var/run/datakit:/var/run/builder'
   datakit:
     user: 'root'
-    command: '--git /data --listen-prometheus=9090 --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:docker/datakit.logs'
+    command: '--git /data --listen-prometheus=9090 --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:moby/datakit.logs'
     image: 'docker/datakit:latest'
     volumes:
       - datakit-public-data:/data

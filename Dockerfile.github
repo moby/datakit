@@ -5,7 +5,7 @@ RUN sudo apk add tzdata aspcud
 
 RUN opam pin add -yn protocol-9p.0.8.0 'https://github.com/talex5/ocaml-9p.git#ping'
 RUN opam pin add github --dev -n
-RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term cmdliner.0.9.8 github protocol-9p rresult prometheus-app mirage-types-lwt.2.8.0 asl win-eventlog mtime hex github-hooks hvsock
+RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term cmdliner.0.9.8 github protocol-9p rresult prometheus-app mirage-types-lwt.2.8.0 asl win-eventlog mtime hex github-hooks hvsock camlzip irmin-watcher datakit-server git mirage-tc irmin.0.12.0
 
 COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml
@@ -27,16 +27,16 @@ RUN cd /home/opam/src/datakit && \
     git checkout . && scripts/watermark.sh && \
     git status --porcelain
 
-RUN opam install datakit-bridge-github -y
+RUN opam install datakit-bridge-github -ytv
 
 RUN sudo cp $(opam config exec -- which datakit-bridge-github) /usr/bin/
 
 USER root
 
-#FROM alpine:3.5
-#RUN apk add --no-cache libev gmp tzdata ca-certificates
+FROM alpine:3.5
+RUN apk add --no-cache libev gmp tzdata ca-certificates
 EXPOSE 5640
 EXPOSE 5641
 ENTRYPOINT ["/usr/bin/datakit-bridge-github"]
 CMD ["--listen=tcp://0.0.0.0:5641", "-v", "--datakit=tcp:127.0.0.1:5640"]
-#COPY --from=0 /usr/bin/datakit-bridge-github /usr/bin/datakit-bridge-github
+COPY --from=0 /usr/bin/datakit-bridge-github /usr/bin/datakit-bridge-github

@@ -36,8 +36,6 @@ let opam_test ?depexts pkg =
   Docker.command ~logs ~pool ~user:"opam" ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
 
 let opam_test_ci = opam_test "datakit-ci" ~depexts:["conf-autoconf"; "conf-libpcre"; "camlzip"]
-let opam_test_datakit = opam_test "datakit" ~depexts:["conf-gmp"; "conf-libpcre"; "conf-perl"; "conf-autoconf"]
-
 module Tests = struct
   open Term.Infix
 
@@ -78,7 +76,7 @@ module Tests = struct
         "ci",          run_tests    images#ci           opam_test_ci;
         "self-ci",     check_builds images#self_ci;
         "github",      check_builds images#github;
-        "datakit",     run_tests    images#datakit      opam_test_datakit;
+        "datakit",     check_builds images#datakit;
         "local-git",   check_builds images#local_git;
         "libraries",   Term.wait_for_all [
           "client",      check_builds images#client;

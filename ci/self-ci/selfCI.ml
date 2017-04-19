@@ -14,7 +14,6 @@ module Dockerfile = struct
   let client      = v ~timeout:(30. *. minute) "Dockerfile.client"
   let ci          = v ~timeout:(30. *. minute) "Dockerfile.ci"
   let self_ci     = v ~timeout:(30. *. minute) "ci/self-ci/Dockerfile" ~label:"Dockerfile.self-ci"
-  let server      = v ~timeout:(30. *. minute) "Dockerfile.server"
   let github      = v ~timeout:(30. *. minute) "Dockerfile.github"
   let local_git   = v ~timeout:(30. *. minute) "Dockerfile.bridge-local-git"
   let datakit     = v ~timeout:(30. *. minute) "Dockerfile"
@@ -34,7 +33,7 @@ let opam_test ?depexts pkg =
     Fmt.strf "opam remove -y %S%s&& opam install -y -t --deps-only %S && opam install -y -v -t %S"
       pkg depexts pkg pkg in
   let entrypoint = "/bin/sh" in
-  Docker.command ~logs ~pool ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
+  Docker.command ~logs ~pool ~user:"opam" ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
 
 let opam_test_ci = opam_test "datakit-ci" ~depexts:["conf-autoconf"; "conf-libpcre"; "camlzip"]
 let opam_test_datakit = opam_test "datakit" ~depexts:["conf-gmp"; "conf-libpcre"; "conf-perl"; "conf-autoconf"]
@@ -59,9 +58,8 @@ module Tests = struct
       method local_git   = build Dockerfile.local_git  ~from:self#client
       method ci          = build Dockerfile.ci
       method self_ci     = build Dockerfile.self_ci    ~from:self#ci
-      method server      = build Dockerfile.server
-      method github      = build Dockerfile.github     ~from:self#server
-      method datakit     = build Dockerfile.datakit    ~from:self#server
+      method github      = build Dockerfile.github
+      method datakit     = build Dockerfile.datakit
     end
 
   let check_builds term =
@@ -83,7 +81,6 @@ module Tests = struct
         "datakit",     run_tests    images#datakit      opam_test_datakit;
         "local-git",   check_builds images#local_git;
         "libraries",   Term.wait_for_all [
-          "server",      check_builds images#server;
           "client",      check_builds images#client;
           "client-4.02", check_builds images#client_4_02;
         ] >|= fun () -> "Library tests succeeded"

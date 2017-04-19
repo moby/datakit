@@ -157,6 +157,7 @@ module Runner = struct
 
   type t = {
     label : string;
+    user : string option;
     entrypoint : string option;
     command : string list;
     timeout : float;
@@ -191,6 +192,11 @@ module Runner = struct
       | None -> []
       | Some entrypoint -> ["--entrypoint"; entrypoint]
     in
+    let docker_opts =
+      match t.user with
+      | None -> docker_opts
+      | Some user -> "--user" :: user :: docker_opts
+    in
     let cmd = Array.of_list (["docker"; "run"; "--rm"] @ docker_opts @ [Image.id image] @ t.command) in
     CI_process.run ~switch ~log ~output ("", cmd) >>= fun () ->
     Lwt.return (Ok ())
@@ -200,8 +206,8 @@ module Run_cache = CI_cache.Make(Runner)
 
 type command = Run_cache.t
 
-let command ~logs ~pool ~timeout ~label ?entrypoint command =
-  Run_cache.create ~logs { Runner.label; entrypoint; command; timeout; pool }
+let command ~logs ~pool ~timeout ~label ?entrypoint ?user command =
+  Run_cache.create ~logs { Runner.label; entrypoint; user; command; timeout; pool }
 
 let run t image =
   let open! CI_term.Infix in

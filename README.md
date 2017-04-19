@@ -65,7 +65,6 @@ The easiest way to build the DataKit project is to use [docker](https://docker.c
 does under the hood):
 
 ```shell
-docker build -t docker/datakit:server -f Dockerfile.server .
 docker build -t docker/datakit -f Dockerfile .
 docker run -p 5640:5640 -it --rm docker/datakit --listen-9p=tcp://0.0.0.0:5640
 ```

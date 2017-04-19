@@ -10,9 +10,10 @@ COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml
 
 # cache opam install of dependencies
-COPY opam /home/opam/src/datakit/opam
+COPY datakit.opam /home/opam/src/datakit/
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
 COPY datakit-server.opam /home/opam/src/datakit/datakit-server.opam
+COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
 RUN opam pin add datakit-server.dev /home/opam/src/datakit -yn && \
     opam pin add datakit-client.dev /home/opam/src/datakit -yn && \
     opam pin add datakit.dev /home/opam/src/datakit -yn        && \

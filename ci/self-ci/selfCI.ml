@@ -33,7 +33,7 @@ let opam_test ?depexts pkg =
     Fmt.strf "opam remove -y %S%s&& opam install -y -t --deps-only %S && opam install -y -v -t %S"
       pkg depexts pkg pkg in
   let entrypoint = "/bin/sh" in
-  Docker.command ~logs ~pool ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
+  Docker.command ~logs ~pool ~user:"opam" ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
 
 let opam_test_ci = opam_test "datakit-ci" ~depexts:["conf-autoconf"; "conf-libpcre"; "camlzip"]
 let opam_test_datakit = opam_test "datakit" ~depexts:["conf-gmp"; "conf-libpcre"; "conf-perl"; "conf-autoconf"]

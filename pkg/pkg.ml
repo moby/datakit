@@ -54,7 +54,7 @@ let metas = List.map (Pkg.meta_file ~install:false) [
   ]
 
 let opams = List.map (Pkg.opam_file ~lint_deps_excluding:None ~install:false) [
-    "opam";
+    "datakit.opam";
     "datakit-client.opam";
     "datakit-server.opam";
     "datakit-github.opam";
@@ -68,7 +68,7 @@ let () =
   match Conf.pkg_name c with
   | "datakit" -> Ok [
       Pkg.lib   "pkg/META";
-      Pkg.lib   "opam";
+      Pkg.lib   "datakit.opam" ~dst:"opam";
       Pkg.mllib "src/datakit/ivfs.mllib";
       Pkg.bin   "src/datakit/main" ~dst:"datakit";
       Pkg.bin   "src/datakit-client/mount" ~dst:"datakit-mount" ;

@@ -115,39 +115,12 @@ module Date = struct
       tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec
 end
 
-module HTTP = Irmin_http_server.Make(Cohttp_lwt_unix.Server)(Date)
-
-let http_server uri git =
-  let timeout = 3600 in
-  let uri = match Uri.host uri with
-    | None   -> Uri.with_host uri (Some "localhost")
-    | Some _ -> uri in
-  let port, uri = match Uri.port uri with
-    | None   -> 8080, Uri.with_port uri (Some 8080)
-    | Some p -> p, uri in
-  let mode = `TCP (`Port port) in
-  Logs.info (fun f -> f "daemon: %s" (Uri.to_string uri));
-  Printf.printf "Server starting on port %d.\n%!" port;
-  begin match git with
-    | None -> (* in-memory store *)
-      let module HTTP = HTTP(In_memory_store.Store) in
-      In_memory_store.repo () >>= fun repo ->
-      In_memory_store.Store.master make_task repo >|= fun t ->
-      HTTP.http_spec (t "HTTP server for the in-memory store")
-    | Some path -> (* on-disk store *)
-      let module HTTP = HTTP(Git_fs_store.Store) in
-      Git_fs_store.repo path >>= fun repo ->
-      Git_fs_store.Store.master make_task repo >|= fun t ->
-      HTTP.http_spec (t "HTTP server for the on-disk store")
-  end >>= fun spec ->
-  Cohttp_lwt_unix.Server.create ~timeout ~mode spec
-
 let () =
   Lwt.async_exception_hook := (fun exn ->
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
     )
 
-let start ~listen_9p ~listen_http prometheus git =
+let start ~listen_9p prometheus git =
   quiet ();
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
   set_signal_if_supported Sys.sigterm (Sys.Signal_handle (fun _ ->
@@ -166,10 +139,6 @@ let start ~listen_9p ~listen_http prometheus git =
       l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v
     );
   let prometheus_threads = Prometheus_unix.serve prometheus in
-  let serve_http = match listen_http with
-    | None     -> []
-    | Some uri -> [http_server (Uri.of_string uri) git]
-  in
   let serve_9p =
     begin match git with
       | None      -> In_memory_store.connect ()
@@ -180,10 +149,10 @@ let start ~listen_9p ~listen_http prometheus git =
       ) listen_9p
   in
   serve_9p >>= fun serve_9p ->
-  Lwt.choose (serve_http @ serve_9p @ prometheus_threads)
+  Lwt.choose (serve_9p @ prometheus_threads)
 
-let start () listen_9p listen_http prometheus git auto_push =
-  let start () = start ~listen_9p ~listen_http prometheus git in
+let start () listen_9p prometheus git auto_push =
+  let start () = start ~listen_9p prometheus git in
   Lwt_main.run begin
     match auto_push with
     | None        -> start ()
@@ -247,23 +216,13 @@ let listen_9p =
   in
   Arg.(value & opt (list (endpoint 5640)) [ `Tcp ("127.0.0.1", 5640) ] doc)
 
-let listen_http =
-  let docs = listen_options in
-  let doc =
-    Arg.info ~docs ~doc:
-      "An URL to listen on for HTTP connection, on of the form \
-       port or host:port"
-      ["listen-http"]
-  in
-  Arg.(value & opt (some string) None doc)
-
 let term =
   let doc = "A git-like database with a 9p interface." in
   let man = [
     `S "DESCRIPTION";
     `P "$(tname) is a Git-like database with a 9p interface.";
   ] in
-  Term.(pure start $ setup_log $ listen_9p $ listen_http $ Prometheus_unix.opts
+  Term.(pure start $ setup_log $ listen_9p $ Prometheus_unix.opts
         $ git $ auto_push),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 

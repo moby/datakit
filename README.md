@@ -13,8 +13,8 @@ for the [DataKitCI][] continuous integration system.
 
 ---
 
-[![Build Status (OSX, Linux)](https://travis-ci.org/docker/datakit.svg)](https://travis-ci.org/docker/datakit)
-[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/6qrdgiqbhi4sehmy/branch/master?svg=true)](https://ci.appveyor.com/project/docker/datakit/branch/master)
+[![Build Status (OSX, Linux)](https://travis-ci.org/moby/datakit.svg)](https://travis-ci.org/moby/datakit)
+[![Build status (Windows)](https://ci.appveyor.com/api/projects/status/6qrdgiqbhi4sehmy/branch/master?svg=true)](https://ci.appveyor.com/project/moby/datakit/branch/master)
 [![docs](https://img.shields.io/badge/doc-online-blue.svg)](https://docker.github.io/datakit/)
 
 There are several components in this repository:
@@ -34,7 +34,7 @@ To expose a Git repository as a 9p endpoint on port 5640 on a private network, r
 
 ```shell
 $ docker network create datakit-net # create a private network
-$ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit
+$ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data datakit/db
 ```
 
 *Note*: The `--name datakit` option is mandatory.  It will allow the client
@@ -45,7 +45,7 @@ expose the database as a filesystem API:
 
 ```shell
 # In an other terminal
-$ docker run -it --privileged --net datakit-net docker/datakit:client
+$ docker run -it --privileged --net datakit-net datakit/client
 $ ls /db
 branch     remotes    snapshots  trees
 ```
@@ -61,12 +61,12 @@ for more details.
 
 The easiest way to build the DataKit project is to use [docker](https://docker.com),
 (which is what the
-[start-datakit.sh](https://github.com/docker/datakit/blob/master/scripts/start-datakit.sh) script
+[start-datakit.sh](https://github.com/moby/datakit/blob/master/scripts/start-datakit.sh) script
 does under the hood):
 
 ```shell
-docker build -t docker/datakit -f Dockerfile .
-docker run -p 5640:5640 -it --rm docker/datakit --listen-9p=tcp://0.0.0.0:5640
+docker build -t datakit/db -f Dockerfile .
+docker run -p 5640:5640 -it --rm datakit/db --listen-9p=tcp://0.0.0.0:5640
 ```
 These commands will expose the database's 9p endpoint on port 5640.
 
@@ -102,8 +102,8 @@ want to collect metrics remotely.
 ## Licensing
 
 DataKit is licensed under the Apache License, Version 2.0. See
-[LICENSE](https://github.com/docker/datakit/blob/master/LICENSE.md) for the full
+[LICENSE](https://github.com/moby/datakit/blob/master/LICENSE.md) for the full
 license text.
 
-[DataKitCI]: https://github.com/docker/datakit/tree/master/ci
-[Filesystem API]: https://github.com/docker/datakit/tree/master/9p.md
+[DataKitCI]: https://github.com/moby/datakit/tree/master/ci
+[Filesystem API]: https://github.com/moby/datakit/tree/master/9p.md

@@ -1,4 +1,4 @@
-FROM docker/datakit:ci
+FROM datakit/ci
 
 ARG CONFIG=exampleCI
 ADD . /datakit-ci

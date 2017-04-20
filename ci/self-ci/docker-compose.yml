@@ -5,7 +5,7 @@ services:
   # For production use datakit-ci.yml, which tests against GitHub.
   bridge:
     command: '--metadata-store tcp:datakit:5640 -v moby/datakit:/data/repos/datakit'
-    image: 'docker/datakit:bridge-local-git'
+    image: 'datakit/local-bridge'
     links:
       - datakit
     volumes:
@@ -24,6 +24,6 @@ services:
   datakit:
     user: 'root'
     command: '--git /data --listen-9p tcp://0.0.0.0:5640'
-    image: 'docker/datakit:latest'
+    image: 'datakit/db'
     volumes:
       - /data

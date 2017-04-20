@@ -61,14 +61,3 @@ Replace:
 
 Connect to DataKit and create an empty file `repo/project/.monitor` on the `github-metadata` branch.
 The bridge will immediately start querying GitHub and will populate the directory with information about the project.
-
-### Experimental GitHub API bindings
-
-To start DataKit with the experimental GitHub bindings:
-
-```shell
-$ docker run -it --net datakit-net --name datakit -v <path/to/git/repo>:/data docker/datakit:github
-$ docker run -it --privileged --net datakit-net docker/datakit:client
-$ ls /db
-branch      github.com  remotes     snapshots   trees
-```

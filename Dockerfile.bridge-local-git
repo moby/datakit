@@ -1,4 +1,4 @@
-FROM docker/datakit:client
+FROM datakit/client
 
 RUN opam pin add github --dev -n
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n

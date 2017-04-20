@@ -220,9 +220,9 @@ is a GitHub user who can read the "my-org/my-private-repository" repository.
 
 
 
-[DataKit]: https://github.com/docker/datakit
+[DataKit]: https://github.com/moby/datakit
 [cmdliner]: http://erratique.ch/software/cmdliner/doc/Cmdliner
 [DataKitCI API]: https://docker.github.io/datakit/Datakit_ci.html
 [MirageCI service]: https://ci.mirage.io/
 [MirageCI source]: https://github.com/avsm/mirage-ci/tree/master/src-bin
-[SelfCI]: https://github.com/docker/datakit/blob/master/ci/self-ci/selfCI.ml
+[SelfCI]: https://github.com/moby/datakit/blob/master/ci/self-ci/selfCI.ml

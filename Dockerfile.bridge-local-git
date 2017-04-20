@@ -20,6 +20,7 @@ RUN opam install datakit-bridge-local-git -vv
 RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
 RUN sudo cp $(opam config exec -- which datakit-bridge-local-git) /usr/bin/
 
-USER root
+FROM alpine:3.5
+RUN apk add --no-cache libev gmp tzdata ca-certificates
 ENTRYPOINT ["/usr/bin/datakit-bridge-local-git"]
-CMD ["-v", "--datakit=tcp:datakit:5640"]
+COPY --from=0 /usr/bin/datakit-bridge-local-git /usr/bin/datakit-bridge-local-git

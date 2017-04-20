@@ -1,4 +1,4 @@
-FROM docker/datakit:ci AS build-env
+FROM datakit/ci AS build-env
 RUN sudo apk add --no-cache libev docker gmp
 ADD . /home/opam/build
 WORKDIR /home/opam/build

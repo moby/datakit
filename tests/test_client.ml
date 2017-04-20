@@ -611,7 +611,7 @@ let test_remove dk =
       >>*= fun () ->
 
       (* XXX: hack to make the test pass until we fix
-         https://github.com/docker/datakit/issues/147 *)
+         https://github.com/moby/datakit/issues/147 *)
       DK.Transaction.read_dir t (p "foo") >>*= fun _ ->
 
       DK.Transaction.remove t (p "foo/bar") >>*= fun () ->

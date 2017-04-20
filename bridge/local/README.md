@@ -21,20 +21,20 @@ For an example test configuration using this bridge, see `ci/self-ci/docker-comp
 
 Build using the `Dockerfile.bridge-local-git` file at the root of this repository:
 
-    docker build -t docker/datakit:bridge-local-git -f Dockerfile.bridge-local-git .
+    docker build -t datakit/local-bridge -f Dockerfile.bridge-local-git .
 
 ### Run
 
 To see the help text:
 
-    docker run -it --rm docker/datakit:bridge-local-git --help
+    docker run -it --rm datakit/local-bridge --help
 
 To run it (after starting a DataKit container called "datakit"):
 
     docker run -it --rm \
       --link datakit:datakit \
       -v /path/to/repos:/repos \
-      docker/datakit:bridge-local-git -v \
+      datakit/local-bridge -v \
       me/my-project:/repos/my-project \
       --verbose \
       --webhook=http://my-ip

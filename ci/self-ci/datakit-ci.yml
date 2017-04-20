@@ -3,7 +3,7 @@ version: '3.1'
 services:
   bridge:
     command: '--listen-prometheus=9090 --datakit tcp://datakit:5640 --no-listen -v -c "*:r,status[ci/datakit]:x,webhook:rw" --webhook http://hooks.datakit.ci:81 --log-destination timestamp'
-    image: 'docker/datakit:github'
+    image: 'datakit/github-bridge'
     ports:
       - '81:81'
     secrets:
@@ -21,7 +21,7 @@ services:
   datakit:
     user: 'root'
     command: '--git /data --listen-prometheus=9090 --listen-9p tcp://0.0.0.0:5640 --auto-push git@github.com:moby/datakit.logs'
-    image: 'docker/datakit:latest'
+    image: 'datakit/db'
     volumes:
       - datakit-public-data:/data
       - datakit-ssh:/root/.ssh

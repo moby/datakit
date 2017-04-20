@@ -16,7 +16,7 @@ Visit the URL shown to configure an admin user.
 
 In this configuration:
 
-- The bridge that normally syncs the CI state with GitHub is replaced by `docker/datakit:bridge-local-git`, which tracks the local DataKit Git repository (`../../.git`).
+- The bridge that normally syncs the CI state with GitHub is replaced by `datakit/local-bridge`, which tracks the local DataKit Git repository (`../../.git`).
 - Only the master branch is tested (`--canary=moby/datakit/heads/master`).
 - Plain HTTP connections are used, to avoid browser warnings about self-signed certificates when testing.
 - The main executable is called with `--profile=localhost`, which affects some settings in `selfCI.ml` (search for `Localhost` to find the changes).
@@ -32,7 +32,7 @@ To use this as a template for your own projects:
    - For the `ci` service:
      - Change `--web-ui=https://datakit.datakit.ci/` to the URL users should use to see the web user interface of your service.
    - For the `datakit` service:
-     - Edit (or remove) the `--auto-push git@github.com:docker/datakit.logs` option to point at a new, empty, GitHub repository
+     - Edit (or remove) the `--auto-push git@github.com:moby/datakit.logs` option to point at a new, empty, GitHub repository
        which will mirror the results.
    - For the bridge, change `--webhook http://HOST:PORT` to a public endpoint that GitHub can use to send web events.
      If you change the port, change *both* ports in the `ports` configuration below.

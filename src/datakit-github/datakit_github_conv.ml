@@ -14,6 +14,8 @@ let ( >>*= ) x f =
 let pp_path = Fmt.(list ~sep:(unit "/") string)
 let mapo f = function None -> None | Some x -> Some (f x)
 
+let failf fmt = Fmt.kstrf failwith fmt
+
 module Make (DK: Datakit_S.CLIENT) = struct
 
   type tree = DK.Tree.t
@@ -29,49 +31,44 @@ module Make (DK: Datakit_S.CLIENT) = struct
      behaviour. Assuming we don't see these errors being logged, we can
      change the code to raise exceptions instead. *)
 
-  let safe_remove t path =
+  let remove_if_exists t path =
     DK.Transaction.remove t path >|= function
     | Error `Does_not_exist | Ok () -> ()
     | Error e ->
-      Log.err (fun f -> f "safe_remove(%a): %a" Datakit_path.pp path DK.pp_error e)
+      failf "remove_if_exists(%a): %a" Datakit_path.pp path DK.pp_error e
 
-  let safe_read_dir t dir =
+  let read_dir_if_exists t dir =
     DK.Tree.read_dir t dir >|= function
     | Ok dirs -> dirs
     | Error (`Does_not_exist | `Not_dir) -> []
     | Error e ->
-      Log.err (fun f -> f "safe_read_dir(%a): %a" Datakit_path.pp dir DK.pp_error e);
-      []
+      failf "safe_read_dir(%a): %a" Datakit_path.pp dir DK.pp_error e
 
-  let safe_exists_dir t dir =
+  let exists_dir t dir =
     DK.Tree.exists_dir t dir >|= function
     | Ok b    -> b
     | Error `Not_dir -> false      (* Some parent doesn't exist or isn't a directory *)
     | Error e ->
-      Log.err (fun f -> f "safe_exists_dir(%a): %a" Datakit_path.pp dir DK.pp_error e);
-      false
+      failf "exists_dir(%a): %a" Datakit_path.pp dir DK.pp_error e
 
-  let safe_exists_file t file =
+  let exists_file t file =
     DK.Tree.exists_file t file >|= function
     | Ok b    -> b
     | Error `Not_dir -> false      (* Some parent doesn't exist or isn't a directory *)
     | Error e ->
-      Log.err (fun f -> f "safe_exists_file(%a): %a" Datakit_path.pp file DK.pp_error e);
-      false
+      failf "exists_file(%a): %a" Datakit_path.pp file DK.pp_error e
 
-  let safe_read_file t file =
+  let read_file_if_exists t file =
     DK.Tree.read_file t file >|= function
     | Ok b    -> Some (String.trim (Cstruct.to_string b))
     | Error (`Does_not_exist | `Not_dir) -> None
     | Error e ->
-      Log.err (fun f -> f "safe_read_file(%a): %a" Datakit_path.pp file DK.pp_error e);
-      None
+      failf "read_file(%a): %a" Datakit_path.pp file DK.pp_error e
 
-  let safe_create_file tr file contents =
+  let create_file tr file contents =
     match Datakit_path.basename file with
     | None   ->
-      Log.err (fun l -> l "%a is not a file" Datakit_path.pp file);
-      Lwt.return_unit
+      failf "%a is not a file" Datakit_path.pp file
     | Some _ ->
       let dir  = Datakit_path.dirname file in
       (DK.Transaction.make_dirs tr dir >>*= fun () ->
@@ -79,16 +76,13 @@ module Make (DK: Datakit_S.CLIENT) = struct
       >|= function
       | Ok ()   -> ()
       | Error e ->
-        Log.err (fun l ->
-            l "Got %a while creating %a, skipping."
-              DK.pp_error e Datakit_path.pp file)
+        failf "Got %a while creating %a" DK.pp_error e Datakit_path.pp file
 
-  let safe_tr_diff tr c =
+  let tr_diff tr c =
     DK.Transaction.diff tr c >|= function
     | Ok d    -> d
     | Error e ->
-      Log.err (fun f -> f "safe_tr_diff: %a" DK.pp_error e);
-      []
+      failf "tr_diff: %a" DK.pp_error e
 
   let lift_errors name f = f >>= function
     | Error e -> Lwt.fail_with @@ Fmt.strf "%s: %a" name DK.pp_error e
@@ -150,9 +144,9 @@ module Make (DK: Datakit_S.CLIENT) = struct
         | Error e -> Log.err (fun l -> l "%s" e); aux acc todo
         | Ok ctx  ->
           let dir = root /@ ctx in
-          safe_read_dir tree dir >>= fun childs ->
+          read_dir_if_exists tree dir >>= fun childs ->
           let todo = List.map (fun c -> context @ [c]) childs @ todo in
-          safe_exists_file tree (dir / file) >>= function
+          exists_file tree (dir / file) >>= function
           | false -> aux acc todo
           | true ->
             fn (Datakit_path.unwrap ctx) >>= function
@@ -168,7 +162,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
   (* Repos *)
 
   let repo tree repo =
-    safe_read_file tree (root repo / ".monitor") >|= function
+    read_file_if_exists tree (root repo / ".monitor") >|= function
     | None   ->
       Log.debug (fun l -> l "repo %a -> false" Repo.pp repo);
       None
@@ -180,11 +174,11 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let repos tree =
     let root = Datakit_path.empty in
-    safe_read_dir tree root >>= fun users ->
+    read_dir_if_exists tree root >>= fun users ->
     Lwt_list.map_p (fun user ->
-        safe_read_dir tree (root / user) >>= fun repos ->
+        read_dir_if_exists tree (root / user) >>= fun repos ->
         Lwt_list.map_p (fun repo ->
-            safe_read_file tree (root / user /repo / ".monitor") >|= function
+            read_file_if_exists tree (root / user / repo / ".monitor") >|= function
             | None   -> Repo.Set.empty
             | Some _ -> Repo.Set.singleton (Repo.v ~user ~repo)
           ) repos >|= reduce_repos
@@ -196,7 +190,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let update_repo_aux tr s r =
     let dir = root r in
     match s with
-    | `Ignored   -> safe_remove tr (root r / ".monitor")
+    | `Ignored   -> remove_if_exists tr (root r / ".monitor")
     | `Monitored ->
       let remove =
         DK.Transaction.make_dirs tr dir >>*= fun () ->
@@ -233,15 +227,15 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let remove_pr t (repo, num) =
     let dir = root repo / "pr" / string_of_int num in
     Log.debug (fun l -> l "remove_pr %s" @@ Datakit_path.to_hum dir);
-    safe_remove t dir
+    remove_if_exists t dir
 
   let pr tree (repo, number) =
     let dir = root repo / "pr" / string_of_int number in
     Log.debug (fun l -> l "pr %a" Datakit_path.pp dir);
-    safe_read_file tree (dir / "head")  >>= fun head ->
-    safe_read_file tree (dir / "state") >>= fun state ->
-    safe_read_file tree (dir / "title") >>= fun title ->
-    safe_read_file tree (dir / "base")  >|= fun base ->
+    read_file_if_exists tree (dir / "head")  >>= fun head ->
+    read_file_if_exists tree (dir / "state") >>= fun state ->
+    read_file_if_exists tree (dir / "title") >>= fun title ->
+    read_file_if_exists tree (dir / "base")  >|= fun base ->
     match head, state with
     | None, _ ->
       Log.debug (fun l ->
@@ -276,7 +270,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let prs_of_repo tree repo =
     let dir = root repo / "pr"  in
-    safe_read_dir tree dir >>= fun nums ->
+    read_dir_if_exists tree dir >>= fun nums ->
     Lwt_list.map_p (fun n ->
         pr tree (repo, int_of_string n) >|= function
         | None   -> PR.Set.empty
@@ -302,7 +296,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let commit tree { Commit.repo; hash } =
     let dir = root repo / "commit" / hash in
-    safe_exists_dir tree dir >|= function
+    exists_dir tree dir >|= function
     | false ->
       Log.debug (fun l -> l "commit {%a %s} -> false" Repo.pp repo hash);
       None
@@ -312,7 +306,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let commits_of_repo tree repo =
     let dir = root repo / "commit" in
-    safe_read_dir tree dir >|= fun commits ->
+    read_dir_if_exists tree dir >|= fun commits ->
     List.fold_left (fun s id ->
         Commit.Set.add (Commit.v repo id) s
       ) Commit.Set.empty commits
@@ -350,7 +344,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       "target_url" , mapo Uri.to_string (Status.url s);
     ] in
     Lwt_list.iter_p (fun (k, v) -> match v with
-        | None   -> safe_remove t (dir / k)
+        | None   -> remove_if_exists t (dir / k)
         | Some v ->
           let v = Cstruct.of_string (v ^ "\n") in
           lift_errors "update_status" @@
@@ -363,7 +357,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
       root (Commit.repo commit) / "commit" / Commit.hash commit / "status"
       /@ context
     in
-    safe_read_file tree (dir / "state") >>= fun state ->
+    read_file_if_exists tree (dir / "state") >>= fun state ->
     match state with
     | None     ->
       Log.debug (fun l -> l "status %a -> None" Datakit_path.pp dir);
@@ -377,8 +371,8 @@ module Make (DK: Datakit_S.CLIENT) = struct
       in
       Log.debug (fun l -> l "status %a -> %a"
                     Datakit_path.pp context Status_state.pp state);
-      safe_read_file tree (dir / "description") >>= fun description ->
-      safe_read_file tree (dir / "target_url")  >|= fun url ->
+      read_file_if_exists tree (dir / "description") >>= fun description ->
+      read_file_if_exists tree (dir / "target_url")  >|= fun url ->
       let context = Datakit_path.unwrap context in
       let url = mapo Uri.of_string url in
       Some (Status.v ?description ?url commit context state)
@@ -413,7 +407,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let ref tree (repo, name) =
     let path = Datakit_path.of_steps_exn name in
     let head = root repo / "ref" /@ path / "head" in
-    safe_read_file tree head >|= function
+    read_file_if_exists tree head >|= function
     | None    ->
       Log.debug (fun l -> l "ref_ %a:%a -> None" Repo.pp repo pp_path name);
       None
@@ -454,7 +448,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     let path = Datakit_path.of_steps_exn name in
     let dir = root repo / "ref" /@ path in
     Log.debug (fun l -> l "remove_ref %a" Datakit_path.pp dir);
-    safe_remove tr dir
+    remove_if_exists tr dir
 
   let update_event t = function
     | Event.Repo (s, r) -> update_repo_aux t s r
@@ -487,11 +481,11 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let dirty_repos tree =
     let root = Datakit_path.empty in
-    safe_read_dir tree root >>= fun users ->
+    read_dir_if_exists tree root >>= fun users ->
     Lwt_list.map_p (fun user ->
-        safe_read_dir tree (root / user) >>= fun repos ->
+        read_dir_if_exists tree (root / user) >>= fun repos ->
         Lwt_list.map_p (fun repo ->
-            safe_exists_file tree (root / user /repo / ".dirty") >|= function
+            exists_file tree (root / user /repo / ".dirty") >|= function
             | false -> Elt.IdSet.empty
             | true  -> Elt.IdSet.singleton (`Repo (Repo.v ~user ~repo))
           ) repos >|= reduce_elts
@@ -499,10 +493,10 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let dirty_prs tree repo =
     let dir = root repo / "pr"  in
-    safe_read_dir tree dir >>= fun nums ->
+    read_dir_if_exists tree dir >>= fun nums ->
     Lwt_list.map_p (fun n ->
         let d = dir / n / ".dirty" in
-        safe_exists_file tree d >|= function
+        exists_file tree d >|= function
         | false -> Elt.IdSet.empty
         | true  ->
           try Elt.IdSet.singleton (`PR (repo, int_of_string n))
@@ -536,13 +530,13 @@ module Make (DK: Datakit_S.CLIENT) = struct
     | _ -> failwith "TODO"
 
   let clean tr dirty =
-    Lwt_list.iter_p (fun d -> safe_remove tr (dirty_file d))
+    Lwt_list.iter_p (fun d -> remove_if_exists tr (dirty_file d))
       @@ Elt.IdSet.elements dirty
 
   let empty = Cstruct.of_string ""
 
   let stain tr dirty =
-    Lwt_list.iter_p (fun d -> safe_create_file tr (dirty_file d) empty)
+    Lwt_list.iter_p (fun d -> create_file tr (dirty_file d) empty)
       @@ Elt.IdSet.elements dirty
 
   (* Elements *)
@@ -675,10 +669,10 @@ module Make (DK: Datakit_S.CLIENT) = struct
         root (Commit.repo h) / "commit" / Commit.hash h / "status"
         /@ path c
       in
-      safe_remove tr dir
+      remove_if_exists tr dir
     | `Commit c ->
       let dir = root (Commit.repo c) / "commit" / c.Commit.hash in
-      safe_remove tr dir
+      remove_if_exists tr dir
 
   let update_elt tr = function
     | `Repo r   -> update_repo tr r
@@ -719,7 +713,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     tr_head tr >>= fun head ->
     clean () >>= fun () ->
     update () >>= fun () ->
-    safe_tr_diff tr head >|= fun diff ->
+    tr_diff tr head >|= fun diff ->
     diff <> []
 
 end

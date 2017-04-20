@@ -19,6 +19,7 @@ depends:
 
 datakit:
 	ocaml pkg/pkg.ml build --tests $(TESTS) -q
+	ocaml pkg/pkg.ml test
 
 client:
 	ocaml pkg/pkg.ml build -n datakit-client -q

@@ -15,7 +15,7 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "cmdliner" {< "1.0.0"}
+  "cmdliner"
   "irmin"    {< "1.0"}
   "irmin-watcher"
   "irmin-unix"

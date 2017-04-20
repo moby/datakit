@@ -6,6 +6,9 @@ open Result
 type t
 (** A [t] is an immutable sequence of bytes. *)
 
+val t: t Irmin.Type.t
+(** [t] is the value representing the type {!t}. *)
+
 val pp: t Fmt.t
 (** [pp] is the pretty-printer for blobs. *)
 

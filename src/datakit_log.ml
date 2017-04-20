@@ -21,7 +21,7 @@ type t =
   | Eventlog
   | ASL
 
-let conv = Arg.enum [
+let mk = Arg.enum [
     "quiet"    , Quiet;
     "timestamp", Timestamp;
     "eventlog" , Eventlog;
@@ -80,7 +80,7 @@ let log_destination =
   let doc =
     Arg.info ~docs ~doc:"Destination for the logs" [ "log-destination" ]
   in
-  Arg.(value & opt conv Quiet & doc)
+  Arg.(value & opt mk Quiet & doc)
 
 let log_clock =
   let doc = Arg.info ~docs ~doc:"Kind of clock" ["log-clock"] in

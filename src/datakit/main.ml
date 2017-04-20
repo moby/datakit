@@ -41,31 +41,14 @@ let error fmt = Printf.ksprintf (fun s ->
 
 let max_chunk_size = Int32.of_int (100 * 1024)
 
-let make_task msg =
+let info msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
-  Irmin.Task.create ~date ~owner:"datakit <datakit@docker.com>" msg
+  Irmin.Info.v ~date ~author:"datakit <datakit@docker.com>" msg
 
-(* FIXME: this is a bit ridiculous *)
-module Contents_string = struct
-  open Irmin.Contents.String
-  type t = string
-  let equal = equal
-  let compare = compare
-  let hash = hash
-  let to_json = to_json
-  let of_json = of_json
-  let size_of = size_of
-  let write = write
-  let read = read
-  let merge _ = merge []
-  module Path = Ivfs_tree.Path
-end
 module Git_fs_store = struct
-  open Irmin
   open Datakit_io
-  module Store =
-    Irmin_git.FS(Sync)(Zlib)(Lock)(FS)
-      (Contents_string)(Ref.String)(Hash.SHA1)
+  module Maker = Irmin_git.FS.Make(IO)(Zlib)(FS)
+  module Store = Ivfs_tree.Make(Maker)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
   let listener = lazy (
@@ -73,33 +56,32 @@ module Git_fs_store = struct
   )
 
   let repo path =
-    let config = Irmin_git.config ~root:path ~bare:true () in
-    Store.Repo.create config
+    let config = Irmin_git.config ~bare:true path in
+    Store.Repo.v config
 
   let connect path =
     Lazy.force listener;
     Log.debug (fun l -> l "Using Git-format store %s" path);
     repo path >|= fun repo ->
-    fun () -> Filesystem.create make_task repo
+    fun () -> Filesystem.create ~info repo
 end
 
 module In_memory_store = struct
-  open Irmin
   open Datakit_io
-  module Store = Irmin_git.Memory
-      (Sync)(Zlib)(Contents_string)(Ref.String) (Hash.SHA1)
+  module Maker = Irmin_git.Mem.Make(IO)(Zlib)
+  module Store = Ivfs_tree.Make(Maker)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
 
   let repo () =
     let config = Irmin_mem.config () in
-    Store.Repo.create config
+    Store.Repo.v config
 
   let connect () =
     Log.debug (fun l ->
         l "Using in-memory store (use --git for a disk-backed store)");
     repo () >|= fun repo ->
-    fun () -> Filesystem.create make_task repo
+    fun () -> Filesystem.create ~info repo
 end
 
 let set_signal_if_supported signal handler =
@@ -163,11 +145,11 @@ let start () listen_9p prometheus git auto_push =
         Lazy.force Git_fs_store.listener;
         Git_fs_store.repo local >>= fun repo ->
         let pusher = Autopush.create ~local ~remote in
-        Git_fs_store.Store.Repo.watch_branches repo
+        Git_fs_store.Store.Branch.watch_all repo
           (fun branch _ -> Autopush.push pusher ~branch; Lwt.return_unit)
-        >>= fun unwatch ->
+        >>= fun w ->
         start () >>= fun () ->
-        unwatch ()
+        Git_fs_store.Store.unwatch w
   end
 
 open Cmdliner

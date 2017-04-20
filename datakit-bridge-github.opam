@@ -21,7 +21,7 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "cmdliner" {<"1.0.0"}
+  "cmdliner"
   "lwt" {>= "2.7.0"}
   "datakit-github"
   "logs" "fmt" "mtime" "asl" "win-eventlog"

@@ -1,97 +1,104 @@
+open Astring
 open Lwt.Infix
 
-module Path = Ivfs_tree.Path
+let src = Logs.Src.create "ivfs.merge" ~doc:"Irmin VFS"
+module Log = (val Logs.src_log src : Logs.LOG)
+
+type path = Ivfs_tree.path
+type step = Ivfs_tree.step
+
+module Path = struct
+  include Ivfs_tree.Path
+  let compare = Irmin.Type.compare t
+end
 module PathSet = Set.Make(Path)
-module StepMap = Asetmap.Map.Make(Path.Step)
-
-type path = Path.t
-type step = Path.Step.t
-
-let blob = Tc.biject (module Tc.Cstruct)
-    Ivfs_blob.of_ro_cstruct
-    Ivfs_blob.to_ro_cstruct
-
-module Blob = (val blob : Tc.S0 with type t = Ivfs_blob.t)
 
 module type RW = sig
   type t
-  val update_force : t -> path -> step -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
-  val remove_force : t -> path -> step -> unit Lwt.t
+  val update_force : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
+  val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
 end
 
-module Make
-    (Store : Ivfs_tree.STORE)
-    (RW : RW)
-= struct
-  module Tree = Ivfs_tree.Make(Store)
-  module Metadata = Store.Private.Node.Val.Metadata
-  module ContentsMeta = Tc.Pair(Blob)(Metadata)
+module Make (Store : Ivfs_tree.S) (RW : RW) = struct
+  module Metadata = Store.Metadata
+  module Dir = Store.Tree
 
-  let as_file = function
-    | `File (f, perm) -> Tree.File.content f >|= fun c -> Some (c, perm)
-    | `Directory _ | `None -> Lwt.return None
-
-  let merge_blob = Irmin.Merge.default (module Blob)
+  (* blobs are idempotents *)
+  (* FIXME: move into Irmin.Merge *)
+  let merge_idempotent dt =
+    let (=) = Irmin.Type.equal dt in
+    let default = Irmin.Merge.default dt in
+    let f ~old x y =
+      if x = y then Irmin.Merge.ok x
+      else Irmin.Merge.f default ~old x y
+    in
+    Irmin.Merge.v dt f
 
   let merge_file =
-    Irmin.Merge.option (module ContentsMeta)
-      (Irmin.Merge.pair (module Blob) (module Metadata) merge_blob Metadata.merge)
+    let blob = merge_idempotent Irmin.Type.(pair Ivfs_blob.t Metadata.t) in
+    Irmin.Merge.(option blob)
+
+  let map tree = Dir.list tree Store.Key.empty >|= String.Map.of_list
 
   let merge ~ours ~theirs ~base result =
     let conflicts = ref PathSet.empty in
     let note_conflict path leaf msg =
-      conflicts := !conflicts |> PathSet.add (Path.rcons path leaf);
+      conflicts := !conflicts |> PathSet.add (Store.Key.rcons path leaf);
       let f = Ivfs_blob.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
-      RW.update_force result path leaf (f, `Normal) in
-    let repo = Store.repo ours in
-    let empty = Tree.Dir.empty repo in
+      RW.update_force result path leaf (f, `Normal)
+    in
+    let empty = Store.Tree.empty () in
     let as_dir = function
-      | `Directory x -> x
-      | `File _ -> empty
-      | `None -> empty in
-    let rec merge_dir ~ours ~theirs ~base (path : Path.t) =
-      Tree.Dir.map ours >>= fun our_files ->
-      Tree.Dir.map theirs >>= fun their_files ->
-      (* Types tells us the type the result will have, if successful, or [`Conflict] if we
-         know it won't work. *)
+      | None   -> empty
+      | Some v -> v
+    in
+    let rec merge_dir ~ours ~theirs ~base path =
+      map ours >>= fun our_files ->
+      map theirs >>= fun their_files ->
+      (* Types tells us the type the result will have, if successful,
+         or [`Conflict] if we know it won't work. *)
       let types =
-        StepMap.merge (fun _leaf ours theirs ->
+        String.Map.merge (fun _leaf ours theirs ->
             match ours, theirs with
-            | Some (`Directory _), Some (`Directory _) -> Some `Directory
-            | Some (`File _), Some (`File _) -> Some `File
+            | Some `Node, Some `Node -> Some `Node
+            | Some `Contents, Some `Contents -> Some `Contents
             | Some _, Some _ -> Some `Conflict
-            | Some (`File _), None | None, Some (`File _) -> Some `File
-            | Some (`Directory _), None | None, Some (`Directory _) -> Some `Directory
+            | Some `Contents, None | None, Some `Contents -> Some `Contents
+            | Some `Node, None | None, Some `Node -> Some `Node
             | None, None -> assert false
-          ) our_files their_files in
-      StepMap.bindings types |> Lwt_list.iter_s (fun (leaf, ty) ->
-          let sub_path = Path.rcons path leaf in
+          ) our_files their_files
+      in
+      String.Map.bindings types |> Lwt_list.iter_s (fun (leaf, ty) ->
+          let sub_path = Store.Key.rcons path leaf in
+          let step = Path.v [leaf] in
           match ty with
           | `Conflict -> note_conflict path leaf "File vs dir"
-          | `Directory ->
-            Tree.Dir.lookup ours leaf >|= as_dir >>= fun ours ->
-            Tree.Dir.lookup theirs leaf >|= as_dir >>= fun theirs ->
-            Tree.Dir.lookup base leaf >|= as_dir >>= fun base ->
+          | `Node ->
+            Dir.find_tree ours step >|= as_dir >>= fun ours ->
+            Dir.find_tree theirs step >|= as_dir >>= fun theirs ->
+            Dir.find_tree base step >|= as_dir >>= fun base ->
             merge_dir ~ours ~theirs ~base sub_path
-          | `File ->
-            Tree.Dir.lookup ours leaf >>= as_file >>= fun ours ->
-            Tree.Dir.lookup theirs leaf >>= as_file >>= fun theirs ->
+          | `Contents ->
+            Dir.find_all ours step >>= fun ours ->
+            Dir.find_all theirs step >>= fun theirs ->
             let old () =
-              Tree.Dir.lookup base leaf >>= fun hash ->
-              as_file hash >|= fun f ->
-              `Ok (Some f) in
-            merge_file ~old ours theirs >>= function
-            | `Ok (Some x) -> RW.update_force result path leaf x
-            | `Ok None -> RW.remove_force result path leaf
-            | `Conflict "default" -> note_conflict path leaf "Changed on both branches"
-            | `Conflict x -> note_conflict path leaf x
-        ) in
-    Tree.snapshot ours >>= fun ours ->
-    Tree.snapshot theirs >>= fun theirs ->
+              Dir.find_all base step >|= fun f ->
+              Ok (Some f)
+            in
+            Irmin.Merge.f merge_file ~old ours theirs >>= function
+            | Ok (Some x) -> RW.update_force result path leaf x
+            | Ok None -> RW.remove_force result path leaf
+            | Error (`Conflict "default") ->
+              note_conflict path leaf "Changed on both branches"
+            | Error (`Conflict x)         -> note_conflict path leaf x
+        )
+    in
+    Store.tree ours >>= fun ours ->
+    Store.tree theirs >>= fun theirs ->
     begin match base with
-      | None -> Lwt.return (Tree.Dir.empty repo)
-      | Some base -> Tree.snapshot base
+      | None      -> Lwt.return empty
+      | Some base -> Store.tree base
     end >>= fun base ->
-    merge_dir ~ours ~theirs ~base Path.empty >>= fun () ->
+    merge_dir ~ours ~theirs ~base Store.Key.empty >>= fun () ->
     Lwt.return !conflicts
 end

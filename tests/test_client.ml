@@ -597,7 +597,8 @@ let test_truncate dk =
 
 (* FIXME: automaticall run ./scripts/git-dumb-server *)
 let test_remotes dk =
-  DK.fetch dk ~url:"git://localhost/" ~branch:"origin" >>*= fun fetch_head ->
+  DK.fetch dk ~url:"git://localhost/#master" ~branch:"origin"
+  >>*= fun fetch_head ->
   DK.Tree.read_dir (DK.Commit.tree fetch_head) (p "") >>*= fun items ->
   Alcotest.(check (list string)) "Remotes entries" ["foo"; "x"] items;
   Lwt.return_unit

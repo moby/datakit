@@ -1,7 +1,7 @@
 open Astring
 open Lwt.Infix
 
-let src = Logs.Src.create "ivfs.merge" ~doc:"Irmin VFS"
+let src = Logs.Src.create "DataKit.merge" ~doc:"Irmin VFS for DataKit"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 type path = Ivfs_tree.path

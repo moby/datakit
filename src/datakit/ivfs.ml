@@ -2,7 +2,7 @@ open Astring
 open Rresult
 open Lwt.Infix
 
-let src = Logs.Src.create "ivfs" ~doc:"Irmin VFS"
+let src = Logs.Src.create "DataKit" ~doc:"Irmin VFS for DataKit"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module PathSet = Ivfs_merge.PathSet

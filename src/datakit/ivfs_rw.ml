@@ -31,7 +31,7 @@ module Make (Store : Ivfs_tree.S) = struct
      [fn dir], then update all the parents back to the root. *)
   let update_dir ~file_on_path t path fn =
     Lwt_mutex.with_lock t.mutex @@ fun () ->
-    let empty = Store.Tree.empty () in
+    let empty = Store.Tree.empty in
     let rec aux base path =
       match Store.Key.decons path with
       | None -> fn base

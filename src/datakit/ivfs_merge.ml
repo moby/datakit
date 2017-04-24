@@ -1,9 +1,6 @@
 open Astring
 open Lwt.Infix
 
-let src = Logs.Src.create "DataKit.merge" ~doc:"Irmin VFS for DataKit"
-module Log = (val Logs.src_log src : Logs.LOG)
-
 type path = Ivfs_tree.path
 type step = Ivfs_tree.step
 
@@ -47,9 +44,8 @@ module Make (Store : Ivfs_tree.S) (RW : RW) = struct
       let f = Ivfs_blob.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
       RW.update_force result path leaf (f, `Normal)
     in
-    let empty = Store.Tree.empty () in
     let as_dir = function
-      | None   -> empty
+      | None   -> Store.Tree.empty
       | Some v -> v
     in
     let rec merge_dir ~ours ~theirs ~base path =
@@ -96,7 +92,7 @@ module Make (Store : Ivfs_tree.S) (RW : RW) = struct
     Store.tree ours >>= fun ours ->
     Store.tree theirs >>= fun theirs ->
     begin match base with
-      | None      -> Lwt.return empty
+      | None      -> Lwt.return Store.Tree.empty
       | Some base -> Store.tree base
     end >>= fun base ->
     merge_dir ~ours ~theirs ~base Store.Key.empty >>= fun () ->

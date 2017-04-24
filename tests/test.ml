@@ -573,10 +573,9 @@ let test_rw () =
   let v x = Ivfs_blob.of_string x, `Normal in
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
-  let empty = Store.Tree.empty () in
   Lwt_main.run begin
     Store.Repo.v config >>= fun repo ->
-    let rw = RW.of_dir repo empty in
+    let rw = RW.of_dir repo Store.Tree.empty in
 
     RW.update rw (p []) "foo" (v "a")
     >|= Alcotest.(check (result unit err)) "Write /a" (Ok ()) >>= fun () ->

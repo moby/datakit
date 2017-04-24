@@ -454,7 +454,7 @@ module Make (Store : Ivfs_tree.S) = struct
 
     let snapshot store =
       Store.Head.find store >>= function
-      | None    -> Lwt.return (Store.Tree.empty (), [])
+      | None    -> Lwt.return (Store.Tree.empty, [])
       | Some id -> Store.Commit.tree id >|= fun tree -> (tree, [id])
 
     let store_of_hash repo hash =

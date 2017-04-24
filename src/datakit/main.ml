@@ -43,7 +43,7 @@ let max_chunk_size = Int32.of_int (100 * 1024)
 
 let info msg =
   let date = Int64.of_float (Unix.gettimeofday ()) in
-  Irmin.Info.v ~date ~author:"datakit <datakit@docker.com>" msg
+  Irmin.Info.v ~date ~author:"datakit <datakit@mobyproject.org>" msg
 
 module Git_fs_store = struct
   open Datakit_io

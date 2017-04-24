@@ -678,22 +678,12 @@ module Make (Store : Ivfs_tree.S) = struct
   (* Note: can't use [Store.fast_forward_head] because it can
      sometimes return [false] on success (when already up-to-date). *)
   let fast_forward store commit =
-    Store.Head.find store >>= fun old_head ->
-    let do_ff () =
-      Store.Head.test_and_set store ~test:old_head ~set:(Some commit)
-      >|= function
-      | true  -> `Ok
-      | false -> `Not_fast_forward  (* (concurrent update) *)
-    in
-    match old_head with
-    | None -> do_ff ()
-    | Some expected ->
-      Store.lcas_with_commit store commit >>= function
-      | Ok lcas ->
-        if List.mem expected lcas then do_ff ()
-        else Lwt.return `Not_fast_forward
-      (* These shouldn't happen, because we didn't set any limits *)
-      | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
+    Store.Head.fast_forward store commit >|= function
+    | Ok ()            -> `Ok
+    | Error `No_change -> `Ok
+    | Error `Rejected  -> `Not_fast_forward (* (concurrent update) *)
+    (* These shouldn't happen, because we didn't set any limits *)
+    | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
 
   let fast_forward_merge store =
     Vfs.File.command (fun hash ->

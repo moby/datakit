@@ -3,7 +3,7 @@ open Result
 type t = Cstruct.t list ref (* (reversed) *)
 
 let pp_buf ppf buf = Fmt.string ppf (Cstruct.to_string buf)
-let pp ppf t = Fmt.pf ppf "%a" Fmt.(list ~sep:(unit "") pp_buf) !t
+let pp ppf t = Fmt.pf ppf "%a" Fmt.(list ~sep:nop pp_buf) !t
 
 (* FIXME: very expensive! *)
 let compare x y =

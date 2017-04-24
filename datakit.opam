@@ -27,7 +27,7 @@ depends: [
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result"
-  "lwt"         {>= "2.7.0"}
+  "lwt"         {>= "2.7.1"}
   "conduit" "mirage-flow"
   "named-pipe"  {>= "0.4.0"}
   "hvsock"      {>= "0.8.1"}

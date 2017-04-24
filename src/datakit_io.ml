@@ -136,11 +136,7 @@ module FS = struct
       ) in
     Lwt_pool.use mkdir_pool (fun () -> aux dirname)
 
-  let file_exists f =
-    Lwt.catch (fun () -> Lwt_unix.file_exists f) (function
-        (* See https://github.com/ocsigen/lwt/issues/316 *)
-        | Unix.Unix_error (Unix.ENOTDIR, _, _) -> Lwt.return_false
-        | e -> Lwt.fail e)
+  let file_exists f = Lwt_unix.file_exists f
 
   module Lock = struct
 

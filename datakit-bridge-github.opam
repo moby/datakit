@@ -22,7 +22,7 @@ depends: [
   "ocamlbuild" {build}
   "topkg"      {build}
   "cmdliner"
-  "lwt" {>= "2.7.0"}
+  "lwt" {>= "2.7.1"}
   "datakit-github"
   "logs" "fmt" "mtime" "asl" "win-eventlog"
   "uri" {>= "1.8.0"}

@@ -26,8 +26,7 @@ COPY . /home/opam/src/datakit
 
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && \
-    git diff && git status --porcelain && \
-    git checkout . && scripts/watermark.sh && \
+    scripts/watermark.sh && \
     git status --porcelain
 
 RUN opam install datakit -ytv

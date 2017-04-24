@@ -35,7 +35,7 @@ bridge-local-git:
 
 bridge-github:
 	ocaml pkg/pkg.ml build -n datakit-bridge-github -q --tests true
-	ocaml pkg/pkg.ml test
+	ocaml pkg/pkg.ml test -n datakit-bridge-github
 
 ci:
 	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true

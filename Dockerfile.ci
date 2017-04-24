@@ -1,5 +1,5 @@
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
-FROM ocaml/opam-dev@sha256:573b5d71e94104590a8282a9ae67b63a6144b15bafdacb9980391c84ca730615
+FROM ocaml/opam-dev@sha256:337fd0f78b182a12da3f66d9d5ca075dbb79df414fc01d6a0aee99ffeb35552a
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud
 
@@ -10,6 +10,10 @@ ADD . /home/opam/datakit
 RUN sudo chown opam /home/opam/datakit
 RUN opam pin add -k git datakit-client.dev /home/opam/datakit -y
 RUN opam pin add -k git datakit-github.dev /home/opam/datakit -y
+
+# FIXME: workaround bug in opam2
+RUN opam install datakit irmin-unix alcotest
+
 RUN opam pin add -k git datakit-ci.dev /home/opam/datakit -yt
 
 VOLUME /secrets

@@ -14,7 +14,7 @@ build: [
 
 build-test: [
   ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" name "--tests" "true"]
-  ["ocaml" "pkg/pkg.ml" "test"]
+  ["ocaml" "pkg/pkg.ml" "test" "-n" name]
 ]
 
 depends: [

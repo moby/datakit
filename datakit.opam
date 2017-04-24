@@ -22,7 +22,7 @@ depends: [
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.9.3"}
   "uri"
-  "irmin"       {>= "1.0.0"}
+  "irmin"       {>= "1.1.0"}
   "irmin-git"   {>= "1.0.0"}
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}

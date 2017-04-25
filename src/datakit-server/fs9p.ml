@@ -188,7 +188,7 @@ module Op9p = struct
 
 end
 
-module Make (Flow: V1_LWT.FLOW) = struct
+module Make (Flow: Mirage_types_lwt.FLOW) = struct
 
   type flow = Flow.flow
 

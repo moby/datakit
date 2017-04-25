@@ -24,23 +24,9 @@ let or_fail msg = function
   | None -> Alcotest.fail msg
   | Some x -> x
 
-(* FIXME: this is a bit ridiculous *)
-module Contents_string = struct
-  open !Irmin.Contents.String
-  type t = string
-  let equal = equal
-  let compare = compare
-  let hash = hash
-  let to_json = to_json
-  let of_json = of_json
-  let size_of = size_of
-  let write = write
-  let read = read
-  let merge _ = merge []
-  module Path = Ivfs_tree.Path
-end
+module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Datakit_io.Zlib)
+module Store = Ivfs_tree.Make(Maker)
 
-module Store = Irmin_unix.Irmin_git.Memory(Contents_string)(Irmin.Ref.String)(Irmin.Hash.SHA1)
 let config = Irmin_mem.config ()
 
 (*
@@ -51,7 +37,7 @@ let () = Irmin_unix.install_dir_polling_listener 1.0
 
 let make_task msg =
   let date = 0L in
-  Irmin.Task.create ~date ~owner:"datakit-ci-test" msg
+  Irmin.Info.v ~date ~author:"datakit-ci-test" msg
 
 module Server = Fs9p.Make(Flow_lwt_unix)
 module Filesystem = Ivfs.Make(Store)
@@ -87,10 +73,10 @@ let with_named_socket fn =
     )
 
 let with_datakit fn =
-  Store.Repo.create config >>= fun repo ->
+  Store.Repo.v config >>= fun repo ->
   Store.Repo.branches repo >>= fun branches ->
   Lwt_list.iter_s (fun branch ->
-      Store.Repo.remove_branch repo branch
+      Store.Branch.remove repo branch
     ) branches
   >>= fun () ->
   with_named_socket @@ fun (for_client, for_server) ->

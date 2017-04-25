@@ -39,7 +39,7 @@ bridge-github:
 
 ci:
 	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true
-	ocaml pkg/pkg.ml test _build/ci/tests/test_ci.native
+	ocaml pkg/pkg.ml test -n datakit-ci
 
 clean:
 	ocaml pkg/pkg.ml clean

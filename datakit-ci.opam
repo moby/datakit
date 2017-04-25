@@ -14,7 +14,7 @@ build: [
 
 build-test: [
   ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true" "-n" name]
-  ["ocaml" "pkg/pkg.ml" "test"]
+  ["ocaml" "pkg/pkg.ml" "test" "-n" name]
 ]
 
 depends: [
@@ -24,7 +24,7 @@ depends: [
   "datakit-github" {>= "0.9.0"}
   "protocol-9p" {>= "0.8.0"}
   "astring"
-  "cmdliner" {<"1.0.0"}
+  "cmdliner"
   "fmt"
   "logs"
   "tyxml" {>= "4.0.0"}
@@ -39,7 +39,7 @@ depends: [
   "asetmap"
   "github" {>= "2.2.0"}
   "prometheus-app"
-  "lwt" {>= "2.7.0"}
+  "lwt" {>= "2.7.1"}
   "ppx_sexp_conv" {build}
   "crunch" {build}
   "datakit" {test}

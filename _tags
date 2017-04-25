@@ -11,18 +11,18 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 
 ### datakit-server
 
-<src/datakit-server/*>: package(protocol-9p.unix, mirage-types)
+<src/datakit-server/*>: package(protocol-9p.unix mirage-flow-lwt)
 
 ### datakit
 
-<src/datakit/ivfs*>: package(irmin tc datakit-server.vfs asetmap)
+<src/datakit/ivfs*>: package(irmin datakit-server.vfs asetmap)
 
 #### irmin-io
-<src/datakit_io.*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git tc)
+<src/datakit_io.*>: package(conduit.lwt-unix irmin lwt.unix uri camlzip git irmin-git)
 
 <src/datakit/*>: package(prometheus-app.unix)
 <src/datakit/main.*>: package(cmdliner fmt.cli fmt.tty logs.fmt asetmap)
-<src/datakit/main.*>: package(git irmin irmin.git irmin.mem irmin-watcher)
+<src/datakit/main.*>: package(git irmin irmin-git irmin-watcher)
 <src/datakit/main.*>: package(irmin-watcher), thread
 <src/datakit/main.*>: package(protocol-9p.unix camlzip)
 
@@ -37,8 +37,8 @@ true: package(bytes lwt astring logs result cstruct fmt rresult)
 ### Tests
 
 <tests/*>: package(alcotest conduit.lwt-unix str logs.fmt fmt.tty mtime.os)
-<tests/*>: package(mirage-types.lwt protocol-9p.unix irmin irmin.mem camlzip)
-<tests/*>: package(git irmin.git asetmap)
+<tests/*>: package(protocol-9p.unix irmin camlzip)
+<tests/*>: package(git irmin-git asetmap)
 <tests/*>: thread, package(conduit.lwt-unix hvsock.lwt-unix named-pipe.lwt)
 
 ### Painful

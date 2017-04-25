@@ -2,8 +2,8 @@ open Result
 
 type t = Cstruct.t list ref (* (reversed) *)
 
-let pp_buf ppf buf = Fmt.pf ppf "%S" (Cstruct.to_string buf)
-let pp ppf t = Fmt.pf ppf "%a" Fmt.(Dump.list pp_buf) !t
+let pp_buf ppf buf = Fmt.string ppf (Cstruct.to_string buf)
+let pp ppf t = Fmt.pf ppf "%a" Fmt.(list ~sep:nop pp_buf) !t
 
 (* FIXME: very expensive! *)
 let compare x y =
@@ -27,6 +27,8 @@ let to_ro_cstruct t =
   let cs = Cstruct.concat (List.rev !t) in
   t := [cs];
   cs
+
+let t = Irmin.Type.(like cstruct) of_ro_cstruct to_ro_cstruct
 
 let to_string t =
   Cstruct.to_string (to_ro_cstruct t)

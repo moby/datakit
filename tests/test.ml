@@ -2,7 +2,8 @@ open Lwt.Infix
 open Test_utils
 open Result
 
-let p l = Ivfs_tree.Path.of_hum (String.concat "/" l)
+let p l = Ivfs_tree.Path.v l
+let v b = Ivfs_blob.of_string b
 
 let root_entries = ["branch"; "debug"; "snapshots"; "trees"; "remotes"]
 
@@ -35,11 +36,11 @@ let test_transaction repo conn =
   let length = Int64.to_int info.Protocol_9p.Types.Stat.length in
   Alcotest.(check int) "File size" 15 length;
 
-  Store.master Irmin.Task.none repo >>= fun master ->
-  Store.head_exn (master ()) >>=
-  Store.Repo.task_of_commit_id repo >>= fun task ->
-  let msg = Irmin.Task.messages task in
-  Alcotest.(check (list string)) "Message" ["My commit"] msg;
+  Store.master repo >>= fun master ->
+  Store.Head.get master >>= fun commit ->
+  let info = Store.Commit.info commit in
+  let msg = Irmin.Info.message info in
+  Alcotest.(check string) "Message" "My commit" msg;
 
   Lwt.return_unit
 
@@ -336,9 +337,10 @@ let test_qids _repo conn =
     ) >>*=
   Lwt.return
 
+let info = Irmin.Info.none
+
 let test_watch repo conn =
-  Store.master (fun () -> Irmin.Task.empty) repo >>= fun master ->
-  let master = master () in
+  Store.master repo >>= fun master ->
   Client.mkdir conn ["branch"] "master" rwxr_xr_x >>*= fun () ->
   with_stream conn ["branch"; "master"; "watch"; "tree.live"] @@ fun top ->
   read_line_exn top >>= fun top_init ->
@@ -349,7 +351,10 @@ let test_watch repo conn =
   @@ fun doc ->
   read_line_exn doc >>= fun doc_init ->
   Alcotest.(check string) "Doc tree hash initially empty" "" doc_init;
-  Store.update master (p ["src"; "Makefile"]) "all: build" >>= fun () ->
+  Store.set master ~info (p ["src"; "Makefile"]) (v "all: build") >>= fun () ->
+  Store.get master (p ["src"; "Makefile"]) >>= fun makefile_init ->
+  Alcotest.(check string)
+    "Makefile contents" "all: build" (Ivfs_blob.to_string makefile_init);
   with_stream conn
     ["branch"; "master"; "watch"; "src.node"; "Makefile.node"; "tree.live"]
   @@ fun makefile ->
@@ -358,7 +363,7 @@ let test_watch repo conn =
     "F-d81e367f87ee314bcd3e449b1c6641efda5bc269" makefile_init;
   (* Modify file under doc *)
   let next_make = makefile () in
-  Store.update master (p ["doc"; "README"]) "Instructions" >>= fun () ->
+  Store.set ~info master (p ["doc"; "README"]) (v "Instructions") >>= fun () ->
   read_line_exn doc >>= fun doc_new ->
   Alcotest.(check string) "Doc update"
     "D-a3e8adf6d194bfbdec2ca73aebe0990edee2ddbf" doc_new;
@@ -372,9 +377,8 @@ let test_watch repo conn =
   Lwt.return_unit
 
 let test_rename_branch repo conn =
-  Store.of_branch_id Irmin.Task.none "old" repo >>= fun old ->
-  let old = old () in
-  Store.update old (p ["key"]) "value" >>= fun () ->
+  Store.of_branch repo "old" >>= fun old ->
+  Store.set ~info old (p ["key"]) (v "value") >>= fun () ->
   Client.mkdir conn ["branch"] "old" rwxr_xr_x >>*= fun () ->
   Client.with_fid conn (fun newfid ->
       Client.walk_from_root conn newfid ["branch"; "old"] >>*= fun _ ->
@@ -385,13 +389,12 @@ let test_rename_branch repo conn =
   check_dir conn ["branch"] "New branches" ["new"] >>= fun () ->
   Client.stat conn ["branch"; "new"] >>*= fun info ->
   Alcotest.(check string) "Inode name" "new" info.Protocol_9p.Types.Stat.name;
-  let refs = Store.Private.Repo.ref_t repo in
-  Store.Private.Ref.mem refs "old" >>= fun old_exists ->
-  Store.Private.Ref.mem refs "new" >>= fun new_exists ->
+  Store.Branch.mem repo "old" >>= fun old_exists ->
+  Store.Branch.mem repo "new" >>= fun new_exists ->
   Alcotest.(check bool) "Old gone" false old_exists;
   Alcotest.(check bool) "New appeared" true new_exists;
   Client.remove conn ["branch"; "new"] >>*= fun () ->
-  Store.Private.Ref.mem refs "new" >>= fun new_exists ->
+  Store.Branch.mem repo "new" >>= fun new_exists ->
   Alcotest.(check bool) "New gone" false new_exists;
   Lwt.return_unit
 
@@ -571,8 +574,8 @@ let test_rw () =
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
   Lwt_main.run begin
-    Store.Repo.create config >>= fun repo ->
-    let rw = RW.of_dir (Tree.Dir.empty repo) in
+    Store.Repo.v config >>= fun repo ->
+    let rw = RW.of_dir repo Store.Tree.empty in
 
     RW.update rw (p []) "foo" (v "a")
     >|= Alcotest.(check (result unit err)) "Write /a" (Ok ()) >>= fun () ->
@@ -605,8 +608,8 @@ let test_rw () =
 
     let root = RW.root rw in
 
-    Tree.Dir.ls root
-    >|= List.map snd
+    Store.Tree.list root Store.Key.empty
+    >|= List.map fst
     >|= Alcotest.(check (slist string String.compare)) "ls /" ["foo"; "sub"]
     >>= fun () ->
 

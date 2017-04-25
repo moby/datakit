@@ -14,15 +14,15 @@ build: [
 
 build-test: [
   ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" name "--tests" "true"]
-  ["ocaml" "pkg/pkg.ml" "test"]
+  ["ocaml" "pkg/pkg.ml" "test" "-n" name]
 ]
 
 depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "cmdliner" {<"1.0.0"}
-  "lwt" {>= "2.7.0"}
+  "cmdliner"
+  "lwt" {>= "2.7.1"}
   "datakit-github"
   "logs" "fmt" "mtime" "asl" "win-eventlog"
   "uri" {>= "1.8.0"}

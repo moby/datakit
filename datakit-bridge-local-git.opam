@@ -15,11 +15,11 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "cmdliner" {< "1.0.0"}
+  "cmdliner"
   "irmin"    {< "1.0"}
   "irmin-watcher"
   "irmin-unix"
-  "lwt" {>= "2.7.0"}
+  "lwt" {>= "2.7.1"}
   "logs" "fmt"
   "protocol-9p"    {>= "0.8.0"}
   "datakit-client" {>= "0.9.0"}

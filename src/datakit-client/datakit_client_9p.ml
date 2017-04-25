@@ -785,7 +785,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
          FS.write_stream t (path / "url") (Cstruct.of_string url) >>*= fun () ->
          FS.write_stream t (path / "fetch") (Cstruct.of_string branch) >>*= fun () ->
          FS.read_all t (path / "head") >>*= fun commit_id ->
-         ok { Commit.fs = t; id = Cstruct.to_string commit_id })
+         let id = String.trim (Cstruct.to_string commit_id) in
+         ok { Commit.fs = t; id })
       (fun () ->
          FS.remove t path >|= function
          | Error e ->

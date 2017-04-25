@@ -1,10 +1,14 @@
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
-FROM ocaml/opam-dev@sha256:573b5d71e94104590a8282a9ae67b63a6144b15bafdacb9980391c84ca730615
+FROM ocaml/opam-dev@sha256:337fd0f78b182a12da3f66d9d5ca075dbb79df414fc01d6a0aee99ffeb35552a
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud gmp-dev perl
 
-RUN opam pin add -yn protocol-9p.0.8.0 'https://github.com/talex5/ocaml-9p.git#ping'
-RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term asl win-eventlog camlzip irmin-watcher mtime mirage-flow conduit hvsock cohttp prometheus-app git.1.9.3 mirage-tc irmin.0.12.0 cmdliner.0.9.8 protocol-9p channel rresult win-error named-pipe
+RUN opam pin add hvsock.0.14.0 -n https://github.com/mirage/ocaml-hvsock.git#88397c37a910c61507a9655ed8413c1692294da0
+RUN opam pin add irmin.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
+RUN opam pin add irmin-git.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
+RUN opam pin add -yn protocol-9p.0.9.0 'https://github.com/talex5/ocaml-9p.git#ping-mirage-3'
+
+RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term asl win-eventlog camlzip irmin-watcher mtime mirage-flow conduit hvsock cohttp prometheus-app git irmin cmdliner protocol-9p channel rresult win-error named-pipe
 
 COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml
@@ -26,10 +30,11 @@ COPY . /home/opam/src/datakit
 
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && \
-    git diff && git status --porcelain && \
-    git checkout . && scripts/watermark.sh && \
+    scripts/watermark.sh && \
     git status --porcelain
 
+# FIXME: warkaround a bug in opam2
+RUN opam install datakit-client datakit-github alcotest
 RUN opam install datakit -ytv
 
 RUN sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \

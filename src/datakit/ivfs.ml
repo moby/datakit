@@ -2,11 +2,14 @@ open Astring
 open Rresult
 open Lwt.Infix
 
+let src = Logs.Src.create "DataKit" ~doc:"Irmin VFS for DataKit"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 module PathSet = Ivfs_merge.PathSet
 
 module type S = sig
   type repo
-  val create: string Irmin.Task.f -> repo -> Vfs.Dir.t
+  val create: info:(string -> Irmin.Info.t) -> repo -> Vfs.Dir.t
 end
 
 let ( >>*= ) x f =
@@ -21,54 +24,68 @@ let err_not_dir = Lwt.return Vfs.Error.not_dir
 let err_read_only = Lwt.return Vfs.Error.read_only_file
 let err_conflict msg = Vfs.error "Merge conflict: %s" msg
 let err_unknown_cmd x = Vfs.error "Unknown command %S" x
-let err_invalid_commit_id id = Vfs.error "Invalid commit ID %S" id
 let err_invalid_hash h x =
   Vfs.error "invalid-hash %S: %s" h (Printexc.to_string x)
 let err_not_fast_forward = Vfs.error "not-fast-forward"
 
-module Make (Store : Ivfs_tree.STORE) = struct
+module Make (Store : Ivfs_tree.S) = struct
 
   type repo = Store.Repo.t
   let empty_inode_map: Vfs.Inode.t String.Map.t = String.Map.empty
 
-  module Path = Ivfs_tree.Path
-  module Tree = Ivfs_tree.Make(Store)
-  module RW = Ivfs_rw.Make(Tree)
+  module Path = Store.Key
+  module RW = Ivfs_rw.Make(Store)
   module Merge = Ivfs_merge.Make(Store)(RW)
   module Remote = Ivfs_remote.Make(Store)
 
-  let string_of_commit_ids ids =
+  let commit_of_commit_id repo name =
+    match Store.Commit.Hash.of_string name with
+    | Error (`Msg e) -> err_invalid_hash name (Failure e)
+    | Ok hash        ->
+      Store.Commit.of_hash repo hash >>= function
+      | None      -> err_no_entry
+      | Some hash -> ok hash
+
+  let string_of_commits ids =
     ids
-    |> List.map (fun h -> Store.Hash.to_hum h ^ "\n")
+    |> List.map (fun h -> Fmt.strf "%a\n" Store.Commit.pp h)
     |> String.concat ~sep:""
 
-  module CommitListFile : sig
+    module CommitListFile : sig
     type t
-    val make : Store.Hash.t list -> t
+    val make : Store.Repo.t -> Store.Commit.t list -> t
     val file : t -> Vfs.File.t
-    val read : t -> (Store.Hash.t list, string) result Lwt.t
-    val append : t -> Store.Hash.t -> unit Vfs.or_err
+    val read : t -> (Store.Commit.t list, Vfs.Error.t) result Lwt.t
+    val append : t -> Store.Commit.t -> unit Vfs.or_err
   end = struct
     type t = {
+      repo : Store.Repo.t;
       file : Vfs.File.t;
-      get : unit -> string;
+      get  : unit -> string;
     }
 
-    let make init =
-      let init = string_of_commit_ids init in
+    let make repo init =
+      let init = string_of_commits init in
       let file, get = Vfs.File.rw_of_string init in
-      { file; get }
+      { repo; file; get }
 
     let file t = t.file
 
     let read t =
       let lines = String.cuts ~empty:false ~sep:"\n" (t.get ()) in
-      match List.map Store.Hash.of_hum lines with
-      | exception Invalid_argument msg -> Lwt.return (Error msg)
-      | hashes -> Lwt.return (Ok hashes)
+      Lwt_list.fold_left_s (fun acc line ->
+          match acc with
+          | Error _ -> Lwt.return acc
+          | Ok acc  ->
+            commit_of_commit_id t.repo line >|= function
+            | Error _ as e -> e
+            | Ok commit    -> Ok (commit :: acc)
+        ) (Ok []) (List.rev lines)
 
-    let append t commit_id =
-      let data = Cstruct.of_string (Store.Hash.to_hum commit_id ^ "\n") in
+    let append t commit =
+      let data =
+        Fmt.kstrf (fun x -> Cstruct.of_string x) "%a\n" Store.Commit.pp commit
+      in
       Vfs.File.size t.file >>*= fun size ->
       Vfs.File.open_ t.file >>*= fun fd ->
       Vfs.File.write fd ~offset:size data
@@ -79,8 +96,8 @@ module Make (Store : Ivfs_tree.STORE) = struct
     val make : unit -> t
     val add_all : t -> PathSet.t -> unit
     val read : t -> PathSet.t
-    val remove_file : t -> Ivfs_tree.Path.t -> unit
-    val remove_subtree : t -> Ivfs_tree.Path.t -> unit
+    val remove_file : t -> Store.Key.t -> unit
+    val remove_subtree : t -> Store.Key.t -> unit
     val file : t -> Vfs.File.t
   end = struct
     type t = PathSet.t ref
@@ -89,7 +106,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
       let lines =
         conflicts
         |> PathSet.elements
-        |> List.map (fun p -> Path.to_hum p ^ "\n")
+        |> List.map (fun p -> Fmt.strf "%a\n" Store.Key.pp p)
       in
       Cstruct.of_string (String.concat ~sep:"" lines)
 
@@ -123,26 +140,25 @@ module Make (Store : Ivfs_tree.STORE) = struct
   let empty_file = Ivfs_blob.empty
 
   let stat path root =
-    Tree.Dir.lookup_path root path >>= function
-    | `None         -> err_no_entry
-    | `Directory _  -> err_is_dir
-    | `File (f, (`Normal | `Exec as perm)) ->
-      Tree.File.size f >|= fun length ->
-      Ok {Vfs.length; perm}
-    | `File (f, `Link) ->
-      Tree.File.content f >>= fun target ->
-      Tree.File.size f >|= fun length ->
-      Ok {Vfs.length; perm = `Link (Ivfs_blob.to_string target)}
+    Store.Tree.find_tree root path >>= function
+    | None -> err_no_entry
+    | Some (`Node _) -> err_is_dir
+    | Some (`Contents (f, (`Normal | `Exec as perm))) ->
+      let length = Ivfs_blob.len f in
+      ok {Vfs.length; perm}
+    | Some (`Contents (f, `Link)) ->
+      let length = Ivfs_blob.len f in
+      let target = Ivfs_blob.to_string f in
+      ok {Vfs.length; perm = `Link target}
 
   let irmin_ro_file ~get_root path =
     let read () =
       get_root () >>= fun root ->
-      Tree.Dir.lookup_path root path >>= function
-      | `None         -> Lwt.return (Ok None)
-      | `Directory _  -> err_is_dir
-      | `File (f, _perm) ->
-        Tree.File.content f >|= fun content ->
-        Ok (Some (Ivfs_blob.to_ro_cstruct content))
+      Store.Tree.find_tree root path >>= function
+      | None -> Lwt.return (Ok None)
+      | Some (`Node _) -> err_is_dir
+      | Some (`Contents (f, _perm)) ->
+        ok (Some (Ivfs_blob.to_ro_cstruct f))
     in
     let stat () = get_root () >>= stat path in
     Vfs.File.of_kvro ~read ~stat
@@ -153,10 +169,10 @@ module Make (Store : Ivfs_tree.STORE) = struct
     | Some (dir, leaf) ->
       let blob () =
         let root = RW.root view in
-        Tree.Dir.lookup_path root path >>= function
-        | `None         -> Lwt.return (Ok None)
-        | `Directory _  -> err_is_dir
-        | `File (f, _perm) -> Tree.File.content f >|= fun b -> Ok (Some b)
+        Store.Tree.find_tree root path >>= function
+        | None -> Lwt.return (Ok None)
+        | Some (`Node _) -> err_is_dir
+        | Some (`Contents (f, _perm)) -> ok (Some f)
       in
       let blob_or_empty () =
         blob () >>*= function
@@ -213,7 +229,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
        same qid to the client each time. TODO: use a weak map here. *)
     let nodes = Hashtbl.create 10 in
 
-    let rec get ~dir (ty, leaf) =
+    let rec get ~dir (leaf, ty) =
       let hash_key = (ty, Path.rcons dir leaf) in
       try Hashtbl.find nodes hash_key
       with Not_found ->
@@ -223,8 +239,8 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
     and inode_of (ty, full_path) =
       match ty with
-      | `Directory -> irmin_ro_dir full_path
-      | `File      ->
+      | `Node -> irmin_ro_dir full_path
+      | `Contents      ->
         let path = name_of_irmin_path full_path in
         let file = irmin_ro_file ~get_root full_path in
         Vfs.Inode.file path file
@@ -233,31 +249,31 @@ module Make (Store : Ivfs_tree.STORE) = struct
       let name = name_of_irmin_path path in
       let ls () =
         get_root () >>= fun root ->
-        Tree.Dir.get root path >>= function
-        | None -> err_no_entry
-        | Some dir ->
-          Tree.Dir.ls dir >>= fun items ->
+        Store.Tree.find_tree root path >>= function
+        | None | Some (`Contents _) -> err_no_entry
+        | Some (`Node _ as dir) ->
+          Store.Tree.list dir Store.Key.empty >>= fun items ->
           ok (List.map (get ~dir:path) items)
       in
       let lookup name =
         get_root () >>= fun root ->
-        Tree.Dir.get root path >>= function
-        | None -> err_no_entry
-        | Some dir ->
-          Tree.Dir.ty dir name >>= function
-          | `File
-          | `Directory as ty -> ok (get ~dir:path (ty, name))
-          | `None            -> err_no_entry
+        Store.Tree.find_tree root path >>= function
+        | None | Some (`Contents _) -> err_no_entry
+        | Some (`Node _ as dir) ->
+          let step = Store.Key.v [name] in
+          Store.Tree.kind dir step >>= function
+          | None -> err_no_entry
+          | Some (`Contents | `Node as ty) -> ok (get ~dir:path (name, ty))
       in
       let remove () = Vfs.Dir.err_read_only in
       Vfs.Dir.read_only ~ls ~lookup ~remove |> Vfs.Inode.dir name
     in
     irmin_ro_dir Path.empty
 
-  let read_only store = ro_tree ~get_root:(fun () -> Tree.snapshot store)
+  let read_only store = ro_tree ~get_root:(fun () -> Store.tree store)
 
   let remove_shadowed_by items map =
-    List.fold_left (fun acc (_, name) ->
+    List.fold_left (fun acc (name, _) ->
         String.Map.remove name acc
       ) map items
 
@@ -269,7 +285,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
        same qid to the client each time. TODO: use a weak map here. *)
     let nodes = Hashtbl.create 10 in
 
-    let rec get ~dir (ty, leaf) =
+    let rec get ~dir (leaf, ty) =
       let hash_key = (ty, Path.rcons dir leaf) in
       try Hashtbl.find nodes hash_key
       with Not_found ->
@@ -279,8 +295,8 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
     and inode_of (ty, full_path) =
       match ty with
-      | `Directory -> irmin_rw_dir full_path
-      | `File ->
+      | `Node -> irmin_rw_dir full_path
+      | `Contents ->
         let path = name_of_irmin_path full_path in
         let file = irmin_rw_file ~remove_conflict ~view full_path in
         Vfs.Inode.file path file
@@ -292,9 +308,9 @@ module Make (Store : Ivfs_tree.STORE) = struct
       let extra_dirs = ref empty_inode_map in
       let ls () =
         let root = RW.root view in
-        begin Tree.Dir.get root path >>= function
-          | None     -> Lwt.return []   (* in parent's extra_dirs? *)
-          | Some dir -> Tree.Dir.ls dir
+        begin Store.Tree.find_tree root path >>= function
+          | None | Some (`Contents _) -> Lwt.return [] (* in parent's extra_dirs? *)
+          | Some (`Node _ as dir) -> Store.Tree.list dir Store.Key.empty
         end >>= fun items ->
         extra_dirs := remove_shadowed_by items !extra_dirs;
         let extra_inodes = String.Map.bindings !extra_dirs |> List.map snd in
@@ -310,18 +326,18 @@ module Make (Store : Ivfs_tree.STORE) = struct
         | Ok () ->
           let new_path = Path.rcons path name in
           remove_conflict new_path;
-          Lwt.return (Ok (get ~dir:path (`File, name)))
+          Lwt.return (Ok (get ~dir:path (name, `Contents)))
       in
       let lookup name =
         let real_result =
           let snapshot = RW.root view in
-          Tree.Dir.get snapshot path >>= function
-          | None -> err_no_entry
-          | Some dir ->
-            Tree.Dir.ty dir name >>= function
-            | `File
-            | `Directory as ty -> ok (get ~dir:path (ty, name))
-            | `None            -> err_no_entry
+          Store.Tree.find_tree snapshot path >>= function
+          | None | Some (`Contents _) -> err_no_entry
+          | Some (`Node _ as dir) ->
+            let step = Store.Key.v [name] in
+            Store.Tree.kind dir step >>= function
+            | Some (`Contents | `Node as ty) -> ok (get ~dir:path (name, ty))
+            | None -> err_no_entry
         in
         real_result >|= function
         | Ok _ as ok   -> ok
@@ -334,7 +350,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
         lookup name >>= function
         | Ok _    -> Vfs.Dir.err_already_exists
         | Error _ ->
-          let new_dir = get ~dir:path (`Directory, name) in
+          let new_dir = get ~dir:path (name, `Node) in
           extra_dirs := String.Map.add name new_dir !extra_dirs;
           remove_conflict (Path.rcons path name);
           ok new_dir
@@ -374,7 +390,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     irmin_rw_dir Path.empty
 
   module Diff : sig
-    val vfs_dir : (unit -> Tree.Dir.t Lwt.t) -> Vfs.Dir.t
+    val vfs_dir : Store.Repo.t -> (unit -> Store.tree Lwt.t) -> Vfs.Dir.t
     (* [vfs_dir head] is directory that provides diffs against [head ()]. *)
   end = struct
     let pp_op ppf = function
@@ -383,21 +399,20 @@ module Make (Store : Ivfs_tree.STORE) = struct
       | `Updated _ -> Fmt.string ppf "*"
 
     let pp_diff ppf (path, op) =
-      let path = Path.to_hum path in
+      let path = Fmt.to_to_string Store.Key.pp path in
       let path =
         if Filename.is_relative path then path
         else String.with_index_range ~first:1 path
       in
       Fmt.pf ppf "%a %s\n" pp_op op path
 
-    let vfs_dir head =
+    let vfs_dir repo head =
       let lookup name =
-        head () >>= fun head_t ->
-        let repo = Tree.Dir.repo head_t in
-        let hash = Store.Hash.of_hum name in
-        Store.of_commit_id Irmin.Task.none hash repo >>= fun t ->
-        Tree.snapshot (t ()) >>= fun parent_t ->
-        Tree.Dir.diff parent_t head_t >>= fun diff ->
+        head () >>= fun head ->
+        commit_of_commit_id repo name >>*= fun commit ->
+        Store.of_commit commit >>= fun t ->
+        Store.tree t >>= fun parent_t ->
+        Store.Tree.diff parent_t head >>= fun diff ->
         let lines = List.map (Fmt.to_to_string pp_diff) diff in
         let file  = Vfs.File.ro_of_string (String.concat ~sep:"" lines) in
         ok (Vfs.Inode.file name file)
@@ -408,25 +423,21 @@ module Make (Store : Ivfs_tree.STORE) = struct
   end
 
   module Transaction : sig
-    val make : (string -> Store.t) -> remover:unit Lwt.t Lazy.t -> Vfs.Dir.t Lwt.t
-    (* [make store ~remover] is a directory for making a transaction on [store].
-       When done, it will force [remover] (which should remove the directory). *)
+    val make :
+      Store.t -> info:(string -> Irmin.Info.t) -> remover:unit Lwt.t Lazy.t ->
+      Vfs.Dir.t Lwt.t
+    (* [make store ~info ~remover] is a directory for making a
+       transaction on [store].  When done, it will force [remover]
+       (which should remove the directory). *)
   end = struct
     type t = {
-      store : string -> Store.t;        (* The branch we're going to commit on *)
-      view : RW.t;                      (* The read/write directory with the current state *)
+      repo : Store.Repo.t;
+      store : Store.t;                 (* The branch we're going to commit on *)
+      view : RW.t;         (* The read/write directory with the current state *)
       get_msg : unit -> string;
       parents : CommitListFile.t;
       conflicts : PathSetFile.t;
     }
-
-    let make_commit root task ~parents =
-      let repo = Tree.Dir.repo root in
-      Tree.Dir.hash root >>= fun node ->
-      let commit = Store.Private.Commit.Val.create task ~parents ~node in
-      Store.Private.Commit.add (Store.Private.Repo.commit_t repo) commit
-
-    let unit_task () = Irmin.Task.empty
 
     let base ~our_parents ~ours ~their_commit =
       match our_parents with
@@ -436,36 +447,22 @@ module Make (Store : Ivfs_tree.STORE) = struct
            would have to explore the entire history to check). *)
         Lwt.return None
       | _ ->
-        Store.lcas_head ours ~n:1 their_commit >>= function
-        | `Max_depth_reached | `Too_many_lcas -> assert false
-        | `Ok [] -> Lwt.return None
-        | `Ok (base::_) ->
-          let repo = Store.repo ours in
-          Store.of_commit_id unit_task base repo >|= fun s ->
-          Some (s ())
+        Store.lcas_with_commit ours ~n:1 their_commit >>= function
+        | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
+        | Ok []        -> Lwt.return None
+        | Ok (base::_) -> Store.of_commit base >|= fun s -> Some s
 
     let snapshot store =
-      let store1 = store "snapshot" in
-      let repo = Store.repo store1 in
-      Store.head store1 >>= fun orig_head ->
-      match orig_head with
-      | None -> Lwt.return (Tree.Dir.empty repo, [])
-      | Some id ->
-        Store.Private.Commit.read_exn (Store.Private.Repo.commit_t repo) id
-        >|= fun commit ->
-        Tree.Dir.of_hash repo (Store.Private.Commit.Val.node commit),
-        [id]
+      Store.Head.find store >>= function
+      | None    -> Lwt.return (Store.Tree.empty, [])
+      | Some id -> Store.Commit.tree id >|= fun tree -> (tree, [id])
 
-    let store_of_hash repo commit_id =
-      match Store.Hash.of_hum commit_id with
-      | exception _  -> err_invalid_commit_id commit_id
-      | their_commit ->
-        Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) their_commit
-        >>= function
-        | false -> err_no_entry
-        | true ->
-          Store.of_commit_id unit_task their_commit repo >>= fun store ->
-          Lwt.return (Ok (store, their_commit))
+    let store_of_hash repo hash =
+      commit_of_commit_id repo hash >>= function
+      | Error _ as e    -> Lwt.return e
+      | Ok their_commit ->
+        Store.of_commit their_commit >|= fun store ->
+        Ok (store, their_commit)
 
     let base_dir lca =
       match lca with
@@ -475,46 +472,53 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let check_no_conflicts conflicts =
       match PathSetFile.read conflicts with
       | e when not (PathSet.is_empty e) ->
-        Lwt.return (Error "conflicts file is not empty")
-      | _ -> Lwt.return (Ok ())
+        Vfs.error "conflicts file is not empty"
+      | _ -> ok ()
 
     (* Make a commit based on "rw", "parents" and "msg" *)
-    let commit_of_view t =
+    let commit_of_view ~info t =
       check_no_conflicts t.conflicts >>*= fun () ->
       CommitListFile.read t.parents >>*= fun parents ->
       let msg = match t.get_msg () with
         | "" -> "(no commit message)"
         | x -> x
       in
-      let store = t.store msg in
       let root = RW.root t.view in
-      make_commit root (Store.task store) ~parents >|= fun c ->
+      Store.Commit.v t.repo ~info:(info msg) ~parents root >|= fun c ->
       Ok (c, "Merge", parents)
 
     (* Commit transaction *)
-    let merge t =
-      commit_of_view t >>*= fun (head, msg, _parents) ->
-      Store.merge_head (t.store msg) head >|= fun x -> Ok x
+    let merge ~info t =
+      commit_of_view ~info t >>= function
+      | Error e -> Lwt.return (Error (`Vfs e))
+      | Ok (head, msg, _parents) ->
+        (* FIXME(samoht): why do we reuse the same commit message here? *)
+        Store.Head.merge ~info:(fun () -> info msg) ~into:t.store head
+        >|= function
+        | Error (`Conflict _) as e -> e
+        | Ok () -> Ok ()
 
-    let transactions_ctl t ~remover = function
+    let transactions_ctl ~info t ~remover = function
       | "close" -> Lazy.force remover >|= fun () -> Ok ""
       | "commit" ->
-        begin merge t >>= function
-          | Ok (`Ok ())        -> Lazy.force remover >|= fun () -> Ok ""
-          | Ok (`Conflict msg) -> err_conflict msg
-          | Error ename        -> Vfs.error "%s" ename
+        begin merge ~info t >>= function
+          | Ok ()                 -> Lazy.force remover >|= fun () -> Ok ""
+          | Error (`Conflict msg) -> err_conflict msg
+          | Error (`Vfs err)      -> Lwt.return (Error err)
         end
       | x -> err_unknown_cmd x
 
-    let make store ~remover =
+    let make store ~info ~remover =
       let path = Path.empty in
       let msg_file, get_msg = Vfs.File.rw_of_string "" in
       snapshot store >>= fun (orig_root, parents) ->
+      let repo = Store.repo store in
       let t = {
+        repo;
         store;
-        view = RW.of_dir orig_root;
+        view = RW.of_dir repo orig_root;
         get_msg;
-        parents = CommitListFile.make parents;
+        parents = CommitListFile.make repo parents;
         conflicts = PathSetFile.make ();
       } in
       (* Current state (will finish initialisation below) *)
@@ -522,9 +526,9 @@ module Make (Store : Ivfs_tree.STORE) = struct
       (* Files present in both normal and merge modes *)
       let stage = rw ~conflicts:t.conflicts t.view in
       let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
-      let ctl = Vfs.File.command (transactions_ctl t ~remover) in
-      let origin = Vfs.File.ro_of_string (Path.to_hum path) in
-      let diff = Diff.vfs_dir (fun  () -> Lwt.return (RW.root t.view)) in
+      let ctl = Vfs.File.command (transactions_ctl t ~info ~remover) in
+      let origin = Vfs.File.ro_of_string (Fmt.to_to_string Store.Key.pp path) in
+      let diff = Diff.vfs_dir repo (fun  () -> Lwt.return (RW.root t.view)) in
       let common =
         empty_inode_map
         |> add stage
@@ -536,32 +540,27 @@ module Make (Store : Ivfs_tree.STORE) = struct
       in
       (* Merge mode *)
       let rec merge_mode commit_id =
-        let store = store "merge" in
         let repo = Store.repo store in
         store_of_hash repo commit_id >>*= fun (theirs, their_commit) ->
-        let theirs = theirs () in
         (* Grab current "rw" dir as "ours" *)
-        commit_of_view t >>= function
-        | Error e -> Vfs.error "Can't start merge: %s" e
-        | Ok (our_commit, _msg, our_parents) ->
-          Store.of_commit_id unit_task our_commit repo >>= fun ours ->
-          let ours = ours () in
-          let ours_ro = read_only ~name:"ours" ours in
-          let theirs_ro = read_only ~name:"theirs" theirs in
-          base ~our_parents ~ours ~their_commit >>= fun base ->
-          (* Add to parents *)
-          CommitListFile.append t.parents their_commit >>*= fun () ->
-          (* Do the merge *)
-          Merge.merge ~ours ~theirs ~base t.view >>= fun merge_conflicts ->
-          PathSetFile.add_all t.conflicts merge_conflicts;
-          contents :=
-            common
-            |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
-            |> add (Vfs.Inode.file "conflicts" (PathSetFile.file t.conflicts))
-            |> add ours_ro
-            |> add (base_dir base)
-            |> add theirs_ro;
-          Lwt.return (Ok "ok")
+        commit_of_view ~info t >>*= fun (our_commit, _msg, our_parents) ->
+        Store.of_commit our_commit >>= fun ours ->
+        let ours_ro = read_only ~name:"ours" ours in
+        let theirs_ro = read_only ~name:"theirs" theirs in
+        base ~our_parents ~ours ~their_commit >>= fun base ->
+        (* Add to parents *)
+        CommitListFile.append t.parents their_commit >>*= fun () ->
+        (* Do the merge *)
+        Merge.merge ~ours ~theirs ~base t.view >>= fun merge_conflicts ->
+        PathSetFile.add_all t.conflicts merge_conflicts;
+        contents :=
+          common
+          |> add (Vfs.Inode.file "merge" (Vfs.File.command merge_mode))
+          |> add (Vfs.Inode.file "conflicts" (PathSetFile.file t.conflicts))
+          |> add ours_ro
+          |> add (base_dir base)
+          |> add theirs_ro;
+        Lwt.return (Ok "ok")
       in
       let normal_mode () =
         common
@@ -576,19 +575,19 @@ module Make (Store : Ivfs_tree.STORE) = struct
   let head_stream store initial_head =
     let session = Vfs.File.Stream.session initial_head in
     let remove_watch =
-      let cb _ = Store.head store >|= Vfs.File.Stream.publish session in
-      Store.watch_head store ?init:initial_head cb
+      let cb _ = Store.Head.find store >|= Vfs.File.Stream.publish session in
+      Store.watch store ?init:initial_head cb
     in
     let pp ppf = function
       | None      -> Fmt.string ppf "\n"
-      | Some hash -> Fmt.string ppf (Store.Hash.to_hum hash ^ "\n")
+      | Some hash -> Fmt.pf ppf "%a\n" Store.Commit.pp hash
     in
     ignore remove_watch; (* TODO *)
     Vfs.File.Stream.create pp session
 
   let head_live store =
     Vfs.File.of_stream (fun () ->
-        Store.head store >|= fun initial_head ->
+        Store.Head.find store >|= fun initial_head ->
         head_stream store initial_head
       )
 
@@ -599,10 +598,10 @@ module Make (Store : Ivfs_tree.STORE) = struct
         | `Added x | `Updated (_, x) -> Vfs.File.Stream.publish session (Some x)
         | `Removed _                 -> Vfs.File.Stream.publish session None
       in
-      Store.watch_head store (fun x -> Lwt.return @@ cb x)
+      Store.watch store (fun x -> Lwt.return @@ cb x)
     in
     let pp ppf = function
-      | Some x -> Fmt.pf ppf "%s\n" (Store.Hash.to_hum x)
+      | Some x -> Fmt.pf ppf "%a\n" Store.Commit.pp x
       | None   -> Fmt.string ppf "\n"
     in
     ignore remove_watch; (* TODO *)
@@ -612,15 +611,22 @@ module Make (Store : Ivfs_tree.STORE) = struct
     Vfs.File.of_stream (fun () -> Lwt.return (reflog_stream store))
 
   let hash_line store path =
-    Tree.snapshot store >>= fun snapshot ->
-    Tree.Dir.lookup_path snapshot path >>= function
-    | `None              -> Lwt.return "\n"
-    | `File (f, `Normal) -> Tree.File.hash f >|= Fmt.strf "F-%a\n" Tree.File.pp_hash
-    | `File (f, `Exec)   -> Tree.File.hash f >|= Fmt.strf "X-%a\n" Tree.File.pp_hash
-    | `File (f, `Link)   -> Tree.File.hash f >|= Fmt.strf "L-%a\n" Tree.File.pp_hash
-    | `Directory dir ->
-      Tree.Dir.hash dir >|= fun h ->
-      Fmt.strf "D-%s\n" @@ Store.Private.Node.Key.to_hum h
+    Store.tree store >>= fun snapshot ->
+    Log.debug (fun x -> x "hash_line snapshot=%a path=%a"
+                  (Irmin.Type.pp_json Store.tree_t) snapshot
+                  (Irmin.Type.pp_json Store.key_t) path);
+    (* FIXME: `hash` is probably slow as there is no caching *)
+    let repo = Store.repo store in
+    let hash = Store.Contents.hash repo in
+    let pp_hash = Store.Contents.Hash.pp in
+    Store.Tree.find_tree snapshot path >>= function
+    | None                          -> Lwt.return "\n"
+    | Some (`Contents (f, `Normal)) -> hash f >|= Fmt.strf "F-%a\n" pp_hash
+    | Some (`Contents (f, `Exec))   -> hash f >|= Fmt.strf "X-%a\n" pp_hash
+    | Some (`Contents (f, `Link))   -> hash f >|= Fmt.strf "L-%a\n" pp_hash
+    | Some (`Node _ as dir) ->
+      Store.Tree.hash repo dir >|= fun h ->
+      Fmt.strf "D-%a\n" Store.Tree.Hash.pp h
 
   let watch_tree_stream store ~path ~init =
     let session = Vfs.File.Stream.session init in
@@ -632,7 +638,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
           current := line;
           Vfs.File.Stream.publish session !current
         ) in
-      Store.watch_head store cb
+      Store.watch store cb
     in
     ignore remove_watch; (* TODO *)
     Vfs.File.Stream.create Fmt.string session
@@ -656,10 +662,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
         inode
     in
     let ls () =
-      let to_inode x =
-        match Path.rdecons x with
-        | None -> assert false
-        | Some (_, name) -> lookup name in
+      let to_inode (x, _) = lookup x in
       Store.list store path >|= fun items ->
       Ok (Lazy.force live :: List.map to_inode items)
     in
@@ -674,43 +677,28 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   (* Note: can't use [Store.fast_forward_head] because it can
      sometimes return [false] on success (when already up-to-date). *)
-  let fast_forward store commit_id =
-    let store = store "Fast-forward" in
-    Store.head store >>= fun old_head ->
-    let do_ff () =
-      Store.compare_and_set_head store ~test:old_head ~set:(Some commit_id) >|= function
-      | true -> `Ok
-      | false -> `Not_fast_forward in   (* (concurrent update) *)
-    match old_head with
-    | None -> do_ff ()
-    | Some expected ->
-      Store.lcas_head store commit_id >>= function
-      | `Ok lcas ->
-        if List.mem expected lcas then do_ff ()
-        else Lwt.return `Not_fast_forward
-      (* These shouldn't happen, because we didn't set any limits *)
-      | `Max_depth_reached | `Too_many_lcas -> assert false
+  let fast_forward store commit =
+    Store.Head.fast_forward store commit >|= function
+    | Ok ()            -> `Ok
+    | Error `No_change -> `Ok
+    | Error `Rejected  -> `Not_fast_forward (* (concurrent update) *)
+    (* These shouldn't happen, because we didn't set any limits *)
+    | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
 
   let fast_forward_merge store =
     Vfs.File.command (fun hash ->
-        match Store.Hash.of_hum hash with
-        | exception ex -> err_invalid_hash hash ex
-        | hash         ->
-          let commit_t = Store.Private.Repo.commit_t (Store.repo (store "commit_t")) in
-          Store.Private.Commit.mem commit_t hash >>= function
-          | false -> Vfs.error "Commit not in store"
-          | true ->
-            fast_forward store hash >>= function
-            | `Ok               -> ok ""
-            | `Not_fast_forward -> err_not_fast_forward
+        commit_of_commit_id (Store.repo store) hash >>*= fun hash ->
+        fast_forward store hash >>= function
+        | `Ok               -> ok ""
+        | `Not_fast_forward -> err_not_fast_forward
       )
 
   let status store () =
-    Store.head (store "head") >|= function
+    Store.Head.find store >|= function
     | None      -> "\n"
-    | Some head -> Store.Hash.to_hum head ^ "\n"
+    | Some head -> Fmt.strf "%a\n" Store.Commit.pp head
 
-  let transactions store =
+  let transactions ~info store =
     let lock = Lwt_mutex.create () in
     let items = ref String.Map.empty in
     let ls () = ok (String.Map.bindings !items |> List.map snd) in
@@ -730,7 +718,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
           if String.Map.mem name !items then Vfs.Dir.err_already_exists
           else (
             let remover = remover name in
-            Transaction.make store ~remover >>= fun dir ->
+            Transaction.make store ~info ~remover >>= fun dir ->
             if Lazy.is_val remover then err_no_entry else (
               let inode = Vfs.Inode.dir name dir in
               items := String.Map.add name inode !items;
@@ -742,18 +730,18 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let remove _ = Vfs.Dir.err_read_only in
     Vfs.Dir.create ~ls ~mkfile ~mkdir ~lookup ~remove ~rename
 
-  let branch make_task ~remove repo name =
+  let branch ~info ~remove repo name =
     let name = ref name in
     let remove () = remove !name in
     let make_contents name =
-      Store.of_branch_id make_task name repo >|= fun store ->
+      Store.of_branch repo name >|= fun store ->
       [
-        read_only ~name:"ro" (store "ro");
-        Vfs.Inode.dir  "transactions" (transactions store);
-        Vfs.Inode.dir  "watch"        (watch_dir ~path:Path.empty @@ store "watch");
-        Vfs.Inode.file "head.live"    (head_live @@ store "watch");
+        read_only ~name:"ro" store;
+        Vfs.Inode.dir  "transactions" (transactions ~info store);
+        Vfs.Inode.dir  "watch"        (watch_dir ~path:Path.empty store);
+        Vfs.Inode.file "head.live"    (head_live store);
         Vfs.Inode.file "fast-forward" (fast_forward_merge store);
-        Vfs.Inode.file "reflog"       (reflog @@ store "watch");
+        Vfs.Inode.file "reflog"       (reflog store);
         Vfs.Inode.file "head"         (Vfs.File.status (status store));
       ] in
     let contents = ref (make_contents !name) in
@@ -776,16 +764,17 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   module StringSet = Set.Make(String)
 
-  let branch_dir make_task repo =
+  let branch_dir ~info repo =
     let cache = ref String.Map.empty in
     let remove name =
-      Store.Repo.remove_branch repo name >|= fun () ->
+      Store.Branch.remove repo name >|= fun () ->
       cache := String.Map.remove name !cache;
-      Ok () in
+      Ok ()
+    in
     let get_via_cache name = match String.Map.find name !cache with
       | Some x -> x
       | None   ->
-        let entry = branch ~remove make_task repo name in
+        let entry = branch ~remove ~info repo name in
         cache :=  String.Map.add name entry !cache;
         entry
     in
@@ -804,7 +793,7 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let lookup name = match String.Map.find name !cache with
       | Some (x, _) -> ok x
       | None        ->
-        Store.Private.Ref.mem (Store.Private.Repo.ref_t repo) name >>= function
+        Store.Branch.mem repo name >>= function
         | true  -> ok (get_via_cache name |> fst)
         | false -> err_no_entry
     in
@@ -813,16 +802,15 @@ module Make (Store : Ivfs_tree.STORE) = struct
     let rename inode new_name =
       (* TODO: some races here... *)
       let old_name = Vfs.Inode.basename inode in
-      let refs = Store.Private.Repo.ref_t repo in
-      Store.Private.Ref.mem refs new_name >>= function
+      Store.Branch.mem repo new_name >>= function
       | true -> err_is_dir
       | false ->
-        Store.Private.Ref.read refs old_name >>= fun head ->
+        Store.Branch.find repo old_name >>= fun head ->
         begin match head with
           | None      -> Lwt.return_unit
-          | Some head -> Store.Private.Ref.update refs new_name head end
-        >>= fun () ->
-        Store.Private.Ref.remove refs old_name >>= fun () ->
+          | Some head -> Store.Branch.set repo new_name head
+        end >>= fun () ->
+        Store.Branch.remove repo old_name >>= fun () ->
         match String.Map.find old_name !cache with
         | None      -> err_no_entry
         | Some entry ->
@@ -838,36 +826,46 @@ module Make (Store : Ivfs_tree.STORE) = struct
   (* /trees *)
 
   let tree_hash_of_hum h =
-    let file ty h = `File (ty, String.trim h |> Store.Private.Contents.Key.of_hum) in
-    let dir h = `Dir (String.trim h |> Store.Private.Node.Key.of_hum) in
-    try
-      match String.span ~min:2 ~max:2 h with
-      | "F-", hash -> Ok (file `Normal hash)
-      | "X-", hash -> Ok (file `Exec hash)
-      | "L-", hash -> Ok (file `Link hash)
-      | "D-", hash -> Ok (dir hash)
-      | _ -> Vfs.Error.no_entry
-    with _ex ->
-      Vfs.Error.no_entry
+    let file ty h =
+      let h = String.trim h in
+      match Store.Contents.Hash.of_string h with
+      | Error _ -> Vfs.Error.no_entry
+      | Ok hash -> Ok (`Contents (hash, ty))
+    in
+    let dir h =
+      let h = String.trim h in
+      match Store.Tree.Hash.of_string h with
+      | Error _ -> Vfs.Error.no_entry
+      | Ok hash -> Ok (`Node hash)
+    in
+    match String.span ~min:2 ~max:2 h with
+    | "F-", hash -> file `Normal hash
+    | "X-", hash -> file `Exec hash
+    | "L-", hash -> file `Link hash
+    | "D-", hash -> dir hash
+    | _ -> Vfs.Error.no_entry
 
-  let trees_dir _make_task repo =
+  let trees_dir repo =
     let inode_of_tree_hash name =
       Lwt.return (tree_hash_of_hum name) >>*= function
-      | `File (ty, hash) ->
+      | `Contents (hash, ty) ->
         begin
-          Store.Private.Contents.read (Store.Private.Repo.contents_t repo) hash
-          >|= function
+          Store.Contents.of_hash repo hash >|= function
           | None      -> Vfs.Error.no_entry
           | Some data ->
+            let data = Ivfs_blob.to_string data in
             let perm =
               match ty with
               | `Normal | `Exec as perm -> perm
-              | `Link -> `Link data in
+              | `Link -> `Link data
+            in
             Ok (Vfs.File.ro_of_string ~perm data |> Vfs.Inode.file name)
         end
-      | `Dir hash ->
-        let root = Tree.Dir.of_hash repo hash in
-        ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return root))
+      | `Node hash ->
+        Store.Tree.of_hash repo hash >|= function
+        | None      -> Vfs.Error.no_entry
+        | Some data ->
+          Ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return data))
     in
     let cache = ref String.Map.empty in   (* Could use a weak map here *)
     let ls () = ok [] in
@@ -885,64 +883,59 @@ module Make (Store : Ivfs_tree.STORE) = struct
 
   let parents_file store =
     let read () =
-      begin Store.head store >>= function
+      begin Store.Head.find store >>= function
         | None -> Lwt.return []
-        | Some head -> Store.history store ~depth:1 >|= fun hist ->
-          Store.History.pred hist head
+        | Some head ->
+          Store.history store ~depth:1 >|= fun hist ->
+          try Store.History.pred hist head
+          with Invalid_argument _ -> []
       end >|= fun parents ->
-      Ok (Some (Cstruct.of_string (string_of_commit_ids parents))) in
+      Ok (Some (Cstruct.of_string (string_of_commits parents)))
+    in
     Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
 
   let msg_file store commit_id =
     let read () =
       let repo = Store.repo store in
-      let id = Store.Private.Commit.Key.of_hum commit_id in
-      Store.Repo.task_of_commit_id repo id >|= fun task ->
-      let messages = Irmin.Task.messages task in
-      let msg = (String.concat ~sep:"\n" messages) ^ "\n" in
-      Ok (Some (Cstruct.of_string msg))
+      commit_of_commit_id repo commit_id >>*= fun commit ->
+      let info = Store.Commit.info commit in
+      let msg = Irmin.Info.message info ^ "\n" in
+      ok (Some (Cstruct.of_string msg))
     in
     Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
 
   let snapshot_dir store name =
-    let store = store "ro" in
+    let repo = Store.repo store in
     let dirs = Vfs.ok [
         read_only ~name:"ro"     store;
         Vfs.Inode.file "hash"    (Vfs.File.ro_of_string name);
         Vfs.Inode.file "msg"     (msg_file store name);
         Vfs.Inode.file "parents" (parents_file store);
-        Vfs.Inode.dir  "diff"    (Diff.vfs_dir (fun () -> Tree.snapshot store));
+        Vfs.Inode.dir  "diff"    (Diff.vfs_dir repo (fun () -> Store.tree store));
       ] in
     static_dir name (fun () -> dirs)
 
-  let snapshots_dir make_task repo =
+  let snapshots_dir repo =
     let cache = ref empty_inode_map in   (* Could use a weak map here *)
     let ls () = ok [] in
     let lookup name = match String.Map.find name !cache with
       | Some x ->  ok x
       | None   ->
-        begin
-          try ok (Store.Hash.of_hum name)
-          with _ex -> err_invalid_commit_id name
-        end >>*= fun commit_id ->
-        Store.Private.Commit.mem (Store.Private.Repo.commit_t repo) commit_id
-        >>= function
-        | false -> err_no_entry
-        | true  ->
-          Store.of_commit_id make_task commit_id repo >|= fun store ->
-          let inode = snapshot_dir store name in
-          cache := String.Map.add name inode !cache;
-          Ok inode
+        commit_of_commit_id repo name >>*= fun commit ->
+        Store.of_commit commit >|= fun store ->
+        let inode = snapshot_dir store name in
+        cache := String.Map.add name inode !cache;
+        Ok inode
     in
     let remove () = Vfs.Dir.err_read_only in
     Vfs.Dir.read_only ~ls ~lookup ~remove
 
-  let create make_task repo =
+  let create ~info repo =
     let dirs = Vfs.ok [
-        Vfs.Inode.dir "branch"     (branch_dir make_task repo);
-        Vfs.Inode.dir "trees"      (trees_dir make_task repo);
-        Vfs.Inode.dir "snapshots"  (snapshots_dir make_task repo);
-        Vfs.Inode.dir "remotes"    (Remote.create make_task repo);
+        Vfs.Inode.dir "branch"     (branch_dir ~info repo);
+        Vfs.Inode.dir "trees"      (trees_dir repo);
+        Vfs.Inode.dir "snapshots"  (snapshots_dir repo);
+        Vfs.Inode.dir "remotes"    (Remote.create repo);
         Vfs.Inode.dir "debug"      Vfs.Logs.dir;
       ] in
     Vfs.Dir.of_list (fun () -> dirs)

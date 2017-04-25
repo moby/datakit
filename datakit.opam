@@ -18,16 +18,16 @@ depends: [
   "ocamlfind"  {build}
   "ocamlbuild" {build}
   "topkg"      {build}
-  "cmdliner"    {<"1.0.0"}
+  "cmdliner"
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.9.3"}
-  "mirage-tc" "uri"
-  "mirage-types" {< "3.0.0"}
-  "irmin"       {>= "0.12.0" & < "1.0.0"}
+  "uri"
+  "irmin"       {>= "1.1.0"}
+  "irmin-git"   {>= "1.0.0"}
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result"
-  "lwt"         {>= "2.7.0"}
+  "lwt"         {>= "2.7.1"}
   "conduit" "mirage-flow"
   "named-pipe"  {>= "0.4.0"}
   "hvsock"      {>= "0.8.1"}

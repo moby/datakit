@@ -42,6 +42,9 @@ let () =
 
 module Test_flow = struct
   type error = {zero : 'a. 'a}
+  let pp_error ppf _ = Fmt.string ppf "<0>"
+  type write_error = Mirage_flow.write_error
+  let pp_write_error = Mirage_flow.pp_write_error
   type buffer = Cstruct.t
   type 'a io = 'a Lwt.t
   let error_message e = e.zero
@@ -59,13 +62,12 @@ module Test_flow = struct
     (flow1, flow2)
 
 
-  let ok x = `Ok x
+  let ok x = Ok x
   let close _t = Lwt.return_unit
   let write1 t buf = Lwt_mvar.put t.to_remote buf
   let write t buf = write1 t buf >|= ok
   let writev t bufv = Lwt_list.iter_s (write1 t) bufv >|= ok
-
-  let read t = Lwt_mvar.take t.from_remote >|= ok
+  let read t = Lwt_mvar.take t.from_remote >|= fun x -> Ok (`Data x)
 end
 
 let reporter () =
@@ -94,29 +96,9 @@ let () =
   Logs.set_reporter (reporter ());
   ()
 
-(* FIXME: this is a bit ridiculous *)
-module Contents_string = struct
-  open Irmin.Contents.String
-  type t = string
-  let equal = equal
-  let compare = compare
-  let hash = hash
-  let to_json = to_json
-  let of_json = of_json
-  let size_of = size_of
-  let write = write
-  let read = read
-  let merge _ = merge []
-  module Path = Ivfs_tree.Path
-end
-
-module Store =
-  Irmin_git.Memory(Datakit_io.Sync)(Datakit_io.Zlib)
-    (Contents_string)(Irmin.Ref.String)(Irmin.Hash.SHA1)
-
-module Tree = Ivfs_tree.Make(Store)
-module RW = Ivfs_rw.Make(Tree)
-
+module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Datakit_io.Zlib)
+module Store = Ivfs_tree.Make(Maker)
+module RW = Ivfs_rw.Make(Store)
 module Server = Fs9p.Make(Test_flow)
 module Filesystem = Ivfs.Make(Store)
 
@@ -164,18 +146,18 @@ let config = Irmin_mem.config ()
 
 let run fn =
   Lwt_main.run begin
-    Store.Repo.create config >>= fun repo ->
+    Store.Repo.v config >>= fun repo ->
     Store.Repo.branches repo >>= fun branches ->
     Lwt_list.iter_s (fun branch ->
-        Store.Repo.remove_branch repo branch
+        Store.Branch.remove repo branch
       ) branches
     >>= fun () ->
     let for_client, for_server = Test_flow.create () in
-    let make_task msg =
+    let info msg =
       let date = 0L in
-      Irmin.Task.create ~date ~owner:"irmin9p" msg
+      Irmin.Info.v ~date ~author:"irmin9p" msg
     in
-    let root = Filesystem.create make_task repo in
+    let root = Filesystem.create ~info repo in
     let server_thread =
       Server.accept ~root ~msg:"test" for_server >>*= Lwt.return
     in
@@ -393,6 +375,14 @@ let make_branch conn ?src name =
   | None -> Lwt.return ()
   | Some src -> write_file conn (path @ ["fast-forward"]) src >>*= Lwt.return
 
+let split path =
+  match Irmin.Path.String_list.of_string path with
+  | Error _ -> assert false
+  | Ok path ->
+    match Irmin.Path.String_list.rdecons path with
+    | None -> assert false
+    | Some (x, y) -> x, y
+
 (* Replace the files currently on [branch] with [files]. *)
 let populate conn ~branch files =
   with_transaction conn ~branch "init" (fun t ->
@@ -418,14 +408,10 @@ let populate conn ~branch files =
             Lwt.return
         ) in
       files |> Lwt_list.iter_s (fun (path, value) ->
-          match
-            Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons
-          with
-          | None -> assert false
-          | Some (dir, name) ->
-            ensure_dir dir >>= fun () ->
-            let dir = t @ ["rw"] @ dir in
-            create_file conn dir name value
+          let dir, name = split path in
+          ensure_dir dir >>= fun () ->
+          let dir = t @ ["rw"] @ dir in
+          create_file conn dir name value
         )
     )
 
@@ -450,15 +436,11 @@ let populate_client branch files =
             >>**= Lwt.return
         ) in
       files |> Lwt_list.iter_s (fun (path, value) ->
-          match
-            Irmin.Path.String_list.of_hum path |> Irmin.Path.String_list.rdecons
-          with
-          | None -> assert false
-          | Some (dir, name) ->
-            ensure_dir dir >>= fun () ->
-            let dir = Datakit_path.of_steps_exn dir in
-            DK.Transaction.create_file t (dir / name) (Cstruct.of_string value)
-            >>**= Lwt.return
+          let dir, name = split path in
+          ensure_dir dir >>= fun () ->
+          let dir = Datakit_path.of_steps_exn dir in
+          DK.Transaction.create_file t (dir / name) (Cstruct.of_string value)
+          >>**= Lwt.return
         ) >>= fun () ->
       DK.Transaction.commit t ~message:"init"
     )

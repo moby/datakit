@@ -89,6 +89,13 @@ let projects repo = [
   Config.project ~id:"moby/datakit" (Tests.datakit repo)
 ]
 
+let can_build =
+  let open ACL in
+  any [
+    username "admin";
+    github_org "moby";
+  ]
+
 let make_config ?state_repo ~listen_addr ~remote () =
   let repo = Git.v ~logs ~remote "/data/repos/datakit" in
   let web_config =
@@ -96,7 +103,7 @@ let make_config ?state_repo ~listen_addr ~remote () =
       ~name:"datakit-ci"
       ?state_repo
       ~can_read:ACL.everyone
-      ~can_build:ACL.(username "admin")
+      ~can_build
       ~listen_addr
       ()
   in

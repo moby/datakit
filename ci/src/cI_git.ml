@@ -146,12 +146,9 @@ let clone_if_missing ?remote ~dir =
         "env"; "GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no\"";
         "git"; "clone"; remote; dir;
       |] in
+      let output x = print_string x; flush stdout in
       Lwt.catch
-        (fun () ->
-          Lwt.finalize
-            (fun () -> CI_process.run ~output:print_string ("", cmd))
-            (fun () -> flush stdout; Lwt.return ())
-        )
+        (fun () -> CI_process.run ~output ("", cmd))
         (fun ex ->
            Log.err (fun f -> f "Failed to clone Git repository: %a" CI_utils.pp_exn ex);
            Lwt.fail ex

@@ -1,0 +1,9 @@
+(jbuild_version 1)
+
+(library
+ ((name        datakit)
+  (public_name datakit)
+  (wrapped     false)
+  (libraries   (datakit_io bytes lwt astring logs result cstruct fmt rresult
+                irmin datakit-server asetmap prometheus-app))
+ ))

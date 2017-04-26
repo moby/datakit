@@ -1,0 +1,13 @@
+(jbuild_version 1)
+
+(executable
+  ((name        mount)
+   (public_name datakit-mount)
+   (package     datakit-client)
+   (libraries   (cmdliner unix))))
+
+; TODO: generate the right version using tokpg watermarking
+(rule
+  ((targets (version.ml))
+   (deps    (../../../src/version.ml))
+   (action  (copy ${<} ${@}))))

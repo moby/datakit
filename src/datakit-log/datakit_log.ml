@@ -36,7 +36,7 @@ let pp_ptime f () =
 
 let pp_mtime f () =
   let dt = Mtime.to_us (Mtime.elapsed ()) in
-  Fmt.pf f "%0+04.0fus" dt
+  Fmt.pf f "%+04.0fus" dt
 
 let reporter log_clock =
   let pp_time = match log_clock with

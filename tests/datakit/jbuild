@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(executable
+ ((name      test)
+  (package   datakit)
+  (libraries (test datakit_conduit))
+ ))
+
+(alias
+ ((name runtest)
+  (deps (test.exe))
+  (action (run ${exe:test.exe} -q))))

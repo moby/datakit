@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name        datakit_io)
+  (wrapped     false)
+  (libraries   (irmin-git conduit.lwt-unix camlzip))
+ ))

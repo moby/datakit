@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(executable
+ ((name      test)
+  (package   datakit-bridge-github)
+  (libraries (test datakit-github datakit_bridge_github))
+ ))
+
+(alias
+ ((name runtest)
+  (deps (test.exe))
+  (action (run ${exe:test.exe} -q))))

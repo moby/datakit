@@ -36,8 +36,8 @@ let pp_exn f = function
   | ex -> Fmt.string f (Printexc.to_string ex)
 
 let pp_duration f d =
-  if d < 120. then Fmt.pf f "%.f seconds" d
-  else Fmt.pf f "%.f minutes" (d /. 60.)
+  if d < 120. then Fmt.pf f "%.2f seconds" d
+  else Fmt.pf f "%.2f minutes" (d /. 60.)
 
 let with_switch fn =
   let switch = Lwt_switch.create () in

@@ -3,8 +3,10 @@
 #require "topkg"
 open Topkg
 
-let includes = function
-  | "datakit-ci" -> ["ci"]
+let includes c =
+  let tests = Conf.build_tests c in
+  match Conf.pkg_name c with
+  | "datakit-ci" -> (if tests then ["src"] else []) @ ["ci"]
   | "datakit" -> ["src"; "src/datakit"]
   | "datakit-client" -> ["src"; "src/datakit-client"]
   | "datakit-server" -> ["src"; "src/datakit-server"]
@@ -32,7 +34,7 @@ let extra_deps c =
 
 let build =
   let cmd c os =
-    let includes = match includes (Conf.pkg_name c) with
+    let includes = match includes c with
       | [] -> Cmd.empty
       | is -> Cmd.(v "-Is" % String.concat "," is)
     in

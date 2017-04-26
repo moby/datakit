@@ -5,7 +5,7 @@ let src = Logs.Src.create "bridge-local-git.sync" ~doc:"Local Git bridge sync fo
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Make
-    (S : Irmin.S with type branch_id = string)
+    (S : Irmin.S with type branch = string)
     (DK : Datakit_S.CLIENT)
 = struct
   module Conv = Datakit_github_conv.Make(DK)
@@ -24,13 +24,15 @@ module Make
 
   let on_change t repo_id irmin_repo branch =
     Log.debug (fun f -> f "Notification for %S" branch);
-    S.Private.Ref.read (S.Private.Repo.ref_t irmin_repo) branch >|= fun head ->
+    S.Branch.find irmin_repo branch >|= fun head ->
     let old = t.known in
     let id = (repo_id, ["heads"; branch]) in
     let next =
       match head with
-      | None -> Ref.Index.remove id old
-      | Some head -> Ref.Index.add id (Commit.v repo_id (S.Hash.to_hum head)) old
+      | None      -> Ref.Index.remove id old
+      | Some head ->
+        Ref.Index.add
+          id (Commit.v repo_id (Fmt.to_to_string S.Commit.pp head)) old
     in
     if t.known != next then (
       Log.debug (fun f -> f "Update for %S" branch);
@@ -40,7 +42,7 @@ module Make
 
   let watch t (name, repo) =
     let callback branch _diff = on_change t name repo branch in
-    S.Repo.watch_branches ~init:[] repo callback >>= fun (_stop : (unit -> unit Lwt.t)) ->
+    S.Branch.watch_all ~init:[] repo callback >>= fun (_w: S.watch) ->
     (* XXX: In theory, we should be able to pass [~init:[]] and have Irmin notify us
        of the initial state. However, Irmin's [watch_branches] is buggy. *)
     S.Repo.branches repo >>= Lwt_list.iter_s (fun b -> on_change t name repo b)

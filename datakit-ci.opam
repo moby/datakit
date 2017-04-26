@@ -1,6 +1,6 @@
 opam-version: "1.2"
 maintainer:   "datakit@docker.com"
-authors:      ["Thomas Leonard" "Anil Madhavapeddy"
+authors:      ["Thomas© Leonard" "Anil Madhavapeddy"
                "Dave Tucker" "Thomas Gazagnaire" ]
 license:      "Apache"
 homepage:     "https://github.com/moby/datakit"
@@ -29,7 +29,6 @@ depends: [
   "logs"
   "tyxml" {>= "4.0.0"}
   "tls"
-  "channel"
   "conduit"
   "io-page"
   "pbkdf"
@@ -43,7 +42,7 @@ depends: [
   "ppx_sexp_conv" {build}
   "crunch" {build}
   "datakit" {test}
-  "irmin-unix" {test}
+  "irmin-unix" {test & >= "1.1.0"}
   "alcotest" {test}
 ]
 available: [ocaml-version >= "4.03.0"]

@@ -6,7 +6,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let src9p = Logs.Src.create "bridge-local-git.9p" ~doc:"Local Git bridge for Datakit (9p)"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
 module Client9p = Client9p_unix.Make(Log9p)
-module Store = Irmin_unix.Irmin_git.FS(Irmin.Contents.String)(Irmin.Ref.String)(Irmin.Hash.SHA1)
+module Store = Irmin_unix.Git.FS.KV(Irmin.Contents.String)
 module DK = Datakit_client_9p.Make(Client9p)
 
 module Sync = Sync.Make(Store)(DK)
@@ -31,8 +31,8 @@ let start () (protocol, address) repos =
     >|= DK.connect >>= fun dk ->
     repos |> Lwt_list.map_p (fun (name, root) ->
         Log.info (fun f -> f "Monitoring local repository %S" root);
-        let config = Irmin_unix.Irmin_git.config ~root ~bare:true () in
-        Store.Repo.create config >|= fun store -> (name, store)
+        let config = Irmin_git.config root ~bare:true in
+        Store.Repo.v config >|= fun store -> (name, store)
       )
     >>= Sync.run dk
   end

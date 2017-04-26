@@ -16,9 +16,9 @@ depends: [
   "ocamlbuild" {build}
   "topkg"      {build}
   "cmdliner"
-  "irmin"    {< "1.0"}
   "irmin-watcher"
-  "irmin-unix"
+  "irmin"      {>= "1.1.0"}
+  "irmin-unix" {>= "1.1.0"}
   "lwt" {>= "2.7.1"}
   "logs" "fmt"
   "protocol-9p"    {>= "0.8.0"}

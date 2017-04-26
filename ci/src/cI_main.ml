@@ -140,12 +140,12 @@ let session_backend =
       let uri = Uri.make ~scheme:"redis" ~host ~port () in
       Uri.pp_hum f uri
   in
-  let conv = (parse, print) in
+  let mk = (parse, print) in
   let doc =
     Arg.info ~doc:"Where to store web UI session data (e.g. redis://host:port)"
       ~docv:"URL" ["sessions-backend"]
   in
-  Arg.(value (opt conv `Memory doc))
+  Arg.(value (opt mk `Memory doc))
 
 let default_info = Term.info "DataKitCI"
 

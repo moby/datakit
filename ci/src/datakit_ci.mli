@@ -339,12 +339,18 @@ module Web: sig
       (`SHA256 expected)] given then doing an HTTP GET on [/metrics]
       with an Authorization header containing "Bearer TTT" will return
       Prometheus-format metrics if sha256(TTT) = expected. There is no
-      rate limiting, so pick a long [token]. *)
+      rate limiting, so pick a long [token].
+      [github_scopes_needed] should be [`Read_org; `Public_repo] to check whether
+      users can access a public repository, or [`Read_org, `Repo] to check
+      access to private repos. Unfortunately, the GitHub API requires us to
+      ask for far more permissions than we need.
+  *)
   val config:
     ?name:string ->
     ?state_repo:Uri.t ->
     ?metrics_token:[`SHA256 of string] ->
     ?listen_addr:[`HTTP of int | `HTTPS of int] ->
+    ?github_scopes_needed:Github_t.scope list ->
     can_read:ACL.t ->
     can_build:ACL.t ->
     unit -> config

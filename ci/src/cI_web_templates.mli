@@ -7,6 +7,7 @@ type t = private {
   state_repo : Uri.t option;
   metrics_token : [`SHA256 of Cstruct.t] option;
   listen_addr: [`HTTP of int | `HTTPS of int];
+  github_scopes_needed : Github_t.scope list;
   can_read : CI_ACL.t;
   can_build : CI_ACL.t;
 }
@@ -16,6 +17,7 @@ val config:
   ?state_repo:Uri.t ->
   ?metrics_token:[`SHA256 of string] ->
   ?listen_addr:[`HTTP of int | `HTTPS of int] ->
+  ?github_scopes_needed:Github_t.scope list ->
   can_read:CI_ACL.t ->
   can_build:CI_ACL.t ->
   unit -> t

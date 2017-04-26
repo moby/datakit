@@ -16,10 +16,15 @@ end
 module Auth : sig
   type t
 
-  val create : github:CI_secrets.github_auth CI_secrets.secret -> web_ui:Uri.t -> string -> t Lwt.t
-  (** [create ~github ~web_ui passwd_file] is a user authenticator with configuration at [passwd_file].
-      If [passwd_file] does not exist, a one-time configuration URL under [web_ui] is printed
-      to the logs. [passwd_file] must be an absolute path. *)
+  val create :
+    github:CI_secrets.github_auth CI_secrets.secret ->
+    github_scopes_needed:Github_t.scope list ->
+    web_ui:Uri.t -> string -> t Lwt.t
+  (** [create ~github ~github_scopes_needed ~web_ui passwd_file] is a user
+      authenticator with configuration at [passwd_file].
+      If [passwd_file] does not exist, a one-time configuration URL under
+      [web_ui] is printed to the logs.
+      [passwd_file] must be an absolute path. *)
 
   val lookup : t -> user:string -> password:string -> User.t option
   (** [lookup t (username, password)] returns the user with name [username] if the user exists and

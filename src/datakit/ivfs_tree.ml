@@ -43,6 +43,28 @@ module Path: Irmin.Path.S with type step = string = struct
 
 end
 
+(* Similar to Irmin.Branch.String but allow '/' in branch names. *)
+module Branch = struct
+  include Irmin.Branch.String
+
+  let is_valid s =
+    let ok = ref true in
+    let n = String.length s in
+    let i = ref 0 in
+    while !i < n do
+      (match s.[!i] with
+       | '/'
+       | 'a' .. 'z'
+       | 'A' .. 'Z'
+       | '0' .. '9'
+       | '-'| '_' | '.' -> ()
+       | _ -> ok := false
+      );
+      incr i;
+    done;
+    !ok
+end
+
 type step = Path.step
 type path = Path.t
 
@@ -70,4 +92,4 @@ module type MAKER =
              and type branch = B.t
              and type metadata = perm
 
-module Make (M: MAKER) = M(Blobs)(Path)(Irmin.Branch.String)
+module Make (M: MAKER) = M(Blobs)(Path)(Branch)

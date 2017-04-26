@@ -7,11 +7,16 @@ type t = {
   state_repo : Uri.t option;
   metrics_token : [`SHA256 of Cstruct.t] option;
   listen_addr: [`HTTP of int | `HTTPS of int];
+  github_scopes_needed : Github_t.scope list;
   can_read : CI_ACL.t;
   can_build : CI_ACL.t;
 }
 
 type page = user:string option -> [`Html] Tyxml.Html.elt
+
+(* Requests access to all public and private repos. Needed to check if users can read private repos.
+   Once https://github.com/mirage/ocaml-github/issues/185 is implemented, this mess can go away. *)
+let default_github_scopes = [`Read_org; `Repo]
 
 module Error = struct
   type t = string
@@ -28,13 +33,15 @@ let job_state job =
   | None -> (Error (`Pending "(new)"), CI_output.Empty)
   | Some o -> o
 
-let config ?(name="datakit-ci") ?state_repo ?metrics_token ?(listen_addr=`HTTPS 8443) ~can_read ~can_build () =
+let config
+    ?(name="datakit-ci") ?state_repo ?metrics_token ?(listen_addr=`HTTPS 8443)
+    ?(github_scopes_needed=default_github_scopes) ~can_read ~can_build () =
   let metrics_token =
     match metrics_token with
     | None -> None
     | Some (`SHA256 str) -> Some (`SHA256 (Cstruct.of_string str))
   in
-  { name; state_repo; metrics_token; listen_addr; can_read; can_build }
+  { name; state_repo; metrics_token; listen_addr; github_scopes_needed; can_read; can_build }
 
 let state_repo_url t fmt =
   fmt |> Fmt.kstrf @@ fun path ->

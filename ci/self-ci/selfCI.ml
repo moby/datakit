@@ -102,6 +102,7 @@ let make_config ?state_repo ~listen_addr ~remote () =
     Web.config
       ~name:"datakit-ci"
       ?state_repo
+      ~github_scopes_needed:[`Read_org]
       ~can_read:ACL.everyone
       ~can_build
       ~listen_addr

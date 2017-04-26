@@ -157,6 +157,7 @@ module Auth = struct
   type t = {
     passwd_file : string;
     github : CI_secrets.github_auth CI_secrets.secret;
+    github_scopes_needed : Github_t.scope list;
     mutable local_users : [`Configured of User.t String.Map.t | `Config_token of string];
   }
 
@@ -220,19 +221,17 @@ module Auth = struct
       t.local_users <- `Configured local_users;
       Lwt.return @@ Ok ()
 
-  let create ~github ~web_ui passwd_file =
+  let create ~github ~github_scopes_needed ~web_ui passwd_file =
     if Filename.is_relative passwd_file then CI_utils.failf "Path %S is relative" passwd_file;
     try_load_local_users ~web_ui ~passwd_file >>= fun local_users ->
-    Lwt.return { passwd_file; github; local_users }
-
-  let scopes = [`Read_org; `Repo]
+    Lwt.return { passwd_file; github; github_scopes_needed; local_users }
 
   let github_login_url ~csrf_token t =
     match CI_secrets.get t.github with
     | None -> None
     | Some github ->
       let url = Github.URI.authorize
-          ~scopes
+          ~scopes:t.github_scopes_needed
           ~client_id:github.CI_secrets.client_id
           ?redirect_uri:github.CI_secrets.callback
           ~state:csrf_token

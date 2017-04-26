@@ -142,8 +142,15 @@ let clone_if_missing ?remote ~dir =
     | None ->
       CI_utils.failf "Directory %S does not exist (and no ~remote provided, so can't clone it automatically)." dir
     | Some remote ->
-      Lwt.catch (fun () ->
-          CI_process.run ~output:print_string ("", [| "git"; "clone"; remote; dir |])
+      let cmd = [|
+        "env"; "GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no\"";
+        "git"; "clone"; remote; dir;
+      |] in
+      Lwt.catch
+        (fun () ->
+          Lwt.finalize
+            (fun () -> CI_process.run ~output:print_string ("", cmd))
+            (fun () -> flush stdout; Lwt.return ())
         )
         (fun ex ->
            Log.err (fun f -> f "Failed to clone Git repository: %a" CI_utils.pp_exn ex);

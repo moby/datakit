@@ -80,7 +80,7 @@ let with_datakit fn =
     ) branches
   >>= fun () ->
   with_named_socket @@ fun (for_client, for_server) ->
-  let root = Filesystem.create make_task repo in
+  let root = Filesystem.create ~info:make_task repo in
   Lwt.async (fun () ->
       Lwt_unix.accept for_server >>= fun (client, _addr) ->
       let flow = Flow_lwt_unix.connect client in

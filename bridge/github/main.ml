@@ -1,5 +1,6 @@
 open Lwt.Infix
 open Result
+open Astring
 
 let src = Logs.Src.create "gh-bridge" ~doc:"Github bridge for Datakit"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -39,14 +40,7 @@ let quiet () =
 
 module Client9p = Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
-
-module VG = struct
-  include Datakit_github_vfs.Make(Datakit_github_api)
-  module Sync = Datakit_github_sync.Make(Datakit_github_api)(DK)
-end
-
-(* Hyper-V socket applications use well-known GUIDs. This is ours: *)
-let serviceid = "C378280D-DA14-42C8-A24E-0DE92A1028E3"
+module Sync = Datakit_github_sync.Make(Datakit_github_api)(DK)
 
 let token () =
   let cookie = "datakit-github-cookie" in
@@ -81,12 +75,32 @@ let () =
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
     )
 
+type endpoint = [
+  | `File of string
+  | `Tcp of string * int
+]
+
+let pp_endpoint ppf = function
+  | `File f     -> Fmt.pf ppf "file://%s" f
+  | `Tcp (h, p) -> Fmt.pf ppf "tcp://%s:%d" h p
+
+let endpoint_of_string ~default_tcp_port str =
+  match String.cut ~sep:"://" str with
+  | Some ("file", f) -> `Ok (`File f)
+  | Some ("tcp" , s) ->
+    (match String.cut ~rev:true ~sep:":" s with
+    | None              -> `Ok (`Tcp (s, default_tcp_port))
+    | Some (host, port) ->
+      try `Ok (`Tcp (host, int_of_string port))
+      with Failure _ -> `Error "use tcp://host:port")
+  | _ -> `Error "invalid endpoint"
+
 type datakit_config = {
-  endpoint: Datakit_conduit.t;
+  endpoint: endpoint;
   branch  : string;
 }
 
-let start () no_listen listen_urls datakit cap webhook resync_interval prometheus =
+let start () datakit cap webhook resync_interval prometheus =
   quiet ();
   let prometheus_threads = Prometheus_unix.serve prometheus in
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
@@ -122,15 +136,10 @@ let start () no_listen listen_urls datakit cap webhook resync_interval prometheu
     | None   -> let t, _ = Lwt.task () in t
     | Some d ->
       Log.app (fun l -> l "Connecting to %a [%s]."
-                  Datakit_conduit.pp d.endpoint d.branch);
+                  pp_endpoint d.endpoint d.branch);
       let proto, address = match d.endpoint with
         | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
         | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
-        | p ->
-          Log.err (fun l ->
-              l "Cannot connect over 9p to %a: transport not (yet) supported"
-                Datakit_conduit.pp p);
-          failwith "connect to datakit"
       in
       Lwt.catch
         (fun () -> Client9p.connect proto address ~max_fids:Int32.max_int ())
@@ -140,30 +149,21 @@ let start () no_listen listen_urls datakit cap webhook resync_interval prometheu
         Log.err (fun l -> l "cannot connect: %s" e);
         Lwt.fail_with "connecting to datakit"
       | Ok conn        ->
-        Log.info (fun l -> l "Connected to %a" Datakit_conduit.pp d.endpoint);
+        Log.info (fun l -> l "Connected to %a" pp_endpoint d.endpoint);
         let dk = DK.connect conn in
-        let t = VG.Sync.empty in
+        let t = Sync.empty in
         DK.branch dk d.branch >>~ fun br ->
-        VG.Sync.sync ~token ?webhook ?resync_interval ~cap br t
+        Sync.sync ~token ?webhook ?resync_interval ~cap br t
         >|= ignore
   in
-  let accept_9p_connections () =
-    if no_listen || listen_urls = [] then []
-    else
-      let make_root = let r = VG.root token in fun () -> r in
-      List.map (fun addr ->
-          Datakit_conduit.accept_forever ~make_root ~serviceid addr
-        ) listen_urls
-  in
   Lwt_main.run @@ Lwt.choose (
-    [connect_to_datakit ()] @ accept_9p_connections () @ prometheus_threads
+    [connect_to_datakit ()] @ prometheus_threads
   )
 
 open Cmdliner
 
 let env_docs = "ENVIRONMENT VARIABLES"
 let datakit_options = "DATAKIT OPTIONS"
-let listen_options = "LISTEN OPTIONS"
 let github_options = "GITHUB OPTIONS"
 
 let setup_log =
@@ -176,27 +176,7 @@ let setup_log =
         $ Datakit_log.log_destination $ Logs_cli.level ~env ()
         $ Datakit_log.log_clock)
 
-let no_listen =
-  let docs = listen_options in
-  let doc =
-    Arg.info ~docs ~doc:"Do not expose the GitHub API over 9p" ["no-listen"]
-  in
-  Arg.(value & flag doc)
-
-let endpoint port = Datakit_conduit.(parse ~default_tcp_port:port, pp)
-
-let listen_urls =
-  let docs = listen_options in
-  let doc =
-    Arg.info ~docs ~doc:
-      "Expose the GitHub API over 9p endpoints. That command-line argument \
-       takes a comma-separated list of URLs to listen on of the form \
-       file:///var/tmp/foo or tcp://host:port or \\\\\\\\.\\\\pipe\\\\foo \
-       or hyperv-connect://vmid/serviceid or hyperv-accept://vmid/serviceid"
-      ["l"; "listen-urls"]
-  in
-  (* FIXME: maybe we want to not listen by default *)
-  Arg.(value & opt (list (endpoint 5641)) [ `Tcp ("127.0.0.1", 5641) ] doc)
+let endpoint port = (endpoint_of_string ~default_tcp_port:port, pp_endpoint)
 
 let no_datakit =
   let docs = datakit_options in
@@ -277,7 +257,7 @@ let term =
         filesystem. Also connect to a DataKit instance and ensure a \
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
-  Term.(pure start $ setup_log $ no_listen $ listen_urls
+  Term.(pure start $ setup_log
         $ datakit $ capabilities $ webhook $ resync $ Prometheus_unix.opts),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 

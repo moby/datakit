@@ -30,7 +30,6 @@ depends: [
   "hex" "nocrypto" "conduit"
   "prometheus-app"
   "protocol-9p" {>= "0.8.0"}
-  "datakit-server" {>= "0.9.0"}
   "datakit-client" {>= "0.9.0"}
   "github-hooks" {>= "0.1.1"}
   "github" {>= "2.1.0"}

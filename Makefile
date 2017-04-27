@@ -13,9 +13,13 @@ all:
 depends:
 	opam pin add ${PINOPTS} datakit-client .
 	opam pin add ${PINOPTS} datakit-server .
+	opam pin add ${PINOPTS} datakit .
 	opam pin add ${PINOPTS} datakit-github .
+	opam pin add ${PINOPTS} datakit-bridge-github .
+	opam pin add ${PINOPTS} datakit-bridge-local-git .
 	opam pin add ${PINOPTS} datakit-ci .
-	opam update -u datakit-client datakit-server datakit-github datakit-ci -y
+	opam update -u datakit datakit-client datakit-server datakit-github \
+	  datakit-ci datakit-bridge-github datakit-bridge-local-git -y
 
 datakit:
 	$(BUILD) -n datakit

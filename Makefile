@@ -10,6 +10,13 @@ RUNTEST=jbuilder runtest
 all:
 	$(BUILD)
 
+depends:
+	opam pin add ${PINOPTS} datakit-client .
+	opam pin add ${PINOPTS} datakit-server .
+	opam pin add ${PINOPTS} datakit-github .
+	opam pin add ${PINOPTS} datakit-ci .
+	opam update -u datakit-client datakit-server datakit-github datakit-ci -y
+
 datakit:
 	$(BUILD) -n datakit
 	$(RUNTEST) test/datakit

@@ -8,17 +8,11 @@ bug-reports:  "https://github.com/moby/datakit/issues"
 dev-repo:     "https://github.com/moby/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
-build: [
-  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false" "-n" name
-]
-
-build-test: [
-  ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true" "-n" name]
-  ["ocaml" "pkg/pkg.ml" "test" "-n" name]
-]
+build: ["jbuilder" "build" "-p" name "-j" jobs]
+build-test: ["jbuilder" "runtest" "ci/tests"]
 
 depends: [
-  "ocamlfind" {build}
+  "jbuilder" {build}
   "multipart-form-data"
   "datakit-client" {>= "0.9.0"}
   "datakit-github" {>= "0.9.0"}

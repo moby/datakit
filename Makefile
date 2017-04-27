@@ -1,64 +1,56 @@
-GITHUB=$(shell opam config var github:installed)
 APP=Datakit.app
 EXE=Datakit
 PINOPTS=-y -k git
 
-TESTS = true
+BUILD=jbuilder build --dev
+RUNTEST=jbuilder runtest
 
 .PHONY: all clean test bundle COMMIT exe ci
 
-all: datakit
-	@
-
-depends:
-	opam pin add ${PINOPTS} datakit-client .
-	opam pin add ${PINOPTS} datakit-server .
-	opam pin add ${PINOPTS} datakit-github .
-	opam pin add ${PINOPTS} datakit-ci .
-	opam update -u datakit-client datakit-server datakit-github datakit-ci -y
+all:
+	$(BUILD)
 
 datakit:
-	ocaml pkg/pkg.ml build --tests $(TESTS) -q
-	ocaml pkg/pkg.ml test
+	$(BUILD) -n datakit
+	$(RUNTEST) test/datakit
 
 client:
-	ocaml pkg/pkg.ml build -n datakit-client -q
+	$(BUILD) -p datakit-client
 
 server:
-	ocaml pkg/pkg.ml build -n datakit-server -q
+	$(BUILD) -p datakit-server
 
 github:
-	ocaml pkg/pkg.ml build -n datakit-github -q
+	$(BUILD) -p datakit-github
 
 bridge-local-git:
-	ocaml pkg/pkg.ml build -n datakit-bridge-local-git -q
+	$(BUILD) -p datakit-bridge-local-git
 
 bridge-github:
-	ocaml pkg/pkg.ml build -n datakit-bridge-github -q --tests true
-	ocaml pkg/pkg.ml test -n datakit-bridge-github
+	$(BUILD) -p datakit-bridge-github
+	$(RUNTEST) test/datakit-github-bridge
 
 ci:
-	ocaml pkg/pkg.ml build -n datakit-ci -q --tests true
-	ocaml pkg/pkg.ml test -n datakit-ci
+	$(BUILD) -p datakit-ci
+	$(RUNTEST) ci/tests
 
 clean:
-	ocaml pkg/pkg.ml clean
+	rm -rf _build
 	rm -rf $(APP) $(EXE) _tests
 	rm -f examples/ocaml-client/*.native
 	rm -f ci/skeleton/exampleCI.native
 	rm -f com.docker.db
 
 test:
-	ocaml pkg/pkg.ml build --tests true
-	ocaml pkg/pkg.ml test
+	jbuilder runtest
 
 bundle:
 	opam remove tls ssl -y
 	$(MAKE) clean
-	ocaml pkg/pkg.ml build --tests false --pinned true
+	$(BUILD) src/datakit/bin/main.exe
 	mkdir -p $(APP)/Contents/MacOS/
 	mkdir -p $(APP)/Contents/Resources/lib/
-	cp _build/src/datakit/main.native $(APP)/Contents/MacOS/com.docker.db
+	cp _build/default/src/datakit/bin/main.exe $(APP)/Contents/MacOS/com.docker.db
 	./scripts/check-dylib.sh
 	dylibbundler -od -b \
 	 -x $(APP)/Contents/MacOS/com.docker.db \
@@ -72,9 +64,9 @@ COMMIT:
 exe:
 	opam remove tls ssl -y
 	rm -rf _build/
-	ocaml pkg/pkg.ml build --tests false --pinned true
+	$(BUILD) src/datakit/bin/main.exe
 	mkdir -p $(EXE)
-	cp _build/src/datakit/main.native $(EXE)/datakit.exe
+	cp _build/debfault/src/datakit/bin/main.exe $(EXE)/datakit.exe
 	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)
 
 REPO=../opam-repository
@@ -82,7 +74,7 @@ PACKAGES=$(REPO)/packages
 
 # until we have https://github.com/ocaml/opam-publish/issues/38
 pkg-%:
-	topkg opam pkg -n $*
+	topkg opam pkg -p $*
 	mkdir -p $(PACKAGES)/$*
 	cp -r _build/$*.* $(PACKAGES)/$*/
 	cd $(PACKAGES) && git add $*

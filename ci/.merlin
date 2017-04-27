@@ -1,5 +1,0 @@
-PKG protocol-9p.unix datakit-client uri cohttp.lwt yojson logs irmin.unix
-PKG cmdliner pbkdf webmachine session.webmachine
-PKG tyxml cmdliner pbkdf asetmap
-PKG multipart-form-data prometheus-app
-REC

@@ -1,4 +1,0 @@
-true: warn(A)
-true: strict_sequence, safe_string, annot, bin_annot
-true: package(cmdliner, logs, datakit-client, protocol-9p.unix, fmt.cli, fmt.tty, logs.cli)
-true: package(irmin-unix, irmin-git, irmin-watcher, datakit-github)

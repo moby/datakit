@@ -1,0 +1,9 @@
+(jbuild_version 1)
+
+(executable
+ ((name        main)
+  (package     datakit-bridge-local-git)
+  (public_name datakit-bridge-local-git)
+  (libraries   (irmin datakit-client datakit-github irmin-unix cmdliner
+                protocol-9p.unix fmt.cli logs.cli fmt.tty))
+ ))

@@ -1,0 +1,16 @@
+(jbuild_version 1)
+
+(executable
+ ((name        main)
+  (package     datakit)
+  (public_name datakit)
+  (libraries   (datakit datakit_conduit datakit_log
+                cmdliner fmt.cli fmt.tty logs.fmt asetmap git irmin
+                irmin-git irmin-watcher))
+ ))
+
+; TODO: generate the right version using tokpg watermarking
+(rule
+  ((targets (version.ml))
+   (deps    (../../version.ml))
+   (action  (copy ${<} ${@}))))

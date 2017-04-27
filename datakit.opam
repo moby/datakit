@@ -8,16 +8,11 @@ bug-reports:  "https://github.com/moby/datakit/issues"
 dev-repo:     "https://github.com/moby/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
-build: ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "false"]
-build-test: [
-  ["ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "--tests" "true"]
-  ["ocaml" "pkg/pkg.ml" "test"]
-]
+build: ["jbuilder" "build" "-p" name "-j" jobs]
+build-test: ["jbuilder" "runtest" "tests/%{name}%"]
 
 depends: [
-  "ocamlfind"  {build}
-  "ocamlbuild" {build}
-  "topkg"      {build}
+  "jbuilder" {build}
   "cmdliner"
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.9.3"}

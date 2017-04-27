@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name        datakit_log)
+  (wrapped     false)
+  (libraries   (cmdliner fmt logs.cli prometheus-app.unix mtime.os win-eventlog
+                asl))
+ ))

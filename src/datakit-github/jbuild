@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name        datakit_github)
+  (public_name datakit-github)
+  (wrapped     false)
+  (libraries   (fmt asetmap uri lwt astring logs datakit-client))
+ ))

@@ -8,14 +8,10 @@ bug-reports:  "https://github.com/moby/datakit/issues"
 dev-repo:     "https://github.com/moby/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
-build: [
-  "ocaml" "pkg/pkg.ml" "build" "--pinned" "%{pinned}%" "-n" name
-]
+build: ["jbuilder" "build" "-p" name "-j" jobs]
 
 depends: [
-  "ocamlfind"  {build}
-  "ocamlbuild" {build}
-  "topkg"      {build}
+  "jbuilder" {build}
   "base-bytes"
   "astring" "logs" "uri" "rresult" "fmt"
   "cstruct" {> "2.2.0"}

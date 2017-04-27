@@ -10,3 +10,4 @@ Datakit.app/
 *.byte
 bridge/github/webhook/webhook
 COMMIT
+.merlin

@@ -12,15 +12,15 @@ RUN opam pin add -yn protocol-9p.0.9.0 'https://github.com/talex5/ocaml-9p.git#p
 
 RUN opam depext -i asl win-eventlog camlzip alcotest mtime mirage-flow hvsock git irmin irmin-unix lwt protocol-9p tyxml redis multipart-form-data pbkdf tls prometheus-app github git session irmin irmin-unix cmdliner webmachine
 
+# FIXME: workaround bug in opam2
+RUN opam install irmin-unix alcotest
+
 ADD . /home/opam/datakit
 RUN sudo chown opam /home/opam/datakit
 RUN opam pin add -k git datakit-client.dev /home/opam/datakit -y
 RUN opam pin add -k git datakit-server.dev /home/opam/datakit -y
 RUN opam pin add -k git datakit-github.dev /home/opam/datakit -y
 RUN opam pin add -k git datakit.dev /home/opam/datakit -y
-
-# FIXME: workaround bug in opam2
-RUN opam install irmin-unix alcotest
 
 RUN opam pin add -k git datakit-ci.dev /home/opam/datakit -yt
 

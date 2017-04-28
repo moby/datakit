@@ -1,3 +1,50 @@
+### 0.10.0 (2017-04-28)
+
+DataKit has a new home: the [Moby Project](http://mobyproject.org/)!
+
+**all**
+
+- Rename docker/datakit into moby/datakit (#528, @talex5)
+- The Docker images on Hub have moved to [datakit](https://hub.docker.com/u/datakit/):
+  Use `docker run datakit/db` to run the database (see README.md)
+- Use jbuilder to build the project. Total project build time pass from ~1min
+  to less than 10s and identifed a few issues with linking local/global names.
+  For instance `Datakit_conduit` were depending on datakit-server and it was
+  not clear which version it was linked with (#532, @samoht)
+
+**datakit-ci**
+
+- ci: record history of builds (#489, @talex5)
+- ci: show queue lengths for resource pools in web UI (#500, @talex5)
+- ci: allow separating stdout and stderr in CI_process (#502, @talex5)
+- ci: remove the iframe with the logs (#501, @samoht)
+- ci: include test name in links from GitHub (#508, @talex5)
+- ci: fix escaping in Rebuild button link (#515, @talex5)
+- ci: turn off switch when build function returns (#518, @talex5)
+- ci: make required GitHub scopes configurable (#534, @talex5)
+- ci: when auto-cloning, accept the SSH key automatically (#536, @talex5)
+
+**datakit**
+
+- datakit: Fix escaping in git push (#503, @talex5)
+- datakit: Batch up git pushes (#505, @talex5)
+- datakit: do not expose an HTTP server anymore (#524, @samoht)
+- datakit: update to irmin.1.1.0, cmdliner.1.0, hvsock.0.18 (#529, @samoht)
+
+**datakit-github**
+
+- github: don't ignore errors from DataKit (#513, @talex5)
+- github: raise exceptions instead of logging errors (#526, @talex5)
+
+**datakit-bridge-github**
+
+- bridge-github: read secrets from `/run/secrets/github-jar` (#519, @talex5)
+- bridge-github: remove the VFS and simplify server startup (#535, @samoht)
+
+**datakit-bridge-local-git**
+
+- bridge-local-git: update to irmin 1.1.0 (#531, @samoht)
+
 ### 0.9.0 (2017-02-03)
 
 **datakit-local-git** (new)

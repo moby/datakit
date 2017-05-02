@@ -16,6 +16,7 @@ depends: [
   "cmdliner"
   "lwt" {>= "2.7.1"}
   "datakit-github" {>= "0.10.0"}
+  "datakit-server" {>= "0.10.0"}
   "logs" "fmt" "mtime" "asl" "win-eventlog"
   "uri" {>= "1.8.0"}
   "hvsock" {>= "0.8.1"}

@@ -16,12 +16,13 @@ depends: [
   "cmdliner"
   "lwt" {>= "2.7.1"}
   "datakit-github" {>= "0.10.0"}
+  "datakit-server" {>= "0.10.0"}
   "logs" "fmt" "mtime" "asl" "win-eventlog"
   "uri" {>= "1.8.0"}
   "hvsock" {>= "0.8.1"}
   "hex" "nocrypto" "conduit"
   "prometheus-app"
-  "protocol-9p" {>= "0.8.0"}
+  "protocol-9p" {= "0.9.0"}
   "datakit-client" {>= "0.10.0"}
   "github-hooks" {>= "0.1.1"}
   "github" {>= "2.1.0"}

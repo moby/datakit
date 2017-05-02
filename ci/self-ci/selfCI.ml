@@ -19,7 +19,7 @@ module Dockerfile = struct
   let datakit     = v ~timeout:(30. *. minute) "Dockerfile"
 end
 
-let alpine_4_02 = Term.return (Docker.Image.of_published "ocaml/opam:alpine_ocaml-4.02.3")
+let alpine_4_04 = Term.return (Docker.Image.of_published "ocaml/opam:alpine_ocaml-4.04.0")
 
 let pp_packages = Fmt.(list ~sep:(const string " ") String.dump)
 
@@ -52,7 +52,7 @@ module Tests = struct
     in
     object(self)
       method client      = build Dockerfile.client
-      method client_4_02 = build Dockerfile.client     ~from:alpine_4_02
+      method client_4_04 = build Dockerfile.client     ~from:alpine_4_04
       method local_git   = build Dockerfile.local_git  ~from:self#client
       method ci          = build Dockerfile.ci
       method self_ci     = build Dockerfile.self_ci    ~from:self#ci
@@ -80,7 +80,7 @@ module Tests = struct
         "local-git",   check_builds images#local_git;
         "libraries",   Term.wait_for_all [
           "client",      check_builds images#client;
-          "client-4.02", check_builds images#client_4_02;
+          "client-4.04", check_builds images#client_4_04;
         ] >|= fun () -> "Library tests succeeded"
       ]
 end

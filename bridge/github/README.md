@@ -45,7 +45,6 @@ To run it:
       -v /path/to/jar/datakit:/run/secrets/datakit-github-cookie \
       datakit-github \
       --datakit=tcp:x.x.x.x:6640 \
-      --no-listen \
       --verbose \
       --webhook=http://my-ip
 

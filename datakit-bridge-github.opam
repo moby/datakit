@@ -22,7 +22,7 @@ depends: [
   "hvsock" {>= "0.8.1"}
   "hex" "nocrypto" "conduit"
   "prometheus-app"
-  "protocol-9p" {>= "0.8.0"}
+  "protocol-9p" {= "0.9.0"}
   "datakit-client" {>= "0.10.0"}
   "github-hooks" {>= "0.1.1"}
   "github" {>= "2.1.0"}

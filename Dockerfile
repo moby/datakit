@@ -8,7 +8,7 @@ RUN opam pin add irmin.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53
 RUN opam pin add irmin-git.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
 RUN opam pin add -yn protocol-9p.0.10.0 'https://github.com/talex5/ocaml-9p.git#ping-0.10.0'
 
-RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term asl win-eventlog camlzip irmin-watcher mtime mirage-flow conduit hvsock cohttp prometheus-app git irmin cmdliner protocol-9p channel rresult win-error named-pipe
+RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog camlzip irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin cmdliner protocol-9p rresult win-error named-pipe
 
 COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml

@@ -2,7 +2,7 @@ open Lwt.Infix
 open Result
 open Astring
 
-module UnixServer = Fs9p.Make(Flow_lwt_unix)
+module UnixServer = Fs9p.Make(Protocol_9p_unix.Flow_lwt_unix)
 module HyperVServer = Fs9p.Make(Flow_lwt_unix_hvsock)
 
 let src = Logs.Src.create "conduit" ~doc:"Datakit conduit handling"
@@ -93,7 +93,7 @@ module Unix = struct
   let handle ~make_root t fd =
     let msg = str t in
     Lwt.catch (fun () ->
-         let flow = Flow_lwt_unix.connect fd in
+         let flow = Protocol_9p_unix.Flow_lwt_unix.connect fd in
          (* Re-build the filesystem for each client because command files
             need per-client state. *)
          let root = make_root () in

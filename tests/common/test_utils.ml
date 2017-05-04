@@ -243,7 +243,7 @@ let create_file ?(perm=rw_r__r__) conn path leaf contents =
     )
 
 let write_file conn ?(truncate=false) path contents =
-  let ( >>== ) = Protocol_9p_infix.( >>*= ) in
+  let ( >>== ) = Protocol_9p.Infix.( >>*= ) in
   with_file conn path (fun fid ->
       begin
         if not truncate then Lwt.return_unit
@@ -388,12 +388,12 @@ let populate conn ~branch files =
   with_transaction conn ~branch "init" (fun t ->
       Client.readdir conn (t @ ["rw"]) >>*= fun existing ->
       existing |> Lwt_list.iter_s (fun stat ->
-          let name = stat.Protocol_9p_types.Stat.name in
+          let name = stat.Protocol_9p.Types.Stat.name in
           Client.remove conn (t @ ["rw"; name]) >>*= Lwt.return
         ) >>= fun () ->
       Client.readdir conn (t @ ["rw"]) >>*= fun existing ->
       existing
-      |> List.map (fun e -> e.Protocol_9p_types.Stat.name)
+      |> List.map (fun e -> e.Protocol_9p.Types.Stat.name)
       |> Alcotest.(check (list string)) "rw is empty" [];
       let dirs = Hashtbl.create 2 in
       let rec ensure_dir d =

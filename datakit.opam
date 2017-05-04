@@ -33,6 +33,7 @@ depends: [
   "irmin-watcher" {>= "0.2.0"}
   "prometheus-app"
   "datakit-server" {>= "0.10.0"}
+  "protocol-9p-unix" {>= "0.10.0"}
   "datakit-client" {test & >= "0.10.0"}
   "datakit-github" {test & >= "0.10.0"}
   "alcotest"       {test & >= "0.7.0"}

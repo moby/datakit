@@ -1,6 +1,6 @@
 (** A DataKit client that connects to the server over a 9p connection. *)
 
-module Make(P9p : Protocol_9p_client.S) : sig
+module Make(P9p : Protocol_9p.Client.S) : sig
   include Datakit_S.CLIENT
 
   val connect : P9p.t -> t

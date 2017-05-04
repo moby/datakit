@@ -8,7 +8,7 @@ RUN opam pin add irmin.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53
 RUN opam pin add irmin-git.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
 RUN opam pin add irmin-unix.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
 
-RUN opam pin add -yn protocol-9p.0.9.0 'https://github.com/talex5/ocaml-9p.git#ping-mirage-3'
+RUN opam pin add -yn protocol-9p.0.10.0 'https://github.com/talex5/ocaml-9p.git#ping-0.10.0'
 
 RUN opam depext -i asl win-eventlog camlzip alcotest mtime mirage-flow hvsock git irmin irmin-unix lwt protocol-9p tyxml redis multipart-form-data pbkdf tls prometheus-app github git session irmin irmin-unix cmdliner webmachine
 

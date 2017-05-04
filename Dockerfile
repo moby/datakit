@@ -6,7 +6,7 @@ RUN sudo apk add tzdata aspcud gmp-dev perl
 RUN opam pin add hvsock.0.14.0 -n https://github.com/mirage/ocaml-hvsock.git#88397c37a910c61507a9655ed8413c1692294da0
 RUN opam pin add irmin.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
 RUN opam pin add irmin-git.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
-RUN opam pin add -yn protocol-9p 'https://github.com/talex5/ocaml-9p.git#ping-mirage-3'
+RUN opam pin add -yn protocol-9p.0.10.0 'https://github.com/talex5/ocaml-9p.git#ping-0.10.0'
 
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term asl win-eventlog camlzip irmin-watcher mtime mirage-flow conduit hvsock cohttp prometheus-app git irmin cmdliner protocol-9p channel rresult win-error named-pipe
 

@@ -1,5 +1,5 @@
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
-FROM ocaml/opam-dev@sha256:337fd0f78b182a12da3f66d9d5ca075dbb79df414fc01d6a0aee99ffeb35552a
+FROM ocaml/opam-dev@sha256:64dc0522876ebbd27b186e3ba955ae5ab864ace580add5b0d1abb8715bdf1bbe
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud
 

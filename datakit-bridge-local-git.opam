@@ -15,7 +15,7 @@ depends: [
   "irmin-watcher"
   "irmin"      {>= "1.1.0"}
   "irmin-unix" {>= "1.1.0"}
-  "lwt" {>= "2.7.1"}
+  "lwt" {>= "3.0.0"}
   "logs" "fmt"
   "protocol-9p-unix" {>= "0.10.0"}
   "datakit-client" {>= "0.10.0"}

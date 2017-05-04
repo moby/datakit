@@ -22,7 +22,7 @@ dependencies:
   - opam pin add irmin-git.1.1.0 --dev -n
   - opam pin add datakit-server.dev . -n
   - opam pin add datakit.dev . -n
-  - opam update && opam upgrade
+  - opam update && opam upgrade --fixup && opam upgrade
   - opam install depext && opam depext osx-fsevents datakit
   - opam list
   - opam reinstall datakit-server datakit -v

@@ -12,8 +12,8 @@
   (modules     (main version))
   (package     datakit-bridge-github)
   (public_name datakit-bridge-github)
-  (libraries   (datakit_bridge_github protocol-9p.unix prometheus-app.unix
-                datakit_log fmt.cli fmt.tty github.unix))
+  (libraries   (datakit_bridge_github protocol-9p-unix prometheus-app.unix
+                datakit_log fmt.cli fmt.tty github.unix io-page.unix))
  ))
 
 ; TODO: generate the right version using topkg watermarking

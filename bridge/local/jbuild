@@ -5,5 +5,5 @@
   (package     datakit-bridge-local-git)
   (public_name datakit-bridge-local-git)
   (libraries   (irmin datakit-client datakit-github irmin-unix cmdliner
-                protocol-9p.unix fmt.cli logs.cli fmt.tty))
+                protocol-9p-unix fmt.cli logs.cli fmt.tty io-page.unix))
  ))

@@ -22,7 +22,7 @@ depends: [
   "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result"
-  "lwt"         {>= "2.7.1"}
+  "lwt"         {>= "3.0.0"}
   "conduit" "mirage-flow"
   "named-pipe"  {>= "0.4.0"}
   "hvsock"      {>= "0.8.1"}
@@ -33,6 +33,7 @@ depends: [
   "irmin-watcher" {>= "0.2.0"}
   "prometheus-app"
   "datakit-server" {>= "0.10.0"}
+  "protocol-9p-unix" {>= "0.10.0"}
   "datakit-client" {test & >= "0.10.0"}
   "datakit-github" {test & >= "0.10.0"}
   "alcotest"       {test & >= "0.7.0"}

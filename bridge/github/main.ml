@@ -38,7 +38,7 @@ let quiet () =
   quiet_git ();
   quiet_irmin ()
 
-module Client9p = Client9p_unix.Make(Log9p)
+module Client9p = Protocol_9p_unix.Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
 module Sync = Datakit_github_sync.Make(Datakit_github_api)(DK)
 

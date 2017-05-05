@@ -39,7 +39,7 @@ let make_task msg =
   let date = 0L in
   Irmin.Info.v ~date ~author:"datakit-ci-test" msg
 
-module Server = Fs9p.Make(Flow_lwt_unix)
+module Server = Fs9p.Make(Protocol_9p_unix.Flow_lwt_unix)
 module Filesystem = Ivfs.Make(Store)
 
 let p = Datakit_path.of_string_exn
@@ -64,7 +64,7 @@ let with_named_socket fn =
   begin try Unix.unlink path with _ -> () end;
   Lwt.finalize
     (fun () ->
-       Lwt_unix.Versioned.bind_2 socket (Lwt_unix.ADDR_UNIX path) >>= fun () ->
+       Lwt_unix.bind socket (Lwt_unix.ADDR_UNIX path) >>= fun () ->
        Lwt_unix.listen socket 2;
        fn (path, socket)
     )
@@ -83,7 +83,7 @@ let with_datakit fn =
   let root = Filesystem.create ~info:make_task repo in
   Lwt.async (fun () ->
       Lwt_unix.accept for_server >>= fun (client, _addr) ->
-      let flow = Flow_lwt_unix.connect client in
+      let flow = Protocol_9p_unix.Flow_lwt_unix.connect client in
       Server.accept ~root ~msg:"test connection" flow >|= function
       | Ok x -> x
       | Error (`Msg m) -> failwith m

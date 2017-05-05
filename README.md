@@ -105,5 +105,8 @@ DataKit is licensed under the Apache License, Version 2.0. See
 [LICENSE](https://github.com/moby/datakit/blob/master/LICENSE.md) for the full
 license text.
 
+Contributions are welcome under the terms of this license. You may wish to browse
+the [weekly reports](reports) to read about overall activity in the repository.
+
 [DataKitCI]: https://github.com/moby/datakit/tree/master/ci
 [Filesystem API]: https://github.com/moby/datakit/tree/master/9p.md

@@ -12,7 +12,7 @@
   (modules     (main version))
   (package     datakit-bridge-github)
   (public_name datakit-bridge-github)
-  (libraries   (datakit_bridge_github protocol-9p.unix prometheus-app.unix
+  (libraries   (datakit_bridge_github protocol-9p-unix prometheus-app.unix
                 datakit_log fmt.cli fmt.tty github.unix))
  ))
 

@@ -2,7 +2,7 @@ open Lwt.Infix
 open Result
 open Astring
 
-module UnixServer = Fs9p.Make(Flow_lwt_unix)
+module UnixServer = Fs9p.Make(Protocol_9p_unix.Flow_lwt_unix)
 module HyperVServer = Fs9p.Make(Flow_lwt_unix_hvsock)
 
 let src = Logs.Src.create "conduit" ~doc:"Datakit conduit handling"
@@ -87,13 +87,13 @@ module Unix = struct
         | e -> Lwt.fail e)
     >>= fun () ->
     let s = Lwt_unix.(socket PF_UNIX SOCK_STREAM 0) in
-    Lwt_unix.Versioned.bind_2 s (Lwt_unix.ADDR_UNIX path) >>= fun () ->
+    Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path) >>= fun () ->
     Lwt.return s
 
   let handle ~make_root t fd =
     let msg = str t in
     Lwt.catch (fun () ->
-         let flow = Flow_lwt_unix.connect fd in
+         let flow = Protocol_9p_unix.Flow_lwt_unix.connect fd in
          (* Re-build the filesystem for each client because command files
             need per-client state. *)
          let root = make_root () in
@@ -225,7 +225,7 @@ let accept_forever ?backlog ~serviceid ~make_root t =
       let socket = Lwt_unix.(socket PF_INET SOCK_STREAM 0) in
       (* Makes testing easier *)
       Lwt_unix.setsockopt socket Lwt_unix.SO_REUSEADDR true;
-      Lwt_unix.Versioned.bind_2 socket addr >>= fun () ->
+      Lwt_unix.bind socket addr >>= fun () ->
       Unix.accept_forever ?backlog socket (Unix.handle ~make_root t)
     | `HyperV_connect uri ->
       HyperV.connect_forever (HyperV.of_uri ~serviceid uri)

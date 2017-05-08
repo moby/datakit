@@ -708,11 +708,11 @@ module Private: sig
   type engine
 
   module Client9p: sig
-    include Protocol_9p_client.S
+    include Protocol_9p.Client.S
     val connect:
       string -> string ->
-      ?msize:int32 -> ?username:string -> ?aname:string -> ?max_fids:int32 ->
-      unit -> t Protocol_9p_error.t Lwt.t
+      ?msize:int32 -> ?username:string -> ?aname:string -> ?max_fids:int32 -> ?send_pings:bool ->
+      unit -> t Protocol_9p.Error.t Lwt.t
   end
 
   val connect: Client9p.t -> DK.t

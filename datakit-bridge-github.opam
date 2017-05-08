@@ -14,7 +14,7 @@ build-test: ["jbuilder" "runtest" "tests/%{name}%"]
 depends: [
   "jbuilder" {build}
   "cmdliner"
-  "lwt" {>= "2.7.1"}
+  "lwt" {>= "3.0.0"}
   "datakit-github" {>= "0.10.0"}
   "datakit-server" {>= "0.10.0"}
   "logs" "fmt" "mtime" "asl" "win-eventlog"

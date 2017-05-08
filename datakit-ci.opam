@@ -32,7 +32,7 @@ depends: [
   "asetmap"
   "github" {>= "2.2.0"}
   "prometheus-app"
-  "lwt" {>= "2.7.1"}
+  "lwt" {>= "3.0.0"}
   "ppx_sexp_conv" {build}
   "crunch" {build}
   "datakit" {test & >= "0.10.0"}

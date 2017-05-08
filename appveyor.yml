@@ -6,7 +6,7 @@ environment:
   FORK_BRANCH: master
   CYG_ROOT: C:\cygwin64
   PACKAGE: datakit
-  PINS: "hvsock:https://github.com/mirage/ocaml-hvsock.git irmin.1.1.0:--dev irmin-git.1.1.0:--dev datakit-server.dev:. datakit-github.dev:. datakit-client.dev:."
+  PINS: "conduit.0.15.3:--dev irmin.1.1.0:--dev irmin-git.1.1.0:--dev datakit-server.dev:. datakit-github.dev:. datakit-client.dev:."
 
 install:
   - ps: iex ((new-object net.webclient).DownloadString("https://raw.githubusercontent.com/$env:FORK_USER/ocaml-ci-scripts/$env:FORK_BRANCH/appveyor-install.ps1"))

@@ -30,9 +30,10 @@ let ( >>*= ) x f = x >>= function
   | Ok y -> f y
   | Error (`Msg msg) -> Alcotest.fail ("Msg: " ^ msg)
 
-let fd_stderr = Unix.descr_of_out_channel stderr
-let real_stderr = Unix.dup fd_stderr
+
 let () =
+  let fd_stderr = Unix.descr_of_out_channel stderr in
+  let real_stderr = Unix.dup fd_stderr in
   let old_hook = !Lwt.async_exception_hook in
   Lwt.async_exception_hook := (fun ex ->
       Unix.dup2 real_stderr fd_stderr;

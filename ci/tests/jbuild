@@ -10,4 +10,4 @@
 (alias
  ((name runtest)
   (deps (test_ci.exe))
-  (action (run ${exe:test_ci.exe} -q))))
+  (action (run ${exe:test_ci.exe} -q --color=always))))

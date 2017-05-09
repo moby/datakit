@@ -15,8 +15,8 @@ depends: [
   "jbuilder" {build}
   "cmdliner"
   "lwt" {>= "3.0.0"}
-  "datakit-github" {>= "0.10.0"}
-  "datakit-server" {>= "0.10.0"}
+  "datakit-github"    {>= "0.11.0"}
+  "datakit-client-9p" {>= "0.11.0"}
   "logs" "fmt" "mtime" "asl" "win-eventlog"
   "uri" {>= "1.8.0"}
   "hvsock" {>= "0.8.1"}
@@ -26,5 +26,6 @@ depends: [
   "datakit-client" {>= "0.10.0"}
   "github-hooks" {>= "0.1.1"}
   "github" {>= "2.1.0"}
-  "datakit" {test & >= "0.10.0"}
+  "alcotest" {test}
+  "datakit"  {test & >= "0.11.0"}
 ]

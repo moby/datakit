@@ -14,8 +14,8 @@ build-test: ["jbuilder" "runtest" "ci/tests"]
 depends: [
   "jbuilder" {build}
   "multipart-form-data"
-  "datakit-client" {>= "0.10.0"}
-  "datakit-github" {>= "0.10.0"}
+  "datakit-client" {>= "0.11.0"}
+  "datakit-github" {>= "0.11.0"}
   "protocol-9p-unix" {>= "0.11.0"}
   "astring"
   "cmdliner"
@@ -35,7 +35,7 @@ depends: [
   "lwt" {>= "3.0.0"}
   "ppx_sexp_conv" {build}
   "crunch" {build}
-  "datakit" {test & >= "0.10.0"}
+  "datakit" {test & >= "0.11.0"}
   "irmin-unix" {test & >= "1.1.0"}
   "alcotest" {test}
 ]

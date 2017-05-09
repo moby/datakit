@@ -1,8 +1,8 @@
-FROM ocaml/opam:alpine
-ENV OPAMERRLOGLEN=0 OPAMYES=1
+FROM ocaml/opam@sha256:5a6371c3a9f43dcac9b700e9dffa81ade05a792d853772cdd6c92a15e3939820
+#FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
+RUN git -C /home/opam/opam-repository pull origin master && opam update 
 
-# TMP
-RUN cd /home/opam/opam-repository && git pull && opam update -y
+ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN opam depext -ui lwt alcotest conf-libev
 

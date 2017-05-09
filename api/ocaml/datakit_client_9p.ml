@@ -66,7 +66,7 @@ let abort_if_off switch fn =
 
 exception Err of string
 
-module Make(P9p : Protocol_9p_client.S) = struct
+module Make(P9p : Protocol_9p.Client.S) = struct
 
   type error = [
     | `Does_not_exist
@@ -76,7 +76,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     | `Not_dir
     | `Not_file
     | `Internal of string               (* A bug in this library or the server *)
-    | `IO of Protocol_9p_error.error
+    | `IO of Protocol_9p.Error.error
   ]
 
   let pp_error f : error -> unit = function
@@ -194,7 +194,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
         else (
           let to_request = min len maximum_payload in
           P9p.LowLevel.write t.conn fid offset (Cstruct.sub remaining 0 to_request)
-          >>*= fun { Protocol_9p_response.Write.count } ->
+          >>*= fun { Protocol_9p.Response.Write.count } ->
           let count = Int32.to_int count in
           let remaining = Cstruct.shift remaining count in
           loop ~offset:Int64.(add offset (of_int count)) remaining
@@ -282,8 +282,8 @@ module Make(P9p : Protocol_9p_client.S) = struct
       )
 
     let read_node_aux ~link ~file ~dir t path =
-      let open Protocol_9p_types in
-      with_file_full t path (fun _fid { Protocol_9p_response.Walk.wqids } ->
+      let open Protocol_9p.Types in
+      with_file_full t path (fun _fid { Protocol_9p.Response.Walk.wqids } ->
           (* Note: would be more efficient to use [_fid] here... *)
           match last wqids with
           | Some qid when List.mem Qid.Symlink qid.Qid.flags -> link t path
@@ -302,7 +302,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
     let read_dir_aux t path =
       P9p.readdir t.conn path >|= wrap_9p >>*= fun items ->
       let items =
-        List.map (fun item -> item.Protocol_9p_types.Stat.name) items
+        List.map (fun item -> item.Protocol_9p.Types.Stat.name) items
       in
       ok (`Dir items)
 
@@ -329,7 +329,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       | Error `Does_not_exist -> ok None
       | Error _ as e -> Lwt.return e
       | Ok info ->
-      let open Protocol_9p_types in
+      let open Protocol_9p.Types in
       let mode = info.Stat.mode in
       let kind =
         if mode.FileMode.is_directory then `Dir
@@ -383,7 +383,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
       let stream_offset = ref 0L in
       let read () =
         P9p.LowLevel.read t.conn fid !stream_offset 4096l >|= wrap_9p >>*= fun resp ->
-        let data = resp.Protocol_9p_response.Read.data in
+        let data = resp.Protocol_9p.Response.Read.data in
         let len = Cstruct.len data in
         stream_offset := Int64.add !stream_offset (Int64.of_int len);
         ok data in
@@ -772,7 +772,7 @@ module Make(P9p : Protocol_9p_client.S) = struct
 
   let branches t =
     P9p.readdir t.FS.conn ["branch"] >|= wrap_9p >|*=
-    List.map (fun info -> info.Protocol_9p_types.Stat.name)
+    List.map (fun info -> info.Protocol_9p.Types.Stat.name)
 
   let remove_branch t name =
     Branch.remove { Branch.fs = t; name }

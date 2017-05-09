@@ -270,7 +270,7 @@ let test_conflicts _repo conn =
          Client.readdir conn (t @ ["rw"]) >>*= fun items ->
          let items =
            items
-           |> List.map (fun i -> i.Protocol_9p_types.Stat.name)
+           |> List.map (fun i -> i.Protocol_9p.Types.Stat.name)
            |> List.sort String.compare
          in
          Alcotest.(check (list string)) "Resolved files"

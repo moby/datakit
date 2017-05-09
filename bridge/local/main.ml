@@ -5,7 +5,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 let src9p = Logs.Src.create "bridge-local-git.9p" ~doc:"Local Git bridge for Datakit (9p)"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
-module Client9p = Client9p_unix.Make(Log9p)
+module Client9p = Protocol_9p_unix.Client9p_unix.Make(Log9p)
 module Store = Irmin_unix.Git.FS.KV(Irmin.Contents.String)
 module DK = Datakit_client_9p.Make(Client9p)
 

@@ -13,7 +13,7 @@ let connect protocol address =
   Log.info (fun f -> f "Connecting to DataKit server on %s:%s" protocol address);
   Lwt.catch
     (fun () ->
-       Client9p.connect protocol address ~max_fids:Int32.max_int () >|= function
+       Client9p.connect protocol address ~send_pings:true ~max_fids:Int32.max_int () >|= function
        | Ok x -> x
        | Error (`Msg m) -> failwith m
     )

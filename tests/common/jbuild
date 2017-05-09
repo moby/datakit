@@ -4,5 +4,4 @@
   ((name      test)
    (wrapped   false)
    (libraries (alcotest mtime.os logs.fmt io-page.unix
-               datakit-client datakit-server datakit datakit_io))
- ))
+               datakit-client datakit-server datakit datakit_io))))

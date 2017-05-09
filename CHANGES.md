@@ -1,3 +1,11 @@
+### 0.10.1 (2017-05-09)
+
+**all**
+
+- Update to support protocol-9p and protocol-9p-unix 0.11.0
+  (#547, #549 by @avsm, @samoht)
+- Update to support lwt 3.0.0 (#547, #549 by @avsm, @samoht)
+
 ### 0.10.0 (2017-04-28)
 
 DataKit has a new home: the [Moby Project](http://mobyproject.org/)!

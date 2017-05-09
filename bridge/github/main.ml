@@ -142,7 +142,7 @@ let start () datakit cap webhook resync_interval prometheus =
         | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
       in
       Lwt.catch
-        (fun () -> Client9p.connect proto address ~max_fids:Int32.max_int ())
+        (fun () -> Client9p.connect proto address ~send_pings:true ~max_fids:Int32.max_int ())
         (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
       >>= function
       | Error (`Msg e) ->

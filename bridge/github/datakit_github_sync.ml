@@ -1,7 +1,7 @@
 open Result
 open Lwt.Infix
 open Datakit_github
-open Datakit_path.Infix
+open Datakit_client.Path.Infix
 
 let src = Logs.Src.create "dkt-github" ~doc:"Github to Git bridge"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -13,20 +13,20 @@ let ( >>*= ) x f =
 
 let ok x = Lwt.return (Ok x)
 
-module Make (API: API) (DK: Datakit_S.CLIENT) = struct
+module Make (API: API) (DK: Datakit_client.S) = struct
 
   module State = Datakit_github_state.Make(API)
   module Conv  = Datakit_github_conv.Make(DK)
 
   (*              [bridge]     [datakit]
-      [in memory Snapshot.t] [9p/datakit endpoint]
+                  [in memory Snapshot.t] [9p/datakit endpoint]
                       |            |
-      GH --events-->  |            | <--commits-- Users
+                  GH --events-->  |            | <--commits-- Users
                       |            |
                       | <--watch-- |
                       |            |
-      GH --API GET--> |            |
-      GH <--API SET-- |            |
+                  GH --API GET--> |            |
+                  GH <--API SET-- |            |
                       | --write--> |
                       |            |
   *)
@@ -78,7 +78,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
       | Some _ -> ok ()
       | None   ->
         DK.Branch.with_transaction br (fun tr ->
-            let file = Datakit_path.(empty / "README.md") in
+            let file = Datakit_client.Path.(empty / "README.md") in
             let data = Cstruct.of_string "### DataKit -- GitHub bridge\n" in
             DK.Transaction.create_or_replace_file tr file data
             >>= function

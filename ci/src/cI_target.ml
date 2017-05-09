@@ -1,6 +1,7 @@
 open Datakit_github
 open! Astring
 open !Asetmap
+open Datakit_client
 
 type t = [ `PR of PR.id | `Ref of Ref.id ]
 
@@ -45,9 +46,9 @@ let parse s =
   let repo = Repo.v ~user ~repo in
   let parse_target = function
     | ("heads" | "tags") as ref_type, ref ->
-      let open! Datakit_path.Infix in
-      begin match Datakit_path.of_string ref with
-        | Ok path -> `Ok (`Ref (repo, ref_type :: Datakit_path.unwrap path))
+      begin match Path.of_string ref with
+        | Ok path   ->
+          `Ok (`Ref (repo, ref_type :: Path.unwrap path))
         | Error msg -> `Error msg
       end
     | "prs", id ->

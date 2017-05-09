@@ -1,9 +1,10 @@
 open Lwt.Infix
 open Test_utils
 open Result
+open Datakit_client
 
 module type S = sig
-  include Datakit_S.CLIENT
+  include S
   val run: (t -> unit Lwt.t) -> unit
 end
 
@@ -58,13 +59,13 @@ module Make (DK: S) = struct
             | Some (parent, name) ->
               ensure_dir parent >>= fun () ->
               Hashtbl.add dirs d ();
-              DK.Transaction.create_dir t (Datakit_path.of_steps_exn parent / name)
+              DK.Transaction.create_dir t (Path.of_steps_exn parent / name)
               >>*= Lwt.return
           ) in
         files |> Lwt_list.iter_s (fun (path, value) ->
             let dir, name = split path in
             ensure_dir dir >>= fun () ->
-            let dir = Datakit_path.of_steps_exn dir in
+            let dir = Path.of_steps_exn dir in
             DK.Transaction.create_file t (dir / name) (Cstruct.of_string value)
             >>*= Lwt.return
           ) >>= fun () ->
@@ -136,9 +137,11 @@ module Make (DK: S) = struct
     | None      -> Alcotest.fail "Branch does not exist!"
     | Some head ->
       DK.Commit.tree head >>*= fun root ->
+      DK.Tree.read_file root (p "src/Makefile") >>*= fun v ->
+      Printf.printf "XXX %s %d\n%!" (Cstruct.to_string v) (Cstruct.len v);
       DK.Tree.stat root (p "src/Makefile") >>*= function
       | None -> Alcotest.fail "Missing Makefile!"
-      | Some {Datakit_S.size; _} ->
+      | Some {size; _} ->
         Alcotest.(check int) "File size" 15 (Int64.to_int size);
         DK.Commit.message head >|*= fun msg ->
         Alcotest.(check string) "Message" "My commit\n" msg
@@ -248,7 +251,7 @@ module Make (DK: S) = struct
     stat >>*= function
     | None        -> Alcotest.fail "Missing file"
     | Some actual ->
-      Alcotest.(check (of_pp pp_kind)) msg expected actual.Datakit_S.kind;
+      Alcotest.(check (of_pp pp_kind)) msg expected actual.kind;
       Lwt.return_unit
 
   let test_merge dk =
@@ -297,14 +300,14 @@ module Make (DK: S) = struct
       Alcotest.(check string) "Merge result"
         "from-master+pr" (Cstruct.to_string merged)
 
-  let diff: Datakit_path.t Datakit_S.diff Alcotest.testable =
+  let diff: Path.t diff Alcotest.testable =
     (module struct
-      type t = Datakit_path.t Datakit_S.diff
+      type t = Path.t diff
       let equal = (=)
       let pp ppf = function
-        | `Added p   -> Fmt.pf ppf "+ %a" Datakit_path.pp p
-        | `Removed p -> Fmt.pf ppf "- %a" Datakit_path.pp p
-        | `Updated p -> Fmt.pf ppf "* %a" Datakit_path.pp p
+        | `Added p   -> Fmt.pf ppf "+ %a" Path.pp p
+        | `Removed p -> Fmt.pf ppf "- %a" Path.pp p
+        | `Updated p -> Fmt.pf ppf "* %a" Path.pp p
     end)
 
   let diffs = Alcotest.slist diff compare
@@ -491,7 +494,7 @@ module Make (DK: S) = struct
            |> check_file "dir" "** Conflict **\nFile vs dir\n"
            >>= fun () ->
            DK.Transaction.conflicts t >>*= fun conflicts ->
-           let conflicts = List.map Datakit_path.to_hum conflicts in
+           let conflicts = List.map Path.to_hum conflicts in
            Alcotest.(check (list string)) "conflicts"
              ["a"; "dir"; "dir2"; "f"; "h"] conflicts;
            DK.Transaction.remove t (p "a") >>*= fun () ->
@@ -500,7 +503,7 @@ module Make (DK: S) = struct
            DK.Tree.read_file theirs (p "f") >>*=
            DK.Transaction.replace_file t (p "f") >>*= fun () ->
            DK.Transaction.conflicts t >>*= fun conflicts ->
-           let conflicts = List.map Datakit_path.to_hum conflicts in
+           let conflicts = List.map Path.to_hum conflicts in
            Alcotest.(check (list string)) "conflicts" ["h"] conflicts;
            DK.Transaction.remove t (p "h")
       ) >>= fun () ->
@@ -532,7 +535,7 @@ module Make (DK: S) = struct
     let events, push = Lwt_stream.create () in
     let th =
       DK.Branch.wait_for_path branch ~switch path (fun node ->
-          Logs.warn (fun f -> f "Update: %a" Datakit_path.pp path);
+          Logs.warn (fun f -> f "Update: %a" Path.pp path);
           push (Some node);
           Lwt.return (Ok `Again)
         ) >>*= Lwt.return

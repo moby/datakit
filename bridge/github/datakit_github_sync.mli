@@ -1,6 +1,6 @@
 open Datakit_github
 
-module Make (API: API) (DK: Datakit_S.CLIENT): sig
+module Make (API: API) (DK: Datakit_client.S): sig
 
   type t
   (** The type for synchronizer state. *)

@@ -9,10 +9,10 @@ let default d = function
   | Some x -> x
 
 let p = function
-  | "" -> Datakit_path.empty
-  | path -> Datakit_path.of_string_exn path
+  | "" -> Datakit_client.Path.empty
+  | path -> Datakit_client.Path.of_string_exn path
 
-let ( / ) = Datakit_path.Infix.( / )
+let ( / ) = Datakit_client.Path.Infix.( / )
 
 let v = Cstruct.of_string
 

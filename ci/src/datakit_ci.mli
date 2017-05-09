@@ -19,7 +19,7 @@
 
 (** {1:core Core} *)
 
-module DK: Datakit_S.CLIENT
+module DK: Datakit_client.S
 (** Datakit client library. *)
 
 module Live_log: sig
@@ -623,7 +623,7 @@ module Cache: sig
       A cache for values computed (slowly) by terms. *)
 
   module Path: sig
-    val value: Datakit_path.t
+    val value: Datakit_client.Path.t
     (** Build results are stored in this directory *)
   end
 

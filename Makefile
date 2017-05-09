@@ -56,7 +56,7 @@ clean:
 	rm -f com.docker.db
 
 test:
-	jbuilder runtest
+	jbuilder runtest --dev
 
 bundle:
 	opam remove tls ssl -y

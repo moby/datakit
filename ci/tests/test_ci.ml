@@ -3,7 +3,7 @@ open Datakit_ci
 open! Astring
 open Utils.Infix
 
-let ( / ) = Datakit_path.Infix.( / )
+let ( / ) = Datakit_client.Path.Infix.( / )
 
 let src = Logs.Src.create "datakit-ci.tests" ~doc:"CI Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -77,7 +77,7 @@ let test_simple conn =
   | None -> Alcotest.fail "Missing status branch!"
   | Some head ->
     DK.Commit.tree head >>*= fun tree ->
-    DK.Tree.read_file tree (Datakit_path.of_string_exn "job/test/output")
+    DK.Tree.read_file tree (Datakit_client.Path.of_string_exn "job/test/output")
     >>*= fun data ->
     Alcotest.check Test_utils.json "Status JSON" (
       `Assoc [
@@ -234,7 +234,7 @@ module Builder = struct
     Lwt.return @@ Ok (int_of_string key)
 
   let load _t tr _key =
-    DK.Tree.read_file tr (Datakit_path.of_string_exn "value/x") >>*= fun data ->
+    DK.Tree.read_file tr (Datakit_client.Path.of_string_exn "value/x") >>*= fun data ->
     Lwt.return (int_of_string (Cstruct.to_string data))
 
   let branch _t key = Printf.sprintf "cache-of-%s" key
@@ -409,7 +409,7 @@ let test_git_dir conn ~clone =
   | None -> Alcotest.fail "Missing results branch!"
   | Some head ->
     DK.Commit.tree head >>*= fun tree ->
-    DK.Tree.read_file tree (Datakit_path.of_string_exn "log") >>*= fun log ->
+    DK.Tree.read_file tree (Datakit_client.Path.of_string_exn "log") >>*= fun log ->
     let log = Cstruct.to_string log in
     if not (String.is_infix ~affix:"Running \"ls\"...\nsrc" log) then
       Alcotest.fail "Missing 'src' in log output"

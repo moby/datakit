@@ -49,7 +49,7 @@ module Path = struct
      - /value may contain extra artifacts/data (depending on the builder)
      - /rebuild-requested (if present) indicates that the current results are not acceptable
   *)
-  let v = Datakit_path.of_string_exn
+  let v = Datakit_client.Path.of_string_exn
   let log     = v "log"
   let failure = v "failure"
   let rebuild = v "rebuild-requested"

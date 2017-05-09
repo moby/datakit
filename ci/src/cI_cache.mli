@@ -3,8 +3,8 @@
 open CI_utils
 
 module Path : sig
-  val log : Datakit_path.t      (* The job's log output *)
-  val value : Datakit_path.t    (* Store build results in this directory *)
+  val log  : Datakit_client.Path.t                    (* The job's log output *)
+  val value: Datakit_client.Path.t   (* Store build results in this directory *)
 end
 
 module Make(B : CI_s.BUILDER) : sig

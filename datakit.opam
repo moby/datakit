@@ -29,7 +29,7 @@ depends: [
   "logs"        {>= "0.5.0"}
   "win-eventlog"
   "asl"         {>= "0.10"}
-  "mtime"
+  "mtime"       {< "1.0.0"}
   "irmin-watcher" {>= "0.2.0"}
   "prometheus-app"
   "protocol-9p-unix"  {>= "0.11.0"}

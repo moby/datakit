@@ -20,7 +20,7 @@ let start () (protocol, address) repos =
   Lwt_main.run begin
     Lwt.catch
       (fun () ->
-         Client9p.connect protocol address () >|= function
+         Client9p.connect ~send_pings:true protocol address () >|= function
          | Ok c -> c
          | Error (`Msg m) -> failwith m
       )

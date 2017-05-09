@@ -56,7 +56,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     tr, { datakit; bridge }
 
   let safe_abort tr =
-    if DK.Transaction.closed tr then Lwt.return_unit
+    if DK.Transaction.closed tr then Lwt.return (Ok ())
     else DK.Transaction.abort tr
 
   let rec safe_commit ?(retry=5) tr ~message =
@@ -66,7 +66,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
       if retry <> 0 then safe_commit ~retry:(retry-1) tr ~message
       else (
         Log.info (fun l -> l "Abort: %a" DK.pp_error e);
-        DK.Transaction.abort tr >|= fun () ->
+        DK.Transaction.abort tr >|= fun _ ->
         false
       )
 
@@ -84,7 +84,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
             >>= function
             | Ok ()   -> DK.Transaction.commit tr ~message:"Initial commit"
             | Error e ->
-              DK.Transaction.abort tr >>= fun () ->
+              DK.Transaction.abort tr >>*= fun () ->
               Lwt.fail_with @@ Fmt.strf "init_sync: %a" DK.pp_error e
           )
     in
@@ -99,11 +99,16 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
     events: unit -> Event.t list;
   }
 
+  let (>|*=) x f =
+    x >>= function
+    | Ok x    -> Lwt.return (f x)
+    | Error e -> Fmt.kstrf Lwt.fail_with "%a" DK.pp_error e
+
   let commit t tr =
     let diff = Snapshot.diff t.bridge (Conv.snapshot t.datakit) in
     let dirty = Conv.dirty t.datakit in
     if Diff.is_empty diff && Elt.IdSet.is_empty dirty then
-      safe_abort tr >|= fun () -> true
+      safe_abort tr >|*= fun () -> true
     else if not (Elt.IdSet.is_empty dirty) then
       let message = "Cleaning up .dirty files" in
       safe_commit tr ~message
@@ -111,7 +116,7 @@ module Make (API: API) (DK: Datakit_S.CLIENT) = struct
       let message = Diff.commit_message diff in
       Conv.apply ~debug:"commit" diff tr >>= fun updated ->
       if updated then safe_commit tr ~message
-      else safe_abort tr >|= fun () -> true
+      else safe_abort tr >|*= fun () -> true
     )
 
   let process_webhooks ~token ~webhook t repos = match webhook with

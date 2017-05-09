@@ -4,4 +4,4 @@
  ((name        datakit_client)
   (public_name datakit-client)
   (wrapped     false)
-  (libraries   (fmt lwt cstruct astring protocol-9p-unix))))
+  (libraries   (fmt lwt cstruct astring))))

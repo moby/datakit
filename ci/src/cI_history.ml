@@ -74,7 +74,7 @@ let read_opt_string tree path =
   | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
 
 let load commit =
-  let tree = DK.Commit.tree commit in
+  DK.Commit.tree commit >>*= fun tree ->
   DK.Commit.parents commit >>*= fun parents ->
   let parents = List.map DK.Commit.id parents in
   read_opt_string tree source_commit_path >>= fun source_commit ->
@@ -209,7 +209,7 @@ let builds_of_commit dk c =
   DK.Branch.head branch >>*= function
   | None -> Lwt.return CI_target.Map.empty
   | Some head ->
-    let tree = DK.Commit.tree head in
+    DK.Commit.tree head >>*= fun tree ->
     let open Datakit_github in
     let {Commit.repo; hash} = c in
     let dir = index_dir ~repo ~source_commit:hash in
@@ -219,10 +219,9 @@ let builds_of_commit dk c =
     | Ok branches ->
       branches |> Lwt_list.map_p (fun b ->
           DK.Tree.read_file tree (dir / b) >>*= fun data ->
-          let state_commit = DK.commit dk (Cstruct.to_string data) in
+          DK.commit dk (Cstruct.to_string data) >>*= fun state_commit ->
           match CI_target.Branch_escape.parse_sub ~repo b with
           | Some target -> Lwt.return (target, state_commit)
           | None -> CI_utils.failf "Invalid branch name in index: %S" b
         )
       >|= CI_target.Map.of_list
-

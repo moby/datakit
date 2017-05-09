@@ -28,6 +28,9 @@ datakit:
 client:
 	$(BUILD) -p datakit-client
 
+client-9p:
+	$(BUILD) -p datakit-client-9p
+
 server:
 	$(BUILD) -p datakit-server
 

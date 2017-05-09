@@ -91,6 +91,11 @@ module Make (DK: Datakit_S.CLIENT) = struct
   let path_of_diff = function
     | `Added f | `Removed f | `Updated f -> Datakit_path.unwrap f
 
+  let safe_tree c =
+    DK.Commit.tree c >>= function
+    | Error e -> Fmt.kstrf Lwt.fail_with "%a" DK.pp_error e
+    | Ok tree -> Lwt.return tree
+
   type dirty = Elt.IdSet.t
 
   let changes diff =
@@ -471,7 +476,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     Snapshot.v ~repos ~status ~prs ~refs ~commits
 
   let snapshot_of_commit c =
-    let tree = DK.Commit.tree c in
+    safe_tree c >>= fun tree ->
     repos tree >>= fun repos ->
     snapshot_of_repos tree repos
 
@@ -509,7 +514,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
     walk (module Elt.IdSet) tree dir (".dirty", r)
 
   let dirty_of_commit c: dirty Lwt.t =
-    let t = DK.Commit.tree c in
+    safe_tree c >>= fun t ->
     let (++) = Elt.IdSet.union in
     (* we handle dirty repo even if not monitored *)
     dirty_repos t >>= fun dirty_repos ->
@@ -580,7 +585,7 @@ module Make (DK: Datakit_S.CLIENT) = struct
 
   let apply_on_commit diff head =
     Log.debug (fun l -> l "apply");
-    let tree = DK.Commit.tree head in
+    safe_tree head >>= fun tree ->
     if Elt.IdSet.is_empty diff then Lwt.return Diff.empty
     else Lwt_list.fold_left_s (fun acc -> function
         | `Repo repo -> combine_repo acc tree repo

@@ -50,7 +50,7 @@ module Make
   let read_refs t tr =
     DK.Transaction.parents tr >>*= function
     | [] -> Lwt.return Ref.Set.empty
-    | [p] -> Conv.refs ~repos:t.repos (DK.Commit.tree p)
+    | [p] -> DK.Commit.tree p >>*= Conv.refs ~repos:t.repos
     | _ -> assert false (* We never make merge transactions. *)
 
   let update_ref tr ~changelog ~new_state existing_ref =
@@ -89,7 +89,7 @@ module Make
         match Buffer.contents changelog with
         | "" ->
           Log.info (fun f -> f "No updates needed");
-          DK.Transaction.abort tr >|= fun () -> Ok ()
+          DK.Transaction.abort tr
         | message ->
           DK.Transaction.commit tr ~message
       )

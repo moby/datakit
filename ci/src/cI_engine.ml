@@ -175,7 +175,7 @@ let enable_monitoring t repos =
       | h::_ ->
         DK.Transaction.diff t h >>*= fun diff ->
         if diff <> [] then commit ()
-        else DK.Transaction.abort t >|= fun () -> Ok ()
+        else DK.Transaction.abort t >|*= fun () -> Ok ()
     ) >>*= Lwt.return
 
 let monitor t ?switch fn =
@@ -226,12 +226,15 @@ let recalculate t ~snapshot job =
   let head = job.parent.v in
   Lwt.catch
     (fun () ->
-       let r, cancel =
-         CI_term.run ~snapshot:(DK.Commit.tree snapshot) ~job_id:(job_id job) ~recalc ~dk:(fun () -> t.dk)
-           job.term
-       in
-       job.cancel <- cancel;
-       r
+       DK.Commit.tree snapshot >>= function
+       | Error e     -> Fmt.kstrf Lwt.fail_with "%a" DK.pp_error e
+       | Ok snapshot ->
+         let r, cancel =
+           CI_term.run ~snapshot ~job_id:(job_id job) ~recalc
+             ~dk:(fun () -> t.dk) job.term
+         in
+         job.cancel <- cancel;
+         r
     )
     (function
       | Failure msg ->
@@ -429,7 +432,7 @@ let flush_states t snapshot =
                )
              >>= fun () ->
              match !messages with
-             | [] -> DK.Transaction.abort tr >|= fun () -> Ok ()
+             | [] -> DK.Transaction.abort tr
              | [message] -> DK.Transaction.commit tr ~message
              | ms ->
                let message =
@@ -516,7 +519,7 @@ let recalc_loop t ~snapshot_ref =
 
       t.projects |> Repo.Map.bindings |> Lwt_list.iter_p (fun (repo, project) ->
           Log.debug (fun f -> f "Monitor iter");
-          let snapshot_tree = DK.Commit.tree snapshot in
+          DK.Commit.tree snapshot >>*= fun snapshot_tree ->
           Conv.prs snapshot_tree ~repos:(Repo.Set.singleton repo) >>= fun prs ->
           Conv.refs snapshot_tree ~repos:(Repo.Set.singleton repo) >>= fun refs ->
           let prs = match Repo.Map.find repo (PR.index prs) with

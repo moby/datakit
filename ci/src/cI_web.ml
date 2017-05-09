@@ -125,7 +125,8 @@ let load_jobs t target rd =
     CI_engine.latest_state t.ci target >|= default CI_history.State.empty
   | Some commit ->
     CI_engine.dk t.ci >>= fun dk ->
-    CI_history.load (DK.commit dk commit)
+    DK.commit dk commit >>*= fun commit ->
+    CI_history.load commit
 
 class pr_page t = object(self)
   inherit CI_web_utils.html_page t.server
@@ -365,7 +366,7 @@ class saved_log_page t = object(self)
     let user = self#authenticated_user in
     let web_config = CI_web_utils.web_config t.server in
     CI_engine.dk t.ci >>= fun dk ->
-    let tree = DK.Commit.tree (DK.commit dk commit) in
+    DK.commit dk commit >>*= DK.Commit.tree >>*= fun tree ->
     DK.Tree.read_file tree CI_cache.Path.log >>= function
     | Error e ->
       let html = CI_web_templates.plain_error (Fmt.to_to_string DK.pp_error e) in

@@ -4,7 +4,8 @@
  ((name        datakit_ci)
   (public_name datakit-ci)
   (wrapped     false)
-  (libraries   (datakit-github yojson cmdliner tyxml multipart-form-data
+  (libraries   (datakit-github datakit-client-9p
+                yojson cmdliner tyxml multipart-form-data
                 prometheus-app.unix webmachine redis.lwt session pbkdf
                 github protocol-9p-unix logs.cli session.redis-lwt
                 session.webmachine github.unix fmt.cli fmt.tty))

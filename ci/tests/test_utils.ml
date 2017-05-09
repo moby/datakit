@@ -171,7 +171,8 @@ let assert_file branch path value =
   DK.Branch.head branch >>*= function
   | None -> Alcotest.fail (Printf.sprintf "Branch does not exist! Checking %S" path)
   | Some head ->
-    DK.Tree.read_file (DK.Commit.tree head) (p path) >>*= fun data ->
+    DK.Commit.tree head >>*= fun tree ->
+    DK.Tree.read_file tree (p path) >>*= fun data ->
     let data = single_line data in
     Alcotest.(check string) (Printf.sprintf "%s=%s" path value) value data;
     Lwt.return ()

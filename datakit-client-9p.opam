@@ -14,7 +14,9 @@ depends: [
   "jbuilder" {build}
   "astring"
   "logs"
-  "rresult"
   "fmt"
-  "cstruct" {>= "2.2.0"}
+  "cstruct"          {> "2.2.0"}
+  "datakit-client"   {>= "0.10.0"}
+  "protocol-9p-unix" {= "0.10.0"}
+  "cmdliner"
 ]

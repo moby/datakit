@@ -12,9 +12,8 @@ build: ["jbuilder" "build" "-p" name "-j" jobs]
 
 depends: [
   "jbuilder" {build}
-  "astring"
-  "logs"
-  "rresult"
-  "fmt"
-  "cstruct" {>= "2.2.0"}
+  "datakit-server" {>= "0.11.0"}
+  "protocol-9p"    {= "0.9.0"}
+  "mirage-flow-lwt"
+  "sexplib"
 ]

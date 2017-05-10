@@ -171,7 +171,8 @@ let assert_file branch path value =
   DK.Branch.head branch >>*= function
   | None -> Alcotest.fail (Printf.sprintf "Branch does not exist! Checking %S" path)
   | Some head ->
-    DK.Tree.read_file (DK.Commit.tree head) (p path) >>*= fun data ->
+    DK.Commit.tree head >>*= fun tree ->
+    DK.Tree.read_file tree (p path) >>*= fun data ->
     let data = single_line data in
     Alcotest.(check string) (Printf.sprintf "%s=%s" path value) value data;
     Lwt.return ()
@@ -266,3 +267,13 @@ module Json = struct
   let equal = (=)
 end
 let json = (module Json : Alcotest.TESTABLE with type t = Json.t)
+
+let () =
+  let fd_stderr = Unix.descr_of_out_channel stderr in
+  let real_stderr = Unix.dup fd_stderr in
+  let old_hook = !Lwt.async_exception_hook in
+  Lwt.async_exception_hook := (fun ex ->
+      Unix.dup2 real_stderr fd_stderr;
+      Printf.eprintf "\nasync_exception_hook:\n%!";
+      old_hook ex
+    )

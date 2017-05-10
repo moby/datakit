@@ -76,8 +76,9 @@ let test_simple conn =
   DK.branch dk "status-user-project-pr-3907" >>*= DK.Branch.head >>*= function
   | None -> Alcotest.fail "Missing status branch!"
   | Some head ->
-    let tree = DK.Commit.tree head in
-    DK.Tree.read_file tree (Datakit_path.of_string_exn "job/test/output") >>*= fun data ->
+    DK.Commit.tree head >>*= fun tree ->
+    DK.Tree.read_file tree (Datakit_path.of_string_exn "job/test/output")
+    >>*= fun data ->
     Alcotest.check Test_utils.json "Status JSON" (
       `Assoc [
         "result", `Assoc [
@@ -407,7 +408,7 @@ let test_git_dir conn ~clone =
   DK.Branch.head results >>*= function
   | None -> Alcotest.fail "Missing results branch!"
   | Some head ->
-    let tree = DK.Commit.tree head in
+    DK.Commit.tree head >>*= fun tree ->
     DK.Tree.read_file tree (Datakit_path.of_string_exn "log") >>*= fun log ->
     let log = Cstruct.to_string log in
     if not (String.is_infix ~affix:"Running \"ls\"...\nsrc" log) then
@@ -636,7 +637,7 @@ let test_history conn =
       "three", (Error (`Pending "Testing"), CI_output.Live live);
     ]
   in
-  let metadata_commit = DK.commit dk "abc" in
+  DK.commit dk "abc" >>*= fun metadata_commit ->
   CI_history.record master_h dk ~source_commit metadata_commit s1 >>= fun () ->
   (* Check s1 *)
   CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.jobs |> Alcotest.check jobs_t "Initial commit" s1;
@@ -658,7 +659,8 @@ let test_history conn =
   in
   Alcotest.check jobs_t "Updated commit" s2 (CI_history.State.jobs head2);
   (* Check saved s1 *)
-  CI_history.load (DK.commit dk head1) >>= fun loaded1 ->
+  DK.commit dk head1 >>*= fun tree ->
+  CI_history.load tree >>= fun loaded1 ->
   Alcotest.(check (option string)) "Source commit" (Some "123") (CI_history.State.source_commit loaded1);
   let s1_expected = s1 |> String.Map.add "three" (Error (`Pending "Testing"), CI_output.Empty) in
   Alcotest.check jobs_t "Loaded" s1_expected (CI_history.State.jobs loaded1);

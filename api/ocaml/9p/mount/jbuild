@@ -9,5 +9,5 @@
 ; TODO: generate the right version using tokpg watermarking
 (rule
   ((targets (version.ml))
-   (deps    (../../../src/version.ml))
+   (deps    (${ROOT}/src/version.ml))
    (action  (copy ${<} ${@}))))

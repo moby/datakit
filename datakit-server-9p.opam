@@ -9,12 +9,15 @@ dev-repo:     "https://github.com/moby/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
 build: ["jbuilder" "build" "-p" name "-j" jobs]
+build-test: ["jbuilder" "runtest" "tests/datakit-9p"]
 
 depends: [
   "jbuilder" {build}
-  "astring"
-  "logs"
-  "rresult"
-  "fmt"
-  "cstruct" {>= "2.2.0"}
+  "datakit-server"  {>= "0.11.0"}
+  "mirage-flow-lwt"
+  "protocol-9p" {>= "0.11.0"}
+  "sexplib"
+  "alcotest" {test}
+  "datakit-client-9p" {test & >= "0.11.0"}
+  "protocol-9p-unix"  {test & >= "0.11.0"}
 ]

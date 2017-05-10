@@ -4,20 +4,19 @@
  ((name      datakit_bridge_github)
   (wrapped   false)
   (modules   (:standard \ main \ version))
-  (libraries (github-hooks.unix github.unix datakit-github datakit-server))
- ))
+  (libraries (rresult github-hooks.unix github.unix datakit-github
+              datakit-client))))
 
 (executable
  ((name        main)
   (modules     (main version))
   (package     datakit-bridge-github)
   (public_name datakit-bridge-github)
-  (libraries   (datakit_bridge_github protocol-9p-unix prometheus-app.unix
-                datakit_log fmt.cli fmt.tty github.unix))
- ))
+  (libraries   (datakit_bridge_github datakit-client-9p protocol-9p-unix
+                prometheus-app.unix datakit_log fmt.cli fmt.tty github.unix))))
 
 ; TODO: generate the right version using topkg watermarking
 (rule
   ((targets (version.ml))
-   (deps    (../../src/version.ml))
+   (deps    (${ROOT}/src/version.ml))
    (action  (copy ${<} ${@}))))

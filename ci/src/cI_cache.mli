@@ -16,5 +16,5 @@ module Make(B : CI_s.BUILDER) : sig
   val find: t -> B.context -> B.Key.t -> B.value CI_term.t
 end
 
-val read_log : DK.t -> CI_output.saved -> string DK.or_error Lwt.t
+val read_log : DK.t -> CI_output.saved -> string DK.result
 (** [read_log dk log] is the contents of the saved log [log]. *)

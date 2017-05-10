@@ -1,6 +1,6 @@
 FROM ocaml/opam@sha256:5a6371c3a9f43dcac9b700e9dffa81ade05a792d853772cdd6c92a15e3939820
 #FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
-RUN git -C /home/opam/opam-repository pull origin master && opam update 
+RUN git -C /home/opam/opam-repository pull origin master && opam update
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
@@ -9,7 +9,11 @@ RUN opam depext -ui lwt alcotest conf-libev
 # cache opam install of dependencies
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n
-RUN opam depext datakit-client && \
+
+COPY datakit-client-9p.opam /home/opam/src/datakit/datakit-client-9p.opam
+RUN opam pin add datakit-client-9p.dev /home/opam/src/datakit -n
+
+RUN opam depext datakit-client datakit-client-9p && \
     opam install datakit-client --deps
 
 COPY . /home/opam/src/datakit
@@ -17,10 +21,12 @@ RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN cd /home/opam/src/datakit && \
     scripts/watermark.sh && \
     git status --porcelain
-RUN opam update datakit-client
+RUN opam update datakit-client datakit-client-9p
 RUN opam info datakit-client --raw
 
 RUN opam install datakit-client.dev -vv
+RUN opam install datakit-client-9p --deps
+RUN opam install datakit-client-9p -vv
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount

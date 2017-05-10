@@ -3,13 +3,14 @@ FROM ocaml/opam-dev@sha256:64dc0522876ebbd27b186e3ba955ae5ab864ace580add5b0d1abb
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud gmp-dev perl
 
-RUN opam pin add hvsock.0.14.0 -n https://github.com/mirage/ocaml-hvsock.git#88397c37a910c61507a9655ed8413c1692294da0
 RUN opam pin add irmin.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
 RUN opam pin add irmin-git.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
 RUN opam pin add -yn protocol-9p.0.11.0 'https://github.com/mirage/ocaml-9p.git#v0.11.0'
 RUN opam pin add -yn protocol-9p-unix.0.11.0 'https://github.com/mirage/ocaml-9p.git#v0.11.0'
 
-RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog camlzip irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin cmdliner protocol-9p rresult win-error named-pipe
+RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog camlzip \
+    irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin \
+    cmdliner protocol-9p rresult win-error named-pipe
 
 COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml
@@ -17,15 +18,18 @@ RUN opam config exec -- ocaml /tmp/check-libev.ml
 # cache opam install of dependencies
 COPY datakit.opam /home/opam/src/datakit/
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
+COPY datakit-client-9p.opam /home/opam/src/datakit/datakit-client-9p.opam
 COPY datakit-server.opam /home/opam/src/datakit/datakit-server.opam
-COPY datakit-github.opam /home/opam/src/datakit/datakit-github.opam
+COPY datakit-server-9p.opam /home/opam/src/datakit/datakit-server-9p.opam
 RUN opam pin add datakit-server.dev /home/opam/src/datakit -yn && \
+    opam pin add datakit-server-9p.dev /home/opam/src/datakit -yn && \
     opam pin add datakit-client.dev /home/opam/src/datakit -yn && \
-    opam pin add datakit.dev /home/opam/src/datakit -yn        && \
-    opam pin add datakit-github.dev /home/opam/src/datakit -yn
+    opam pin add datakit-client-9p.dev /home/opam/src/datakit -yn && \
+    opam pin add datakit.dev /home/opam/src/datakit -yn
 
 RUN opam depext -y datakit
 RUN opam install -y --deps-only datakit-client datakit-server
+RUN opam install alcotest
 
 COPY . /home/opam/src/datakit
 
@@ -35,7 +39,7 @@ RUN cd /home/opam/src/datakit && \
     git status --porcelain
 
 # FIXME: warkaround a bug in opam2
-RUN opam install datakit-client datakit-github alcotest
+RUN opam install datakit-client-9p
 RUN opam install datakit -ytv
 
 RUN sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \

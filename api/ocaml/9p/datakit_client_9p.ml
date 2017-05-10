@@ -68,6 +68,11 @@ exception Err of string
 
 module Make(P9p : Protocol_9p.Client.S) = struct
 
+  module Infix = struct
+    let (>>=) = (>>*=)
+    let (>|=) = (>|*=)
+  end
+
   type error = [
     | `Does_not_exist
     | `Already_exists
@@ -89,7 +94,8 @@ module Make(P9p : Protocol_9p.Client.S) = struct
     | `Internal e -> Fmt.pf f "client-9p internal error: %s" e
     | `IO (`Msg e) -> Fmt.pf f "9p error: %s" e
 
-  type 'a or_error = ('a, error) result
+  type +'a result = ('a, error) Result.result Lwt.t
+
   let bug fmt = Printf.ksprintf (fun str -> Lwt.return (Error (`Internal str))) fmt
 
   let wrap_9p = function
@@ -105,11 +111,11 @@ module Make(P9p : Protocol_9p.Client.S) = struct
     (* A buffering reader that splits a raw byte stream into lines.
        `Lwt_io` can do this too, but depends on Unix and uses exceptions. *)
 
-    val create : (unit -> Cstruct.t or_error Lwt.t) -> t
-    val read_line : t -> [`Line of string | `Eof] or_error Lwt.t
+    val create : (unit -> Cstruct.t result) -> t
+    val read_line : t -> [`Line of string | `Eof] result
   end = struct
     type t = {
-      read : unit -> Cstruct.t or_error Lwt.t;
+      read : unit -> Cstruct.t result;
       mutable buffer : string;
       mutable eof : bool;
     }
@@ -441,7 +447,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
   module Tree = struct
 
     type value = [ `Dir of string list | `File of Cstruct.t | `Link of string ]
-    type 'a cache = 'a or_error Datakit_path.Map.t ref
+    type 'a cache = ('a, error) Result.result Datakit_path.Map.t ref
 
     type t = {
       fs   : FS.t;
@@ -519,7 +525,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
   module Commit = struct
     type t = { fs : FS.t; id : string }
     let path t = ["snapshots"; t.id]
-    let tree t = Tree.v t.fs (path t / "ro")
+    let tree t = Lwt.return (Ok (Tree.v t.fs (path t / "ro")))
     let message t = FS.read_all t.fs (path t / "msg") >|*= Cstruct.to_string
     let id t = t.id
     let pp ppf t = Fmt.string ppf t.id
@@ -639,7 +645,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
       | Error _ as e -> e
 
     let abort t =
-      if t.closed then Lwt.return ()
+      if t.closed then Lwt.return (Ok ())
       else (
         FS.write_stream t.fs (t.path / "ctl") (Cstruct.of_string "close")
         >>= function
@@ -647,10 +653,10 @@ module Make(P9p : Protocol_9p.Client.S) = struct
           Log.err
             (fun f -> f "Error aborting transaction %a: %a" pp_path t.path pp_error e);
           t.closed <- true; (* Give up *)
-          Lwt.return ()
+          Lwt.return (Ok ())
         | Ok () ->
           t.closed <- true;
-          Lwt.return ()
+          Lwt.return (Ok ())
       )
 
     let read t path = FS.read_node t.fs (t.path / "rw" /@ path)
@@ -749,7 +755,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
            fn tr >>*= fun result ->
            if tr.Transaction.closed then ok result
            else (
-             Transaction.abort tr >|= fun () ->
+             Transaction.abort tr >|= fun _ ->
              (* Make sure the user doesn't think their transaction succeeded *)
              failwith "Transaction returned Ok without committing or aborting \
                        (so forced abort)";
@@ -761,7 +767,11 @@ module Make(P9p : Protocol_9p.Client.S) = struct
              (* Just log, so we don't hide the underlying error *)
              Log.info (fun f -> f "Transaction finished without committing or \
                                    aborting (will abort)");
-             Transaction.abort tr
+             Transaction.abort tr >|= function
+             | Ok ()   -> ()
+             | Error e ->
+               Fmt.kstrf failwith "error while aborting the transaction: %a"
+                 pp_error e
            )
         )
 
@@ -793,17 +803,9 @@ module Make(P9p : Protocol_9p.Client.S) = struct
            Log.err (fun f -> f "Error removing remote %S: %a" id pp_error e)
          | Ok () -> ())
 
-  let commit t id =
-    { Commit.fs = t; id }
-
-  let tree t id =
-    Tree.of_id t id
-
+  let commit t id = Lwt.return (Ok { Commit.fs = t; id })
+  let tree t id = Lwt.return (Ok (Tree.of_id t id))
   let connect conn = { FS.conn }
-
-  let disconnect t =
-    P9p.disconnect t.FS.conn
-
+  let disconnect t = P9p.disconnect t.FS.conn >|= fun () -> Ok ()
   type t = FS.t
-
 end

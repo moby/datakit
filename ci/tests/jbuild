@@ -3,10 +3,11 @@
 (executable
  ((name      test_ci)
   (package   datakit-ci)
-  (libraries (datakit-github datakit-ci alcotest datakit_io datakit))
+  (libraries (datakit-github datakit-ci datakit-server-9p alcotest
+              datakit_io datakit))
  ))
 
 (alias
  ((name runtest)
   (deps (test_ci.exe))
-  (action (run ${exe:test_ci.exe} -q))))
+  (action (run ${exe:test_ci.exe} -q --color=always))))

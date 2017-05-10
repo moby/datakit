@@ -2,16 +2,8 @@ FROM datakit/client
 
 RUN opam pin add github --dev -n
 RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
-
-RUN opam pin add irmin.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
-RUN opam pin add irmin-git.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
-RUN opam pin add irmin-unix.1.1.0 -n https://github.com/mirage/irmin.git#89196ad17c53b02f333022a87ecc264ec8c06af0
-
-RUN opam depext datakit-github && opam install datakit-github --deps
-
-COPY datakit-bridge-local-git.opam /home/opam/src/datakit/datakit-bridge-local-git.opam
 RUN opam pin add datakit-bridge-local-git.dev /home/opam/src/datakit -n
-RUN opam depext datakit-bridge-local-git && opam install datakit-bridge-local-git --deps
+RUN opam depext datakit-bridge-local-git && opam install datakit-client --deps
 
 COPY . /home/opam/src/datakit/
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit

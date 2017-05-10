@@ -727,6 +727,6 @@ module Private: sig
   val create_logs: unit -> Live_log.manager
   val lookup_log: branch:string -> Live_log.manager -> Live_log.t option
   val cancel: Live_log.t -> (unit, string) result Lwt.t
-  val read_log: DK.t -> Output.saved -> string DK.or_error Lwt.t
+  val read_log: DK.t -> Output.saved -> string DK.result
   val rebuild : Output.saved -> unit Lwt.t
 end

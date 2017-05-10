@@ -4,5 +4,4 @@
  ((name        datakit_server)
   (public_name datakit-server)
   (wrapped     false)
-  (libraries   (astring result lwt fmt cstruct protocol-9p-unix mirage-flow-lwt))
- ))
+  (libraries   (astring rresult logs lwt fmt cstruct))))

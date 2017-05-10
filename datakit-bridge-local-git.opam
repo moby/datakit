@@ -18,6 +18,6 @@ depends: [
   "lwt" {>= "3.0.0"}
   "logs" "fmt"
   "protocol-9p-unix" {>= "0.11.0"}
-  "datakit-client" {>= "0.10.0"}
-  "datakit-github" {>= "0.10.0"}
+  "datakit-client" {>= "0.11.0"}
+  "datakit-github" {>= "0.11.0"}
 ]

@@ -58,7 +58,8 @@ end
 
 let read_log dk { CI_output.commit; branch; _} =
   Log.debug (fun f -> f "Loading log from commit %s (branch %s)" commit branch);
-  let tree = DK.Commit.tree (DK.commit dk commit) in
+  DK.commit dk commit >>*= fun commit ->
+  DK.Commit.tree commit >>*= fun tree ->
   DK.Tree.read_file tree Path.log >|= function
   | Ok data -> Ok (Cstruct.to_string data)
   | Error e -> Error e
@@ -152,7 +153,7 @@ module Make(B : CI_s.BUILDER) = struct
     DK.Branch.head branch >>*= function
     | None -> Lwt.return None   (* Results branch doesn't exist *)
     | Some commit ->
-      let tree = DK.Commit.tree commit in
+      DK.Commit.tree commit >>*= fun tree ->
       needs_rebuild tree >>*= function
       | true -> Lwt.return None (* Results exist, but are flagged for rebuild *)
       | false ->

@@ -18,8 +18,9 @@ dependencies:
   - opam init --comp system -n https://github.com/ocaml/opam-repository.git
   - opam switch system
   - opam pin add hvsock --dev -n
-  - opam pin add irmin.1.1.0 --dev -n
-  - opam pin add irmin-git.1.1.0 --dev -n
+  - opam pin add irmin.1.2.0 --dev -n
+  - opam pin add irmin-mem.1.2.0 -n https://github.com/mirage/irmin.git#ca886ac8e1a0b36879617d7c973852d6d04bfede
+  - opam pin add irmin-git.1.2.0 --dev -n
   - opam pin add datakit-server.dev . -n
   - opam pin add datakit-server-9p.dev . -n
   - opam pin add datakit.dev . -n

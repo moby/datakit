@@ -17,6 +17,73 @@ type 'a diff = [ `Added of 'a | `Removed of 'a | `Updated of 'a ]
 type value = [`File of Cstruct.t | `Dir of string list | `Link of string]
 (** The type for values. *)
 
+module Path: sig
+
+  (** Locate files and directories within a DataKit tree. *)
+
+  open Result
+
+  type t
+  (** A [path] identifies a file or directory (relative to some other directory).
+      No component may be empty or contain a '/' character. "." and ".." steps
+      are not permitted in a path. *)
+
+  val empty : t
+  (** The empty path. *)
+
+  val of_steps : string list -> (t, string) result
+  (** Converts a list of the form ["a"; "b"; "c"] to a path. *)
+
+  val of_steps_exn : string list -> t
+  (** Converts a list of the form ["a"; "b"; "c"] to a path. *)
+
+  val of_string : string -> (t, string) result
+  (** Converts a path of the form ["a/b/c"] to a path. *)
+
+  val of_string_exn : string -> t
+
+  val unwrap : t -> string list
+  (** Cast to a list of strings *)
+
+  val pop : t -> (t * string) option
+  (** [pop (dir / leaf)] is [Some (dir, leaf)].
+      [pop empty] is [None]. *)
+
+  val pp : t Fmt.t
+  (** [pp] is a formatter for human-readable paths. *)
+
+  val compare: t -> t -> int
+  (** [compare] is the comparison function for paths. *)
+
+  val to_hum : t -> string
+  (** Convert to a string, in the same format as [pp]. *)
+
+  val basename: t -> string option
+  (** [basename t] is [t]'s basename. *)
+
+  val dirname: t -> t
+  (** [dirname t] is [t]'s dirname. *)
+
+  module Set: Set.S with type elt = t
+  (** Sets of paths. *)
+
+  module Map: Map.S with type key = t
+  (** Maps of paths. *)
+
+  module Infix: sig
+
+    val ( / ) : t -> string -> t
+    (** [a / b] is the path [a] with step [b] appended. Raises an
+        exception if [b] is not a valid step, so this should only be
+        used with string constants, not user input. *)
+
+    val ( /@ ) : t -> t -> t
+    (** [a /@ b] is the concatenation of paths [a] and [b]. *)
+
+  end
+
+end
+
 module type READABLE_TREE = sig
 
   type t
@@ -25,37 +92,37 @@ module type READABLE_TREE = sig
   type +'a result
   (** The type for results. *)
 
-  val read: t -> Datakit_path.t -> value result
+  val read: t -> Path.t -> value result
   (** [read t path] is the contents of the object at the [path]. *)
 
-  val stat: t -> Datakit_path.t -> stat option result
+  val stat: t -> Path.t -> stat option result
   (** [stat t path] is the metadata of the object at [path]. *)
 
-  val exists: t -> Datakit_path.t -> bool result
+  val exists: t -> Path.t -> bool result
   (** [exists t path] is [true] if [stat t path] isn't [None]. *)
 
-  val exists_file: t -> Datakit_path.t -> bool result
+  val exists_file: t -> Path.t -> bool result
   (** [exists_file t path] is similar to {!exists} but for files
       only. *)
 
-  val exists_dir: t -> Datakit_path.t -> bool result
+  val exists_dir: t -> Path.t -> bool result
   (** [exists_dir t path] is similar to {!exists} but for directories
       only. *)
 
-  val read_file: t -> Datakit_path.t -> Cstruct.t result
+  val read_file: t -> Path.t -> Cstruct.t result
   (** [read_file t path] resolves [path] to a file, or returns an
       error if it isn't a file. *)
 
-  val read_dir: t -> Datakit_path.t -> string list result
+  val read_dir: t -> Path.t -> string list result
   (** [read_dir t path] resolves [path] to a directory, or returns an
       error if it isn't one. *)
 
-  val read_link: t -> Datakit_path.t -> string result
+  val read_link: t -> Path.t -> string result
   (** [read_link t path] resolves [path] to a symlink, or returns an
       error if it isn't one. *)
 end
 
-module type CLIENT = sig
+module type S = sig
 
   type t
   (** A [t] is a connection to a Datakit server. *)
@@ -104,7 +171,7 @@ module type CLIENT = sig
     val parents: t -> t list result
     (** [parents t] is the list of [t]'s parent commits. *)
 
-    val diff: t -> t -> Datakit_path.t diff list result
+    val diff: t -> t -> Path.t diff list result
     (** [diff a b] returns the paths with differences between [a] and [b]. *)
   end
 
@@ -119,44 +186,44 @@ module type CLIENT = sig
 
     (** {2 Writing} *)
 
-    val create_dir: t -> Datakit_path.t -> unit result
+    val create_dir: t -> Path.t -> unit result
     (** [create_dir t path] creates the directory [path]. *)
 
-    val create_file: t -> Datakit_path.t -> ?executable:bool ->
+    val create_file: t -> Path.t -> ?executable:bool ->
       Cstruct.t -> unit result
     (** [create_file t path ?executable content] creates the file
         [path]. *)
 
-    val create_symlink: t -> Datakit_path.t -> string -> unit result
+    val create_symlink: t -> Path.t -> string -> unit result
     (** [create_symlink t path target] creates the symlink [path]. *)
 
-    val replace_file: t -> Datakit_path.t -> Cstruct.t -> unit result
+    val replace_file: t -> Path.t -> Cstruct.t -> unit result
     (** [replace_file t path new_content] changes the content of
         the existing file [path]. *)
 
-    val create_or_replace_file: t -> Datakit_path.t -> Cstruct.t -> unit result
+    val create_or_replace_file: t -> Path.t -> Cstruct.t -> unit result
     (** [create_or_replace_file t path content] uses either [create_file]
         or [replace_file] as appropriate to set the contents. *)
 
-    val set_executable: t -> Datakit_path.t -> bool -> unit result
+    val set_executable: t -> Path.t -> bool -> unit result
     (** [set_executable t path flag] marks the file at [path] as
         executable or not. *)
 
-    val remove: t -> Datakit_path.t -> unit result
+    val remove: t -> Path.t -> unit result
     (** [remove t path] removes [path]. If [path] is a directory then
         the entire subtree is removed. *)
 
-    val rename: t -> Datakit_path.t -> string -> unit result
+    val rename: t -> Path.t -> string -> unit result
     (** [rename t path new_name] changes the basename of [path] to
         [new_name].  Note: it is only possible to rename within a
         directory (this is a 9p limitation). *)
 
-    val truncate: t -> Datakit_path.t -> int64 -> unit result
+    val truncate: t -> Path.t -> int64 -> unit result
     (** [truncate t path length] sets the length of the file at [path]
         to [length].  If [length] is longer than the current length,
         the file is padded with zero bytes. *)
 
-    val make_dirs: t -> Datakit_path.t -> unit result
+    val make_dirs: t -> Path.t -> unit result
     (** [make_dirs t path] ensures that [path] exists and is a
         directory, creating it and any missing parents as
         necessary. *)
@@ -187,7 +254,7 @@ module type CLIENT = sig
         merged and [base] is a least common ancestor. If there is no
         common ancestor then [base] is an empty tree. *)
 
-    val merge: t -> Commit.t -> (merge_inputs * Datakit_path.t list) result
+    val merge: t -> Commit.t -> (merge_inputs * Path.t list) result
     (** [merge t commit] merges [commit] into the transaction. It
         performs any trivial merges it can and returns [(merge_inputs,
         conflicts)] to allow you to resolve the remaining ones. You
@@ -207,12 +274,12 @@ module type CLIENT = sig
         updates the parents, so it is not necessary to call it
         manually in that case. *)
 
-    val conflicts: t -> Datakit_path.t list result
+    val conflicts: t -> Path.t list result
     (** [conflicts t] returns the current list of paths that had merge
         conflicts and have not been written to since.  It is not
         possible to commit while this is non-empty. *)
 
-    val diff: t -> Commit.t -> Datakit_path.t diff list result
+    val diff: t -> Commit.t -> Path.t diff list result
     (** [diff t c] returns the paths differences between [c] and [t]'s
         head. *)
 
@@ -251,7 +318,7 @@ module type CLIENT = sig
         off the switch will make the wait return [`Abort] at the next
         opportunity. *)
 
-    val wait_for_path: t -> ?switch:Lwt_switch.t -> Datakit_path.t ->
+    val wait_for_path: t -> ?switch:Lwt_switch.t -> Path.t ->
       ([`File of Cstruct.t | `Dir of Tree.t
        | `Link of string | `Exec of Cstruct.t] option ->
        [`Finish of 'a | `Again | `Abort] result) ->

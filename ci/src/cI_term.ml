@@ -59,9 +59,9 @@ let target id =
 let head id = target id >|= CI_target.head
 
 let ref_head repo ref_name =
-  match Datakit_path.of_string ref_name with
+  match Datakit_client.Path.of_string ref_name with
   | Error msg   -> fail "Invalid ref name %S: %s" ref_name msg
-  | Ok ref_path -> head @@ `Ref (repo, Datakit_path.unwrap ref_path)
+  | Ok ref_path -> head @@ `Ref (repo, Datakit_client.Path.unwrap ref_path)
 
 let branch_head repo branch = ref_head repo ("heads/" ^ branch)
 

@@ -3,5 +3,5 @@
 (library
  ((name        datakit_io)
   (wrapped     false)
-  (libraries   (irmin-git conduit.lwt-unix camlzip))
+  (libraries   (irmin-git conduit.lwt-unix zip))
  ))

@@ -1,15 +1,15 @@
 open CI_utils.Infix
 open Lwt.Infix
 open Astring
+open Datakit_client
+open Datakit_client.Path.Infix
 
 module DK = CI_utils.DK
 
-let metadata_commit_path = Datakit_path.of_string_exn "metadata-commit"
-let source_commit_path = Datakit_path.of_string_exn "source-commit"
+let metadata_commit_path = Path.of_string_exn "metadata-commit"
+let source_commit_path = Path.of_string_exn "source-commit"
 
 let index_branch = "commit-index"
-
-let ( / ) = Datakit_path.Infix.( / )
 
 module State = struct
   type t = {
@@ -79,10 +79,10 @@ let load commit =
   let parents = List.map DK.Commit.id parents in
   read_opt_string tree source_commit_path >>= fun source_commit ->
   read_opt_string tree metadata_commit_path >>= fun metadata_commit ->
-  begin DK.Tree.read_dir tree (Datakit_path.of_steps_exn ["job"]) >>= function
+  begin DK.Tree.read_dir tree (Path.of_steps_exn ["job"]) >>= function
     | Ok items ->
       items |> Lwt_list.filter_map_p (fun job_name ->
-          let path = Datakit_path.of_steps_exn ["job"; job_name; "output"] in
+          let path = Path.of_steps_exn ["job"; job_name; "output"] in
           DK.Tree.read_file tree path >|= function
           | Ok data -> Some (job_name, Saved_output.of_cstruct data)
           | Error `Does_not_exist -> None
@@ -123,7 +123,7 @@ let diff _id prev next =
 
 let index_dir ~repo ~source_commit =
   let {Datakit_github.Repo.user; repo} = repo in
-  Datakit_path.of_steps_exn [user; repo; "commit"; source_commit]
+  Path.of_steps_exn [user; repo; "commit"; source_commit]
 
 let record t dk ~source_commit input jobs =
   Lwt_mutex.with_lock t.lock @@ fun () ->
@@ -134,7 +134,6 @@ let record t dk ~source_commit input jobs =
     t.commit <- Some {state with State.jobs};
     Lwt.return ()
   ) else (
-    let open! Datakit_path.Infix in
     let messages = ref [] in
     let add_msg fmt =
       fmt |> Fmt.kstrf @@ fun msg ->
@@ -150,11 +149,11 @@ let record t dk ~source_commit input jobs =
         DK.Transaction.create_or_replace_file tr metadata_commit_path metadata_commit >>*= fun () ->
         String.Map.bindings patch |> Lwt_list.iter_s (function
             | (job, `Delete) ->
-              let dir = Datakit_path.of_steps_exn ["job"; job] in
+              let dir = Path.of_steps_exn ["job"; job] in
               add_msg "Remove old job %s" job;
               DK.Transaction.remove tr dir >>*= Lwt.return
             | (job, `Write output) ->
-              let dir = Datakit_path.of_steps_exn ["job"; job] in
+              let dir = Path.of_steps_exn ["job"; job] in
               add_msg "%s -> %s" job (CI_output.descr output);
               let json = CI_output.json_of output in
               let data = Saved_output.to_cstruct json in

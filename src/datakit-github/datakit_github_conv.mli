@@ -4,7 +4,7 @@
 open Datakit_github
 
 (** Conversion between GitHub and DataKit states. *)
-module Make (DK: Datakit_S.CLIENT): sig
+module Make (DK: Datakit_client.S): sig
 
   type tree = DK.Tree.t
   (** The type for trees. *)

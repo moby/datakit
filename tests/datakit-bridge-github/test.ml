@@ -1,7 +1,8 @@
 open Astring
 open Test_utils
 open Lwt.Infix
-open Datakit_path.Infix
+open Datakit_client
+open Datakit_client.Path.Infix
 open Datakit_github
 open Result
 
@@ -1169,7 +1170,7 @@ module Make (DK: Test_client.S) = struct
     API.apply_events t;
     t
 
-  let root { Repo.user; repo } = Datakit_path.(empty / user / repo)
+  let root { Repo.user; repo } = Path.(empty / user / repo)
 
   let run_with_test_test f () =
     DK.run (fun dkt ->
@@ -1267,7 +1268,7 @@ module Make (DK: Test_client.S) = struct
     DK.Branch.with_transaction br (fun tr ->
         let dir =
           root repo / "commit" / commit / "status"
-          /@ Datakit_path.of_steps_exn context
+          /@ Path.of_steps_exn context
         in
         DK.Transaction.make_dirs tr dir >>*= fun () ->
         let state = Cstruct.of_string  (Status_state.to_string state ^ "\n") in
@@ -1506,7 +1507,7 @@ module Make (DK: Test_client.S) = struct
     DK.Tree.read_dir tree path >>= function
     | Error _ -> Lwt.return []
     | Ok items ->
-      let open Datakit_path.Infix in
+      let open Path.Infix in
       DK.Tree.read_file tree (path / "state") >>= begin function
         | Error _ -> Lwt.return []
         | Ok status ->
@@ -1539,21 +1540,21 @@ module Make (DK: Test_client.S) = struct
     | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
 
   let read_commits tree ~user ~repo =
-    let path = Datakit_path.of_steps_exn [user; repo; "commit"] in
+    let path = Path.of_steps_exn [user; repo; "commit"] in
     read_opt_dir tree path >>=
     Lwt_list.map_p (fun commit ->
         let path =
-          Datakit_path.of_steps_exn [user; repo; "commit"; commit; "status"]
+          Path.of_steps_exn [user; repo; "commit"; commit; "status"]
         in
         read_state ~user ~repo ~commit tree path [] >>= fun states ->
         Lwt.return (commit, states)
       )
 
   let read_prs tree ~user ~repo =
-    let path = Datakit_path.of_steps_exn [user; repo; "pr"] in
+    let path = Path.of_steps_exn [user; repo; "pr"] in
     read_opt_dir tree path >>=
     Lwt_list.map_p (fun number ->
-        let path = Datakit_path.of_steps_exn [user; repo; "pr"; number] in
+        let path = Path.of_steps_exn [user; repo; "pr"; number] in
         let number = int_of_string number in
         let read name =
           DK.Tree.read_file tree (path / name) >>*= fun data ->
@@ -1568,9 +1569,9 @@ module Make (DK: Test_client.S) = struct
       )
 
   let read_refs tree ~user ~repo =
-    let path = Datakit_path.of_steps_exn [user; repo; "ref"] in
+    let path = Path.of_steps_exn [user; repo; "ref"] in
     let rec aux acc name =
-      let path = Datakit_path.(path /@ of_steps_exn name) in
+      let path = Path.(path /@ of_steps_exn name) in
       DK.Tree.read_file tree (path / "head") >|= begin function
         | Error _ -> acc
         | Ok head ->
@@ -1599,12 +1600,12 @@ module Make (DK: Test_client.S) = struct
   let state_of_branch b =
     expect_head b >>*= fun head ->
     DK.Commit.tree head >>*= fun tree ->
-    DK.Tree.read_dir tree Datakit_path.empty >>*=
+    DK.Tree.read_dir tree Path.empty >>*=
     Lwt_list.fold_left_s (fun acc user ->
-        DK.Tree.exists_dir tree Datakit_path.(empty / user) >>*= function
+        DK.Tree.exists_dir tree Path.(empty / user) >>*= function
         | false -> Lwt.return acc
         | true  ->
-          let path = Datakit_path.of_steps_exn [user] in
+          let path = Path.of_steps_exn [user] in
           DK.Tree.read_dir tree path >>*=
           Lwt_list.fold_left_s (fun acc repo ->
               safe_exists_file tree (path / repo / ".monitor") >>= function
@@ -1748,7 +1749,7 @@ module Make (DK: Test_client.S) = struct
       let events = Users.diff_events users (Users.empty ()) in
       DK.Branch.with_transaction branch (fun tr ->
           Lwt_list.iter_p (fun { Repo.user; repo } ->
-              safe_remove tr Datakit_path.(empty / user / repo)
+              safe_remove tr Path.(empty / user / repo)
             ) (Repo.Set.elements all_repos)
           >>= fun () ->
           Lwt_list.iter_p (Conv.update_event tr) events >>= fun () ->

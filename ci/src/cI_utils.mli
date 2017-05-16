@@ -11,7 +11,7 @@ module Client9p: sig
     t Protocol_9p.Error.t Lwt.t
 end
 module DK: sig
-  include Datakit_S.CLIENT
+  include Datakit_client.S
   val connect: Client9p.t -> t
 end
 

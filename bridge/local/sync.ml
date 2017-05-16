@@ -6,7 +6,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 module Make
     (S : Irmin.S with type branch = string)
-    (DK : Datakit_S.CLIENT)
+    (DK : Datakit_client.S)
 = struct
   module Conv = Datakit_github_conv.Make(DK)
 

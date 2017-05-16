@@ -3,8 +3,9 @@ open Result
 open Lwt.Infix
 open! Astring
 open Datakit_ci
+open Datakit_client
 
-let ( / ) = Datakit_path.Infix.( / )
+let ( / ) = Path.Infix.( / )
 
 (* Chain operations together, returning early if we get an error *)
 let ( >>*= ) x f =
@@ -42,7 +43,7 @@ let make_task msg =
 module Server = Fs9p.Make(Protocol_9p_unix.Flow_lwt_unix)
 module Filesystem = Ivfs.Make(Store)
 
-let p = Datakit_path.of_string_exn
+let p = Path.of_string_exn
 
 let () =
   CI_log_reporter.init None (Some Logs.Info);
@@ -118,8 +119,8 @@ let update branch values ~message =
       values |> Lwt_list.iter_s (fun (path, value) ->
           let dir, leaf =
             match String.cut ~rev:true ~sep:"/" path with
-            | None -> Datakit_path.empty, path
-            | Some (dir, leaf) -> Datakit_path.of_string_exn dir, leaf in
+            | None -> Path.empty, path
+            | Some (dir, leaf) -> Path.of_string_exn dir, leaf in
           DK.Transaction.make_dirs t dir >>*= fun () ->
           DK.Transaction.create_or_replace_file t (dir / leaf) (Cstruct.of_string value) >>*= Lwt.return
         )
@@ -140,7 +141,7 @@ let single_line data =
     Also fails if it becomes a non-file object or if the switch is turned off. *)
 let wait_for_file ?switch branch path ?old expected =
   Logs.info (fun f -> f "wait_for_file %s %s" path expected);
-  DK.Branch.wait_for_path ?switch branch (Datakit_path.of_string_exn path) (function
+  DK.Branch.wait_for_path ?switch branch (Path.of_string_exn path) (function
       | Some (`File data) ->
         let data = single_line data in
         if data = expected then (
@@ -208,7 +209,7 @@ let with_handler set_handler ~logs ?pending key fn =
   set_handler key { result; output = Output.Live log };
   Lwt.wakeup waker ()
 
-let repo_root { Repo.user; repo } = Datakit_path.(empty / user / repo)
+let repo_root { Repo.user; repo } = Path.(empty / user / repo)
 
 (* [with_ci conn workflow fn] is [fn ~logs ~switch dk with_handler], where:
    - switch is turned off when [fn] ends and will stop the CI

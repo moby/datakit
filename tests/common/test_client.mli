@@ -1,5 +1,5 @@
 module type S = sig
-  include Datakit_S.CLIENT
+  include Datakit_client.S
   val run: (t -> unit Lwt.t) -> unit
 end
 

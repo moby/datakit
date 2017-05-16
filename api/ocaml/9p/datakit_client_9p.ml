@@ -1,6 +1,7 @@
 open Result
 open Astring
 open Lwt.Infix
+open Datakit_client
 
 let src = Logs.Src.create "datakit.client" ~doc:"DataKit client bindings"
 module Log = (val Logs.src_log src: Logs.LOG)
@@ -22,7 +23,7 @@ let symlink =
     ~owner:rwx ~group:rx ~other:rx ~is_symlink:true ()
 
 let ( / ) dir leaf = dir @ [leaf]
-let ( /@ ) dir user_path = dir @ Datakit_path.unwrap user_path
+let ( /@ ) dir user_path = dir @ Path.unwrap user_path
 let pp_path = Fmt.Dump.list String.dump
 
 let rec last = function
@@ -157,7 +158,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
           match String.cut ~sep:" " line with
           | None            -> err "missing space"
           | Some (op, path) ->
-            match Datakit_path.of_string path with
+            match Path.of_string path with
             | Error e -> err e
             | Ok path -> match op with
               | "+" -> (`Added path  ) :: acc
@@ -343,7 +344,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
         else if List.mem `Execute mode.FileMode.owner then `Exec
         else `File in
       ok (Some {
-        Datakit_S.kind;
+        kind;
         size = info.Stat.length;
       })
 
@@ -354,12 +355,12 @@ module Make(P9p : Protocol_9p.Client.S) = struct
 
     let exists_dir t path =
       stat t path >|*= function
-      | Some { Datakit_S.kind = `Dir; _ } -> true
+      | Some { kind = `Dir; _ } -> true
       | _ -> false
 
     let exists_file t path =
       stat t path >|*= function
-      | None | Some { Datakit_S.kind = `Dir; _ } -> false
+      | None | Some { kind = `Dir; _ } -> false
       | _ -> true
 
     let set_executable t path exec =
@@ -418,7 +419,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
 
     (* Ensure that [base @ path] exists (assuming that [base] already exists). *)
     let make_dirs t ~base path =
-      let path = Datakit_path.unwrap path in
+      let path = Path.unwrap path in
       let rec aux user_path =
         Log.debug (fun f -> f "make_dirs.aux(%a)" (Fmt.Dump.list String.dump) user_path);
         match rdecons user_path with
@@ -447,20 +448,20 @@ module Make(P9p : Protocol_9p.Client.S) = struct
   module Tree = struct
 
     type value = [ `Dir of string list | `File of Cstruct.t | `Link of string ]
-    type 'a cache = ('a, error) Result.result Datakit_path.Map.t ref
+    type 'a cache = ('a, error) Result.result Path.Map.t ref
 
     type t = {
       fs   : FS.t;
       path : string list;
       reads: value cache;
-      stats: Datakit_S.stat option cache;
+      stats: stat option cache;
     }
 
     let find_cache c p =
-      try Some (Datakit_path.Map.find p !c) with Not_found -> None
+      try Some (Path.Map.find p !c) with Not_found -> None
 
-    let empty () = ref Datakit_path.Map.empty
-    let add_cache c p v = c := Datakit_path.Map.add p v !c
+    let empty () = ref Path.Map.empty
+    let add_cache c p v = c := Path.Map.add p v !c
     let v fs path = { fs; reads = empty () ; stats = empty (); path }
     let of_id fs id = v fs ["trees"; id]
 
@@ -491,14 +492,14 @@ module Make(P9p : Protocol_9p.Client.S) = struct
 
     let exists_dir t path =
       stat t path >|= function
-      | Ok (Some { Datakit_S.kind = `Dir; _ }) -> Ok true
+      | Ok (Some { kind = `Dir; _ }) -> Ok true
       | Ok Some _    -> Ok false
       | Ok None      -> Ok false
       | Error _ as e -> e
 
     let exists_file t path =
       stat t path >|= function
-      | Ok (Some { Datakit_S.kind = `File; _ }) -> Ok true
+      | Ok (Some { kind = `File; _ }) -> Ok true
       | Ok Some _    -> Ok false
       | Ok None      -> Ok false
       | Error _ as e -> e
@@ -568,7 +569,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
       t.path / "rw" /@ path
 
     let split_for_create path =
-      match Datakit_path.pop path with
+      match Path.pop path with
       | Some x -> x
       | None -> raise (Invalid_argument "Can't create '/'!")
 
@@ -616,7 +617,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
       let rec aux = function
         | [] -> Ok []
         | x :: xs ->
-          match Datakit_path.of_string x with
+          match Path.of_string x with
           | Error e -> Error (`Internal (Fmt.strf "Invalid path in conflicts: %s" e))
           | Ok path ->
             match aux xs with
@@ -737,7 +738,7 @@ module Make(P9p : Protocol_9p.Client.S) = struct
         (fun hash -> fn (commit_of_hash t hash))
 
     let wait_for_path t ?switch path fn =
-      let path = Datakit_path.unwrap path in
+      let path = Path.unwrap path in
       let path = List.map (fun x -> x ^ ".node") path in
       FS.wait_for t.fs ?switch (branch_dir t / "watch" @ (path / "tree.live"))
         (fun hash -> node_of_hash t hash >>*= fn)

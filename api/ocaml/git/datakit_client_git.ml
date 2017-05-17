@@ -46,6 +46,11 @@ end
 module Make  = Irmin_git.FS.Make(IO)(Git_unix.Zlib)(Git_unix.FS.IO)
 module S = Make(Irmin.Contents.Cstruct)(Irmin.Path.String_list)(B)
 
+module PathSet = Set.Make(struct
+    include S.Key
+    let compare = Irmin.Type.compare t
+  end)
+
 type t = {
   repo  : S.repo;
   author: string;
@@ -190,27 +195,119 @@ module Commit = struct
     Tree.diff x y
 end
 
+type transaction = {
+    mutable closed   : bool;
+    mutable tree     : S.tree;
+    mutable parents  : S.commit list;
+    mutable conflicts: PathSet.t;
+    store            : S.t;
+    t                : t;
+    lock             : Lwt_mutex.t;
+  }
+
+module Merge = struct
+
+  (* similar to ivfs_merge ... maybe we should be merged *)
+
+  open Astring
+
+  let merge_file =
+    let blob =
+      Irmin.Merge.idempotent Irmin.Type.(pair S.contents_t S.metadata_t)
+    in
+    Irmin.Merge.(option blob)
+
+  let map tree = S.Tree.list tree S.Key.empty >|= String.Map.of_list
+
+  let update t path (f, metadata) =
+    S.Tree.add t.tree path ~metadata f >|= fun tree ->
+    t.tree <- tree
+
+  let remove t path =
+    S.Tree.remove t.tree path >|= fun tree ->
+    t.tree <- tree
+
+  let (/) = S.Key.rcons
+
+  let merge ~ours ~theirs ~base result =
+    let conflicts = ref PathSet.empty in
+    let note_conflict path leaf msg =
+      let path = path / leaf in
+      conflicts := PathSet.add path !conflicts;
+      let f = Cstruct.of_string (Fmt.strf "** Conflict **\n%s\n" msg) in
+      update result path (f, `Normal)
+    in
+    let as_dir = function
+      | None   -> S.Tree.empty
+      | Some v -> v
+    in
+    let rec merge_dir ~ours ~theirs ~base path =
+      map ours >>= fun our_files ->
+      map theirs >>= fun their_files ->
+      (* Types tells us the type the result will have, if successful,
+         or [`Conflict] if we know it won't work. *)
+      let types =
+        String.Map.merge (fun _leaf ours theirs ->
+            match ours, theirs with
+            | Some `Node, Some `Node -> Some `Node
+            | Some `Contents, Some `Contents -> Some `Contents
+            | Some _, Some _ -> Some `Conflict
+            | Some `Contents, None | None, Some `Contents -> Some `Contents
+            | Some `Node, None | None, Some `Node -> Some `Node
+            | None, None -> assert false
+          ) our_files their_files
+      in
+      String.Map.bindings types |> Lwt_list.iter_s (fun (leaf, ty) ->
+          let sub_path = S.Key.rcons path leaf in
+          let step = S.Key.v [leaf] in
+          match ty with
+          | `Conflict -> note_conflict path leaf "File vs dir"
+          | `Node ->
+            S.Tree.find_tree ours step >|= as_dir >>= fun ours ->
+            S.Tree.find_tree theirs step >|= as_dir >>= fun theirs ->
+            S.Tree.find_tree base step >|= as_dir >>= fun base ->
+            merge_dir ~ours ~theirs ~base sub_path
+          | `Contents ->
+            S.Tree.find_all ours step >>= fun ours ->
+            S.Tree.find_all theirs step >>= fun theirs ->
+            let old () =
+              S.Tree.find_all base step >|= fun f ->
+              Ok (Some f)
+            in
+            Irmin.Merge.f merge_file ~old ours theirs >>= function
+            | Ok (Some x) -> update result (path / leaf) x
+            | Ok None     -> remove result (path / leaf)
+            | Error (`Conflict "default") ->
+              note_conflict path leaf "Changed on both branches"
+            | Error (`Conflict x)         -> note_conflict path leaf x
+        )
+    in
+    S.tree ours >>= fun ours ->
+    S.tree theirs >>= fun theirs ->
+    begin match base with
+      | None      -> Lwt.return S.Tree.empty
+      | Some base -> S.tree base
+    end >>= fun base ->
+    merge_dir ~ours ~theirs ~base S.Key.empty >>= fun () ->
+    Lwt.return !conflicts
+
+end
+
 module Transaction = struct
 
-  type nonrec t = {
-    mutable closed : bool;
-    mutable tree   : S.tree;
-    mutable parents: S.commit list;
-    store          : S.t;
-    t              : t;
-    lock           : Lwt_mutex.t;
-  }
+  type t = transaction
 
   let v t ~store =
     let closed = false in
     let lock = Lwt_mutex.create () in
+    let conflicts = PathSet.empty in
     (S.Head.find store >>= function
       | None      -> Lwt.return ([], S.Tree.empty)
       | Some head ->
         S.Commit.tree head >|= fun tree ->
         ([head], tree)
     ) >|= fun (parents, tree) ->
-    Ok { closed; tree; parents; store; t; lock }
+    Ok { closed; tree; parents; store; t; lock; conflicts }
 
   let read t = Tree.read t.tree
   let stat t = Tree.stat t.tree
@@ -345,10 +442,50 @@ module Transaction = struct
     base  : Tree.t;
   }
 
-  let merge _t _c = failwith "TODO: Transaction.merge"
+  (* from ivfs *)
+  let base ~our_parents ~ours ~their_commit =
+    match our_parents with
+    | [] ->
+      (* Optimisation: if our new commit has no parents then we know there
+           can be no LCA, so avoid searching (which would be slow, since Irmin
+           would have to explore the entire history to check). *)
+      Lwt.return None
+    | _ ->
+      S.lcas_with_commit ours ~n:1 their_commit >>= function
+      | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
+      | Ok []        -> Lwt.return None
+      | Ok (base::_) -> S.of_commit base >|= fun s -> Some s
+
+  let paths conflicts =
+    PathSet.elements conflicts
+    |> List.map Path.of_steps_exn
+
+  let merge t their_commit =
+    if t.closed then err_transaction_closed
+    else
+      S.of_commit their_commit >>= fun theirs ->
+      let info = info t "(no commit message)" () in
+      let our_parents = t.parents in
+      let repo = t.t.repo in
+      S.Commit.v repo ~info ~parents:our_parents t.tree >>= fun our_commit ->
+      S.of_commit our_commit >>= fun ours ->
+      base ~our_parents ~ours ~their_commit >>= fun base ->
+      t.parents <- their_commit :: our_parents;
+      Merge.merge ~ours ~theirs ~base t >>= fun merge_conflicts ->
+      t.conflicts <- PathSet.union t.conflicts merge_conflicts;
+      S.tree ours >>= fun ours ->
+      S.tree theirs >>= fun theirs ->
+      (match base with
+       | None   -> Lwt.return S.Tree.empty
+       | Some s -> S.tree s
+      ) >|= fun base ->
+      let inputs = { ours; theirs; base } in
+      Ok (inputs, paths merge_conflicts)
+
   let parents t = Lwt.return (Ok t.parents)
   let set_parents t c = t.parents <- c; Lwt.return (Ok ())
-  let conflicts _t = failwith "TODO: Transation.conflicts"
+  let conflicts t = Lwt.return (Ok (paths t.conflicts))
+
   let closed t = t.closed
 
   let diff t c =

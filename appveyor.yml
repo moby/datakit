@@ -6,7 +6,7 @@ environment:
   FORK_BRANCH: master
   CYG_ROOT: C:\cygwin64
   PACKAGE: datakit
-  PINS: "irmin.dev:--dev irmin-mem.dev:https://github.com/mirage/irmin.git#ca886ac8e1a0b36879617d7c973852d6d04bfede irmin-git.dev:--dev datakit-server.dev:. datakit-server-9p.dev:. datakit-github.dev:. datakit-client.dev:. datakit-client-9p.dev:."
+  PINS: "git.dev:--dev git-mirage.dev:--dev git-http.dev:--dev git-unix.dev:--dev irmin.dev:--dev irmin-mem.dev:https://github.com/mirage/irmin.git irmin-git.dev:--dev datakit-server.dev:. datakit-server-9p.dev:. datakit-github.dev:. datakit-client.dev:. datakit-client-9p.dev:."
 
 install:
   - ps: iex ((new-object net.webclient).DownloadString("https://raw.githubusercontent.com/$env:FORK_USER/ocaml-ci-scripts/$env:FORK_BRANCH/appveyor-install.ps1"))

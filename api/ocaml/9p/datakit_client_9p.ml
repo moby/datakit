@@ -263,11 +263,9 @@ module Make(P9p : Protocol_9p.Client.S) = struct
 
     (* TODO: limited to 2 GB files *)
     let read_all t path =
+      Log.debug (fun f -> f "read_all %s" (String.concat ~sep:"/" path));
       P9p.read t.conn path 0L Int32.max_int >|= wrap_9p >>*= fun data ->
       let data = Cstruct.concat data in
-      Log.debug
-        (fun f -> f "read_all %s -> %S" (String.concat ~sep:"/" path)
-            (Cstruct.to_string data));
       ok data
 
     let remove t path =
@@ -804,7 +802,10 @@ module Make(P9p : Protocol_9p.Client.S) = struct
            Log.err (fun f -> f "Error removing remote %S: %a" id pp_error e)
          | Ok () -> ())
 
-  let commit t id = Lwt.return (Ok { Commit.fs = t; id })
+  let commit t id: Commit.t result =
+    FS.read_all t (["commits"] / id) >>*= fun _json ->
+    Lwt.return (Ok { Commit.fs = t; id })
+
   let tree t id = Lwt.return (Ok (Tree.of_id t id))
   let connect conn = { FS.conn }
   let disconnect t = P9p.disconnect t.FS.conn >|= fun () -> Ok ()

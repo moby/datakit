@@ -604,6 +604,13 @@ module DK_Commit = struct
   let equal a b = (id a = id b)
 end
 
+let empty_commit () =
+  let open Test_utils in
+  Store.Repo.v config >>= fun repo ->
+  Store.Commit.v repo ~info:Irmin.Info.empty ~parents:[] Store.Tree.empty
+  >|= fun c ->
+  Fmt.to_to_string Store.Commit.pp c
+
 let test_history conn =
   let module DK = CI_utils.DK in
   let ( >>*= ) x f =
@@ -637,7 +644,8 @@ let test_history conn =
       "three", (Error (`Pending "Testing"), CI_output.Live live);
     ]
   in
-  DK.commit dk "abc" >>*= fun metadata_commit ->
+  empty_commit () >>= fun empty ->
+  DK.commit dk empty >>*= fun metadata_commit ->
   CI_history.record master_h dk ~source_commit metadata_commit s1 >>= fun () ->
   (* Check s1 *)
   CI_history.head master_h |> Test_utils.or_fail "No head state!" |> CI_history.State.jobs |> Alcotest.check jobs_t "Initial commit" s1;

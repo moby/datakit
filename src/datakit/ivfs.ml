@@ -930,10 +930,27 @@ module Make (Store : Ivfs_tree.S) = struct
     let remove () = Vfs.Dir.err_read_only in
     Vfs.Dir.read_only ~ls ~lookup ~remove
 
+  let commit_dir repo =
+    let ls () = ok [] in
+    let lookup name =
+      commit_of_commit_id repo name >|= function
+      | Ok commit ->
+        let json =
+          Fmt.to_to_string (Irmin.Type.pp_json (Store.commit_t repo)) commit
+        in
+        let hash = Fmt.to_to_string Store.Commit.pp commit in
+        let inode = Vfs.File.ro_of_string json in
+        Ok (Vfs.Inode.file hash inode)
+      | Error _ as e -> e
+    in
+    let remove () = Vfs.File.err_read_only in
+    Vfs.Dir.read_only ~ls ~lookup ~remove
+
   let create ~info repo =
     let dirs = Vfs.ok [
         Vfs.Inode.dir "branch"     (branch_dir ~info repo);
         Vfs.Inode.dir "trees"      (trees_dir repo);
+        Vfs.Inode.dir "commits"    (commit_dir repo);
         Vfs.Inode.dir "snapshots"  (snapshots_dir repo);
         Vfs.Inode.dir "remotes"    (Remote.create repo);
         Vfs.Inode.dir "debug"      Vfs.Logs.dir;

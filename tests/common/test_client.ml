@@ -159,13 +159,9 @@ module Make (DK: S) = struct
     in
     DK.branch dk "dev" >>*= fun dev ->
     let check_fails name parents =
-      list_map (DK.commit dk) parents >>*= fun parents ->
-      DK.Branch.with_transaction dev (fun tr ->
-          DK.Transaction.set_parents tr parents >>*= fun () ->
-          DK.Transaction.commit tr ~message:name >>= function
-          | Ok ()   -> Alcotest.fail ("Should have been rejected: " ^ name)
-          | Error _ -> DK.Transaction.abort tr
-        )
+      list_map (DK.commit dk) parents >|= function
+      | Ok _    -> Alcotest.fail ("Should have been rejected: " ^ name)
+      | Error _ -> Ok ()
     in
 
     DK.branch dk "master" >>*= fun master ->
@@ -265,9 +261,8 @@ module Make (DK: S) = struct
     (* Fork and put "from-master+pr" on pr branch *)
     DK.branch dk "pr" >>*= fun pr ->
     expect_head master >>*= fun merge_a ->
-    DK.commit dk "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35" >>*= fun bad_commit ->
-    DK.Branch.fast_forward pr bad_commit >>= function
-    | Ok () -> Alcotest.fail "Commit not in store!"
+    DK.commit dk "a3827c5d1a2ba8c6a40eded5598dba8d3835fb35" >>= function
+    | Ok _    -> Alcotest.fail "Commit not in store!"
     | Error _ ->
       DK.Branch.fast_forward pr merge_a >>*= fun () ->
       DK.Branch.with_transaction pr (fun tr ->

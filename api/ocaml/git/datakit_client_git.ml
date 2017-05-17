@@ -46,10 +46,23 @@ end
 module Make  = Irmin_git.FS.Make(IO)(Git_unix.Zlib)(Git_unix.FS.IO)
 module S = Make(Irmin.Contents.Cstruct)(Irmin.Path.String_list)(B)
 
-module PathSet = Set.Make(struct
-    include S.Key
-    let compare = Irmin.Type.compare t
-  end)
+module PathSet = struct
+  include Set.Make(struct
+      include S.Key
+      let compare = Irmin.Type.compare t
+    end)
+
+  let rec has_prefix ~prefix p =
+    match S.Key.decons prefix, S.Key.decons p with
+    | None, _ -> true
+    | Some (pre, pres), Some (p, ps) ->
+      if pre = p then has_prefix ~prefix:pres ps
+      else false
+    | _ -> false
+
+  let remove_rec path t = filter (fun x -> not (has_prefix ~prefix:path x)) t
+
+end
 
 type t = {
   repo  : S.repo;
@@ -76,6 +89,7 @@ type error = [
   | `Transaction_closed
   | `Msg of string
   | `Conflict of string
+  | `Conflicts
 ]
 
 type +'a result = ('a, error) Result.result Lwt.t
@@ -88,11 +102,13 @@ let pp_error f : error -> unit = function
   | `Not_dir -> Fmt.string f "Not a directory"
   | `Not_file -> Fmt.string f "Not a file"
   | `Transaction_closed -> Fmt.string f "Transaction is closed"
+  | `Conflicts -> Fmt.string f "conflicts file is not empty"
   | `Msg s -> Fmt.pf f "internal error: %s" s
   | `Conflict c -> Fmt.pf f "conflict: %s" c
 
 let err_does_not_exist = Lwt.return (Error `Does_not_exist)
 let err_transaction_closed = Lwt.return (Error `Transaction_closed)
+let err_conflicts = Lwt.return (Error `Conflicts)
 let err_msg fmt = Fmt.kstrf (fun x -> Error (`Msg x :> error)) fmt
 
 module Tree = struct
@@ -328,6 +344,7 @@ module Transaction = struct
         | false -> *)
           f t.tree path >|= fun tree ->
           t.tree <- tree;
+          t.conflicts <- PathSet.remove_rec path t.conflicts;
           Ok ()
       )
 
@@ -340,6 +357,7 @@ module Transaction = struct
         | true  ->
           f t.tree path >|= fun tree ->
           t.tree <- tree;
+          t.conflicts <- PathSet.remove_rec path t.conflicts;
           Ok ()
       )
 
@@ -352,6 +370,7 @@ module Transaction = struct
         | Some x ->
           f t.tree path x >|= fun tree ->
           t.tree <- tree;
+          t.conflicts <- PathSet.remove_rec path t.conflicts;
           Ok ()
       )
 
@@ -361,6 +380,7 @@ module Transaction = struct
         let path = Path.unwrap path in
         f t.tree path >|= fun tree ->
         t.tree <- tree;
+        t.conflicts <- PathSet.remove_rec path t.conflicts;
         Ok ()
       )
 
@@ -425,6 +445,7 @@ module Transaction = struct
 
   let commit t ~message =
     if t.closed then err_transaction_closed
+    else if not (PathSet.is_empty t.conflicts) then err_conflicts
     else
       let info = info t message () in
       S.Commit.v t.t.repo ~info ~parents:t.parents t.tree >>= fun c ->

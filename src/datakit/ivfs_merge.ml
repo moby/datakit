@@ -20,19 +20,8 @@ module Make (Store : Ivfs_tree.S) (RW : RW) = struct
   module Metadata = Store.Metadata
   module Dir = Store.Tree
 
-  (* blobs are idempotents *)
-  (* FIXME: move into Irmin.Merge *)
-  let merge_idempotent dt =
-    let (=) = Irmin.Type.equal dt in
-    let default = Irmin.Merge.default dt in
-    let f ~old x y =
-      if x = y then Irmin.Merge.ok x
-      else Irmin.Merge.f default ~old x y
-    in
-    Irmin.Merge.v dt f
-
   let merge_file =
-    let blob = merge_idempotent Irmin.Type.(pair Ivfs_blob.t Metadata.t) in
+    let blob = Irmin.Merge.idempotent Irmin.Type.(pair Ivfs_blob.t Metadata.t) in
     Irmin.Merge.(option blob)
 
   let map tree = Dir.list tree Store.Key.empty >|= String.Map.of_list

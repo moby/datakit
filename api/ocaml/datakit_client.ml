@@ -140,7 +140,6 @@ module type S = sig
     val create_or_replace_file: t -> Path.t -> Cstruct.t -> unit result
     val set_executable: t -> Path.t -> bool -> unit result
     val remove: t -> Path.t -> unit result
-    val rename: t -> Path.t -> string -> unit result
     val truncate: t -> Path.t -> int64 -> unit result
     val make_dirs: t -> Path.t -> unit result
     val commit: t -> message:string -> unit result
@@ -162,7 +161,6 @@ module type S = sig
     type t
     val name: t -> string
     val remove: t -> unit result
-    val rename: t -> string -> unit result
     val head: t -> Commit.t option result
     val wait_for_head: t -> ?switch:Lwt_switch.t ->
       (Commit.t option -> [`Finish of 'a | `Again | `Abort] result) ->

@@ -635,62 +635,6 @@ module Make (DK: S) = struct
       expect_file_event "Makefile" makefile_events None >>= fun () ->
       Lwt.return_unit
 
-  let test_rename_branch dk =
-    DK.branch dk "old" >>*= fun branch ->
-    create_in_trans branch (p "") "key" (v "value") >>*= fun () ->
-    DK.Branch.rename branch "new" >>*= fun () ->
-    DK.branches dk >>*= fun branches ->
-    Alcotest.(check (list string)) "New branches" ["new"] branches;
-    DK.branch dk "new" >>*= fun new_branch ->
-    expect_head new_branch >>*= fun head ->
-    DK.Commit.tree head >>*= fun tree ->
-    DK.Tree.read_file tree (p "key") |> check_file "Moved" "value" >>= fun () ->
-    DK.Branch.remove branch >>*= fun () ->
-    DK.branches dk >>*= fun branches ->
-    Alcotest.(check (list string)) "New gone" [] branches;
-    Lwt.return_unit
-
-  let test_rename_dir dk =
-    DK.branch dk "master" >>*= fun master ->
-    DK.Branch.with_transaction master (fun t ->
-        DK.Transaction.create_dir t (p "old") >>*= fun () ->
-        DK.Transaction.rename t (p "old") "new" >>*= fun () ->
-        DK.Transaction.read_dir t (p "") >>*= fun items ->
-        Alcotest.(check (list string)) "New files" ["new"] items;
-        DK.Transaction.abort t
-      ) >|*= fun () -> ()
-
-  let test_rename_file dk =
-    DK.branch dk "master" >>*= fun master ->
-    DK.Branch.with_transaction master (fun t ->
-        DK.Transaction.create_file t (p "old") (v "data") >>*= fun () ->
-        DK.Transaction.rename t (p "old") "new" >>*= fun () ->
-        DK.Transaction.read_dir t (p "") >>*= fun items ->
-        Alcotest.(check (list string)) "New files" ["new"] items;
-        (* Check rename detects errors
-           Note: we currently allow overwriting an empty directory *)
-        DK.Transaction.create_dir t (p "dir") >>*= fun () ->
-        DK.Transaction.create_file t (p "dir/precious") (v "data")
-        >>*= fun () ->
-        DK.Transaction.rename t (p "new") "dir" >>= function
-        | Ok () -> Alcotest.fail "Shouldn't be able to rename over a directory"
-        | Error `Is_dir -> begin
-            (* Rename when source has been deleted. Ideally, we should also
-               check it hasn't been replaced by something with the same
-               name. *)
-            DK.Transaction.remove t (p "new") >>*= fun () ->
-            DK.Transaction.rename t (p "new") "reborn" >>= function
-            | Ok () -> Alcotest.fail "Shouldn't be able to rename a missing source"
-            | Error `Does_not_exist -> DK.Transaction.commit t ~message:"rename"
-            | Error e -> Alcotest.fail (Fmt.to_to_string DK.pp_error e)
-          end
-        | Error e -> Alcotest.fail (Fmt.to_to_string DK.pp_error e)
-      ) >>*= fun () ->
-    expect_head master >>*= fun head ->
-    DK.Commit.tree head >>*= fun tree ->
-    DK.Tree.read_dir tree (p "") >|*= fun items ->
-    Alcotest.(check (list string)) "New files" ["dir"] items
-
   let test_truncate dk =
     DK.branch dk "master" >>*= fun master ->
     DK.Branch.with_transaction master (fun t ->
@@ -779,9 +723,6 @@ module Make (DK: S) = struct
     "Transaction"      , `Quick, run test_transaction;
     "Watch"            , `Quick, run test_watch;
     "Make dirs"        , `Quick, run test_make_dirs;
-    "Rename branch"    , `Quick, run test_rename_branch;
-    "Rename dir"       , `Quick, run test_rename_dir;
-    "Rename file"      , `Quick, run test_rename_file;
     "Truncate"         , `Quick, run test_truncate;
     "Parents"          , `Quick, run test_parents;
     "Merge"            , `Quick, run test_merge;

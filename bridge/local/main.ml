@@ -76,6 +76,7 @@ let report src level ~over k msgf =
 let init style_renderer level =
   Fmt_tty.setup_std_outputs ?style_renderer ();
   Logs.set_level level;
+  Logs.Src.set_level src9p (Some Logs.Info);
   Logs.set_reporter { Logs.report }
 
 let setup_log =

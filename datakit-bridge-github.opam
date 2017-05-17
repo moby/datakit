@@ -17,7 +17,9 @@ depends: [
   "lwt" {>= "3.0.0"}
   "datakit-github"    {>= "0.11.0"}
   "datakit-client-9p" {>= "0.11.0"}
-  "logs" "fmt" "mtime" "asl" "win-eventlog"
+  "logs" "fmt"
+  "mtime" {>= "1.0.0"}
+  "asl" "win-eventlog"
   "uri" {>= "1.8.0"}
   "hvsock" {>= "0.8.1"}
   "hex" "nocrypto" "conduit"

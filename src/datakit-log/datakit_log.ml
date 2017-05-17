@@ -35,7 +35,7 @@ let pp_ptime f () =
     (tm.tm_year + 1900) (tm.tm_mon + 1) tm.tm_mday tm.tm_hour tm.tm_min
 
 let pp_mtime f () =
-  let dt = Mtime.to_us (Mtime.elapsed ()) in
+  let dt = Mtime.Span.to_us (Mtime_clock.elapsed ()) in
   Fmt.pf f "%+04.0fus" dt
 
 let reporter log_clock =

@@ -2,7 +2,6 @@
 
 (executable
  ((name      test)
-  (package   datakit-bridge-github)
   (libraries (test datakit-github datakit-client datakit_bridge_github
               datakit-client-9p datakit-server-9p))
  ))

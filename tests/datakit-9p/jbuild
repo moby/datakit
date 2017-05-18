@@ -2,7 +2,6 @@
 
 (executable
  ((name      test)
-  (package   datakit)
   (libraries (test datakit-server-9p datakit-client-9p protocol-9p-unix))
  ))
 

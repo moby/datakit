@@ -2,8 +2,7 @@
 
 (executable
  ((name      test)
-  (libraries (test datakit-server-9p datakit-client-9p protocol-9p-unix))
- ))
+  (libraries (test str datakit-server-9p datakit-client-9p protocol-9p-unix))))
 
 (alias
  ((name runtest)

@@ -97,7 +97,7 @@ let () =
   Logs.set_reporter (reporter ());
   ()
 
-module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Datakit_io.Zlib)
+module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Git.Inflate.M)
 module Store = Ivfs_tree.Make(Maker)
 module RW = Ivfs_rw.Make(Store)
 module Filesystem = Ivfs.Make(Store)

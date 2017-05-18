@@ -23,7 +23,6 @@ depends: [
   "irmin"       {>= "1.1.0"}
   "irmin-mem"
   "irmin-git"   {>= "1.0.0"}
-  "camlzip"     {>= "1.06"}
   "cstruct"     {>= "2.2"}
   "result"
   "lwt"         {>= "3.0.0"}

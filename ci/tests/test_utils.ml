@@ -1,3 +1,6 @@
+module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Git.Inflate.M)
+module Store = Ivfs_tree.Make(Maker)
+
 open Datakit_github
 open Result
 open Lwt.Infix
@@ -24,9 +27,6 @@ let ( >>**= ) x f =
 let or_fail msg = function
   | None -> Alcotest.fail msg
   | Some x -> x
-
-module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Datakit_io.Zlib)
-module Store = Ivfs_tree.Make(Maker)
 
 let config = Irmin_mem.config ()
 

@@ -28,6 +28,17 @@ RUN opam install datakit-client.dev -vv
 RUN opam install datakit-client-9p --deps
 RUN opam install datakit-client-9p -vv
 
+# Test the Git client library
+RUN opam pin add git.dev --dev -n
+RUN opam pin add git-unix.dev --dev -n
+RUN opam pin add irmin.dev --dev -n
+RUN opam pin add irmin-git.dev --dev -n
+RUN opam pin add irmin-mem.dev https://github.com/mirage/irmin.git -n
+RUN opam pin add datakit-client-git.dev /home/opam/src/datakit -n
+RUN opam install irmin-watcher inotify
+RUN opam depext datakit-client-git && opam install datakit-client-git --deps
+RUN opam install datakit-client-git -t -vv
+
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
 

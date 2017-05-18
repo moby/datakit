@@ -39,6 +39,10 @@ RUN opam install irmin-git irmin-watcher git-unix inotify \
     astring logs fmt cstruct protocol-9p-unix cmdliner \
     irmin-mem irmin-git alcotest
 
+# FIXME(samoht): Not sure why this is needed, but it is
+RUN opam depext camlzip && opam install ounit camlzip fpath conf-which qcheck \
+    fileutils bos qtest
+
 COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
 RUN opam update datakit-client datakit-client-9p datakit-client-git

@@ -9,7 +9,10 @@ dev-repo:     "https://github.com/moby/datakit.git"
 doc:          "https://docker.github.io/datakit/"
 
 build: ["jbuilder" "build" "-p" name "-j" jobs]
-build-test: ["jbuilder" "runtest" "tests/datakit"]
+build-test: [
+  ["jbuilder" "runtest" "tests/datakit"]
+  ["jbuilder" "runtest" "tests/datakit-9p"]
+]
 
 depends: [
   "jbuilder" {build}

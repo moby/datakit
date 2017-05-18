@@ -11,7 +11,8 @@ module Client = Protocol_9p.Client.Make(Log9p)(Test_flow)
 let p l = Ivfs_tree.Path.v l
 let v b = Ivfs_blob.of_string b
 
-let root_entries = ["branch"; "debug"; "snapshots"; "trees"; "remotes"]
+let root_entries =
+  ["branch"; "debug"; "snapshots"; "trees"; "commits"; "remotes"]
 
 let run fn =
   Lwt_main.run begin

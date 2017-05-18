@@ -3,7 +3,7 @@ open Astring
 open Lwt.Infix
 open Datakit_client
 
-let src = Logs.Src.create "datakit.client" ~doc:"DataKit client bindings"
+let src = Logs.Src.create "datakit.9p" ~doc:"DataKit client 9p bindings"
 module Log = (val Logs.src_log src: Logs.LOG)
 
 let () = Random.self_init ()

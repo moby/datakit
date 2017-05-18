@@ -88,28 +88,29 @@ module Make (DK: S) = struct
       )
     >>*= Lwt.return
 
+  module File_event = struct
+    type t = [
+      | `File of Cstruct.t
+      | `Link of string
+      | `Exec of Cstruct.t
+      | `Dir of DK.Tree.t
+    ]
+    let pp f = function
+      | `File contents -> Fmt.pf f "File:%s" (Cstruct.to_string contents)
+      | `Exec contents -> Fmt.pf f "Exec:%s" (Cstruct.to_string contents)
+      | `Link target   -> Fmt.pf f "Link:%s" target
+      | `Dir _         -> Fmt.pf f "Dir"
+    let equal a b =
+      match a, b with
+      | `File a, `File b -> Cstruct.equal a b
+      | `Exec a, `Exec b -> Cstruct.equal a b
+      | `Link a, `Link b -> String.equal a b
+      | _ -> false
+      (* (note: can't compare trees easily, so always false *)
+  end
+
   let file_event =
-    let module T = struct
-      type t = [
-        | `File of Cstruct.t
-        | `Link of string
-        | `Exec of Cstruct.t
-        | `Dir of DK.Tree.t
-      ]
-      let pp f = function
-        | `File contents -> Fmt.pf f "File:%s" (Cstruct.to_string contents)
-        | `Exec contents -> Fmt.pf f "Exec:%s" (Cstruct.to_string contents)
-        | `Link target   -> Fmt.pf f "Link:%s" target
-        | `Dir _         -> Fmt.pf f "Dir"
-      let equal a b =
-        match a, b with
-        | `File a, `File b -> Cstruct.equal a b
-        | `Exec a, `Exec b -> Cstruct.equal a b
-        | `Link a, `Link b -> String.equal a b
-        | _ -> false
-        (* (note: can't compare trees easily, so always false *)
-    end in
-    (module T : Alcotest.TESTABLE with type t = T.t)
+    (module File_event : Alcotest.TESTABLE with type t = File_event.t)
 
   let commit =
     let module T = struct
@@ -137,8 +138,6 @@ module Make (DK: S) = struct
     | None      -> Alcotest.fail "Branch does not exist!"
     | Some head ->
       DK.Commit.tree head >>*= fun root ->
-      DK.Tree.read_file root (p "src/Makefile") >>*= fun v ->
-      Printf.printf "XXX %s %d\n%!" (Cstruct.to_string v) (Cstruct.len v);
       DK.Tree.stat root (p "src/Makefile") >>*= function
       | None -> Alcotest.fail "Missing Makefile!"
       | Some {size; _} ->
@@ -604,9 +603,11 @@ module Make (DK: S) = struct
       create_in_trans master (p "doc") "README" (v "Instructions") >>*= fun () ->
       expect_dir_event "Doc event" doc_events ["README"] >>= fun () ->
       expect_dir_event "Top event" root_events ["doc"; "src"] >>= fun () ->
+
       let next_makefile_event = Lwt_stream.next makefile_events in
       Alcotest.(check bool) "No Makefile update" true
         (Lwt.state next_makefile_event = Lwt.Sleep);
+
       (* Make executable *)
       DK.Branch.with_transaction master (fun t ->
           DK.Transaction.set_executable t (p "src/Makefile") true >>*= fun () ->
@@ -614,7 +615,7 @@ module Make (DK: S) = struct
         )
       >>*= fun () ->
       next_makefile_event >>= fun event ->
-      Alcotest.(check (option file_event)) "Makefile"
+      Alcotest.(check (option file_event)) "Makefile is an exe"
         (Some (`Exec (v "all: build"))) event;
       (* Make symlink *)
       DK.Branch.with_transaction master (fun t ->
@@ -624,7 +625,8 @@ module Make (DK: S) = struct
           DK.Transaction.commit t ~message:"symlink"
         )
       >>*= fun () ->
-      expect_file_event "Makefile" makefile_events (Some (`Link "my-target"))
+      expect_file_event "Makefile is a symlink"
+        makefile_events (Some (`Link "my-target"))
       >>= fun () ->
       (* Remove *)
       DK.Branch.with_transaction master (fun t ->
@@ -632,7 +634,7 @@ module Make (DK: S) = struct
           DK.Transaction.commit t ~message:"symlink"
         )
       >>*= fun () ->
-      expect_file_event "Makefile" makefile_events None >>= fun () ->
+      expect_file_event "Makefile removed" makefile_events None >>= fun () ->
       Lwt.return_unit
 
   let test_truncate dk =

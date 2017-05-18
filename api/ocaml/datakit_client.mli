@@ -213,11 +213,6 @@ module type S = sig
     (** [remove t path] removes [path]. If [path] is a directory then
         the entire subtree is removed. *)
 
-    val rename: t -> Path.t -> string -> unit result
-    (** [rename t path new_name] changes the basename of [path] to
-        [new_name].  Note: it is only possible to rename within a
-        directory (this is a 9p limitation). *)
-
     val truncate: t -> Path.t -> int64 -> unit result
     (** [truncate t path length] sets the length of the file at [path]
         to [length].  If [length] is longer than the current length,
@@ -300,10 +295,6 @@ module type S = sig
     val remove: t -> unit result
     (** [remove t] deletes branch [t]. If [t] does not exist, this
         does nothing. *)
-
-    val rename: t -> string -> unit result
-    (** [rename t new_name] changes the name of this branch. It is an
-        error if [new_name] already exists. *)
 
     val head: t -> Commit.t option result
     (** [head t] is the current head of the branch, or [None] if it

@@ -178,11 +178,13 @@ module Make(P9p : Protocol_9p.Client.S) = struct
 
     let with_file_full t path fn =
       P9p.with_fid t.conn (fun newfid ->
-          P9p.walk_from_root t.conn newfid path >|= wrap_9p >>*= fn newfid >|= fun x -> Ok x
+          P9p.walk_from_root t.conn newfid path >|= wrap_9p >>*=
+          fn newfid >|= fun x -> Ok x
         )
       >|= function
-      | Error _ as e -> wrap_9p e       (* Error from [with_fid] itself or [walk_from_root]. *)
-      | Ok x -> x                       (* Error or success from [fn] *)
+      | Ok x         -> x                       (* Error or success from [fn] *)
+      | Error _ as e -> wrap_9p e               (* Error from [with_fid] itself
+                                                   or [walk_from_root]. *)
 
     let with_file t path fn =
       with_file_full t path (fun fid _resp -> fn fid)
@@ -271,13 +273,6 @@ module Make(P9p : Protocol_9p.Client.S) = struct
     let remove t path =
       Log.debug (fun f -> f "remove %a" pp_path path);
       P9p.remove t.conn path >|= wrap_9p
-
-    let rename t path new_name =
-      Log.debug (fun f -> f "rename %a to %s" pp_path path new_name);
-      with_file t path (fun fid ->
-        P9p.LowLevel.update t.conn ~name:new_name fid
-        >|= wrap_9p
-      )
 
     let truncate t path new_length =
       Log.debug (fun f -> f "truncate %a to %Ld" pp_path path new_length);
@@ -599,9 +594,6 @@ module Make(P9p : Protocol_9p.Client.S) = struct
     let remove t path =
       FS.remove t.fs (rw_path t path)
 
-    let rename t path new_name =
-      FS.rename t.fs (rw_path t path) new_name
-
     let truncate t path new_length =
       FS.truncate t.fs (rw_path t path) new_length
 
@@ -702,11 +694,6 @@ module Make(P9p : Protocol_9p.Client.S) = struct
 
     let remove t =
       FS.remove t.fs (branch_dir t)
-
-    let rename t new_name =
-      FS.rename t.fs (branch_dir t) new_name >>*= fun () ->
-      t.name <- new_name;
-      ok ()
 
     let node_of_hash t = function
       | "" -> ok None

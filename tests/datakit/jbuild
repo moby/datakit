@@ -2,8 +2,7 @@
 
 (executable
  ((name      test)
-  (libraries (test datakit_conduit))
- ))
+  (libraries (test datakit_conduit datakit))))
 
 (alias
  ((name runtest)

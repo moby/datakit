@@ -4,9 +4,6 @@ module Client = Datakit_client_git
 
 let test_db = "_build/test-git"
 
-let p l = Ivfs_tree.Path.v l
-let v b = Ivfs_blob.of_string b
-
 let root_entries = ["branch"; "debug"; "snapshots"; "trees"; "remotes"]
 
 let run fn =

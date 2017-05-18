@@ -9,6 +9,9 @@ open Result
 let src = Logs.Src.create "test" ~doc:"Datakit tests"
 module Log = (val Logs.src_log src)
 
+module Store = Ivfs_tree.Make(Maker)
+module Filesystem = Ivfs.Make(Store)
+
 module Make (DK: Test_client.S) = struct
 
   module Conv = Datakit_github_conv.Make(DK)

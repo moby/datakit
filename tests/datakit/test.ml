@@ -2,6 +2,17 @@ open Lwt.Infix
 open Test_utils
 open Result
 
+let ( >>!= ) x f =
+  match x with
+  | Ok y -> f y
+  | Error vfs_error ->
+    Alcotest.fail ("Vfs.error: " ^ Fmt.to_to_string Vfs.Error.pp vfs_error)
+let vfs_error = Alcotest.of_pp Vfs.Error.pp
+let vfs_result ok = Alcotest.result ok vfs_error
+
+module Store = Ivfs_tree.Make(Maker)
+module RW = Ivfs_rw.Make(Store)
+
 let p l = Ivfs_tree.Path.v l
 
 module RW_err = struct

@@ -13,3 +13,8 @@ install:
 
 build_script:
   - call %CYG_ROOT%\bin\bash.exe -l %APPVEYOR_BUILD_FOLDER%\appveyor-opam.sh
+  - call %CYG_ROOT%\bin\bash.exe -lc 'cd ${APPVEYOR_BUILD_FOLDER}; make exe COMMIT'
+
+artifacts:
+  - path: "com.docker.db.exe"
+  - path: "COMMIT"

@@ -415,5 +415,3 @@ module FS = struct
       )
 
 end
-
-module Zlib = Git.Inflate.Make(Zlib)

@@ -13,7 +13,7 @@ RUN opam pin add irmin.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256d3aa
 RUN opam pin add irmin-mem.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256d3aa6b73b689609f7a5ff01c298fe821
 RUN opam pin add irmin-git.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256d3aa6b73b689609f7a5ff01c298fe821
 
-RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog camlzip \
+RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog \
     irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin \
     cmdliner protocol-9p rresult win-error named-pipe
 

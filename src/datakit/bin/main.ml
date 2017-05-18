@@ -47,7 +47,7 @@ let info msg =
 
 module Git_fs_store = struct
   open Datakit_io
-  module Maker = Irmin_git.FS.Make(IO)(Zlib)(FS)
+  module Maker = Irmin_git.FS.Make(IO)(Git.Inflate.M)(FS)
   module Store = Ivfs_tree.Make(Maker)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)
@@ -68,7 +68,7 @@ end
 
 module In_memory_store = struct
   open Datakit_io
-  module Maker = Irmin_git.Mem.Make(IO)(Zlib)
+  module Maker = Irmin_git.Mem.Make(IO)(Git.Inflate.M)
   module Store = Ivfs_tree.Make(Maker)
   type t = Store.Repo.t
   module Filesystem = Ivfs.Make(Store)

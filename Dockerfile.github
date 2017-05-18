@@ -14,7 +14,7 @@ RUN opam pin add irmin-git.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256
 
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term cmdliner \
     github protocol-9p rresult prometheus-app asl win-eventlog mtime hex \
-    github-hooks hvsock camlzip irmin-watcher git irmin
+    github-hooks hvsock irmin-watcher git irmin
 
 COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml

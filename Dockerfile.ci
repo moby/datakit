@@ -19,7 +19,7 @@ RUN opam pin add irmin-unix.1.2.0 -n https://github.com/mirage/irmin.git#81ffa25
 
 RUN opam pin add protocol-9p-unix.dev --dev -n
 
-RUN opam depext -i asl win-eventlog camlzip alcotest mtime mirage-flow hvsock \
+RUN opam depext -i asl win-eventlog alcotest mtime mirage-flow hvsock \
     git irmin irmin-unix lwt protocol-9p-unix tyxml redis multipart-form-data \
     pbkdf tls prometheus-app github git session irmin irmin-unix cmdliner \
     webmachine alcotest

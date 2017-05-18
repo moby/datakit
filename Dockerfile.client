@@ -44,9 +44,9 @@ RUN opam update datakit-client datakit-client-9p datakit-client-git
 
 RUN opam install datakit-client.dev -vv
 RUN opam install datakit-client-9p --deps
-RUN opam install datakit-client-9p -vv
+RUN opam install datakit-client-9p -vv -t
 RUN opam install datakit-client-git --deps
-RUN opam install datakit-client-git -vv
+RUN opam install datakit-client-git -vv -t
 
 RUN sudo mkdir /data && sudo chown opam.nogroup /data && chmod 700 /data && \
     sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount

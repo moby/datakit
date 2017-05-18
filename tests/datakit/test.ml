@@ -3,13 +3,6 @@ open Test_utils
 open Result
 
 let p l = Ivfs_tree.Path.v l
-let v b = Ivfs_blob.of_string b
-
-module Unit = struct
-  type t = unit
-  let pp fmt () = Fmt.string fmt "()"
-  let equal = (=)
-end
 
 module RW_err = struct
   type t = [`Not_a_directory | `Is_a_directory]

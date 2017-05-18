@@ -1832,12 +1832,16 @@ let run fn =
       (fun () -> Lwt.cancel server_thread; Lwt.return ())
   end
 
-module C = Test_client.Make(struct
-    include Datakit_client_9p.Make(Client)
-    let run f = run (fun t -> f (connect t))
-  end)
+module DK = struct
+  include Datakit_client_9p.Make(Client)
+  let run f = run (fun t -> f (connect t))
+end
+
+module T = Make(DK)
+module C = Test_client.Make(DK)
 
 let () =
   Alcotest.run "datakit-github" [
     "github-9p" , C.test_set;
+    "github"    , T.test_set;
   ]

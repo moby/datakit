@@ -28,7 +28,7 @@ depends: [
   "pbkdf"
   "webmachine" {>= "0.4.0"}
   "session" {>= "0.3.0"}
-  "redis"
+  "redis-lwt"
   "asetmap"
   "github" {>= "2.2.0"}
   "prometheus-app"

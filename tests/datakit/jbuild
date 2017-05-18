@@ -2,7 +2,6 @@
 
 (executable
  ((name      test)
-  (package   datakit)
   (libraries (test datakit_conduit))
  ))
 

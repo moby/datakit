@@ -2,7 +2,6 @@
 
 (executable
  ((name      test_ci)
-  (package   datakit-ci)
   (libraries (datakit-github datakit-ci datakit-server-9p alcotest
               datakit_io datakit))
  ))

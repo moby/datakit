@@ -3,7 +3,7 @@
 (executable
   ((name        mount)
    (public_name datakit-mount)
-   (package     datakit-client)
+   (package     datakit-client-9p)
    (libraries   (cmdliner unix))))
 
 ; TODO: generate the right version using tokpg watermarking

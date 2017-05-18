@@ -36,7 +36,8 @@ RUN opam pin add datakit-client-git.dev /home/opam/src/datakit -n
 RUN opam depext datakit-client datakit-client-9p datakit-client-git inotify
 RUN opam install datakit-client --deps
 RUN opam install irmin-git irmin-watcher git-unix inotify \
-    astring logs fmt cstruct protocol-9p-unix cmdliner
+    astring logs fmt cstruct protocol-9p-unix cmdliner \
+    irmin-mem irmin-git alcotest
 
 COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit

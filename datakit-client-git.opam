@@ -17,4 +17,7 @@ depends: [
   "irmin-git" {>= "1.1.0"}
   "irmin-watcher"
   "git-unix"
+  "alcotest"  {test}
+  "irmin-mem" {test}
+  "irmin-git" {test}
 ]

@@ -41,11 +41,14 @@ let quiet () =
 module Client9p = Protocol_9p_unix.Client9p_unix.Make(Log9p)
 module DK = Datakit_client_9p.Make(Client9p)
 module Sync = Datakit_github_sync.Make(Datakit_github_api)(DK)
+module Sync_git =
+  Datakit_github_sync.Make(Datakit_github_api)(Datakit_client_git)
 
 let token () =
   let cookie = "datakit-github-cookie" in
   let error_msg =
-    Fmt.strf "Missing cookie %s/%s: use `git-jar make -s repo <user> %s`" jar_path cookie cookie in
+    Fmt.strf "Missing cookie %s/%s: use `git-jar make -s repo <user> %s`"
+      jar_path cookie cookie in
   Lwt_main.run (
     Lwt.catch (fun () ->
         let open Lwt.Infix in
@@ -65,11 +68,6 @@ let set_signal_if_supported signal handler =
   with Invalid_argument _ ->
     ()
 
-let ( >>~ ) x f =
-  x >>= function
-  | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
-  | Ok t    -> f t
-
 let () =
   Lwt.async_exception_hook := (fun exn ->
       Logs.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
@@ -78,27 +76,72 @@ let () =
 type endpoint = [
   | `File of string
   | `Tcp of string * int
+  | `Git of string
 ]
 
 let pp_endpoint ppf = function
   | `File f     -> Fmt.pf ppf "file://%s" f
   | `Tcp (h, p) -> Fmt.pf ppf "tcp://%s:%d" h p
+  | `Git d      -> Fmt.pf ppf "git://%s" d
 
 let endpoint_of_string ~default_tcp_port str =
   match String.cut ~sep:"://" str with
   | Some ("file", f) -> `Ok (`File f)
   | Some ("tcp" , s) ->
     (match String.cut ~rev:true ~sep:":" s with
-    | None              -> `Ok (`Tcp (s, default_tcp_port))
-    | Some (host, port) ->
-      try `Ok (`Tcp (host, int_of_string port))
-      with Failure _ -> `Error "use tcp://host:port")
+     | None              -> `Ok (`Tcp (s, default_tcp_port))
+     | Some (host, port) ->
+       try `Ok (`Tcp (host, int_of_string port))
+       with Failure _ -> `Error "use tcp://host:port")
+  | Some ("git", d) -> `Ok (`Git d)
   | _ -> `Error "invalid endpoint"
 
 type datakit_config = {
   endpoint: endpoint;
   branch  : string;
 }
+
+let connect_9p ~token ?webhook ?resync_interval ~cap ~branch endpoint =
+  let proto, address = match endpoint with
+    | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
+    | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
+  in
+  Lwt.catch
+    (fun () ->
+       Client9p.connect
+         proto address ~send_pings:true ~max_fids:Int32.max_int ())
+    (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
+  >>= function
+  | Error (`Msg e) ->
+    Log.err (fun l -> l "cannot connect: %s" e);
+    Lwt.fail_with "connecting to datakit"
+  | Ok conn        ->
+    Log.info (fun l -> l "Connected to %a" pp_endpoint endpoint);
+    let dk = DK.connect conn in
+    let t = Sync.empty in
+    DK.branch dk branch >>= function
+    | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
+    | Ok br   ->
+      Sync.sync ~token ?webhook ?resync_interval ~cap br t
+      >|= ignore
+
+let connect_git ~token ?webhook ?resync_interval ~cap ~branch root =
+  Datakit_client_git.connect ~head:("refs/heads/" ^ branch) ~bare:false root
+  >>= fun dk ->
+  let t = Sync_git.empty in
+  Datakit_client_git.branch dk branch >>= function
+  | Error e -> Lwt.fail_with @@ Fmt.strf "%a" Datakit_client_git.pp_error e
+  | Ok br   ->
+    Sync_git.sync ~token ?webhook ?resync_interval ~cap br t
+    >|= ignore
+
+let connect ~token ?webhook ?resync_interval ~cap d =
+  let branch = d.branch in
+  match d.endpoint with
+  | `Tcp _ | `File _ as x ->
+    connect_9p ~token ?webhook ?resync_interval ~cap ~branch x
+  | `Git root             ->
+    connect_git ~token ?webhook ?resync_interval ~cap ~branch root
 
 let start () datakit cap webhook resync_interval prometheus =
   quiet ();
@@ -137,24 +180,7 @@ let start () datakit cap webhook resync_interval prometheus =
     | Some d ->
       Log.app (fun l -> l "Connecting to %a [%s]."
                   pp_endpoint d.endpoint d.branch);
-      let proto, address = match d.endpoint with
-        | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
-        | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
-      in
-      Lwt.catch
-        (fun () -> Client9p.connect proto address ~send_pings:true ~max_fids:Int32.max_int ())
-        (fun e  -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
-      >>= function
-      | Error (`Msg e) ->
-        Log.err (fun l -> l "cannot connect: %s" e);
-        Lwt.fail_with "connecting to datakit"
-      | Ok conn        ->
-        Log.info (fun l -> l "Connected to %a" pp_endpoint d.endpoint);
-        let dk = DK.connect conn in
-        let t = Sync.empty in
-        DK.branch dk d.branch >>~ fun br ->
-        Sync.sync ~token ?webhook ?resync_interval ~cap br t
-        >|= ignore
+      connect  ~token ?webhook ?resync_interval ~cap d
   in
   Lwt_main.run @@ Lwt.choose (
     [connect_to_datakit ()] @ prometheus_threads

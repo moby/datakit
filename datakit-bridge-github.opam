@@ -17,6 +17,7 @@ depends: [
   "lwt" {>= "3.0.0"}
   "datakit-github"    {>= "0.11.0"}
   "datakit-client-9p" {>= "0.11.0"}
+  "datakit-client-git"
   "logs" "fmt"
   "mtime" {>= "1.0.0"}
   "asl" "win-eventlog"

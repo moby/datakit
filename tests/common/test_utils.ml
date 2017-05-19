@@ -20,12 +20,6 @@ let ( ++ ) = Int64.add
 
 let ok x = Lwt.return (Ok x)
 
-let ( >>!= ) x f =
-  match x with
-  | Ok y -> f y
-  | Error vfs_error ->
-    Alcotest.fail ("Vfs.error: " ^ Fmt.to_to_string Vfs.Error.pp vfs_error)
-
 let ( >>*= ) x f = x >>= function
   | Ok y -> f y
   | Error (`Msg msg) -> Alcotest.fail ("Msg: " ^ msg)
@@ -98,9 +92,6 @@ let () =
   ()
 
 module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Git.Inflate.M)
-module Store = Ivfs_tree.Make(Maker)
-module RW = Ivfs_rw.Make(Store)
-module Filesystem = Ivfs.Make(Store)
 
 type history_node = {
   id : string;
@@ -145,9 +136,6 @@ let split path =
     | Some (x, y) -> x, y
 
 let config = Irmin_mem.config ()
-
-let vfs_error = Alcotest.of_pp Vfs.Error.pp
-let vfs_result ok = Alcotest.result ok vfs_error
 
 let rec pp_history fmt {id; msg; parents} =
   Format.fprintf fmt "@[<v2>%s (%s)@\n%a@]"

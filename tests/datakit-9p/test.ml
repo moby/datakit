@@ -8,6 +8,9 @@ module Log9p = (val Logs.src_log src9p)
 
 module Client = Protocol_9p.Client.Make(Log9p)(Test_flow)
 
+module Store = Ivfs_tree.Make(Maker)
+module Filesystem = Ivfs.Make(Store)
+
 let p l = Ivfs_tree.Path.v l
 let v b = Ivfs_blob.of_string b
 

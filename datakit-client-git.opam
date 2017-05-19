@@ -1,0 +1,23 @@
+opam-version: "1.2"
+maintainer:   "thomas@gazagnaire.org"
+authors:      ["Thomas Leonard" "Magnus Skjegstad"
+               "David Scott" "Thomas Gazagnaire"]
+license:      "Apache"
+homepage:     "https://github.com/moby/datakit"
+bug-reports:  "https://github.com/moby/datakit/issues"
+dev-repo:     "https://github.com/moby/datakit.git"
+doc:          "https://docker.github.io/datakit/"
+
+build: ["jbuilder" "build" "-p" name "-j" jobs]
+build-test: ["jbuilder" "runtest" "tests/datakit-git"]
+
+depends: [
+  "jbuilder" {build}
+  "datakit-client" {>= "0.10.0"}
+  "irmin-git" {>= "1.1.0"}
+  "irmin-watcher"
+  "git-unix"
+  "alcotest"  {test}
+  "irmin-mem" {test}
+  "irmin-git" {test}
+]

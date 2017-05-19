@@ -1,5 +1,3 @@
-APP=Datakit.app
-EXE=Datakit
 PINOPTS=-y -k git
 
 BUILD=jbuilder build --dev
@@ -50,7 +48,7 @@ ci:
 
 clean:
 	rm -rf _build
-	rm -rf $(APP) $(EXE) _tests
+	rm -rf com.docker.db com.docker.db.exe COMMIT _tests
 	rm -f examples/ocaml-client/*.native
 	rm -f ci/skeleton/exampleCI.native
 	rm -f com.docker.db
@@ -62,15 +60,8 @@ bundle:
 	opam remove tls ssl -y
 	$(MAKE) clean
 	$(BUILD) src/datakit/bin/main.exe
-	mkdir -p $(APP)/Contents/MacOS/
-	mkdir -p $(APP)/Contents/Resources/lib/
-	cp _build/default/src/datakit/bin/main.exe $(APP)/Contents/MacOS/com.docker.db
+	cp _build/default/src/datakit/bin/main.exe com.docker.db
 	./scripts/check-dylib.sh
-	dylibbundler -od -b \
-	 -x $(APP)/Contents/MacOS/com.docker.db \
-	 -d $(APP)/Contents/Resources/lib \
-	 -p @executable_path/../Resources/lib
-	cp $(APP)/Contents/MacOS/com.docker.db .
 
 COMMIT:
 	@git rev-parse HEAD > COMMIT
@@ -79,9 +70,7 @@ exe:
 	opam remove tls ssl -y
 	rm -rf _build/
 	$(BUILD) src/datakit/bin/main.exe
-	mkdir -p $(EXE)
-	cp _build/debfault/src/datakit/bin/main.exe $(EXE)/datakit.exe
-	cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll $(EXE)
+	cp _build/default/src/datakit/bin/main.exe com.docker.db.exe
 
 REPO=../opam-repository
 PACKAGES=$(REPO)/packages

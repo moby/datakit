@@ -164,15 +164,17 @@ module Tree = struct
 
   let exists_file t path =
     read t path >|= function
-    | Ok (`File _) -> Ok true
-    | Ok _         -> Ok false
-    | Error _ as e -> e
+    | Ok (`File _)          -> Ok true
+    | Ok _                  -> Ok false
+    | Error `Does_not_exist -> Ok false
+    | Error _ as e          -> e
 
   let exists_dir t path =
     read t path >|= function
-    | Ok (`Dir _)  -> Ok true
-    | Ok _         -> Ok false
-    | Error _ as e -> e
+    | Ok (`Dir _)           -> Ok true
+    | Ok _                  -> Ok false
+    | Error `Does_not_exist -> Ok false
+    | Error _ as e          -> e
 
   let diff x y =
     S.Tree.diff y x >|= fun diff ->

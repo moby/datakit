@@ -108,7 +108,26 @@ type datakit_config = {
   branch  : string;
 }
 
-let connect_9p ~token ?webhook ?resync_interval ~cap ~branch endpoint =
+let monitor (type a) (module DK: Datakit_client.S with type Branch.t = a)
+    (br: a) repos =
+  let module Conv = Datakit_github_conv.Make(DK) in
+  if repos <> [] then (
+    DK.Branch.with_transaction br (fun tr ->
+        Lwt_list.iter_p (fun r ->
+            match Datakit_github.Repo.of_string r with
+            | None   -> Lwt.return_unit
+            | Some r -> Conv.update_elt tr (`Repo r)
+          ) repos
+        >>= fun () ->
+        DK.Transaction.commit tr ~message:"initial commit"
+      ) >>= function
+    | Error e -> Fmt.kstrf Lwt.fail_with "%a" DK.pp_error e
+    | Ok ()   -> Lwt.return_unit
+  ) else
+    Lwt.return_unit
+
+let connect_9p ~token ?webhook ?resync_interval ~cap ~branch ~repositories
+    endpoint =
   let proto, address = match endpoint with
     | `Tcp (host, port) -> "tcp" , Fmt.strf "%s:%d" host port
     | `File path        -> "unix", path (* FIXME: weird proto name for 9p *)
@@ -129,28 +148,31 @@ let connect_9p ~token ?webhook ?resync_interval ~cap ~branch endpoint =
     DK.branch dk branch >>= function
     | Error e -> Lwt.fail_with @@ Fmt.strf "%a" DK.pp_error e
     | Ok br   ->
+      monitor (module DK) br repositories >>= fun () ->
       Sync.sync ~token ?webhook ?resync_interval ~cap br t
       >|= ignore
 
-let connect_git ~token ?webhook ?resync_interval ~cap ~branch root =
+let connect_git ~token ?webhook ?resync_interval ~cap ~branch ~repositories
+    root =
   Datakit_client_git.connect ~head:("refs/heads/" ^ branch) ~bare:false root
   >>= fun dk ->
   let t = Sync_git.empty in
   Datakit_client_git.branch dk branch >>= function
   | Error e -> Lwt.fail_with @@ Fmt.strf "%a" Datakit_client_git.pp_error e
   | Ok br   ->
+    monitor (module Datakit_client_git) br repositories >>= fun () ->
     Sync_git.sync ~token ?webhook ?resync_interval ~cap br t
     >|= ignore
 
-let connect ~token ?webhook ?resync_interval ~cap d =
+let connect ~token ?webhook ?resync_interval ~repositories ~cap d =
   let branch = d.branch in
   match d.endpoint with
   | `Tcp _ | `File _ as x ->
-    connect_9p ~token ?webhook ?resync_interval ~cap ~branch x
+    connect_9p ~token ?webhook ?resync_interval ~cap ~branch ~repositories x
   | `Git root             ->
-    connect_git ~token ?webhook ?resync_interval ~cap ~branch root
+    connect_git ~token ?webhook ?resync_interval ~cap ~branch ~repositories root
 
-let start () datakit cap webhook resync_interval prometheus =
+let start () datakit repositories cap webhook resync_interval prometheus =
   quiet ();
   let prometheus_threads = Prometheus_unix.serve prometheus in
   set_signal_if_supported Sys.sigpipe Sys.Signal_ignore;
@@ -187,7 +209,7 @@ let start () datakit cap webhook resync_interval prometheus =
     | Some d ->
       Log.app (fun l -> l "Connecting to %a [%s]."
                   pp_endpoint d.endpoint d.branch);
-      connect  ~token ?webhook ?resync_interval ~cap d
+      connect ~token ?webhook ?resync_interval ~cap ~repositories d
   in
   Lwt_main.run @@ Lwt.choose (
     [connect_to_datakit ()] @ prometheus_threads
@@ -282,6 +304,14 @@ let capabilities =
   in
   Arg.(value & opt cap Datakit_github.Capabilities.all doc)
 
+let repositories =
+  let docs = github_options in
+  let doc =
+    Arg.info ~docs ~doc:"A list of repository to monitor on startup."
+      ["repositories";"r"]
+  in
+  Arg.(value & opt (list string) [] doc)
+
 let term =
   let doc = "Bridge between GitHub API and Datakit." in
   let man = [
@@ -291,7 +321,8 @@ let term =
         bidirectional mapping between the GitHub API and a Git branch.";
   ] in
   Term.(pure start $ setup_log
-        $ datakit $ capabilities $ webhook $ resync $ Prometheus_unix.opts),
+        $ datakit $ repositories
+        $ capabilities $ webhook $ resync $ Prometheus_unix.opts),
   Term.info (Filename.basename Sys.argv.(0)) ~version:Version.v ~doc ~man
 
 let () = match Term.eval term with

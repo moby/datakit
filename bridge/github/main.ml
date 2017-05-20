@@ -8,7 +8,14 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let src9p = Logs.Src.create "g9p" ~doc:"Github bridge for Datakit (9p)"
 module Log9p = (val Logs.src_log src9p : Logs.LOG)
 
-let jar_path = "/run/secrets"
+let jar_paths = [
+  (try Sys.getenv "HOME" with Not_found -> "") ^ "/.github/jar";
+  "/run/secrets";
+]
+
+let jar_path =
+  try List.find Sys.file_exists jar_paths
+  with Not_found -> List.hd jar_paths
 
 let quiet_9p () =
   Logs.Src.set_level src9p (Some Logs.Info);

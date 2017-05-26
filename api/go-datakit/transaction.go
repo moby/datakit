@@ -1,6 +1,8 @@
 package datakit
 
 import (
+	"bytes"
+	"io"
 	"log"
 
 	p9p "github.com/docker/go-p9p"
@@ -88,12 +90,30 @@ func (t *transaction) Write(ctx context.Context, path []string, value string) er
 		return err
 	}
 	defer file.Close(ctx)
-	_, err = file.Write(ctx, []byte(value), 0)
+	writer := file.NewIOWriter(ctx, 0)
+	_, err = writer.Write([]byte(value))
 	if err != nil {
 		log.Println("Failed to Write", path, "=", value, ":", err)
 		return err
 	}
 	return nil
+}
+
+// Read reads a key within the transaction.
+func (t *transaction) Read(ctx context.Context, path []string) (string, error) {
+	p := []string{"branch", t.fromBranch, "transactions", t.newBranch, "rw"}
+	for _, dir := range path[0 : len(path)-1] {
+		p = append(p, dir)
+	}
+	file, err := t.client.Open(ctx, p9p.OREAD, p...)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close(ctx)
+	reader := file.NewIOReader(ctx, 0)
+	buf := bytes.NewBuffer(nil)
+	io.Copy(buf, reader)
+	return string(buf.Bytes()), nil
 }
 
 // Remove deletes a key within the transaction.

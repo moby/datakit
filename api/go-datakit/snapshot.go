@@ -50,8 +50,7 @@ func Head(ctx context.Context, client *Client, fromBranch string) (string, error
 	return strings.TrimSpace(string(buf[0:n])), nil
 }
 
-// Read reads a value from the snapshot
-func (s *Snapshot) Read(ctx context.Context, path []string) (string, error) {
+func (s *Snapshot) getFullPath(path []string) []string {
 	var p []string
 
 	switch s.kind {
@@ -64,6 +63,12 @@ func (s *Snapshot) Read(ctx context.Context, path []string) (string, error) {
 	for _, element := range path {
 		p = append(p, element)
 	}
+	return p
+}
+
+// Read reads a value from the snapshot
+func (s *Snapshot) Read(ctx context.Context, path []string) (string, error) {
+	p := s.getFullPath(path)
 	file, err := s.client.Open(ctx, p9p.OREAD, p...)
 	if err != nil {
 		return "", err
@@ -73,4 +78,10 @@ func (s *Snapshot) Read(ctx context.Context, path []string) (string, error) {
 	buf := bytes.NewBuffer(nil)
 	io.Copy(buf, reader)
 	return string(buf.Bytes()), nil
+}
+
+// List returns filenames list in directory
+func (s *Snapshot) List(ctx context.Context, path []string) ([]string, error) {
+	p := s.getFullPath(path)
+	return s.client.List(ctx, p)
 }

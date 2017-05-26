@@ -1,6 +1,7 @@
 package datakit
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"net"
@@ -214,6 +215,41 @@ func (c *Client) Open(ctx context.Context, mode p9p.Flag, path ...string) (*File
 	}
 	var m sync.Mutex
 	return &File{fid: fid, c: c, m: &m, open: true}, nil
+}
+
+// List a directory
+func (c *Client) List(ctx context.Context, path []string) ([]string, error) {
+	file, err := c.Open(ctx, p9p.OREAD, path...)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close(ctx)
+
+	msize, _ := c.session.Version()
+	iounit := uint32(msize - 24) // size of message max minus fcall io header (Rread)
+
+	p := make([]byte, iounit)
+
+	n, err := c.session.Read(ctx, file.fid, p, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	files := []string{}
+
+	rd := bytes.NewReader(p[:n])
+	codec := p9p.NewCodec() // TODO(stevvooe): Need way to resolve codec based on session.
+	for {
+		var d p9p.Dir
+		if err := p9p.DecodeDir(codec, rd, &d); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return files, err
+		}
+		files = append(files, d.Name)
+	}
+	return files, nil
 }
 
 // Close closes a file

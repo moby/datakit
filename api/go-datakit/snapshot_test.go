@@ -43,4 +43,12 @@ func TestSnapshot(t *testing.T) {
 	if expected != actual {
 		t.Fatalf("Value in snapshot (%v) doesn't match the value we wrote (%v)", actual, expected)
 	}
+	testpath := []string{"snapshot", "test"}
+	list, err := snap.List(ctx, testpath)
+	if err != nil {
+		t.Fatalf("Failed to list path %v from snapshot %v: %v", testpath, sha, err)
+	}
+	if len(list) != 1 && list[0] != "time" {
+		t.Fatalf("Value in snapshot (%v) doesn't match the value we wrote (%v)", actual, expected)
+	}
 }

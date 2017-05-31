@@ -100,6 +100,9 @@ module type S = Irmin.S
    and type Tree.Hash.t = hash
    and type Contents.Hash.t = hash
 
+(** Make an DataKit store from a normal Irmin backend. *)
+module Make (M: Irmin.S_MAKER): S
+
 (** Similar to [Irmin_git.S_MAKER] *)
 module type GIT_S_MAKER =
   functor (C: Irmin.Contents.S) ->

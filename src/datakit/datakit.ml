@@ -22,6 +22,8 @@ module type S = Store.S
 module type GIT_S_MAKER = Store.GIT_S_MAKER
 module Make_git = Store.Make_git
 
+module Make (M: Irmin.S_MAKER) = M (Metadata)(Blob)(Path)(Branch)(Hash)
+
 module type VFS = sig
   type repo
   val create: info:(string -> Irmin.Info.t) -> repo -> Vfs.Dir.t

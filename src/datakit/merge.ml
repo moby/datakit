@@ -1,36 +1,32 @@
 open Astring
 open Lwt.Infix
 
-type path = Ivfs_tree.path
-type step = Ivfs_tree.step
-
-module Path = struct
-  include Ivfs_tree.Path
-  let compare = Irmin.Type.compare t
-end
-module PathSet = Set.Make(Path)
+type path = Path.t
+type step = Path.step
+type blob = Blob.t
+type perm = Metadata.t
 
 module type RW = sig
   type t
-  val update_force : t -> Ivfs_tree.path -> string -> Ivfs_blob.t * Ivfs_tree.perm -> unit Lwt.t
-  val remove_force : t -> Ivfs_tree.path -> string -> unit Lwt.t
+  val update_force : t -> path -> string -> blob * perm -> unit Lwt.t
+  val remove_force : t -> path -> string -> unit Lwt.t
 end
 
-module Make (Store : Ivfs_tree.S) (RW : RW) = struct
+module Make (Store : Store.S) (RW : RW) = struct
   module Metadata = Store.Metadata
   module Dir = Store.Tree
 
   let merge_file =
-    let blob = Irmin.Merge.idempotent Irmin.Type.(pair Ivfs_blob.t Metadata.t) in
+    let blob = Irmin.Merge.idempotent Irmin.Type.(pair Blob.t Metadata.t) in
     Irmin.Merge.(option blob)
 
   let map tree = Dir.list tree Store.Key.empty >|= String.Map.of_list
 
   let merge ~ours ~theirs ~base result =
-    let conflicts = ref PathSet.empty in
+    let conflicts = ref Path.Set.empty in
     let note_conflict path leaf msg =
-      conflicts := !conflicts |> PathSet.add (Store.Key.rcons path leaf);
-      let f = Ivfs_blob.of_string (Printf.sprintf "** Conflict **\n%s\n" msg) in
+      conflicts := !conflicts |> Path.Set.add (Store.Key.rcons path leaf);
+      let f = Blob.string (Printf.sprintf "** Conflict **\n%s\n" msg) in
       RW.update_force result path leaf (f, `Normal)
     in
     let as_dir = function

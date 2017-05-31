@@ -48,9 +48,9 @@ let info msg =
 module Git_fs_store = struct
   open Datakit_io
   module Maker = Irmin_git.FS.Make(IO)(Git.Inflate.M)(FS)
-  module Store = Ivfs_tree.Make(Maker)
+  module Store = Datakit.Make_git(Maker)
   type t = Store.Repo.t
-  module Filesystem = Ivfs.Make(Store)
+  module Filesystem = Datakit.Vfs(Store)
   let listener = lazy (
     Irmin.Private.Watch.set_listen_dir_hook Irmin_watcher.hook
   )
@@ -69,9 +69,9 @@ end
 module In_memory_store = struct
   open Datakit_io
   module Maker = Irmin_git.Mem.Make(IO)(Git.Inflate.M)
-  module Store = Ivfs_tree.Make(Maker)
+  module Store = Datakit.Make_git(Maker)
   type t = Store.Repo.t
-  module Filesystem = Ivfs.Make(Store)
+  module Filesystem = Datakit.Vfs(Store)
 
   let repo () =
     let config = Irmin_mem.config () in

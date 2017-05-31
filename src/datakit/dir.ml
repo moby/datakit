@@ -1,6 +1,10 @@
 open Lwt.Infix
 open Result
 
+type path = Path.t
+type perm = Metadata.t
+type blob = Blob.t
+
 let ( >>*= ) x f =
   x >>= function
   | Ok y -> f y
@@ -12,7 +16,7 @@ let doesnt_fail = function
   | Ok x -> x
   | Error (_:impossible) -> assert false
 
-module Make (Store : Ivfs_tree.S) = struct
+module Make (Store : Store.S) = struct
 
   type t = {
     repo : Store.Repo.t;
@@ -20,7 +24,7 @@ module Make (Store : Ivfs_tree.S) = struct
     mutex : Lwt_mutex.t;
   }
 
-  let of_dir repo root = {
+  let v repo root = {
     repo; root;
     mutex = Lwt_mutex.create ();
   }
@@ -60,8 +64,8 @@ module Make (Store : Ivfs_tree.S) = struct
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
     let update ~old_perm =
       let perm = match perm with
-        | #Ivfs_tree.perm as p -> p
-        | `Keep -> old_perm
+        | #Metadata.t as p -> p
+        | `Keep            -> old_perm
       in
       Store.Tree.add dir step ~metadata:perm value
       >|= fun new_dir -> Ok new_dir
@@ -82,7 +86,7 @@ module Make (Store : Ivfs_tree.S) = struct
       let file =
         match perm with
         | `Normal | `Exec as perm -> `Contents (f, perm)
-        | `Link target            -> `Contents (Ivfs_blob.of_string target, `Link)
+        | `Link target            -> `Contents (Blob.string target, `Link)
       in
       Store.Tree.add_tree dir step file >|= fun new_dir -> Ok new_dir
 

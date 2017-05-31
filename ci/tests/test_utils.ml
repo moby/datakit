@@ -1,5 +1,5 @@
 module Maker = Irmin_git.Mem.Make(Datakit_io.IO)(Git.Inflate.M)
-module Store = Ivfs_tree.Make(Maker)
+module Store = Datakit.Make_git(Maker)
 
 open Datakit_github
 open Result
@@ -41,7 +41,7 @@ let make_task msg =
   Irmin.Info.v ~date ~author:"datakit-ci-test" msg
 
 module Server = Fs9p.Make(Protocol_9p_unix.Flow_lwt_unix)
-module Filesystem = Ivfs.Make(Store)
+module Filesystem = Datakit.Vfs(Store)
 
 let p = Path.of_string_exn
 

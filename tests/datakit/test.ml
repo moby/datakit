@@ -10,10 +10,10 @@ let ( >>!= ) x f =
 let vfs_error = Alcotest.of_pp Vfs.Error.pp
 let vfs_result ok = Alcotest.result ok vfs_error
 
-module Store = Ivfs_tree.Make(Maker)
-module RW = Ivfs_rw.Make(Store)
+module Store = Datakit.Make_git(Maker)
+module RW = Datakit.Dir(Store)
 
-let p l = Ivfs_tree.Path.v l
+let p l = Datakit.Path.v l
 
 module RW_err = struct
   type t = [`Not_a_directory | `Is_a_directory]
@@ -61,12 +61,12 @@ let test_writes () =
   end
 
 let test_rw () =
-  let v x = Ivfs_blob.of_string x, `Normal in
+  let v x = Datakit.Blob.string x, `Normal in
   let err = (module RW_err : Alcotest.TESTABLE with type t = RW_err.t) in
   let err1 = (module RW_err1 : Alcotest.TESTABLE with type t = RW_err1.t) in
   Lwt_main.run begin
     Store.Repo.v config >>= fun repo ->
-    let rw = RW.of_dir repo Store.Tree.empty in
+    let rw = RW.v repo Store.Tree.empty in
 
     RW.update rw (p []) "foo" (v "a")
     >|= Alcotest.(check (result unit err)) "Write /a" (Ok ()) >>= fun () ->
@@ -109,40 +109,40 @@ let test_rw () =
 
 let test_blobs_fast_path () =
   let correct = ref (Cstruct.create 0) in
-  let blob = ref Ivfs_blob.empty in
+  let blob = ref Datakit.Blob.empty in
   for _ = 1 to 100 do
     let data = Cstruct.create (Random.int 10) in
     for j = 0 to Cstruct.len data - 1 do
       Cstruct.set_uint8 data j (Random.int 26 + 65)
     done;
     correct := Cstruct.append !correct data;
-    Ivfs_blob.write !blob ~offset:(Ivfs_blob.len !blob) data >>!= fun b ->
+    Datakit.Blob.write !blob ~offset:(Datakit.Blob.len !blob) data >>!= fun b ->
     blob := b
   done;
   let correct = Cstruct.to_string !correct in
-  let actual = Ivfs_blob.to_string !blob in
+  let actual = Datakit.Blob.to_string !blob in
   Alcotest.(check string) "Fast-append worked" correct actual
 
 let test_blobs_random () =
   let int64 = Alcotest.of_pp Fmt.int64 in
-  let str b = Ivfs_blob.to_string b in
+  let str b = Datakit.Blob.to_string b in
   let read_ok b ~offset ~count =
-    Ivfs_blob.read b ~offset ~count >>!= Cstruct.to_string
+    Datakit.Blob.read b ~offset ~count >>!= Cstruct.to_string
   in
   let write_ok b ~offset data =
-    Ivfs_blob.write b ~offset (Cstruct.of_string data) >>!= fun x -> x
+    Datakit.Blob.write b ~offset (Cstruct.of_string data) >>!= fun x -> x
   in
-  let truncate_ok b len = Ivfs_blob.truncate b len >>!= fun x -> x in
+  let truncate_ok b len = Datakit.Blob.truncate b len >>!= fun x -> x in
   (* Empty *)
-  let b = Ivfs_blob.empty in
-  Alcotest.check int64 "Empty" 0L (Ivfs_blob.len b);
+  let b = Datakit.Blob.empty in
+  Alcotest.check int64 "Empty" 0L (Datakit.Blob.len b);
   (* Negative offset write *)
-  let bad_write = Ivfs_blob.write b ~offset:(-2L) (Cstruct.of_string "bad") in
+  let bad_write = Datakit.Blob.write b ~offset:(-2L) (Cstruct.of_string "bad") in
   Alcotest.check (vfs_result reject) "Negative offset"
     (Vfs.Error.negative_offset (-2L)) bad_write;
   (* Write *)
   let b = write_ok b ~offset:2L "1st" in
-  Alcotest.check int64 "1st write" 5L (Ivfs_blob.len b);
+  Alcotest.check int64 "1st write" 5L (Datakit.Blob.len b);
   Alcotest.(check string) "Append with gap" "\x00\x001st" (str b);
   let b = write_ok b ~offset:0L "AB" in
   Alcotest.(check string) "Overwrite" "AB1st" (str b);
@@ -155,7 +155,7 @@ let test_blobs_random () =
   Alcotest.(check string) "Truncate short" "AB1" (str (truncate_ok b 3L));
   Alcotest.(check string) "Truncate zero" "" (str (truncate_ok b 0L));
   Alcotest.check (vfs_result reject) "Truncate negative"
-    (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.truncate b (-1L));
+    (Vfs.Error.negative_offset (-1L)) (Datakit.Blob.truncate b (-1L));
   (* Read *)
   Alcotest.(check string) "Read neg" "" (read_ok b ~offset:2L ~count:(-3));
   Alcotest.(check string) "Read zero" "" (read_ok b ~offset:2L ~count:0);
@@ -164,9 +164,9 @@ let test_blobs_random () =
   Alcotest.(check string) "Read long" "1st" (read_ok b ~offset:2L ~count:4);
   Alcotest.(check string) "Read EOF" "" (read_ok b ~offset:5L ~count:4);
   Alcotest.check (vfs_result reject) "Read negative"
-    (Vfs.Error.negative_offset (-1L)) (Ivfs_blob.read b ~offset:(-1L) ~count:1);
+    (Vfs.Error.negative_offset (-1L)) (Datakit.Blob.read b ~offset:(-1L) ~count:1);
   Alcotest.check (vfs_result reject) "Read after EOF"
-    (Vfs.Error.offset_too_large ~offset:6L 5L) (Ivfs_blob.read b ~offset:6L ~count:1);
+    (Vfs.Error.offset_too_large ~offset:6L 5L) (Datakit.Blob.read b ~offset:6L ~count:1);
   ()
 
 let test_streams () =

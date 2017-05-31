@@ -4,5 +4,5 @@
  ((name        datakit)
   (public_name datakit)
   (wrapped     false)
-  (libraries   (datakit_io bytes lwt astring logs result cstruct fmt rresult
+  (libraries   (bytes lwt astring logs result cstruct fmt rresult
                 irmin-mem datakit-server asetmap prometheus-app))))

@@ -1,7 +1,4 @@
-FROM ocaml/opam-dev@sha256:64dc0522876ebbd27b186e3ba955ae5ab864ace580add5b0d1abb8715bdf1bbe
-RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset origin/master --hard && \
-    opam update -u
+FROM ocaml/opam-dev@sha256:1dd4440b3e5f182f705cb5a74f9d4e860c2842b45ed72c199de89a894d13f522
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1

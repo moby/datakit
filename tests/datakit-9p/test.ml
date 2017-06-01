@@ -8,11 +8,11 @@ module Log9p = (val Logs.src_log src9p)
 
 module Client = Protocol_9p.Client.Make(Log9p)(Test_flow)
 
-module Store = Ivfs_tree.Make(Maker)
-module Filesystem = Ivfs.Make(Store)
+module Store = Datakit.Make_git(Maker)
+module Filesystem = Datakit.Vfs(Store)
 
-let p l = Ivfs_tree.Path.v l
-let v b = Ivfs_blob.of_string b
+let p l = Datakit.Path.v l
+let v b = Datakit.Blob.string b
 
 let root_entries =
   ["branch"; "debug"; "snapshots"; "trees"; "commits"; "remotes"]
@@ -623,7 +623,7 @@ let test_watch repo conn =
   Store.set master ~info (p ["src"; "Makefile"]) (v "all: build") >>= fun () ->
   Store.get master (p ["src"; "Makefile"]) >>= fun makefile_init ->
   Alcotest.(check string)
-    "Makefile contents" "all: build" (Ivfs_blob.to_string makefile_init);
+    "Makefile contents" "all: build" (Datakit.Blob.to_string makefile_init);
   with_stream conn
     ["branch"; "master"; "watch"; "src.node"; "Makefile.node"; "tree.live"]
   @@ fun makefile ->

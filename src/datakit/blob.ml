@@ -19,16 +19,16 @@ let len t = Cstruct.lenv !t
 let empty_cs = Cstruct.create 0
 let empty = ref []
 
-let of_string s = ref [Cstruct.of_string s]
+let string s = ref [Cstruct.of_string s]
 
-let of_ro_cstruct cs = ref [cs]
+let ro_cstruct cs = ref [cs]
 
 let to_ro_cstruct t =
   let cs = Cstruct.concat (List.rev !t) in
   t := [cs];
   cs
 
-let t = Irmin.Type.(like cstruct) of_ro_cstruct to_ro_cstruct
+let t = Irmin.Type.(like cstruct) ro_cstruct to_ro_cstruct
 
 let to_string t =
   Cstruct.to_string (to_ro_cstruct t)
@@ -72,7 +72,7 @@ let write old ~offset data =
   else (
     let offset = Int64.to_int offset in
     if offset = len old then Ok (ref (data :: !old))
-    else Ok (of_ro_cstruct (overwrite (to_ro_cstruct old) (data, offset)))
+    else Ok (ro_cstruct (overwrite (to_ro_cstruct old) (data, offset)))
   )
 
 let truncate old = function
@@ -83,10 +83,13 @@ let truncate old = function
     let extra = new_len - len old in
     if extra = 0 then Ok old
     else if extra < 0 then (
-      Ok (of_ro_cstruct (Cstruct.sub (to_ro_cstruct old) 0 new_len))
+      Ok (ro_cstruct (Cstruct.sub (to_ro_cstruct old) 0 new_len))
     ) else (
       let padding = Cstruct.create extra in
       Ok (ref (padding :: !old))
     )
 
 let len t = Int64.of_int (len t)
+
+let merge = Irmin.Merge.(option @@ default t)
+let of_string x = Ok (string x)

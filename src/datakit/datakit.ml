@@ -5,9 +5,24 @@ open Lwt.Infix
 let src = Logs.Src.create "DataKit" ~doc:"Irmin VFS for DataKit"
 module Log = (val Logs.src_log src : Logs.LOG)
 
-module PathSet = Ivfs_merge.PathSet
+module Hash = Irmin.Hash.SHA1
+module Path = Path
+module Metadata = Metadata
+module Branch = Branch
+module Blob = Blob
 
-module type S = sig
+type hash = Hash.t
+type path = Path.t
+type step = Path.step
+type perm = Metadata.t
+type branch = Branch.t
+type blob = Blob.t
+
+module type S = Store.S
+module type GIT_S_MAKER = Store.GIT_S_MAKER
+module Make_git = Store.Make_git
+
+module type VFS = sig
   type repo
   val create: info:(string -> Irmin.Info.t) -> repo -> Vfs.Dir.t
 end
@@ -28,15 +43,16 @@ let err_invalid_hash h x =
   Vfs.error "invalid-hash %S: %s" h (Printexc.to_string x)
 let err_not_fast_forward = Vfs.error "not-fast-forward"
 
-module Make (Store : Ivfs_tree.S) = struct
+module Dir = Dir.Make
+
+module Vfs (Store : Store.S) = struct
 
   type repo = Store.Repo.t
   let empty_inode_map: Vfs.Inode.t String.Map.t = String.Map.empty
 
-  module Path = Store.Key
-  module RW = Ivfs_rw.Make(Store)
-  module Merge = Ivfs_merge.Make(Store)(RW)
-  module Remote = Ivfs_remote.Make(Store)
+  module Dir = Dir(Store)
+  module Merge = Merge.Make(Store)(Dir)
+  module Remote = Remote.Make(Store)
 
   let commit_of_commit_id repo name =
     match Store.Commit.Hash.of_string name with
@@ -94,29 +110,29 @@ module Make (Store : Ivfs_tree.S) = struct
   module PathSetFile : sig
     type t
     val make : unit -> t
-    val add_all : t -> PathSet.t -> unit
-    val read : t -> PathSet.t
+    val add_all : t -> Path.Set.t -> unit
+    val read : t -> Path.Set.t
     val remove_file : t -> Store.Key.t -> unit
     val remove_subtree : t -> Store.Key.t -> unit
     val file : t -> Vfs.File.t
   end = struct
-    type t = PathSet.t ref
+    type t = Path.Set.t ref
 
     let format_conflicts conflicts =
       let lines =
         conflicts
-        |> PathSet.elements
+        |> Path.Set.elements
         |> List.map (fun p -> Fmt.strf "%a\n" Store.Key.pp p)
       in
       Cstruct.of_string (String.concat ~sep:"" lines)
 
     let make () =
-      ref PathSet.empty
+      ref Path.Set.empty
 
     let read t = !t
 
     let remove_file t path =
-      t := PathSet.remove path !t
+      t := Path.Set.remove path !t
 
     let rec has_prefix ~prefix p =
       match Path.decons prefix, Path.decons p with
@@ -127,28 +143,28 @@ module Make (Store : Ivfs_tree.S) = struct
       | _ -> false
 
     let remove_subtree t path =
-      t := PathSet.filter (has_prefix ~prefix:path) !t
+      t := Path.Set.filter (has_prefix ~prefix:path) !t
 
     let add_all t xs =
-      t := PathSet.union !t xs
+      t := Path.Set.union !t xs
 
     let file t =
       let read () = ok (Some (format_conflicts !t)) in
       Vfs.File.of_kvro ~read ~stat:(Vfs.File.stat_of ~read)
   end
 
-  let empty_file = Ivfs_blob.empty
+  let empty_file = Blob.empty
 
   let stat path root =
     Store.Tree.find_tree root path >>= function
     | None -> err_no_entry
     | Some (`Node _) -> err_is_dir
     | Some (`Contents (f, (`Normal | `Exec as perm))) ->
-      let length = Ivfs_blob.len f in
+      let length = Blob.len f in
       ok {Vfs.length; perm}
     | Some (`Contents (f, `Link)) ->
-      let length = Ivfs_blob.len f in
-      let target = Ivfs_blob.to_string f in
+      let length = Blob.len f in
+      let target = Blob.to_string f in
       ok {Vfs.length; perm = `Link target}
 
   let irmin_ro_file ~get_root path =
@@ -158,7 +174,7 @@ module Make (Store : Ivfs_tree.S) = struct
       | None -> Lwt.return (Ok None)
       | Some (`Node _) -> err_is_dir
       | Some (`Contents (f, _perm)) ->
-        ok (Some (Ivfs_blob.to_ro_cstruct f))
+        ok (Some (Blob.to_ro_cstruct f))
     in
     let stat () = get_root () >>= stat path in
     Vfs.File.of_kvro ~read ~stat
@@ -168,7 +184,7 @@ module Make (Store : Ivfs_tree.S) = struct
     | None -> assert false
     | Some (dir, leaf) ->
       let blob () =
-        let root = RW.root view in
+        let root = Dir.root view in
         Store.Tree.find_tree root path >>= function
         | None -> Lwt.return (Ok None)
         | Some (`Node _) -> err_is_dir
@@ -176,24 +192,24 @@ module Make (Store : Ivfs_tree.S) = struct
       in
       let blob_or_empty () =
         blob () >>*= function
-        | None -> ok Ivfs_blob.empty
+        | None -> ok Blob.empty
         | Some b -> ok b in
       let remove () =
-        RW.remove view dir leaf >>= function
+        Dir.remove view dir leaf >>= function
         | Error `Not_a_directory -> err_not_dir
         | Ok () ->
           remove_conflict path; Lwt.return (Ok ())
       in
-      let stat () = RW.root view |> stat path in
+      let stat () = Dir.root view |> stat path in
       let chmod perm =
-        RW.chmod view dir leaf perm >>= function
+        Dir.chmod view dir leaf perm >>= function
         | Error `Is_a_directory -> err_is_dir
         | Error `Not_a_directory -> err_not_dir
         | Error `No_such_item -> err_no_entry
         | Ok () -> Lwt.return (Ok ())
       in
       let update b =
-        RW.update view dir leaf (b, `Keep) >>= function
+        Dir.update view dir leaf (b, `Keep) >>= function
         | Error `Is_a_directory -> err_is_dir
         | Error `Not_a_directory -> err_not_dir
         | Ok () ->
@@ -205,16 +221,16 @@ module Make (Store : Ivfs_tree.S) = struct
           blob () >>*= function
           | None -> err_no_entry
           | Some b ->
-            Lwt.return (Ivfs_blob.read ~offset ~count b)
+            Lwt.return (Blob.read ~offset ~count b)
         and write ~offset data =
           blob_or_empty () >>*= fun b ->
-          Lwt.return (Ivfs_blob.write b ~offset data) >>*= update
+          Lwt.return (Blob.write b ~offset data) >>*= update
         in
         ok @@ Vfs.File.create_fd ~read ~write
       in
       let truncate len =
         blob_or_empty () >>*= fun b ->
-        Lwt.return (Ivfs_blob.truncate b len) >>*= update
+        Lwt.return (Blob.truncate b len) >>*= update
       in
       Vfs.File.create ~stat ~open_ ~truncate ~remove ~chmod
 
@@ -307,7 +323,7 @@ module Make (Store : Ivfs_tree.S) = struct
          that list in the server's memory. Meet [extra_dirs]. *)
       let extra_dirs = ref empty_inode_map in
       let ls () =
-        let root = RW.root view in
+        let root = Dir.root view in
         begin Store.Tree.find_tree root path >>= function
           | None | Some (`Contents _) -> Lwt.return [] (* in parent's extra_dirs? *)
           | Some (`Node _ as dir) -> Store.Tree.list dir Store.Key.empty
@@ -318,8 +334,8 @@ module Make (Store : Ivfs_tree.S) = struct
       in
       let mkfile name perm =
         begin match perm with
-          | `Normal | `Exec as perm -> RW.update view path name (empty_file, perm)
-          | `Link target -> RW.update view path name (Ivfs_blob.of_string target, `Link)
+          | `Normal | `Exec as perm -> Dir.update view path name (empty_file, perm)
+          | `Link target -> Dir.update view path name (Blob.string target, `Link)
         end >>= function
         | Error `Not_a_directory -> err_not_dir
         | Error `Is_a_directory -> err_is_dir
@@ -330,7 +346,7 @@ module Make (Store : Ivfs_tree.S) = struct
       in
       let lookup name =
         let real_result =
-          let snapshot = RW.root view in
+          let snapshot = Dir.root view in
           Store.Tree.find_tree snapshot path >>= function
           | None | Some (`Contents _) -> err_no_entry
           | Some (`Node _ as dir) ->
@@ -360,7 +376,7 @@ module Make (Store : Ivfs_tree.S) = struct
         | None -> err_read_only
         | Some (dir, leaf) ->
           (* FIXME: is this correct? *)
-          RW.remove view dir leaf >>= function
+          Dir.remove view dir leaf >>= function
           | Error `Not_a_directory -> err_not_dir
           | Ok () ->
             extra_dirs := String.Map.empty;
@@ -374,7 +390,7 @@ module Make (Store : Ivfs_tree.S) = struct
         let old_name = Vfs.Inode.basename inode in
         let in_extras = String.Map.mem old_name !extra_dirs in
         if in_extras then extra_dirs := String.Map.remove old_name !extra_dirs;
-        RW.rename view path ~old_name ~new_name >>= function
+        Dir.rename view path ~old_name ~new_name >>= function
         | Error `Is_a_directory -> err_is_dir
         | Error `No_such_item when in_extras ->
           extra_dirs := String.Map.add new_name inode !extra_dirs;
@@ -433,7 +449,7 @@ module Make (Store : Ivfs_tree.S) = struct
     type t = {
       repo : Store.Repo.t;
       store : Store.t;                 (* The branch we're going to commit on *)
-      view : RW.t;         (* The read/write directory with the current state *)
+      view : Dir.t;        (* The read/write directory with the current state *)
       get_msg : unit -> string;
       parents : CommitListFile.t;
       conflicts : PathSetFile.t;
@@ -471,7 +487,7 @@ module Make (Store : Ivfs_tree.S) = struct
 
     let check_no_conflicts conflicts =
       match PathSetFile.read conflicts with
-      | e when not (PathSet.is_empty e) ->
+      | e when not (Path.Set.is_empty e) ->
         Vfs.error "conflicts file is not empty"
       | _ -> ok ()
 
@@ -483,7 +499,7 @@ module Make (Store : Ivfs_tree.S) = struct
         | "" -> "(no commit message)"
         | x -> x
       in
-      let root = RW.root t.view in
+      let root = Dir.root t.view in
       Store.Commit.v t.repo ~info:(info msg) ~parents root >|= fun c ->
       Ok (c, "Merge", parents)
 
@@ -516,7 +532,7 @@ module Make (Store : Ivfs_tree.S) = struct
       let t = {
         repo;
         store;
-        view = RW.of_dir repo orig_root;
+        view = Dir.v repo orig_root;
         get_msg;
         parents = CommitListFile.make repo parents;
         conflicts = PathSetFile.make ();
@@ -528,7 +544,7 @@ module Make (Store : Ivfs_tree.S) = struct
       let add inode = String.Map.add (Vfs.Inode.basename inode) inode in
       let ctl = Vfs.File.command (transactions_ctl t ~info ~remover) in
       let origin = Vfs.File.ro_of_string (Fmt.to_to_string Store.Key.pp path) in
-      let diff = Diff.vfs_dir repo (fun  () -> Lwt.return (RW.root t.view)) in
+      let diff = Diff.vfs_dir repo (fun  () -> Lwt.return (Dir.root t.view)) in
       let common =
         empty_inode_map
         |> add stage
@@ -853,7 +869,7 @@ module Make (Store : Ivfs_tree.S) = struct
           Store.Contents.of_hash repo hash >|= function
           | None      -> Vfs.Error.no_entry
           | Some data ->
-            let data = Ivfs_blob.to_string data in
+            let data = Blob.to_string data in
             let perm =
               match ty with
               | `Normal | `Exec as perm -> perm

@@ -117,13 +117,14 @@ module PR: sig
     state: [`Open | `Closed];
     title: string;
     base: string;
+    owner: string;
   }
 
-  val v: ?state:[`Open|`Closed] -> title:string -> ?base:string ->
-    Commit.t -> int -> t
-  (** [v c n ~title] is the pull-request [n] with head commit [c] and
-      title [title]. If [base] is not set, use ["master"]. If [state]
-      is not set, use [`Open]. *)
+  val v: ?state:[`Open|`Closed] -> title:string -> ?base:string -> owner:string
+    -> Commit.t -> int -> t
+  (** [v c n ~title ~owner] is the pull-request [n] with head commit
+      [c], title [title] and owner [owner]. If [base] is not set, use
+      ["master"]. If [state] is not set, use [`Open]. *)
 
   val pp: t Fmt.t
   (** [pp] is the pretty-printer for pull-request values. *)
@@ -168,6 +169,9 @@ module PR: sig
 
   val title: t -> string
   (** [title t] is [t]'s title. *)
+
+  val owner: t -> string
+  (** [owner t] is [t]'s owner. *)
 
   val same_id: t -> t -> bool
   (** [same_id x y] is true if [x] and [y] have the same ID. *)

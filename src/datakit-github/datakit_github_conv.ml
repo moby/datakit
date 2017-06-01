@@ -226,6 +226,7 @@ module Make (DK: S) = struct
       write "head"  (PR.commit_hash pr)              >>*= fun () ->
       write "state" (PR.string_of_state pr.PR.state) >>*= fun () ->
       write "title" pr.PR.title                      >>*= fun () ->
+      write "owner" pr.PR.owner                      >>*= fun () ->
       write "base"  pr.PR.base
     in
     lift_errors "update_pr" update
@@ -241,17 +242,22 @@ module Make (DK: S) = struct
     read_file_if_exists tree (dir / "head")  >>= fun head ->
     read_file_if_exists tree (dir / "state") >>= fun state ->
     read_file_if_exists tree (dir / "title") >>= fun title ->
+    read_file_if_exists tree (dir / "owner") >>= fun owner ->
     read_file_if_exists tree (dir / "base")  >|= fun base ->
-    match head, state with
-    | None, _ ->
+    match head, state, owner with
+    | None, _, _ ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/head does not exist" Repo.pp repo number);
       None
-    | _, None ->
+    | _, None, _ ->
       Log.debug (fun l ->
           l "error: %a/pr/%d/state does not exist" Repo.pp repo number);
       None
-    | Some id, Some state ->
+    | _, _, None ->
+      Log.debug (fun l ->
+          l "error: %a/pr/%d/owner does not exist" Repo.pp repo number);
+      None
+    | Some id, Some state, Some owner ->
       let base = match base with
         | Some b -> b
         | None   ->
@@ -270,7 +276,7 @@ module Make (DK: S) = struct
                 state);
           `Closed
       in
-      Some (PR.v ~state ~title ~base head number)
+      Some (PR.v ~state ~title ~base ~owner head number)
 
   let reduce_prs = List.fold_left PR.Set.union PR.Set.empty
 

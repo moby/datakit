@@ -339,7 +339,8 @@ module Make (DK: Test_client.S) = struct
             let base = pr.PR.base in
             let commit = pr.PR.head in
             let number = pr.PR.number in
-            let pr = PR.v ~state:`Closed ~title ~base commit number in
+            let owner = pr.PR.owner in
+            let pr = PR.v ~state:`Closed ~title ~base ~owner commit number in
             Event.PR pr)
       in
       let close_refs =
@@ -603,10 +604,10 @@ module Make (DK: Test_client.S) = struct
 
   let base = "master"
 
-  let pr1 = PR.v ~state:`Open   ~title:""     ~base commit_foo 1
-  let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base commit_foo 1
-  let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base commit_bar 2
-  let pr4 = PR.v ~state:`Open   ~title:"toto" ~base commit_bar 2
+  let pr1 = PR.v ~state:`Open   ~title:""     ~base ~owner:"sam" commit_foo 1
+  let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base ~owner:"ana" commit_foo 1
+  let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base ~owner:"aby" commit_bar 2
+  let pr4 = PR.v ~state:`Open   ~title:"toto" ~base ~owner:"joe" commit_bar 2
 
   let ref1 = Ref.v commit_bar ["heads";"master"]
   let ref2 = Ref.v commit_foo ["heads";"master"]
@@ -678,6 +679,7 @@ module Make (DK: Test_client.S) = struct
     let titles = [| "it works!"; "merge me"; "yay!" |]
     let commits =  [| "123"; "456"; "789"; "0ab"; "abc"; "def" |]
     let bases = [| "master"; "test"; "foo" |]
+    let owners = [| "jack"; "joe"; "julia"; "amy" |]
     let pr_states = [| `Closed; `Open  |]
     let users = [| "a"; "b" |]
     let repos = [| "a"; "b"; "c" |]
@@ -725,6 +727,7 @@ module Make (DK: Test_client.S) = struct
     let build_state ~random = choose ~random Data.build_states
     let pr_state ~random = choose ~random Data.pr_states
     let base ~random = choose ~random Data.bases
+    let owner ~random = choose ~random Data.owners
     let title ~random = choose ~random Data.titles
     let url ~random = choose ~random Data.urls
     let context ~random = choose ~random Data.contexts
@@ -745,7 +748,8 @@ module Make (DK: Test_client.S) = struct
         let number = Random.State.int random 10 in
         let state = pr_state ~random in
         let base = base ~random in
-        let r = PR.v ~title ~base ~state head number in
+        let owner = owner ~random in
+        let r = PR.v ~title ~base ~state ~owner head number in
         if List.exists (PR.same_id r) x then aux () else r
       in
       aux ()
@@ -812,27 +816,31 @@ module Make (DK: Test_client.S) = struct
       let old_prs = List.rev old_prs in
       let old_prs =
         List.fold_left (fun prs pr ->
-            let mk_title = title and mk_base = base in
+            let mk_title = title and mk_base = base and mk_owner = owner in
             let state = pr.PR.state in
             let title = pr.PR.title in
             let head = pr.PR.head in
             let base = pr.PR.base in
+            let owner = pr.PR.owner in
             let n = pr.PR.number in
             let pr = match Random.State.int random 5 with
               | 0 ->
                 let state = match pr.PR.state with
                   | `Open -> `Closed | `Closed -> `Open
                 in
-                PR.v ~state ~title ~base head n
+                PR.v ~state ~title ~base ~owner head n
               | 1 ->
                 let head = commit ~random ~repo () in
-                PR.v ~state ~title ~base head n
+                PR.v ~state ~title ~base ~owner head n
               | 2 ->
                 let title = mk_title ~random in
-                PR.v ~state ~title ~base head n
+                PR.v ~state ~title ~base ~owner head n
               | 3 ->
                 let base = mk_base ~random in
-                PR.v ~state ~title ~base head n
+                PR.v ~state ~title ~base ~owner head n
+              | 4 ->
+                let owner = mk_owner ~random in
+                PR.v ~state ~title ~base ~owner head n
               | _ -> pr
             in
             pr :: prs
@@ -850,7 +858,8 @@ module Make (DK: Test_client.S) = struct
           let number = !next_pr in
           incr next_pr;
           let title = "PR#" ^ string_of_int number in
-          let pr = PR.v ~state:`Open ~title ~base head number in
+          let owner = owner ~random in
+          let pr = PR.v ~state:`Open ~title ~base ~owner head number in
           make_prs (pr :: acc) (n - 1)
       in
       make_prs old_prs n_prs |> List.rev
@@ -1228,7 +1237,7 @@ module Make (DK: Test_client.S) = struct
     DK.Tree.read_dir tree pr >>*= fun dirs ->
     check_dirs "pr 1" ["2"] dirs ;
     DK.Tree.read_dir tree (pr / "2") >>*= fun dirs ->
-    check_dirs "pr 2" ["state"; "head"; "title"; "base"] dirs ;
+    check_dirs "pr 2" ["state"; "head"; "title"; "base"; "owner"] dirs ;
     DK.Tree.read_file tree (pr / "2" / "state") >>*= fun data ->
     check_data "state" "open\n" data;
     DK.Tree.read_file tree (pr / "2" / "head") >>*= fun data ->
@@ -1565,10 +1574,11 @@ module Make (DK: Test_client.S) = struct
         in
         read "head"  >>= fun head ->
         read "title" >>= fun title ->
+        read "owner" >>= fun owner ->
         read "base"  >|= fun base ->
         let repo = Repo.v ~user ~repo in
         let head = Commit.v repo head in
-        PR.v ~state:`Open ~title ~base head number
+        PR.v ~state:`Open ~title ~base ~owner head number
       )
 
   let read_refs tree ~user ~repo =

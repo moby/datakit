@@ -189,6 +189,7 @@ let update_pr hooks ~id ~head ~states ~message =
   update hooks ~message (
     (Printf.sprintf "user/project/pr/%d/head" id, head) ::
     (Printf.sprintf "user/project/pr/%d/state" id, "open") ::
+    (Printf.sprintf "user/project/pr/%d/owner" id, "joe") ::
     List.map (fun (path, data) -> Printf.sprintf "user/project/commit/%s/status/%s" head path, data) states
   )
 

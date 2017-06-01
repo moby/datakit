@@ -164,10 +164,12 @@ module PR = struct
     state: [`Open | `Closed];
     title: string;
     base: string;
+    owner: string;
   }
 
-  let v ?(state=`Open) ~title ?(base="master") head number =
-    { state; title = String.trim title; base = String.trim base; head; number }
+  let v ?(state=`Open) ~title ?(base="master") ~owner head number =
+    { state; title = String.trim title; base = String.trim base; head;
+      number; owner }
 
   type id = Repo.t * int
 
@@ -192,6 +194,7 @@ module PR = struct
   let compare_num x y = Pervasives.compare x.number y.number
   let number t = t.number
   let title t = t.title
+  let owner t = t.owner
   let state t = t.state
   let close t = { t with state = `Closed }
   let same_id x y = repo x = repo y && number x = number y
@@ -203,8 +206,9 @@ module PR = struct
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %d[%s] %s %a %S}"
-      Repo.pp (repo t) t.number (commit_hash t) t.base pp_state t.state t.title
+    Fmt.pf ppf "{%a %d[%s] %s %s %a %S}"
+      Repo.pp (repo t) t.number (commit_hash t) t.base t.owner pp_state
+      t.state t.title
 
   let pp_id ppf (r, n) = Fmt.pf ppf "{%a %d}" Repo.pp r n
 

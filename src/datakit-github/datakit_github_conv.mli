@@ -57,7 +57,7 @@ module Make (DK: Datakit_client.S): sig
   (** [update_event t e] applies the (webhook) event [e] to the
       transaction [t]. *)
 
-  (** {1 Dirty *)
+  (** {1 Dirty} *)
 
   type dirty = Elt.IdSet.t
   (** The type for dirty elements. *)

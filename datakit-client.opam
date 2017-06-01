@@ -15,5 +15,6 @@ depends: [
   "astring"
   "result"
   "fmt"
+  "lwt"
   "cstruct" {> "2.2.0"}
 ]

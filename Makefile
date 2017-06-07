@@ -85,11 +85,6 @@ pkg-%:
 	cp -r _build/$*.* $(PACKAGES)/$*/
 	cd $(PACKAGES) && git add $*
 
+PKGS=$(basename $(wildcard *.opam))
 opam-pkg:
-	$(MAKE) pkg-datakit
-	$(MAKE) pkg-datakit-client
-	$(MAKE) pkg-datakit-server
-	$(MAKE) pkg-datakit-ci
-	$(MAKE) pkg-datakit-github
-	$(MAKE) pkg-datakit-bridge-github
-	$(MAKE) pkg-datakit-bridge-local-git
+	$(MAKE) $(PKGS:%=pkg-%)

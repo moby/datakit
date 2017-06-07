@@ -14,7 +14,7 @@ build-test: ["jbuilder" "runtest" "tests/datakit-git"]
 depends: [
   "jbuilder" {build}
   "datakit-client" {>= "0.10.0"}
-  "irmin-git" {>= "1.1.0"}
+  "irmin-git" {>= "1.2.0"}
   "irmin-watcher"
   "git-unix"
   "alcotest"  {test}

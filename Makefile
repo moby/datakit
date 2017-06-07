@@ -18,18 +18,6 @@ depends:
 	opam pin add ${PINOPTS} datakit-bridge-github.dev .
 	opam pin add ${PINOPTS} datakit-bridge-local-git.dev .
 	opam pin add ${PINOPTS} datakit-ci.dev .
-	opam pin add git.dev --dev -ny
-	opam pin add git-http.dev --dev -ny
-	opam pin add git-mirage.dev --dev -ny
-	opam pin add git-unix.dev --dev -ny
-	opam pin add irmin.dev --dev -ny
-	opam pin add irmin-fs.dev https://github.com/mirage/irmin.git -ny
-	opam pin add irmin-mem.dev https://github.com/mirage/irmin.git -ny
-	opam pin add irmin-git.dev --dev -ny
-	opam pin add irmin-http.dev --dev -ny
-	opam pin add irmin-mirage.dev --dev -ny
-	opam pin add irmin-fs.dev --dev -ny
-	opam pin add irmin-unix.dev --dev -ny
 	opam install -y --deps-only datakit-ci datakit datakit-bridge-github datakit-bridge-local-git
 	opam update -u datakit datakit-client datakit-server datakit-github \
 	  datakit-ci datakit-bridge-github datakit-bridge-local-git -y

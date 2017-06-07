@@ -5,21 +5,6 @@ ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN opam depext -ui lwt alcotest conf-libev
 
-# pin git
-RUN opam pin add git.dev --dev -n
-RUN opam pin add git-http.dev --dev -n
-RUN opam pin add git-mirage.dev --dev -n
-RUN opam pin add git-unix.dev --dev -n
-
-# pin irmin
-RUN opam pin add irmin.dev --dev -n
-RUN opam pin add irmin-fs.dev https://github.com/mirage/irmin.git -n
-RUN opam pin add irmin-mem.dev https://github.com/mirage/irmin.git -n
-RUN opam pin add irmin-git.dev --dev -n
-RUN opam pin add irmin-http.dev --dev -n
-RUN opam pin add irmin-mirage.dev --dev -n
-RUN opam pin add irmin-unix.dev --dev -n
-
 # cache opam install of dependencies
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam
 RUN opam pin add datakit-client.dev /home/opam/src/datakit -n

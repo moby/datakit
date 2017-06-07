@@ -1,6 +1,10 @@
 FROM ocaml/opam-dev@sha256:1dd4440b3e5f182f705cb5a74f9d4e860c2842b45ed72c199de89a894d13f522
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 
+RUN git -C /home/opam/opam-repository fetch origin && \
+    git -C /home/opam/opam-repository reset 79046b8ab --hard && \
+    opam update -u
+
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud gmp-dev perl
 

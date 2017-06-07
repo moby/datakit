@@ -1,3 +1,86 @@
+### 0.11.0 (2017-07-07)
+
+The main change in this release is the addition of `datakit-client-git`
+which implements the DataKit API on top of a normal Git repository. This
+means that the deployment of DataKit tools is now much simpler as they do
+not need a running DataKit server anymore. The client and server packages
+have been renamed to make the use of 9p more explicit. Support for more
+transport is planned, including gRPC and Cap-n-proto.
+
+**Go bindings**
+
+- Go: Separate user config from defaults in the database (#523, @djs55)
+- Go: add `List` to list files in snapshots (#578, @ebriney)
+
+**datakit-server, datakit-client**
+
+- client/server: split the libraires between core API and 9p transport.
+
+  There is now:
+  - `datakit-client`: signature for client API + Path library
+  - `datakit-server`: implementation of the VFS on top of Irmin
+  - `datakit-client-9p`: implementation of the API using 9p as transport
+  - `datakit-server-9p`: expose the Irmin VFS as the Datakit API; server-side
+     implementation of the API using 9p as transport
+
+  The tests are split as well, so all the client/server tests can be re-used
+  with a different transport mechanism. (#551, @samoht)
+
+- client: add a top-level `Datakit_client` module namespace: `Datakit_S.CLIENT`
+  becomes `Datakit_client.S` and `Datakit_path` becomes `Datakit_client.Path`
+  (#558, @samoht)
+
+- client: remove `rename` API calls (#563, @samoht)
+
+**datakit-client-9p**
+
+`datakit-client-9p` is now the new name for the previously named
+`datakit-client`. That package contains the 9p client bindings to the DataKit
+API. More clients to come.
+
+- 9p client: `DK.commit` now fails if the commit does not exists (instead of
+  failing later when the commit is used) (#565, @samoht)
+
+**datakit-client-git**
+
+- git client: add client bindings using Git directly, without the need for a
+  DataKit server (#559, @samoht)
+
+**datakit**
+
+- datakit: move all modules under the `Datakit` namespace. Expose
+  `Datakit.Blob`, `Datakit.Branch`, `Datakit.Hash,` `Datakit.Metadata`,
+  `Datakit.Path` forming the base types for DataKit stores. Also expose
+  `Datakit.Make` (and `Datakit.Make_git`) to build a DataKit store from an
+  `Irmin` store (or from a `Irmin_git` store). Finally, rename the functor
+  to expose a DataKit store into a virtual file-system into `Datakit.VFS`
+  (#583, @samoht)
+- datakit: use irmin 1.2.0 and git 1.11.0 (#556, @samoht)
+- datakit: use mtime 1.0 (#560, @samoht)
+- datakit: stop using camlzip, switch to decompress (#570, @samoht)
+
+**datakit-github**
+
+- github: expose PR's owner (#587, @samoht)
+
+**datakit-github-bridge**
+
+- github bridge: look at the GH token in various places (#577, @samoht)
+- github bridge: add the ability to monitor default repositories using the CLI
+  (#577, @samoht)
+- github bridge: allow to use `git://<path>` urls to "connect" to a local Git
+  repo instead of a 9p DataKit server (#577, @samoht). For instance:
+
+      $ datakit-bridge-github -r samoht/test -d git:///tmp/foo --resync 60
+
+  will download all the issues and PR into a Git repository `/tmp/foo` and will
+  keep it up-to-date when changes occur either on GitHub (with a full resync
+  every 60s) or locally by commiting updates in the `/tmp/foo` Git repository.
+
+**datakit-ci**
+
+- use redis 0.3.5 (#562, #567, @samoht)
+
 ### 0.10.1 (2017-05-09)
 
 **all**

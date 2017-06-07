@@ -1,24 +1,13 @@
 FROM ocaml/opam-dev@sha256:1dd4440b3e5f182f705cb5a74f9d4e860c2842b45ed72c199de89a894d13f522
 #FROM ocaml/opam:alpine-3.5_ocaml-4.04.0
 
+RUN git -C /home/opam/opam-repository fetch origin && \
+    git -C /home/opam/opam-repository reset 79046b8ab --hard && \
+    opam update -u
+
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN opam depext -ui lwt alcotest conf-libev
-
-# pin git
-RUN opam pin add git.dev --dev -n
-RUN opam pin add git-http.dev --dev -n
-RUN opam pin add git-mirage.dev --dev -n
-RUN opam pin add git-unix.dev --dev -n
-
-# pin irmin
-RUN opam pin add irmin.dev --dev -n
-RUN opam pin add irmin-fs.dev https://github.com/mirage/irmin.git -n
-RUN opam pin add irmin-mem.dev https://github.com/mirage/irmin.git -n
-RUN opam pin add irmin-git.dev --dev -n
-RUN opam pin add irmin-http.dev --dev -n
-RUN opam pin add irmin-mirage.dev --dev -n
-RUN opam pin add irmin-unix.dev --dev -n
 
 # cache opam install of dependencies
 COPY datakit-client.opam /home/opam/src/datakit/datakit-client.opam

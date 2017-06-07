@@ -1,14 +1,12 @@
 FROM ocaml/opam-dev@sha256:1dd4440b3e5f182f705cb5a74f9d4e860c2842b45ed72c199de89a894d13f522
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 
+RUN git -C /home/opam/opam-repository fetch origin && \
+    git -C /home/opam/opam-repository reset 79046b8ab --hard && \
+    opam update -u
+
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 RUN sudo apk add tzdata aspcud gmp-dev perl
-
-RUN opam pin add git.dev --dev -n
-
-RUN opam pin add irmin.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256d3aa6b73b689609f7a5ff01c298fe821
-RUN opam pin add irmin-mem.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256d3aa6b73b689609f7a5ff01c298fe821
-RUN opam pin add irmin-git.1.2.0 -n https://github.com/mirage/irmin.git#81ffa256d3aa6b73b689609f7a5ff01c298fe821
 
 RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog \
     irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin \

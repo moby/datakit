@@ -76,13 +76,39 @@ module PR = struct
 
   include PR
 
-  let of_gh repo pr =
+  let comments ~token repo num =
+    Log.debug (fun l -> l "API.PR.comments %a/pr/%d" Repo.pp repo num);
+    let comments =
+      token.m >>+= fun () ->
+      let user = repo.Repo.user.User.name in
+      let repo = repo.Repo.repo in
+      let commits = Github.Issue.comments ~user ~repo ~num () in
+      Github.Stream.to_list commits >>+= fun comments ->
+      Github.Monad.return comments
+    in
+    Github.Monad.run comments >|= fun comments ->
+    List.map (fun c ->
+        let id = Int64.to_int c.issue_comment_id in
+        let body = c.issue_comment_body in
+        let user = User.v c.issue_comment_user.user_login in
+        Comment.v ~id ~user ~body
+      ) comments
+    |> fun comments ->
+    Log.debug (fun l -> l "XXX %a" Fmt.(Dump.list Comment.pp) comments);
+    comments
+
+  let of_gh ~token repo pr =
     let head = Commit.v repo pr.pull_head.branch_sha in
     let state = pr.pull_state in
     let title = pr.pull_title in
     let base = pr.pull_base.branch_ref in
     let owner = pr.pull_user.user_login in
-    PR.v ~state ~title ~base ~owner head pr.pull_number
+    let num = pr.pull_number in
+    let user = User.v owner in
+    let body = Comment.v ~id:0 ~user ~body:pr.pull_body in
+    comments ~token repo num >|= fun comments ->
+    let comments = Array.of_list (body :: comments) in
+    PR.v ~state ~title ~base ~owner ~comments head num
 
   let to_gh pr = {
     update_pull_title = Some pr.title;
@@ -91,7 +117,7 @@ module PR = struct
     update_pull_base  = Some pr.base;
   }
 
-  let of_event repo pr =
+  let of_event ~token repo pr =
     let id = pr.pull_request_event_pull_request.pull_head.branch_sha in
     let head = Commit.v repo id in
     let state = pr.pull_request_event_pull_request.pull_state in
@@ -99,7 +125,13 @@ module PR = struct
     let base = pr.pull_request_event_pull_request.pull_base.branch_ref in
     let number = pr.pull_request_event_number in
     let owner = pr.pull_request_event_pull_request.pull_user.user_login in
-    PR.v ~state ~title ~base ~owner head number
+    comments ~token repo number >|= fun comments ->
+    let body =
+      let user = User.v owner in
+      Comment.v ~id:0 ~user ~body:pr.pull_request_event_pull_request.pull_body
+    in
+    let comments = Array.of_list (body :: comments) in
+    Event.PR (PR.v ~state ~title ~base ~owner ~comments head number)
 
 end
 
@@ -262,7 +294,7 @@ module Event = struct
     let ret = Lwt.return in
     match e with
     | `Status s       -> ret @@ Status (Status.of_event repo s)
-    | `PullRequest pr -> ret @@ PR (PR.of_event repo pr)
+    | `PullRequest pr -> PR.of_event ~token repo pr
     | `Push p         -> ret @@ Ref (Ref.of_event repo p)
     | `Create c       -> Ref.of_created_event ~token repo c
     | `Delete d       -> ret @@ Ref.of_deleted_event repo d
@@ -283,12 +315,13 @@ module Event = struct
     | `PullRequestReviewComment _ -> other "pull-request-review-comment"
     | `CommitComment _            -> other "commit-comment"
 
-  let of_gh_hook_constr repo (e:Github_t.event_hook_constr): t =
-    let other str = Other (repo, str) in
+  let of_gh_hook_constr ~token repo (e:Github_t.event_hook_constr): t Lwt.t =
+    let other str = Lwt.return (Other (repo, str)) in
+    let ret = Lwt.return in
     match e with
-    | `Status s       -> Status (Status.of_event repo s)
-    | `PullRequest pr -> PR (PR.of_event repo pr)
-    | `Push p         -> Ref (Ref.of_event_hook repo p)
+    | `Status s       -> ret @@ Status (Status.of_event repo s)
+    | `PullRequest pr -> PR.of_event ~token repo pr
+    | `Push p         -> ret @@ Ref (Ref.of_event_hook repo p)
     | `Create _       -> other "create"
     | `Delete _       -> other "delete"
     | `Download       -> other "download"
@@ -393,10 +426,11 @@ let remove_ref _ _ _ = not_implemented ()
 let prs token r =
   let { Repo.user; repo } = r in
   let user = User.name user in
+  let of_gh x = Github.Monad.embed (PR.of_gh ~token r x >|= fun x -> [x]) in
   (token.m >>+= fun () ->
    Github.Pull.for_repo ~state:`Open ~user ~repo ()
-   |> Github.Stream.to_list
-   |> Github.Monad.map @@ List.map (PR.of_gh r))
+   |> Github.Stream.map of_gh
+   |> Github.Stream.to_list)
   |> run
 
 let pr token (r, num) =
@@ -404,7 +438,7 @@ let pr token (r, num) =
   let user = User.name user in
   (token.m >>+= fun () ->
    Github.Pull.get ~user ~repo ~num () >>+~ fun pr ->
-  Github.Monad.return (PR.of_gh r pr))
+  Github.Monad.embed (PR.of_gh ~token r pr))
   |> run >|= function
   | Error _ -> Ok None
   | Ok pr   -> Ok (Some pr)
@@ -473,8 +507,9 @@ module Webhook = struct
   let of_repo { Repo.user; repo } = User.name user, repo
 
   let events t =
-    List.map (fun (r, e) -> event_hook_constr (to_repo r) e) (Hook.events t.hook)
-    |> Lwt.return
+    Lwt_list.map_p (fun (r, e) ->
+        event_hook_constr ~token:t.token (to_repo r) e
+      ) (Hook.events t.hook)
 
   let repos t =
     Hook.repos t.hook

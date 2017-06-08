@@ -15,6 +15,7 @@ depends: [
   "jbuilder" {build}
   "multipart-form-data"
   "datakit-client" {>= "0.11.0"}
+  "datakit-client-9p" {>= "0.11.0"}
   "datakit-github" {>= "0.11.0"}
   "protocol-9p-unix" {>= "0.11.0"}
   "astring"

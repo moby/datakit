@@ -81,8 +81,8 @@ module PR = struct
     let state = pr.pull_state in
     let title = pr.pull_title in
     let base = pr.pull_base.branch_ref in
-    let owner = pr.pull_user.user_login in
-    PR.v ~state ~title ~base ~owner head pr.pull_number
+    let user = User.v pr.pull_user.user_login in
+    PR.v ~state ~title ~base ~user head pr.pull_number
 
   let to_gh pr = {
     update_pull_title = Some pr.title;
@@ -98,8 +98,8 @@ module PR = struct
     let title = pr.pull_request_event_pull_request.pull_title in
     let base = pr.pull_request_event_pull_request.pull_base.branch_ref in
     let number = pr.pull_request_event_number in
-    let owner = pr.pull_request_event_pull_request.pull_user.user_login in
-    PR.v ~state ~title ~base ~owner head number
+    let user = User.v pr.pull_request_event_pull_request.pull_user.user_login in
+    PR.v ~state ~title ~base ~user head number
 
 end
 

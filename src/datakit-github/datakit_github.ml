@@ -65,21 +65,34 @@ end
 
 let pp_path = Fmt.(list ~sep:(unit "/") string)
 
+module User = struct
+  module X = struct
+    type t = { name: string }
+    let pp ppf t = Fmt.string ppf t.name
+    let compare x y = String.compare x.name y.name
+  end
+  include X
+  let v name = { name = trim_and_validate name }
+  let name t = t.name
+  module Set = Set (X)
+  module Map = Map (X)
+end
+
 module Repo = struct
 
-  type t = { user: string; repo: string }
+  type t = { user: User.t; repo: string }
 
   let v ~user ~repo =
-   let user = trim_and_validate user in
    let repo = trim_and_validate repo in
    { user; repo }
 
   let of_string s = match String.cuts ~sep:"/" s with
     | [user; repo] ->
+      let user = User.v user in
       (try Some (v ~user ~repo) with Invalid_argument _ -> None)
     | _ -> None
 
-  let pp ppf t = Fmt.pf ppf "%s/%s" t.user t.repo
+  let pp ppf t = Fmt.pf ppf "%a/%s" User.pp t.user t.repo
   let compare (x:t) (y:t) = Pervasives.compare x y
   type state = [`Monitored | `Ignored]
 
@@ -1160,7 +1173,7 @@ module Capabilities = struct
     | `Ref _    -> X.check (x t `Ref) op
     | `Repo r   ->
       let { Repo.user; repo } = r in
-      X.check (x t (`Repo [repo; user])) op
+      X.check (x t (`Repo [repo; User.name user])) op
 
   let filter_elt t op (e:Elt.t) = match e with
     | `Commit _ | `PR _ | `Ref _ | `Repo _ as x -> filter_aux t op x
@@ -1182,9 +1195,9 @@ end
 module type API = sig
   type token
   type 'a result = ('a, string) Result.result Lwt.t
-  val user_exists: token -> user:string -> bool result
+  val user_exists: token -> user:User.t -> bool result
   val repo_exists: token -> Repo.t -> bool result
-  val repos: token -> user:string -> Repo.t list result
+  val repos: token -> user:User.t -> Repo.t list result
   val status: token -> Commit.t -> Status.t list result
   val set_status: token -> Status.t -> unit result
   val set_ref: token -> Ref.t -> unit result

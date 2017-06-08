@@ -64,9 +64,11 @@ let log_branch_results_url t branch =
 let gh_target_url = function
   | `PR (repo, id) ->
     let { Repo.user; repo } = repo in
-    Printf.sprintf "https://github.com/%s/%s/pull/%d" user repo id
+    let user = User.name user in
+    Fmt.strf "https://github.com/%s/%s/pull/%d" user repo id
   | `Ref (repo, id) ->
     let { Repo.user; repo } = repo in
+    let user = User.name user in
     match id with
     | "tags" :: id -> Fmt.strf "https://github.com/%s/%s/releases/tag/%s" user repo (String.concat ~sep:"/" id)
     | _            -> Fmt.strf "https://github.com/%s/%s/tree/%a" user repo Ref.pp_name id
@@ -74,18 +76,22 @@ let gh_target_url = function
 let metadata_url t = function
   | `PR (repo, id) ->
     let { Repo.user; repo } = repo in
+    let user = User.name user in
     state_repo_url t "commits/github-metadata/%s/%s/pr/%d" user repo id
   | `Ref (repo, id) ->
     let { Repo.user; repo } = repo in
+    let user = User.name user in
     state_repo_url t "commits/github-metadata/%s/%s/ref/%a" user repo
       Ref.pp_name id
 
 let commit_history_url t target ~metadata_commit ~src_commit =
   let { Repo.user; repo } = CI_target.repo target in
+  let user = User.name user in
   state_repo_url t "commits/%s/%s/%s/commit/%s" metadata_commit user repo src_commit
 
 let commit_url ~repo commit =
   let { Repo.user; repo } = repo in
+  let user = User.name user in
   Printf.sprintf "https://github.com/%s/%s/commit/%s" user repo commit
 
 let short_commit x =

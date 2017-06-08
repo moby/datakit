@@ -123,6 +123,7 @@ let diff _id prev next =
 
 let index_dir ~repo ~source_commit =
   let {Datakit_github.Repo.user; repo} = repo in
+  let user = Datakit_github.User.name user in
   Path.of_steps_exn [user; repo; "commit"; source_commit]
 
 let record t dk ~source_commit input jobs =

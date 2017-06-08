@@ -24,7 +24,7 @@ module Workflows = struct
     T.return (^) $ a $ b
 
   let test_cross_project _check_build target =
-    let other = Repo.v ~user:"bob" ~repo:"bproj" in
+    let other = Repo.v ~user:(User.v "bob") ~repo:"bproj" in
     let pr = T.head target >|= Commit.hash in
     let other_master = T.branch_head other "master" >|= Commit.hash in
     T.return (Fmt.strf "Compile %s with %s") $ pr $ other_master
@@ -625,7 +625,7 @@ let test_history conn =
   let commit_t = (module DK_Commit : Alcotest.TESTABLE with type t = DK_Commit.t) in
   let h = CI_history.create () in
   let dk = DK.connect conn in
-  let repo = Repo.v ~user:"me" ~repo:"repo" in
+  let repo = Repo.v ~user:(User.v "me") ~repo:"repo" in
   let source_commit = "123" in
   let head = Commit.v repo source_commit in
   let master = `Ref (repo, ["heads"; "master"]) in

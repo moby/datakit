@@ -43,6 +43,7 @@ let parse s =
   in
   slash "user" s >>= fun (user, s) ->
   slash "project" s >>= fun (repo, s) ->
+  let user = User.v user in
   let repo = Repo.v ~user ~repo in
   let parse_target = function
     | ("heads" | "tags") as ref_type, ref ->
@@ -73,7 +74,7 @@ let map_of_list xs =
   !map
 
 let pr_path { Repo.user; repo} pr =
-  Printf.sprintf "/%s/%s/pr/%d" user repo pr
+  Printf.sprintf "/%s/%s/pr/%d" (User.name user) repo pr
 
 let unescape_ref s =
   String.cuts ~sep:"/" s
@@ -84,7 +85,7 @@ let escape_ref path =
   |> String.concat ~sep:"/"
 
 let ref_path { Repo.user; repo} r =
-    Fmt.strf "/%s/%s/ref/%s" user repo (escape_ref r)
+    Fmt.strf "/%s/%s/ref/%s" (User.name user) repo (escape_ref r)
 
 let path ?test target =
   let path =
@@ -142,10 +143,11 @@ module Branch_escape = struct
     Str.global_substitute re_escape replace s
 
   let pp_repo f { Repo.user; repo } =
-    Fmt.pf f "%s-%s" (escape user) (escape repo)
+    Fmt.pf f "%s-%s" (escape @@ User.name user) (escape repo)
 
   let parse_repo ~user ~repo =
-    Repo.v ~user:(unescape user) ~repo:(unescape repo)
+    let user = User.v (unescape user) in
+    Repo.v ~user ~repo:(unescape repo)
 
   let pp_sub f (v:t) =
     match v with

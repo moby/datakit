@@ -110,6 +110,7 @@ module Make (DK: S) = struct
         let t = match path with
           | [] | [_]             -> None
           | user :: repo :: path ->
+            let user = User.v user in
             let repo = Repo.v ~user ~repo in
             let pr repo id = `PR (repo, int_of_string id) in
             match path with
@@ -163,7 +164,7 @@ module Make (DK: S) = struct
 
   let empty = Path.empty
 
-  let root r = empty / r.Repo.user / r.Repo.repo
+  let root r = empty / User.name r.Repo.user / r.Repo.repo
 
   (* Repos *)
 
@@ -186,7 +187,10 @@ module Make (DK: S) = struct
         Lwt_list.map_p (fun repo ->
             read_file_if_exists tree (root / user / repo / ".monitor") >|= function
             | None   -> Repo.Set.empty
-            | Some _ -> Repo.Set.singleton (Repo.v ~user ~repo)
+            | Some _ ->
+              let user = User.v user in
+              let repo = Repo.v ~user ~repo in
+              Repo.Set.singleton repo
           ) repos >|= reduce_repos
       ) users >|= fun repos ->
     let repos = reduce_repos repos in
@@ -499,7 +503,10 @@ module Make (DK: S) = struct
         Lwt_list.map_p (fun repo ->
             exists_file tree (root / user /repo / ".dirty") >|= function
             | false -> Elt.IdSet.empty
-            | true  -> Elt.IdSet.singleton (`Repo (Repo.v ~user ~repo))
+            | true  ->
+              let user = User.v user in
+              let repo = Repo.v ~user ~repo in
+              Elt.IdSet.singleton (`Repo repo)
           ) repos >|= reduce_elts
       ) users >|= reduce_elts
 

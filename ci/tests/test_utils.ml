@@ -210,14 +210,15 @@ let with_handler set_handler ~logs ?pending key fn =
   set_handler key { result; output = Output.Live log };
   Lwt.wakeup waker ()
 
-let repo_root { Repo.user; repo } = Path.(empty / user / repo)
+let repo_root { Repo.user; repo } = Path.(empty / User.name user / repo)
 
 (* [with_ci conn workflow fn] is [fn ~logs ~switch dk with_handler], where:
    - switch is turned off when [fn] ends and will stop the CI
    - dk is a DataKit connection which never fails
    - with_handler can be used to register handlers for jobs the CI receives
  *)
-let with_ci ?(repo=Repo.v ~user:"user" ~repo:"project") conn workflow fn =
+let with_ci ?(repo=Repo.v ~user:(User.v "user") ~repo:"project")
+    conn workflow fn =
   let logs = Private.create_logs () in
   let handlers = ref String.Map.empty in
   let check_build key () =

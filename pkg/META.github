@@ -1,8 +1,0 @@
-description = "Use Datakit to interact with the GitHub API"
-version = "%%VERSION%%"
-requires = "astring cstruct datakit-client fmt logs uri asetmap"
-archive(byte)   = "datakit-github.cma"
-archive(native) = "datakit-github.cmxa"
-plugin(byte)    = "datakit-github.cma"
-plugin(native)  = "datakit-github.cmxs"
-exists_if       = "datakit-github.cma"

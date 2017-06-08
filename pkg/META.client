@@ -1,8 +1,0 @@
-description = "9p client for Datakit"
-version = "%%VERSION%%"
-requires = "astring cstruct fmt logs lwt protocol-9p result"
-archive(byte)   = "datakit-client.cma"
-archive(native) = "datakit-client.cmxa"
-plugin(byte)    = "datakit-client.cma"
-plugin(native)  = "datakit-client.cmxs"
-exists_if       = "datakit-client.cma"

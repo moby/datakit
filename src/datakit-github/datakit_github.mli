@@ -42,15 +42,37 @@ module Status_state: sig
 
 end
 
+module User: sig
+
+  type t = private { name: string }
+  (** The type for GitHub users. *)
+
+  val v: string -> t
+  (** [v n] is the user with name [n]. *)
+
+  val name: t -> string
+  (** [name t] is [t]'s name. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for users. *)
+
+  module Set: SET with type elt = t
+  (** Sets of users. *)
+
+  module Map: MAP with type key = t
+  (** Maps of users. *)
+
+end
+
 module Repo: sig
 
-  type t = private { user: string; repo: string }
+  type t = private { user: User.t; repo: string }
   (** The type for Github repositories. *)
 
   type state = [`Monitored | `Ignored]
   (** The type for repository state. *)
 
-  val v : user:string -> repo:string -> t
+  val v : user:User.t -> repo:string -> t
   (** [v user string] will create a fresh {!t}. *)
 
   val of_string: string -> t option
@@ -626,13 +648,13 @@ module type API = sig
   type 'a result = ('a, string) Result.result Lwt.t
   (** The type for results. *)
 
-  val user_exists: token -> user:string -> bool result
+  val user_exists: token -> user:User.t -> bool result
   (** [exist_user t ~user] is true iff [user] exists. *)
 
   val repo_exists: token -> Repo.t -> bool result
   (** [exists_repo t r] is true iff the repository [r] exists. *)
 
-  val repos: token -> user:string -> Repo.t list result
+  val repos: token -> user:User.t -> Repo.t list result
   (** [repos t ~user] is the list of repositories owned by user
       [user]. *)
 

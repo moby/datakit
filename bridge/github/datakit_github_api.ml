@@ -170,6 +170,7 @@ module Ref = struct
   let commit_ref_of_tag ~token ~repo:{ Repo.user; repo } r =
     assert (r.git_ref_obj.obj_ty = `Tag);
     let sha = r.git_ref_obj.obj_sha in
+    let user = User.name user in
     let t =
       token.m >>+= fun () ->
       Github.Repo.get_tag ~user ~repo ~sha () >>+~ fun t ->
@@ -222,6 +223,7 @@ module Ref = struct
     | `Tag s      -> Event.Ref (`Removed (repo, ["refs"; "tags"; s]))
 
   let ref_of_name ~token ~repo:{ Repo.user; repo } name =
+    let user = User.name user in
     (token.m >>+= fun () ->
      Github.Repo.get_ref ~user ~repo ~name () >>+~ fun x ->
      Github.Monad.return x)
@@ -309,7 +311,9 @@ module Event = struct
   let of_gh ~token e =
     let repo = match String.cut ~sep:"/" e.event_repo.repo_name with
       | None  -> failwith (e.event_repo.repo_name ^ " is not a valid repo name")
-      | Some (user, repo) -> Repo.v ~user ~repo
+      | Some (user, repo) ->
+        let user = User.v user in
+        Repo.v ~user ~repo
     in
     of_gh_constr ~token repo e.event_payload
 
@@ -318,6 +322,7 @@ end
 let event_hook_constr = Event.of_gh_hook_constr
 
 let user_exists token ~user =
+  let user = User.name user in
   try
     (token.m >>+= fun () -> Github.User.info ~user ())
     |> run
@@ -326,6 +331,7 @@ let user_exists token ~user =
     Lwt.return (Ok false)
 
 let repo_exists token { Repo.user; repo } =
+  let user = User.name user in
   try
     (token.m >>+= fun () -> Github.Repo.info ~user ~repo ())
     |> run
@@ -334,11 +340,14 @@ let repo_exists token { Repo.user; repo } =
     Lwt.return (Ok false)
 
 let repos token ~user =
+  let user = User.name user in
   (token.m >>+= fun () ->
    Github.User.repositories ~user ()
    |> Github.Stream.to_list
    |> Github.Monad.map
-   @@ List.map (fun r -> Repo.v ~user ~repo:r.repository_name))
+   @@ List.map (fun r ->
+       let user = User.v user in
+       Repo.v ~user ~repo:r.repository_name))
   |> run
 
 let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
@@ -346,6 +355,7 @@ let user_repo c = c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo
 let status token commit =
   let user, repo = user_repo commit in
   let sha = Commit.hash commit in
+  let user = User.name user in
   (token.m >>+= fun () ->
    Github.Status.get ~user ~repo ~sha ()
    |> Github.Monad.map Github.Response.value)
@@ -357,6 +367,7 @@ let status token commit =
 let set_status token status =
   let new_status = Status.to_gh status in
   let user, repo = user_repo (Status.commit status) in
+  let user = User.name user in
   let sha = Status.commit_hash status in
   (token.m >>+= fun () ->
    Github.Status.create ~user ~repo ~sha ~status:new_status ())
@@ -368,6 +379,7 @@ let user_repo pr = user_repo (PR.commit pr)
 let set_pr token pr =
   let new_pr = PR.to_gh pr in
   let user, repo = user_repo pr in
+  let user = User.name user in
   let num = PR.number pr in
   (token.m >>+= fun () ->
    Github.Pull.update ~user ~repo ~num ~update_pull:new_pr ())
@@ -380,6 +392,7 @@ let remove_ref _ _ _ = not_implemented ()
 
 let prs token r =
   let { Repo.user; repo } = r in
+  let user = User.name user in
   (token.m >>+= fun () ->
    Github.Pull.for_repo ~state:`Open ~user ~repo ()
    |> Github.Stream.to_list
@@ -388,6 +401,7 @@ let prs token r =
 
 let pr token (r, num) =
   let { Repo.user; repo } = r in
+  let user = User.name user in
   (token.m >>+= fun () ->
    Github.Pull.get ~user ~repo ~num () >>+~ fun pr ->
   Github.Monad.return (PR.of_gh r pr))
@@ -397,6 +411,7 @@ let pr token (r, num) =
 
 let refs token r =
   let { Repo.user; repo } = r in
+  let user = User.name user in
   let refs ty =
     (token.m >>+= fun () ->
      Github.Repo.refs ~ty ~user ~repo ()
@@ -420,6 +435,7 @@ let refs token r =
 let ref token (r, name) =
   let name = String.concat ~sep:"/" name in
   let { Repo.user; repo } = r in
+  let user = User.name user in
   (token.m >>+= fun () ->
    Github.Repo.get_ref ~user ~repo ~name () >>+~ fun r ->
    Github.Monad.return r)
@@ -429,6 +445,7 @@ let ref token (r, name) =
 
 let events token r =
   let { Repo.user; repo } = r in
+  let user = User.name user in
   (token.m >>+= fun () ->
    let events = Github.Event.for_repo ~user ~repo () in
    Github.Stream.to_list events >>+= fun events ->
@@ -449,8 +466,8 @@ module Webhook = struct
   include Hook
 
   let v t = create t.token
-  let to_repo (user, repo) = Repo.v ~user ~repo
-  let of_repo { Repo.user; repo } = user, repo
+  let to_repo (user, repo) = Repo.v ~user:(User.v user) ~repo
+  let of_repo { Repo.user; repo } = User.name user, repo
 
   let events t =
     List.map (fun (r, e) -> event_hook_constr (to_repo r) e) (events t)

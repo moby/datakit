@@ -144,10 +144,12 @@ module Auth = struct
         let open !Sexplib.Conv in
         pair_of_sexp string_of_sexp string_of_sexp s
       in
+      let user = Datakit_github.User.v user in
       Repo.v ~user ~repo
     let sexp_of_t t =
       let open !Sexplib.Conv in
-      sexp_of_pair sexp_of_string sexp_of_string (t.Repo.user, t.Repo.repo)
+      let user = Datakit_github.User.name t.Repo.user in
+      sexp_of_pair sexp_of_string sexp_of_string (user, t.Repo.repo)
   end
   type user_attributes = {
     github_orgs : string list;
@@ -263,6 +265,7 @@ module Auth = struct
                Github.Monad.run begin
                  let open! Github.Monad in
                  let {Repo.user; repo} = project in
+                 let user = Datakit_github.User.name user in
                  Github.Repo.info ~token ~user ~repo () >|= Github.Response.value
                end
              )

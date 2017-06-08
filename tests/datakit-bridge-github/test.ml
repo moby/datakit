@@ -56,6 +56,7 @@ module Make (DK: Test_client.S) = struct
     }
 
     let v { Repo.user; repo } =
+      let user = User.name user in
       { user; repo; commits = []; prs = []; refs = []; events = [] }
 
     let prune r =
@@ -173,6 +174,7 @@ module Make (DK: Test_client.S) = struct
     let prune monitored_repos t =
       let repos =
         String.Map.filter (fun _ { R.user; repo; _ } ->
+            let user = User.v user in
             Repo.Set.mem (Repo.v ~user ~repo) monitored_repos
           ) t.repos
       in
@@ -183,12 +185,13 @@ module Make (DK: Test_client.S) = struct
 
     let repos t =
       fold (fun { R.user; repo; _ } acc ->
+          let user = User.v user in
           Repo.Set.add (Repo.v ~user ~repo) acc
         ) t Repo.Set.empty
 
     let commits t =
       fold (fun r acc ->
-          let repo = Repo.v ~user:r.R.user ~repo:r.R.repo in
+          let repo = Repo.v ~user:(User.v r.R.user) ~repo:r.R.repo in
           List.fold_left (fun acc (id, _) ->
               Commit.Set.add (Commit.v repo id) acc
             ) acc r.R.commits
@@ -216,64 +219,68 @@ module Make (DK: Test_client.S) = struct
     let pp f { repos } = String.Map.dump R.pp f repos
     let equal a b = String.Map.equal R.equal a.repos b.repos
 
+    module Map = Datakit_github.User.Map
+    let name = Datakit_github.User.name
+    let v = Datakit_github.User.v
+
   end
 
   module Users = struct
 
     type t = {
-      mutable users: User.t String.Map.t;
+      mutable users: User.t User.Map.t;
     }
 
     let of_repos repos: t =
       let users =
-        Repo.Set.fold (fun { Repo.user; _ } acc -> user :: acc) repos []
+        Repo.Set.fold (fun { Repo.user; _ } acc ->user :: acc) repos []
         |> List.map (fun u -> u, { User.repos = String.Map.empty })
-        |> String.Map.of_list
+        |> User.Map.of_list
       in
       Repo.Set.fold (fun ({Repo.user; repo} as r) acc ->
-          let u = String.Map.get user acc in
+          let u = User.Map.get user acc in
           let u =
             { User.repos = String.Map.add repo (R.v r) u.User.repos }
           in
-          String.Map.add user u acc
+          User.Map.add user u acc
         ) repos users
       |> fun users -> { users }
 
-    let empty () = { users = String.Map.empty }
+    let empty () = { users = User.Map.empty }
 
     let mem_repo t r =
-      String.Map.exists (fun u x -> u = r.Repo.user && User.mem_repo x r) t.users
+      User.Map.exists (fun u x -> u = r.Repo.user && User.mem_repo x r) t.users
 
     let add_repo t r =
-      let user = match String.Map.find r.Repo.user t.users with
+      let user = match User.Map.find r.Repo.user t.users with
         | None   -> User.empty ()
         | Some u -> u
       in
       let user = User.add_repo user r in
-      let users = String.Map.add r.Repo.user user t.users in
+      let users = User.Map.add r.Repo.user user t.users in
       t.users <- users
 
     let lookup t r =
-      let user = match String.Map.find r.Repo.user t.users with
+      let user = match User.Map.find r.Repo.user t.users with
         | Some user -> user
         | None      ->
           let user = User.empty () in
-          let users = String.Map.add r.Repo.user user t.users in
+          let users = User.Map.add r.Repo.user user t.users in
           t.users <- users;
           user
       in
       User.lookup user r
 
     let remove_repo t r =
-      let users = String.Map.remove r.Repo.user t.users in
+      let users = User.Map.remove r.Repo.user t.users in
       t.users <- users
 
     let prune repos t =
-      let users = String.Map.map (User.prune repos) t.users in
-      let users = String.Map.filter (fun _ u -> not (User.is_empty u)) users in
+      let users = User.Map.map (User.prune repos) t.users in
+      let users = User.Map.filter (fun _ u -> not (User.is_empty u)) users in
       { users }
 
-    let fold f t acc = String.Map.fold (fun _ user acc -> f user acc ) t.users acc
+    let fold f t acc = User.Map.fold (fun _ user acc -> f user acc ) t.users acc
 
     let repos t =
       fold (fun u acc -> Repo.Set.union acc (User.repos u)) t Repo.Set.empty
@@ -290,7 +297,7 @@ module Make (DK: Test_client.S) = struct
     let refs t =
       fold (fun u acc -> Ref.Set.union acc (User.refs u)) t Ref.Set.empty
 
-    let pp f t = String.Map.dump User.pp f t.users
+    let pp f t = User.Map.dump (fun f (_, v) -> User.pp f v) f t.users
 
     let diff x y =
       let repos = Repo.Set.diff (repos x) (repos y) in
@@ -353,11 +360,11 @@ module Make (DK: Test_client.S) = struct
       in
       repos @ prs @ refs @ status @ close_prs @ close_refs
 
-    let equal a b = String.Map.equal User.equal a.users b.users
+    let equal a b = User.Map.equal User.equal a.users b.users
 
-    let mem x { users } = String.Map.mem x users
-    let find x { users } = String.Map.find x users
-    let iter x { users } = String.Map.iter x users
+    let mem x { users } = User.Map.mem x users
+    let find x { users } = User.Map.find x users
+    let iter x { users } = User.Map.iter x users
 
   end
 
@@ -577,14 +584,14 @@ module Make (DK: Test_client.S) = struct
   module Bridge = Datakit_github_sync.Make(API)(DK)
   module State = Datakit_github_state.Make(API)
 
-  let user = "test"
+  let user = User.v "test"
   let repo = "test"
   let branch = "test"
 
   let repo = Repo.v ~user ~repo
   let commit_bar = Commit.v repo "bar"
   let commit_foo = Commit.v repo "foo"
-  let r1 = Repo.v ~user:"xxx" ~repo:"yyy"
+  let r1 = Repo.v ~user:(User.v "xxx") ~repo:"yyy"
 
   let s1 =
     Status.v ~description:"foo" commit_bar ["foo"; "bar"; "baz"] `Pending
@@ -681,7 +688,7 @@ module Make (DK: Test_client.S) = struct
     let bases = [| "master"; "test"; "foo" |]
     let owners = [| "jack"; "joe"; "julia"; "amy" |]
     let pr_states = [| `Closed; `Open  |]
-    let users = [| "a"; "b" |]
+    let users = Array.map User.v [| "a"; "b" |]
     let repos = [| "a"; "b"; "c" |]
 
     let names = [|
@@ -899,13 +906,14 @@ module Make (DK: Test_client.S) = struct
                 let prs, commits, refs =
                   state ~random ~repo:r ~old_prs ~old_status ~old_refs
                 in
+                let user = User.name user in
                 repo, { R.user; repo; commits; prs; refs; events = [] }
               )
             |> String.Map.of_list
           in
           user, { User.repos }
         )
-      |> String.Map.of_list
+      |> User.Map.of_list
       |> fun users -> { Users.users }
 
     let snapshot ~random =
@@ -1174,15 +1182,17 @@ module Make (DK: Test_client.S) = struct
         Hashtbl.replace tbl (Status.commit s) (s :: v)
       ) status;
     let commits = Hashtbl.fold (fun k v acc -> (Commit.hash k, v) :: acc) tbl [] in
-    let users = String.Map.singleton user {
+    let users = User.Map.singleton user {
         User.repos = String.Map.singleton repo.Repo.repo
-            { R.user; repo = repo.Repo.repo; commits; refs; prs = []; events }
+            { R.user = User.name user;
+              repo = repo.Repo.repo;
+              commits; refs; prs = []; events }
       } in
     let t = API.create { Users.users } in
     API.apply_events t;
     t
 
-  let root { Repo.user; repo } = Path.(empty / user / repo)
+  let root { Repo.user; repo } = Path.(empty / User.name user / repo)
 
   let run_with_test_test f () =
     DK.run (fun dkt ->
@@ -1552,21 +1562,21 @@ module Make (DK: Test_client.S) = struct
     | Error x -> failwith (Fmt.to_to_string DK.pp_error x)
 
   let read_commits tree ~user ~repo =
-    let path = Path.of_steps_exn [user; repo; "commit"] in
+    let name = User.name user in
+    let path = Path.of_steps_exn [name; repo; "commit"] in
     read_opt_dir tree path >>=
     Lwt_list.map_p (fun commit ->
-        let path =
-          Path.of_steps_exn [user; repo; "commit"; commit; "status"]
-        in
+        let path = Path.of_steps_exn [name; repo; "commit"; commit; "status"] in
         read_state ~user ~repo ~commit tree path [] >>= fun states ->
         Lwt.return (commit, states)
       )
 
   let read_prs tree ~user ~repo =
-    let path = Path.of_steps_exn [user; repo; "pr"] in
+    let name = User.name user in
+    let path = Path.of_steps_exn [name; repo; "pr"] in
     read_opt_dir tree path >>=
     Lwt_list.map_p (fun number ->
-        let path = Path.of_steps_exn [user; repo; "pr"; number] in
+        let path = Path.of_steps_exn [name; repo; "pr"; number] in
         let number = int_of_string number in
         let read name =
           DK.Tree.read_file tree (path / name) >>*= fun data ->
@@ -1582,7 +1592,8 @@ module Make (DK: Test_client.S) = struct
       )
 
   let read_refs tree ~user ~repo =
-    let path = Path.of_steps_exn [user; repo; "ref"] in
+    let name = User.name user in
+    let path = Path.of_steps_exn [name; repo; "ref"] in
     let rec aux acc name =
       let path = Path.(path /@ of_steps_exn name) in
       DK.Tree.read_file tree (path / "head") >|= begin function
@@ -1615,10 +1626,12 @@ module Make (DK: Test_client.S) = struct
     DK.Commit.tree head >>*= fun tree ->
     DK.Tree.read_dir tree Path.empty >>*=
     Lwt_list.fold_left_s (fun acc user ->
-        DK.Tree.exists_dir tree Path.(empty / user) >>*= function
+        let name = user in
+        let user = User.v user in
+        DK.Tree.exists_dir tree Path.(empty / name) >>*= function
         | false -> Lwt.return acc
         | true  ->
-          let path = Path.of_steps_exn [user] in
+          let path = Path.of_steps_exn [name] in
           DK.Tree.read_dir tree path >>*=
           Lwt_list.fold_left_s (fun acc repo ->
               safe_exists_file tree (path / repo / ".monitor") >>= function
@@ -1627,13 +1640,15 @@ module Make (DK: Test_client.S) = struct
                 read_commits tree ~user ~repo >>= fun commits ->
                 read_prs tree ~user ~repo >>= fun prs ->
                 read_refs tree ~user ~repo >>= fun refs ->
-                let v = { R.user; repo; commits; prs; refs; events = [] } in
+                let v =
+                  { R.user = name; repo; commits; prs; refs; events = [] }
+                in
                 String.Map.add repo v acc
                 |> Lwt.return
             ) String.Map.empty
           >>= fun repos ->
-          Lwt.return (String.Map.add user { User.repos } acc)
-      ) String.Map.empty
+          Lwt.return (User.Map.add user { User.repos } acc)
+      ) User.Map.empty
     >|= fun users ->
     { Users.users }
 
@@ -1762,7 +1777,7 @@ module Make (DK: Test_client.S) = struct
       let events = Users.diff_events users (Users.empty ()) in
       DK.Branch.with_transaction branch (fun tr ->
           Lwt_list.iter_p (fun { Repo.user; repo } ->
-              safe_remove tr Path.(empty / user / repo)
+              safe_remove tr Path.(empty / User.name user / repo)
             ) (Repo.Set.elements all_repos)
           >>= fun () ->
           Lwt_list.iter_p (Conv.update_event tr) events >>= fun () ->

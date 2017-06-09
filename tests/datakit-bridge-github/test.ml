@@ -571,7 +571,7 @@ module Make (DK: Test_client.S) = struct
       let events t =
         let x = fold (fun u acc -> User.events u @ acc) t.state [] in
         let x = List.filter (fun x -> Repo.Set.mem (Event.repo x) t.repos) x in
-        List.rev x
+        Lwt.return (List.rev x)
 
       let clear t = iter (fun _ -> User.clear) t.state
 

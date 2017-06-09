@@ -714,7 +714,7 @@ module type API = sig
     val watch: t -> Repo.t -> unit Lwt.t
     (** [watch t r] makes [t] watch the repo [r]. *)
 
-    val events: t -> Event.t list
+    val events: t -> Event.t list Lwt.t
     (** [events t] is the list of events stored in [t]. *)
 
     val wait: t -> unit Lwt.t

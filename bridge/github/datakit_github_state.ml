@@ -208,7 +208,7 @@ module Make (API: API) = struct
       ) (Repo.Set.elements repos)
 
   let import_webhook_events token ~events t =
-    match events () with
+    events () >>= function
     | []     -> Lwt.return t
     | events ->
       Log.debug (fun l ->

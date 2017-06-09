@@ -96,7 +96,7 @@ module Make (API: API) (DK: Datakit_client.S) = struct
 
   type webhook = {
     watch : Repo.t -> unit Lwt.t;
-    events: unit -> Event.t list;
+    events: unit -> Event.t list Lwt.t;
   }
 
   let (>|*=) x f =

@@ -463,17 +463,21 @@ module Webhook = struct
 
   module Hook = Github_hooks_unix.Make(Conf)
 
-  include Hook
+  type t = {
+    token: token;
+    hook : Hook.t;
+  }
 
-  let v t = create t.token
+  let v token uri = { token; hook = Hook.create token.token uri }
   let to_repo (user, repo) = Repo.v ~user:(User.v user) ~repo
   let of_repo { Repo.user; repo } = User.name user, repo
 
   let events t =
-    List.map (fun (r, e) -> event_hook_constr (to_repo r) e) (events t)
+    List.map (fun (r, e) -> event_hook_constr (to_repo r) e) (Hook.events t.hook)
+    |> Lwt.return
 
   let repos t =
-    repos t
+    Hook.repos t.hook
     |> Github_hooks.Repo.Set.elements
     |> List.map to_repo
     |> Repo.Set.of_list
@@ -484,6 +488,8 @@ module Webhook = struct
     `PullRequest;            (* PR updates *)
   ]
 
-  let watch t r = watch t ~events:default_events (of_repo r)
-
+  let watch { hook; _ } r = Hook.watch hook ~events:default_events (of_repo r)
+  let wait { hook; _ } = Hook.wait hook
+  let clear { hook; _ } = Hook.clear hook
+  let run { hook; _ } = Hook.run hook
 end

@@ -1214,7 +1214,7 @@ module type API = sig
     val run: t -> unit Lwt.t
     val repos: t -> Repo.Set.t
     val watch: t -> Repo.t -> unit Lwt.t
-    val events: t -> Event.t list
+    val events: t -> Event.t list Lwt.t
     val wait: t -> unit Lwt.t
     val clear: t -> unit
   end

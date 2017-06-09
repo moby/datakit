@@ -35,7 +35,7 @@ module Make (API: API): sig
   (** [add_webhooks t rs] adds webhooks for the repositories [rs]. *)
 
   val import_webhook_events:
-    token -> events:(unit ->  Event.t list) -> Snapshot.t -> Snapshot.t Lwt.t
+    token -> events:(unit ->  Event.t list Lwt.t) -> Snapshot.t -> Snapshot.t Lwt.t
   (** [import_webhook_events t ~events s] applies [events ()] on top
       of [s]. Note: it ensure that all the metadata are correctly
       updated by inserting (possibly) missing events in the mix. For

@@ -169,6 +169,17 @@ module Commit = struct
 
 end
 
+module Comment = struct
+  type t = { id: int; user: User.t; body: string }
+  let v ~id ~user ~body = { id; user; body }
+  let id t = t.id
+  let user t = t.user
+  let body t = t.body
+  let pp ppf t =
+    let body = String.(with_range ~len:80 t.body) in
+    Fmt.pf ppf "@[%d %a: %S@]" t.id User.pp t.user body
+end
+
 module PR = struct
 
   type t = {
@@ -178,11 +189,12 @@ module PR = struct
     title: string;
     base: string;
     owner: string;
+    comments: Comment.t array;
   }
 
-  let v ?(state=`Open) ~title ?(base="master") ~owner head number =
+  let v ?(state=`Open) ~title ?(base="master") ~owner ~comments head number =
     { state; title = String.trim title; base = String.trim base; head;
-      number; owner }
+      number; owner; comments }
 
   type id = Repo.t * int
 
@@ -208,6 +220,7 @@ module PR = struct
   let number t = t.number
   let title t = t.title
   let owner t = t.owner
+  let comments t = t.comments
   let state t = t.state
   let close t = { t with state = `Closed }
   let same_id x y = repo x = repo y && number x = number y
@@ -219,9 +232,9 @@ module PR = struct
     ]
 
   let pp ppf t =
-    Fmt.pf ppf "{%a %d[%s] %s %s %a %S}"
+    Fmt.pf ppf "{%a %d[%s] %s %s %a %S %a}"
       Repo.pp (repo t) t.number (commit_hash t) t.base t.owner pp_state
-      t.state t.title
+      t.state t.title Fmt.(Dump.array Comment.pp) t.comments
 
   let pp_id ppf (r, n) = Fmt.pf ppf "{%a %d}" Repo.pp r n
 

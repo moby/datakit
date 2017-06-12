@@ -302,6 +302,7 @@ module Make (DK: Test_client.S) = struct
     let diff x y =
       let repos = Repo.Set.diff (repos x) (repos y) in
       let commits = Commit.Set.diff (commits x) (commits y) in
+      Log.debug (fun l -> l "XXX diff %a %a" PR.Set.pp (prs x) PR.Set.pp (prs y));
       let prs = PR.Set.diff (prs x) (prs y) in
       let status = Status.Set.diff (status x) (status y) in
       let refs = Ref.Set.diff (refs x) (refs y) in
@@ -347,7 +348,10 @@ module Make (DK: Test_client.S) = struct
             let commit = pr.PR.head in
             let number = pr.PR.number in
             let owner = pr.PR.owner in
-            let pr = PR.v ~state:`Closed ~title ~base ~owner commit number in
+            let comments = pr.PR.comments in
+            let pr =
+              PR.v ~state:`Closed ~title ~base ~owner ~comments commit number
+            in
             Event.PR pr)
       in
       let close_refs =
@@ -611,10 +615,17 @@ module Make (DK: Test_client.S) = struct
 
   let base = "master"
 
-  let pr1 = PR.v ~state:`Open   ~title:""     ~base ~owner:"sam" commit_foo 1
-  let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base ~owner:"ana" commit_foo 1
-  let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base ~owner:"aby" commit_bar 2
-  let pr4 = PR.v ~state:`Open   ~title:"toto" ~base ~owner:"joe" commit_bar 2
+  let c1 = [|
+    Comment.v ~id:0 ~user:(User.v "sam") ~body:"This is a test comment. ";
+    Comment.v ~id:1 ~user:(User.v "ana") ~body:"  This is a test reply   ";
+  |]
+
+  let c2 = [| |]
+
+  let pr1 = PR.v ~state:`Open   ~title:""     ~base ~owner:"sam" ~comments:c1 commit_foo 1
+  let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base ~owner:"ana" ~comments:c1 commit_foo 1
+  let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base ~owner:"aby" ~comments:c2 commit_bar 2
+  let pr4 = PR.v ~state:`Open   ~title:"toto" ~base ~owner:"joe" ~comments:c2 commit_bar 2
 
   let ref1 = Ref.v commit_bar ["heads";"master"]
   let ref2 = Ref.v commit_foo ["heads";"master"]
@@ -687,6 +698,12 @@ module Make (DK: Test_client.S) = struct
     let commits =  [| "123"; "456"; "789"; "0ab"; "abc"; "def" |]
     let bases = [| "master"; "test"; "foo" |]
     let owners = [| "jack"; "joe"; "julia"; "amy" |]
+    let comments = [|
+      [| |];
+      [| Comment.v ~id:12 ~user:(User.v "foo")  ~body:" test test comment   " |];
+      [| Comment.v ~id:42 ~user:(User.v "bar")  ~body:" test ";
+         Comment.v ~id:18 ~user:(User.v "toto") ~body:"  ~~~ "; |]
+    |]
     let pr_states = [| `Closed; `Open  |]
     let users = Array.map User.v [| "a"; "b" |]
     let repos = [| "a"; "b"; "c" |]
@@ -735,6 +752,7 @@ module Make (DK: Test_client.S) = struct
     let pr_state ~random = choose ~random Data.pr_states
     let base ~random = choose ~random Data.bases
     let owner ~random = choose ~random Data.owners
+    let comments ~random = choose ~random Data.comments
     let title ~random = choose ~random Data.titles
     let url ~random = choose ~random Data.urls
     let context ~random = choose ~random Data.contexts
@@ -756,7 +774,8 @@ module Make (DK: Test_client.S) = struct
         let state = pr_state ~random in
         let base = base ~random in
         let owner = owner ~random in
-        let r = PR.v ~title ~base ~state ~owner head number in
+        let comments = comments ~random in
+        let r = PR.v ~title ~base ~state ~owner ~comments head number in
         if List.exists (PR.same_id r) x then aux () else r
       in
       aux ()
@@ -823,31 +842,38 @@ module Make (DK: Test_client.S) = struct
       let old_prs = List.rev old_prs in
       let old_prs =
         List.fold_left (fun prs pr ->
-            let mk_title = title and mk_base = base and mk_owner = owner in
+            let mk_title = title
+            and mk_base = base
+            and mk_owner = owner
+            and mk_comments = comments in
             let state = pr.PR.state in
             let title = pr.PR.title in
             let head = pr.PR.head in
             let base = pr.PR.base in
             let owner = pr.PR.owner in
+            let comments = pr.PR.comments in
             let n = pr.PR.number in
             let pr = match Random.State.int random 5 with
               | 0 ->
                 let state = match pr.PR.state with
                   | `Open -> `Closed | `Closed -> `Open
                 in
-                PR.v ~state ~title ~base ~owner head n
+                PR.v ~state ~title ~base ~owner ~comments head n
               | 1 ->
                 let head = commit ~random ~repo () in
-                PR.v ~state ~title ~base ~owner head n
+                PR.v ~state ~title ~base ~owner ~comments head n
               | 2 ->
                 let title = mk_title ~random in
-                PR.v ~state ~title ~base ~owner head n
+                PR.v ~state ~title ~base ~owner ~comments head n
               | 3 ->
                 let base = mk_base ~random in
-                PR.v ~state ~title ~base ~owner head n
+                PR.v ~state ~title ~base ~owner ~comments head n
               | 4 ->
                 let owner = mk_owner ~random in
-                PR.v ~state ~title ~base ~owner head n
+                PR.v ~state ~title ~base ~owner ~comments head n
+              | 5 ->
+                let comments = mk_comments ~random in
+                PR.v ~state ~title ~base ~owner ~comments head n
               | _ -> pr
             in
             pr :: prs
@@ -866,7 +892,8 @@ module Make (DK: Test_client.S) = struct
           incr next_pr;
           let title = "PR#" ^ string_of_int number in
           let owner = owner ~random in
-          let pr = PR.v ~state:`Open ~title ~base ~owner head number in
+          let comments = comments ~random in
+          let pr = PR.v ~state:`Open ~title ~base ~owner ~comments head number in
           make_prs (pr :: acc) (n - 1)
       in
       make_prs old_prs n_prs |> List.rev
@@ -1571,6 +1598,23 @@ module Make (DK: Test_client.S) = struct
         Lwt.return (commit, states)
       )
 
+  let read_comments tree path =
+    read_opt_dir tree path >>=
+    Lwt_list.map_p (fun n ->
+        let read ~trim name =
+          DK.Tree.read_file tree (path / n / name) >>*= fun data ->
+          if trim then Lwt.return (String.trim (Cstruct.to_string data))
+          else Lwt.return (Cstruct.to_string data)
+        in
+        read ~trim:true  "id"   >>= fun id ->
+        read ~trim:true  "user" >>= fun user ->
+        read ~trim:false "body" >|= fun body ->
+        let id = int_of_string id in
+        let user = User.v user in
+        Comment.v ~id ~user ~body
+      ) >|=
+    Array.of_list
+
   let read_prs tree ~user ~repo =
     let name = User.name user in
     let path = Path.of_steps_exn [name; repo; "pr"] in
@@ -1585,10 +1629,11 @@ module Make (DK: Test_client.S) = struct
         read "head"  >>= fun head ->
         read "title" >>= fun title ->
         read "owner" >>= fun owner ->
-        read "base"  >|= fun base ->
+        read "base"  >>= fun base ->
+        read_comments tree (path / "comments") >|= fun comments ->
         let repo = Repo.v ~user ~repo in
         let head = Commit.v repo head in
-        PR.v ~state:`Open ~title ~base ~owner head number
+        PR.v ~state:`Open ~title ~base ~owner ~comments head number
       )
 
   let read_refs tree ~user ~repo =

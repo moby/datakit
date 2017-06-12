@@ -130,6 +130,33 @@ module Commit: sig
 
 end
 
+module Comment: sig
+
+  (** The type for comments. *)
+  type t = private {
+    id  : int;
+    user: User.t;
+    body: string;
+  }
+
+  val v: id:int -> user:User.t -> body:string -> t
+  (** [v ~id ~user ~body] is a comment done by [user] saying [body]. *)
+
+  val id: t -> int
+  (** [id t] is [t]'s ID, e.g. the appearance order in the comment
+      list. *)
+
+  val user: t -> User.t
+  (** [user t] is [t]'s user. *)
+
+  val body: t -> string
+  (** [body t] is [t]'s body. *)
+
+  val pp: t Fmt.t
+  (** [pp] is the pretty-printer for comments. *)
+
+end
+
 module PR: sig
 
   (** The type for pull-requests values. *)
@@ -140,10 +167,11 @@ module PR: sig
     title: string;
     base: string;
     owner: string;
+    comments: Comment.t array;
   }
 
-  val v: ?state:[`Open|`Closed] -> title:string -> ?base:string -> owner:string
-    -> Commit.t -> int -> t
+  val v: ?state:[`Open|`Closed] -> title:string -> ?base:string ->
+    owner:string -> comments:Comment.t array -> Commit.t -> int -> t
   (** [v c n ~title ~owner] is the pull-request [n] with head commit
       [c], title [title] and owner [owner]. If [base] is not set, use
       ["master"]. If [state] is not set, use [`Open]. *)
@@ -194,6 +222,9 @@ module PR: sig
 
   val owner: t -> string
   (** [owner t] is [t]'s owner. *)
+
+  val comments: t -> Comment.t array
+  (** [comments t] are [t]'s comments. *)
 
   val same_id: t -> t -> bool
   (** [same_id x y] is true if [x] and [y] have the same ID. *)

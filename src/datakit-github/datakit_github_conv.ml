@@ -59,9 +59,11 @@ module Make (DK: S) = struct
     | Error e ->
       failf "exists_file(%a): %a" Path.pp file DK.pp_error e
 
-  let read_file_if_exists t file =
+  let read_file_if_exists ?(trim=true) t file =
     DK.Tree.read_file t file >|= function
-    | Ok b    -> Some (String.trim (Cstruct.to_string b))
+    | Ok b ->
+      let b = Cstruct.to_string b in
+      Some (if trim then String.trim b else b)
     | Error (`Does_not_exist | `Not_dir) -> None
     | Error e ->
       failf "read_file(%a): %a" Path.pp file DK.pp_error e
@@ -223,15 +225,32 @@ module Make (DK: S) = struct
     Log.debug (fun l -> l "update_pr %s" @@ Path.to_hum dir);
     let update =
       DK.Transaction.make_dirs t dir >>*= fun () ->
-      let write k v =
-        let v = Cstruct.of_string (v ^ "\n") in
+      let write ?prefix ?(newline=true) k v =
+        let v = Cstruct.of_string (if newline then v ^ "\n" else v) in
+        let dir = match prefix with None -> dir | Some p -> dir /@ p in
         DK.Transaction.create_or_replace_file t (dir / k) v
       in
       write "head"  (PR.commit_hash pr)              >>*= fun () ->
       write "state" (PR.string_of_state pr.PR.state) >>*= fun () ->
       write "title" pr.PR.title                      >>*= fun () ->
       write "owner" pr.PR.owner                      >>*= fun () ->
-      write "base"  pr.PR.base
+      write "base"  pr.PR.base                       >>*= fun () ->
+      remove_if_exists t (dir / "comments")          >>=  fun () ->
+      Lwt_list.mapi_p (fun id c ->
+          let prefix =
+            Path.empty / "comments" / (string_of_int id)
+          in
+          DK.Transaction.make_dirs t (dir /@ prefix) >>*= fun () ->
+          let user = User.name c.Comment.user in
+          write ~prefix "id" (string_of_int c.Comment.id) >>*= fun () ->
+          write ~prefix "user" user                       >>*= fun () ->
+          write ~newline:false ~prefix "body" c.Comment.body
+        ) (Array.to_list pr.PR.comments)
+      >>= fun l ->
+      List.fold_left (fun acc x ->
+          acc >>*= fun () ->
+          Lwt.return x
+        ) (Lwt.return (Ok ())) l
     in
     lift_errors "update_pr" update
 
@@ -240,6 +259,36 @@ module Make (DK: S) = struct
     Log.debug (fun l -> l "remove_pr %s" @@ Path.to_hum dir);
     remove_if_exists t dir
 
+  let comments tree dir =
+    read_dir_if_exists tree dir >>= fun ids ->
+    Lwt_list.map_p (fun n ->
+        read_file_if_exists tree (dir / n / "id")   >>= fun rid ->
+        read_file_if_exists tree (dir / n / "user") >>= fun user ->
+        read_file_if_exists ~trim:false tree (dir / n / "body") >|= fun body ->
+        let body = match body with None -> "" | Some b -> b in
+        let id = match rid with
+          | None    -> None
+          | Some id -> try Some (int_of_string id) with Failure _ -> None
+        in
+        match id, user with
+        | Some id, Some name ->
+          let user = User.v name in
+          Some (Comment.v ~id ~user ~body)
+        | Some id, None ->
+          Log.debug (fun l ->
+              l "error: %a/comments/%d/author does not exist" Path.pp dir id);
+          None
+        | _ ->
+          Log.debug (fun l ->
+              l "error: %a/comments: %s is not a valid id" Path.pp dir n);
+          None
+      ) ids >|= fun comments ->
+    List.fold_left (fun acc -> function
+        | None -> acc
+        | Some x -> x :: acc
+      ) [] (List.rev comments)
+    |> Array.of_list
+
   let pr tree (repo, number) =
     let dir = root repo / "pr" / string_of_int number in
     Log.debug (fun l -> l "pr %a" Path.pp dir);
@@ -247,6 +296,7 @@ module Make (DK: S) = struct
     read_file_if_exists tree (dir / "state") >>= fun state ->
     read_file_if_exists tree (dir / "title") >>= fun title ->
     read_file_if_exists tree (dir / "owner") >>= fun owner ->
+    comments tree (dir / "comments")         >>= fun comments ->
     read_file_if_exists tree (dir / "base")  >|= fun base ->
     match head, state, owner with
     | None, _, _ ->
@@ -280,7 +330,7 @@ module Make (DK: S) = struct
                 state);
           `Closed
       in
-      Some (PR.v ~state ~title ~base ~owner head number)
+      Some (PR.v ~state ~title ~base ~owner ~comments head number)
 
   let reduce_prs = List.fold_left PR.Set.union PR.Set.empty
 

@@ -11,7 +11,7 @@ doc:          "https://docker.github.io/datakit/"
 build: ["jbuilder" "build" "-p" name "-j" jobs]
 
 depends: [
-  "jbuilder" {build}
+  "jbuilder" {build & >= "1.0+beta10"}
   "cmdliner"
   "lwt" {>= "3.0.0"}
   "uri" {>= "1.8.0"}

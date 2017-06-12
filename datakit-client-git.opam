@@ -12,7 +12,7 @@ build: ["jbuilder" "build" "-p" name "-j" jobs]
 build-test: ["jbuilder" "runtest" "tests/datakit-git"]
 
 depends: [
-  "jbuilder" {build}
+  "jbuilder" {build & >= "1.0+beta10"}
   "datakit-client" {>= "0.10.0"}
   "irmin-git" {>= "1.2.0"}
   "irmin-watcher"

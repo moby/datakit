@@ -15,7 +15,7 @@ build-test: [
 ]
 
 depends: [
-  "jbuilder" {build}
+  "jbuilder" {build & >= "1.0+beta10"}
   "cmdliner"
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.11.0"}

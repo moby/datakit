@@ -622,10 +622,15 @@ module Make (DK: Test_client.S) = struct
 
   let c2 = [| |]
 
-  let pr1 = PR.v ~state:`Open   ~title:""     ~base ~owner:"sam" ~comments:c1 commit_foo 1
-  let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base ~owner:"ana" ~comments:c1 commit_foo 1
-  let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base ~owner:"aby" ~comments:c2 commit_bar 2
-  let pr4 = PR.v ~state:`Open   ~title:"toto" ~base ~owner:"joe" ~comments:c2 commit_bar 2
+  let o1 = User.v "sam"
+  let o2 = User.v "ana"
+  let o3 = User.v "aby"
+  let o4 = User.v "joe"
+
+  let pr1 = PR.v ~state:`Open   ~title:""     ~base ~owner:o1 ~comments:c1 commit_foo 1
+  let pr2 = PR.v ~state:`Closed ~title:"foo"  ~base ~owner:o2 ~comments:c1 commit_foo 1
+  let pr3 = PR.v ~state:`Open   ~title:"bar"  ~base ~owner:o3 ~comments:c2 commit_bar 2
+  let pr4 = PR.v ~state:`Open   ~title:"toto" ~base ~owner:o4 ~comments:c2 commit_bar 2
 
   let ref1 = Ref.v commit_bar ["heads";"master"]
   let ref2 = Ref.v commit_foo ["heads";"master"]
@@ -697,7 +702,7 @@ module Make (DK: Test_client.S) = struct
     let titles = [| "it works!"; "merge me"; "yay!" |]
     let commits =  [| "123"; "456"; "789"; "0ab"; "abc"; "def" |]
     let bases = [| "master"; "test"; "foo" |]
-    let owners = [| "jack"; "joe"; "julia"; "amy" |]
+    let owners = Array.map User.v [| "jack"; "joe"; "julia"; "amy" |]
     let comments = [|
       [| |];
       [| Comment.v ~id:12 ~user:(User.v "foo")  ~body:" test test comment   " |];
@@ -1631,6 +1636,7 @@ module Make (DK: Test_client.S) = struct
         read "owner" >>= fun owner ->
         read "base"  >>= fun base ->
         read_comments tree (path / "comments") >|= fun comments ->
+        let owner = User.v owner in
         let repo = Repo.v ~user ~repo in
         let head = Commit.v repo head in
         PR.v ~state:`Open ~title ~base ~owner ~comments head number

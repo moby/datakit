@@ -166,12 +166,12 @@ module PR: sig
     state: [`Open | `Closed];
     title: string;
     base: string;
-    owner: string;
+    owner: User.t;
     comments: Comment.t array;
   }
 
   val v: ?state:[`Open|`Closed] -> title:string -> ?base:string ->
-    owner:string -> comments:Comment.t array -> Commit.t -> int -> t
+    owner:User.t -> comments:Comment.t array -> Commit.t -> int -> t
   (** [v c n ~title ~owner] is the pull-request [n] with head commit
       [c], title [title] and owner [owner]. If [base] is not set, use
       ["master"]. If [state] is not set, use [`Open]. *)
@@ -220,7 +220,7 @@ module PR: sig
   val title: t -> string
   (** [title t] is [t]'s title. *)
 
-  val owner: t -> string
+  val owner: t -> User.t
   (** [owner t] is [t]'s owner. *)
 
   val comments: t -> Comment.t array

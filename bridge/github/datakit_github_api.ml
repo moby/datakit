@@ -102,10 +102,9 @@ module PR = struct
     let state = pr.pull_state in
     let title = pr.pull_title in
     let base = pr.pull_base.branch_ref in
-    let owner = pr.pull_user.user_login in
+    let owner = User.v pr.pull_user.user_login in
     let num = pr.pull_number in
-    let user = User.v owner in
-    let body = Comment.v ~id:0 ~user ~body:pr.pull_body in
+    let body = Comment.v ~id:0 ~user:owner ~body:pr.pull_body in
     comments ~token repo num >|= fun comments ->
     let comments = Array.of_list (body :: comments) in
     PR.v ~state ~title ~base ~owner ~comments head num
@@ -124,11 +123,13 @@ module PR = struct
     let title = pr.pull_request_event_pull_request.pull_title in
     let base = pr.pull_request_event_pull_request.pull_base.branch_ref in
     let number = pr.pull_request_event_number in
-    let owner = pr.pull_request_event_pull_request.pull_user.user_login in
+    let owner =
+      User.v pr.pull_request_event_pull_request.pull_user.user_login
+    in
     comments ~token repo number >|= fun comments ->
     let body =
-      let user = User.v owner in
-      Comment.v ~id:0 ~user ~body:pr.pull_request_event_pull_request.pull_body
+      let body = pr.pull_request_event_pull_request.pull_body in
+      Comment.v ~id:0 ~user:owner ~body
     in
     let comments = Array.of_list (body :: comments) in
     Event.PR (PR.v ~state ~title ~base ~owner ~comments head number)

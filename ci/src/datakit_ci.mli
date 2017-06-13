@@ -577,7 +577,10 @@ module type BUILDER = sig
       {{!Cache}cache}. *)
 
   module Key: sig type t end
-  (** Input describing what is to be built. *)
+  (** Input describing what is to be built.
+      Any change to the key will trigger a rebuild. If you want to use
+      some value in the build but not rebuild when it changes, put it
+      in the [context] instead. *)
 
   type context
   (** For passing context parameters to the builder which aren't part
@@ -612,8 +615,9 @@ module type BUILDER = sig
 
   val branch: t -> Key.t -> string
   (** The name of the DataKit branch on which to store the result for
-      this key.  If the branch exists and is up-to-date then we use
-      that. *)
+      this key. If the branch exists and is up-to-date then we use
+      that instead of rebuilding. Changes to the key *must* result in
+      a different branch name. *)
 end
 
 module Cache: sig

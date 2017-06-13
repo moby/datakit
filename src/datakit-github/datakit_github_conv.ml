@@ -233,7 +233,7 @@ module Make (DK: S) = struct
       write "head"  (PR.commit_hash pr)              >>*= fun () ->
       write "state" (PR.string_of_state pr.PR.state) >>*= fun () ->
       write "title" pr.PR.title                      >>*= fun () ->
-      write "owner" pr.PR.owner                      >>*= fun () ->
+      write "owner" (User.name pr.PR.owner)          >>*= fun () ->
       write "base"  pr.PR.base                       >>*= fun () ->
       remove_if_exists t (dir / "comments")          >>=  fun () ->
       Lwt_list.mapi_p (fun id c ->
@@ -320,6 +320,7 @@ module Make (DK: S) = struct
                 Repo.pp repo number);
           "master"
       in
+      let owner = User.v owner in
       let head = Commit.v repo id in
       let title = match title with None -> "" | Some t -> t in
       let state = match PR.state_of_string state with

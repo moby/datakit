@@ -188,7 +188,7 @@ module PR = struct
     state: [`Open | `Closed];
     title: string;
     base: string;
-    owner: string;
+    owner: User.t;
     comments: Comment.t array;
   }
 
@@ -233,7 +233,8 @@ module PR = struct
 
   let pp ppf t =
     Fmt.pf ppf "{%a %d[%s] %s %s %a %S %a}"
-      Repo.pp (repo t) t.number (commit_hash t) t.base t.owner pp_state
+      Repo.pp (repo t) t.number (commit_hash t) t.base (User.name t.owner)
+      pp_state
       t.state t.title Fmt.(Dump.array Comment.pp) t.comments
 
   let pp_id ppf (r, n) = Fmt.pf ppf "{%a %d}" Repo.pp r n

@@ -12,7 +12,7 @@ build: ["jbuilder" "build" "-p" name "-j" jobs]
 build-test: ["jbuilder" "runtest" "tests/%{name}%"]
 
 depends: [
-  "jbuilder" {build}
+  "jbuilder" {build & >= "1.0+beta10"}
   "cmdliner"
   "lwt" {>= "3.0.0"}
   "datakit-github"    {>= "0.11.0"}

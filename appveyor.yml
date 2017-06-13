@@ -19,5 +19,5 @@ artifacts:
   - path: "com.docker.db.exe"
   - path: "COMMIT"
 
-cache:
-  - '%CYG_ROOT%\home\appveyor\.opam'
+#cache:
+#  - '%CYG_ROOT%\home\appveyor\.opam'

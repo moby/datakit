@@ -1,10 +1,14 @@
 package datakit
 
 import (
+	"bytes"
+	"io"
 	"log"
 	"testing"
 
-	"golang.org/x/net/context"
+	p9p "github.com/docker/go-p9p"
+
+	"context"
 )
 
 func TestInit(t *testing.T) {
@@ -48,6 +52,7 @@ func TestInit(t *testing.T) {
 		t.Fatalf("Mkdir failed: %v", err)
 	}
 	filePath := append(path, "filename")
+
 	err = client.Remove(ctx, filePath...)
 	if err != nil {
 		t.Fatalf("Remove failed: %v", err)
@@ -74,4 +79,36 @@ func TestInit(t *testing.T) {
 	}
 	file.Close(ctx)
 	file.Close(ctx) // should be idempotent
+
+	largeFilePath := append(path, "largefile")
+	var largeDataInput []byte
+
+	for ix := 0; ix < p9p.DefaultMSize*2+150; ix++ {
+		largeDataInput = append(largeDataInput, byte(ix))
+	}
+	file, err = client.Create(ctx, largeFilePath...)
+	if err != nil {
+		t.Fatalf("Create %v failed: %v", filePath, err)
+	}
+	defer file.Close(ctx)
+	n, err = file.NewIOWriter(ctx, 0).Write(largeDataInput)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if n != len(largeDataInput) {
+		t.Fatalf("Write was only partial: %v", err)
+	}
+	t.Logf("Written %v bytes successfully", n)
+	readBackData := make([]byte, len(largeDataInput)+2) // make sure reported length when ReadAll is called has the right value
+	n, err = io.ReadFull(file.NewIOReader(ctx, 0), readBackData)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if n != len(largeDataInput) {
+		t.Fatalf("Failed to read back the number of bytes we wrote")
+	}
+	if bytes.Compare(largeDataInput, readBackData[:n]) != 0 {
+		t.Fatalf("The message we read back was different to the message we wrote")
+	}
+	t.Logf("Read %v bytes successfully", n)
 }

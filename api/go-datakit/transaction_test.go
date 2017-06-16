@@ -4,7 +4,7 @@ import (
 	"log"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 func TestTransaction(t *testing.T) {

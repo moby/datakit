@@ -5,7 +5,7 @@ import (
 	"log"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 func TestConfig(t *testing.T) {

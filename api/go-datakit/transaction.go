@@ -6,7 +6,7 @@ import (
 	"log"
 
 	p9p "github.com/docker/go-p9p"
-	"golang.org/x/net/context"
+	"context"
 )
 
 type transaction struct {

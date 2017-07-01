@@ -15,8 +15,7 @@ func TestConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to db: %v", err)
 	}
-
-	r, err := NewRecord(ctx, client, []string{"master", "defaults"}, "defaults", []string{"tests"})
+	r, err := NewRecord(ctx, client, []string{"master", "defaults"}, "defaults", "state", []string{"tests"})
 	if err != nil {
 		t.Fatalf("NewRecord failed: %v", err)
 	}

@@ -101,6 +101,61 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+func TestChangeDefaults(t *testing.T) {
+	ctx := context.Background()
+	log.Println("Check that defaults can be updated")
+
+	client, err := dial(ctx)
+	if err != nil {
+		t.Fatalf("Failed to connect to db: %v", err)
+	}
+	key := "change-default-key"
+	if err = rm(ctx, client, "defaults", []string{"tests", key}); err != nil {
+		t.Fatalf("Failed to remove previous test state")
+	}
+
+	r, err := NewRecord(ctx, client, []string{"master", "defaults"}, "defaults", "state", []string{"tests"})
+	if err != nil {
+		t.Fatalf("NewRecord failed: %v", err)
+	}
+	r.Wait(ctx)
+
+	nameF := r.StringField(key, "hello")
+	r.Seal(ctx)
+
+	def, err := read(ctx, client, "defaults", []string{"tests", key})
+	if err != nil {
+		t.Fatalf("r.StringField didn't create a defaults branch entry")
+	}
+	if def != "hello" {
+		t.Fatalf("r.StringField should have set the default value to hello: %s", def)
+	}
+	name, _ := nameF.Get()
+	if name != "hello" {
+		t.Fatalf("r.Get after r.StringField should have read the default value of hello: %s", name)
+	}
+
+	r, err = NewRecord(ctx, client, []string{"master", "defaults"}, "defaults", "state", []string{"tests"})
+	if err != nil {
+		t.Fatalf("NewRecord failed: %v", err)
+	}
+	r.Wait(ctx)
+	nameF = r.StringField(key, "there")
+	r.Seal(ctx)
+
+	def, err = read(ctx, client, "defaults", []string{"tests", key})
+	if err != nil {
+		t.Fatalf("r.StringField didn't create a defaults branch entry")
+	}
+	if def != "there" {
+		t.Fatalf("r.StringField should have reset the default value to there: %s", def)
+	}
+	name, _ = nameF.Get()
+	if name != "there" {
+		t.Fatalf("r.Get after r.StringField should have read the new default value of there: %s", name)
+	}
+}
+
 func write(ctx context.Context, client *Client, path []string, value string) error {
 	t, err := NewTransaction(ctx, client, "master", "test-tmp")
 
@@ -117,4 +172,31 @@ func write(ctx context.Context, client *Client, path []string, value string) err
 	}
 
 	return nil
+}
+
+func rm(ctx context.Context, client *Client, branch string, path []string) error {
+	t, err := NewTransaction(ctx, client, branch, "test-tmp")
+
+	if err != nil {
+		return err
+	}
+	err = t.Remove(ctx, path)
+	if err != nil {
+		return err
+	}
+	err = t.Commit(ctx, "Write test")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func read(ctx context.Context, client *Client, branch string, path []string) (string, error) {
+	sha, err := Head(ctx, client, branch)
+	if err != nil {
+		return "", err
+	}
+	snap := NewSnapshot(ctx, client, COMMIT, sha)
+	return snap.Read(ctx, path)
 }

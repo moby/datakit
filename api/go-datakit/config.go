@@ -140,43 +140,29 @@ func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
 	return r.Wait(ctx)
 }
 
-// fillInDefault writes the default value to the store if no Value
-// is already present. This ensures that the system state is always
-// in sync with the database, and we don't have to also know what
-// default values are also baked into the application.
+// fillInDefault updates the default branch to contain the new value.
 func (r *Record) fillInDefault(path []string, valueref *string) error {
-	if valueref == nil {
-		// Lack of existence of the key is the default, so whether a key is
-		// present or not it is ok.
-		return nil
-	}
-	value := *valueref
 	ctx := context.Background()
-	head, err := Head(ctx, r.client, r.defaultsB)
-	if err != nil {
-		return err
-	}
-	snap := NewSnapshot(ctx, r.client, COMMIT, head)
-	p := append(r.path, path...)
-	current, err := snap.Read(ctx, p)
-
-	if err != nil && err != enoent {
-		return err
-	}
-	if err == nil {
-		// there is a value already
-		return nil
-	}
 	t, err := NewTransaction(ctx, r.client, r.defaultsB, r.defaultsB+".fillInDefault")
 	if err != nil {
 		return err
 	}
-	log.Printf("Updating value at %s to %s (from %s)", strings.Join(p, "/"), value, current)
-	err = t.Write(ctx, p, value)
-	if err != nil {
-		return err
+	p := append(r.path, path...)
+	if valueref == nil {
+		log.Printf("Removing default value at %s", strings.Join(p, "/"))
+
+		if err = t.Remove(ctx, p); err != nil {
+			log.Printf("Failed to remove key at %s", strings.Join(p, "/"))
+			return err
+		}
+	} else {
+		log.Printf("Updating default value at %s to %s", strings.Join(p, "/"), *valueref)
+		if err = t.Write(ctx, p, *valueref); err != nil {
+			log.Printf("Failed to write key %s = %s", strings.Join(p, "/"), *valueref)
+			return err
+		}
 	}
-	return t.Commit(ctx, fmt.Sprintf("fill-in default for %s", path))
+	return t.Commit(ctx, fmt.Sprintf("fill-in default for %s", p))
 }
 
 func (r *Record) SetMultiple(description string, fields []*StringField, values []string) error {

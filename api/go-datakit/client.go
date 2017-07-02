@@ -148,14 +148,16 @@ func (c *Client) Remove(ctx context.Context, path ...string) error {
 	if err != nil {
 		return err
 	}
-	defer c.freeFid(ctx, fid)
 	if _, err := c.session.Walk(ctx, fid, fid, path...); err != nil {
 		if err == enoent || err == enotdir {
+			c.freeFid(ctx, fid)
 			return nil
 		}
 		log.Println("Failed to walk to", path, err)
+		c.freeFid(ctx, fid)
 		return err
 	}
+	// Remove will cluck the fid, even if it fails
 	if err := c.session.Remove(ctx, fid); err != nil {
 		if err == enoent {
 			return nil

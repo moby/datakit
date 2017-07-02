@@ -265,10 +265,6 @@ func (f *Record) StringRefField(key string, value *string) *StringRefField {
 		if err != nil {
 			log.Fatalf("Failed to create transaction for updating state branch: %#v", err)
 		}
-		existingValue, err := t.Read(ctx, append(f.path, path...))
-		if (newValue == nil && err != nil) || (newValue != nil && *newValue == existingValue && err == nil) {
-			return
-		}
 		if newValue != nil {
 			if err = t.Write(ctx, append(f.path, path...), *newValue); err != nil {
 				log.Fatalf("Failed to write state %#v = %s: %#v", path, newValue, err)

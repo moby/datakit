@@ -31,7 +31,7 @@ func NewRecord(ctx context.Context, client *Client, lookupB []string, defaultsB 
 	event := make(chan (interface{}), 0)
 	for _, b := range append(lookupB, stateB) {
 		// Create the branch if it doesn't exist
-		t, err := NewTransaction(ctx, client, b, b+".init")
+		t, err := NewTransaction(ctx, client, b)
 		if err != nil {
 			log.Fatalf("Failed to open a new transaction: %#v", err)
 		}
@@ -115,7 +115,7 @@ func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
 	r.schemaF.raw.defaultValue = &defaultString
 	// Create defaults branch
 	log.Printf("Performing schema upgrade to version %d\n", schemaVersion)
-	t, err := NewTransaction(ctx, r.client, r.defaultsB, r.defaultsB+".Upgrade")
+	t, err := NewTransaction(ctx, r.client, r.defaultsB)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (r *Record) Upgrade(ctx context.Context, schemaVersion int) error {
 // fillInDefault updates the default branch to contain the new value.
 func (r *Record) fillInDefault(path []string, valueref *string) error {
 	ctx := context.Background()
-	t, err := NewTransaction(ctx, r.client, r.defaultsB, r.defaultsB+".fillInDefault")
+	t, err := NewTransaction(ctx, r.client, r.defaultsB)
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (r *Record) SetMultiple(description string, fields []*StringField, values [
 		return fmt.Errorf("Length of fields and values is not equal")
 	}
 	ctx := context.Background()
-	t, err := NewTransaction(ctx, r.client, r.lookupB[0], description)
+	t, err := NewTransaction(ctx, r.client, r.lookupB[0])
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (r *Record) SetMultiple(description string, fields []*StringField, values [
 			return err
 		}
 	}
-	return t.Commit(ctx, "Set multiple fields")
+	return t.Commit(ctx, description)
 }
 
 type StringRefField struct {
@@ -200,7 +200,7 @@ func (f *StringRefField) Set(description string, value *string) error {
 	ctx := context.Background()
 	p := append(f.record.path, f.path...)
 	log.Printf("Setting value in store: %#v=%#v\n", p, value)
-	t, err := NewTransaction(ctx, f.record.client, f.record.lookupB[0], description)
+	t, err := NewTransaction(ctx, f.record.client, f.record.lookupB[0])
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (f *StringRefField) Set(description string, value *string) error {
 	if err != nil {
 		return err
 	}
-	return t.Commit(ctx, fmt.Sprintf("Unconditionally set %s", f.path))
+	return t.Commit(ctx, fmt.Sprintf("Unconditionally set %s: %s", f.path, description))
 }
 
 // Get retrieves the current value of the key
@@ -261,13 +261,13 @@ func (f *Record) StringRefField(key string, value *string) *StringRefField {
 		}
 
 		// Update the value in memory and in the state branch
-		t, err := NewTransaction(ctx, f.client, f.stateB, "update-state")
+		t, err := NewTransaction(ctx, f.client, f.stateB)
 		if err != nil {
 			log.Fatalf("Failed to create transaction for updating state branch: %#v", err)
 		}
 		if newValue != nil {
 			if err = t.Write(ctx, append(f.path, path...), *newValue); err != nil {
-				log.Fatalf("Failed to write state %#v = %s: %#v", path, newValue, err)
+				log.Fatalf("Failed to write state %#v = %s: %#v", path, *newValue, err)
 			}
 		} else {
 			if err = t.Remove(ctx, append(f.path, path...)); err != nil {

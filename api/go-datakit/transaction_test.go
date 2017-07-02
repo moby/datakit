@@ -15,7 +15,7 @@ func TestTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to db: %v", err)
 	}
-	trans, err := NewTransaction(ctx, client, "master", "test-tmp")
+	trans, err := NewTransaction(ctx, client, "master")
 
 	if err != nil {
 		t.Fatalf("NewTransaction failed: %v", err)

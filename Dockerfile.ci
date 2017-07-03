@@ -6,9 +6,7 @@ RUN git -C /home/opam/opam-repository fetch origin && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
-RUN sudo apk add tzdata aspcud
-
-RUN opam pin add protocol-9p-unix.dev --dev -n
+RUN sudo apk update && sudo apk add tzdata aspcud
 
 RUN opam depext -i asl win-eventlog alcotest mtime mirage-flow hvsock \
     git irmin irmin-unix lwt protocol-9p-unix tyxml redis multipart-form-data \

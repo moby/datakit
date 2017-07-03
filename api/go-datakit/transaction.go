@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"strconv"
+	"sync/atomic"
 
 	p9p "github.com/docker/go-p9p"
 	"context"
@@ -15,10 +17,14 @@ type transaction struct {
 	newBranch  string
 }
 
+var nextTransaction = int64(0)
+
 // NewTransaction opens a new transaction originating from fromBranch, named
 // newBranch.
-func NewTransaction(ctx context.Context, client *Client, fromBranch string, newBranch string) (*transaction, error) {
+func NewTransaction(ctx context.Context, client *Client, fromBranch string) (*transaction, error) {
 
+	id := atomic.AddInt64(&nextTransaction, 1)
+	newBranch := strconv.FormatInt(id, 10)
 	err := client.Mkdir(ctx, "branch", fromBranch)
 	if err != nil {
 		log.Println("Failed to Create branch/", fromBranch, err)

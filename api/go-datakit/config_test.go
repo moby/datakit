@@ -157,7 +157,7 @@ func TestChangeDefaults(t *testing.T) {
 }
 
 func write(ctx context.Context, client *Client, path []string, value string) error {
-	t, err := NewTransaction(ctx, client, "master", "test-tmp")
+	t, err := NewTransaction(ctx, client, "master")
 
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func write(ctx context.Context, client *Client, path []string, value string) err
 }
 
 func rm(ctx context.Context, client *Client, branch string, path []string) error {
-	t, err := NewTransaction(ctx, client, branch, "test-tmp")
+	t, err := NewTransaction(ctx, client, branch)
 
 	if err != nil {
 		return err

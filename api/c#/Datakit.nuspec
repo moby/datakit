@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>@project@</id>
+    <version>@build.number@</version>
+    <authors>@authors@</authors>
+    <owners>@authors@</owners>
+    <title>$title$</title>
+    <summary>@summary@</summary>
+    <licenseUrl>https://github.com/docker/datakit/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/docker/datakit</projectUrl>
+    <iconUrl>http://ICON_URL_HERE_OR_DELETE_THIS_LINE</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>@description@</description>
+    <releaseNotes>@releaseNotes@</releaseNotes>
+    <copyright>Copyright 2016 Docker, Inc.</copyright>
+    <tags>9P, Plan9, Datakit, git</tags>
+  </metadata>
+</package>

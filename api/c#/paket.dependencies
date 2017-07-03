@@ -1,0 +1,6 @@
+source https://nuget.org/api/v2
+
+nuget FAKE
+nuget Moq
+nuget NUnit 3.2.1
+nuget Nunit.Runners

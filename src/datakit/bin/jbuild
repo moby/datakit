@@ -5,7 +5,7 @@
   (package     datakit)
   (public_name datakit)
   (libraries   (datakit_io datakit datakit_conduit datakit_log
-                cmdliner fmt.cli fmt.tty logs.fmt asetmap git irmin
+                cmdliner fmt.cli fmt.tty logs.cli asetmap git irmin
                 irmin-git irmin-watcher))
  ))
 

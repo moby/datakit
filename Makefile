@@ -50,7 +50,7 @@ ci:
 	$(RUNTEST) ci/tests
 
 clean:
-	rm -rf _build
+	jbuilder clean
 	rm -rf com.docker.db com.docker.db.exe COMMIT _tests
 	rm -f examples/ocaml-client/*.native
 	rm -f ci/skeleton/exampleCI.native

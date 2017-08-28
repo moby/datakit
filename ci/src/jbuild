@@ -5,10 +5,10 @@
   (public_name datakit-ci)
   (wrapped     false)
   (libraries   (datakit-github datakit-client datakit-client-9p
-                yojson cmdliner tyxml multipart-form-data
+                yojson cmdliner tyxml multipart-form-data conduit-lwt-unix
                 prometheus-app.unix webmachine redis-lwt session pbkdf
-                github protocol-9p-unix logs.cli session.redis-lwt
-                session.webmachine github.unix fmt.cli fmt.tty))
+                github protocol-9p-unix logs.cli session-redis-lwt
+                session-webmachine github.unix fmt.cli fmt.tty))
   (preprocess  (per_module
                  ((pps (ppx_sexp_conv)) (cI_secrets cI_web_utils))))
  ))

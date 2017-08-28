@@ -24,11 +24,12 @@ depends: [
   "logs"
   "tyxml" {>= "4.0.0"}
   "tls"
-  "conduit"
+  "conduit-lwt-unix"
   "io-page"
   "pbkdf"
   "webmachine" {>= "0.4.0"}
-  "session" {>= "0.3.0"}
+  "session-redis-lwt" {>= "0.4.0"}
+  "session-webmachine" {>= "0.4.0"}
   "redis-lwt"
   "asetmap"
   "github" {>= "2.2.0"}
@@ -38,6 +39,6 @@ depends: [
   "crunch" {build}
   "datakit" {test & >= "0.11.0"}
   "irmin-unix" {test & >= "1.2.0"}
-  "alcotest" {test}
+  "alcotest" {test & >= "0.8.0"}
 ]
 available: [ocaml-version >= "4.03.0"]

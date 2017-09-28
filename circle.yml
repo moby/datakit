@@ -21,7 +21,7 @@ dependencies:
   - opam pin add datakit-server-9p.dev . -n
   - opam pin add datakit.dev . -n
   - opam update && opam upgrade --fixup && opam upgrade
-  - opam install depext && opam depext osx-fsevents datakit
+  - opam install depext && opam config exec -- opam depext osx-fsevents datakit
   - opam list
   - opam reinstall datakit-server datakit -v
   - mkdir -p _build/src/datakit

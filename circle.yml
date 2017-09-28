@@ -23,7 +23,7 @@ dependencies:
   - opam update && opam upgrade --fixup && opam upgrade
   - opam install depext && opam config exec -- opam depext osx-fsevents datakit
   - opam list
-  - opam reinstall datakit-server datakit -v
+  - opam config exec -- opam reinstall datakit-server datakit -v
   - mkdir -p _build/src/datakit
   - opam config exec -- make bundle COMMIT
 test:

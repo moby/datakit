@@ -1,8 +1,8 @@
-FROM ocaml/opam-dev@sha256:1dd4440b3e5f182f705cb5a74f9d4e860c2842b45ed72c199de89a894d13f522
+FROM ocaml/opam-dev@sha256:f04c7fbe8fe103b77186f02a5b6c43f9a52e31af26b1211adf86698cfb5bb91f
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset 482bd5f55 --hard && \
+    git -C /home/opam/opam-repository reset 3bcfe6c8d --hard && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
@@ -15,13 +15,13 @@ RUN opam depext -i asl win-eventlog alcotest mtime mirage-flow hvsock \
 
 ADD . /home/opam/datakit
 RUN sudo chown opam /home/opam/datakit
-RUN opam pin add -k git datakit-client.dev /home/opam/datakit -y
-RUN opam pin add -k git datakit-client-9p.dev /home/opam/datakit -y
-RUN opam pin add -k git datakit-server.dev /home/opam/datakit -y
-RUN opam pin add -k git datakit-server-9p.dev /home/opam/datakit -y
-RUN opam pin add -k git datakit-github.dev /home/opam/datakit -y
-RUN opam pin add -k git datakit.dev /home/opam/datakit -y
+RUN opam pin add datakit-client.dev /home/opam/datakit -y
+RUN opam pin add datakit-client-9p.dev /home/opam/datakit -y
+RUN opam pin add datakit-server.dev /home/opam/datakit -y
+RUN opam pin add datakit-server-9p.dev /home/opam/datakit -y
+RUN opam pin add datakit-github.dev /home/opam/datakit -y
+RUN opam pin add datakit.dev /home/opam/datakit -y
 
-RUN opam pin add -k git datakit-ci.dev /home/opam/datakit -yt
+RUN opam pin add datakit-ci.dev /home/opam/datakit -yt
 
 VOLUME /secrets

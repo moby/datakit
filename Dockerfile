@@ -1,12 +1,12 @@
-FROM ocaml/opam-dev@sha256:1dd4440b3e5f182f705cb5a74f9d4e860c2842b45ed72c199de89a894d13f522
+FROM ocaml/opam-dev@sha256:f04c7fbe8fe103b77186f02a5b6c43f9a52e31af26b1211adf86698cfb5bb91f
 #FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset 482bd5f55 --hard && \
+    git -C /home/opam/opam-repository reset 3bcfe6c8d --hard && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
-RUN sudo apk add tzdata aspcud gmp-dev perl
+RUN sudo apk update && sudo apk add tzdata aspcud gmp-dev perl
 
 RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog \
     irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin \
@@ -28,8 +28,8 @@ RUN opam pin add datakit-server.dev /home/opam/src/datakit -yn && \
     opam pin add datakit.dev /home/opam/src/datakit -yn
 
 RUN opam depext -y datakit
-RUN opam install -y --deps-only datakit-client datakit-server
 RUN opam install alcotest
+RUN opam install datakit-client-9p datakit
 
 COPY . /home/opam/src/datakit
 
@@ -38,8 +38,7 @@ RUN cd /home/opam/src/datakit && \
     scripts/watermark.sh && \
     git status --porcelain
 
-# FIXME: warkaround a bug in opam2
-RUN opam install datakit-client-9p
+RUN opam upgrade datakit-client datakit-client-9p datakit-server datakit-server-9p
 RUN opam install datakit -ytv
 
 RUN sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \

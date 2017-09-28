@@ -23,11 +23,11 @@ depends: [
   "asl" "win-eventlog"
   "uri" {>= "1.8.0"}
   "hvsock" {>= "0.8.1"}
-  "hex" "nocrypto" "conduit"
+  "hex" "nocrypto"
   "prometheus-app"
   "protocol-9p-unix" {>= "0.11.0"}
   "datakit-client" {>= "0.10.0"}
-  "github-hooks" {>= "0.1.1"}
+  "github-hooks-unix" {>= "0.2.0"}
   "github" {>= "2.1.0"}
   "alcotest" {test}
   "datakit"  {test & >= "0.11.0"}

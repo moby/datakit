@@ -397,12 +397,24 @@ module FS = struct
           )
       )
 
+  let trim s =
+    let len = Cstruct.len s in
+    if len >= 2
+    && Cstruct.get_char s (len - 1) = '\n'
+    && Cstruct.get_char s (len - 2) = '\r'
+    then
+      Cstruct.sub s 0 (len - 2)
+    else if len >= 1 && Cstruct.get_char s (len - 1) = '\n' then
+      Cstruct.sub s 0 (len - 1)
+    else
+      s
+
   let test_and_set_file ?temp_dir ~lock file ~test ~set =
     Lock.with_lock (Some lock) (fun () ->
         read_file file >>= fun v ->
         let equal = match test, v with
           | None  , None   -> true
-          | Some x, Some y -> Cstruct.equal x y
+          | Some x, Some y -> Cstruct.equal (trim x) (trim y)
           | _ -> false
         in
         if not equal then Lwt.return false

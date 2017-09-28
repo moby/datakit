@@ -23,8 +23,7 @@ depends:
 	  datakit-ci datakit-bridge-github datakit-bridge-local-git -y
 
 datakit:
-	$(BUILD) -n datakit
-	$(RUNTEST) test/datakit
+	$(BUILD) -p datakit
 
 client:
 	$(BUILD) -p datakit-client

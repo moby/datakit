@@ -3,7 +3,7 @@
 (library
  ((name      datakit_bridge_github)
   (wrapped   false)
-  (modules   (:standard \ main \ version))
+  (modules   ((:standard \ main) \ version))
   (libraries (rresult github-hooks.unix github.unix datakit-github
               datakit-client))))
 

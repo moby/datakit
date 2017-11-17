@@ -6,6 +6,7 @@ environment:
   FORK_BRANCH: master
   CYG_ROOT: C:\cygwin64
   PACKAGE: datakit
+  OPAM_SWITCH: "4.05.0+mingw64c"
   PINS: "datakit-server.dev:. datakit-server-9p.dev:. datakit-github.dev:. datakit-client.dev:. datakit-client-9p.dev:."
 
 install:

@@ -6,7 +6,7 @@ RUN git -C /home/opam/opam-repository fetch origin && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
-RUN sudo apk add tzdata aspcud
+RUN sudo apk add --no-cache tzdata aspcud
 
 RUN opam depext -ui lwt inotify alcotest conf-libev lambda-term cmdliner \
     github protocol-9p rresult prometheus-app asl win-eventlog mtime hex \

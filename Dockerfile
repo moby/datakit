@@ -6,7 +6,7 @@ RUN git -C /home/opam/opam-repository fetch origin && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
-RUN sudo apk update && sudo apk add tzdata aspcud gmp-dev perl
+RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl
 
 RUN opam depext -ui lwt inotify alcotest conf-libev asl win-eventlog \
     irmin-watcher mtime mirage-flow conduit hvsock prometheus-app git irmin \

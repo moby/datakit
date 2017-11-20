@@ -1,27 +1,33 @@
-FROM ocaml/opam-dev@sha256:f04c7fbe8fe103b77186f02a5b6c43f9a52e31af26b1211adf86698cfb5bb91f
-#FROM ocaml/opam-dev:alpine-3.5_ocaml-4.04.0
+FROM ocaml/opam-dev:alpine-3.5_ocaml-4.05.0
+RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset 3bcfe6c8d --hard && \
+    git -C /home/opam/opam-repository reset beba7fea --hard && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
-RUN sudo apk add --no-cache tzdata aspcud
+RUN opam install alcotest lwt conf-libev inotify
 
-RUN opam depext -i asl win-eventlog alcotest mtime mirage-flow hvsock \
-    git irmin irmin-unix lwt protocol-9p-unix tyxml redis multipart-form-data \
-    pbkdf tls prometheus-app github git session irmin irmin-unix cmdliner \
-    webmachine alcotest
+COPY check-libev.ml /tmp/check-libev.ml
+RUN opam config exec -- ocaml /tmp/check-libev.ml
 
-ADD . /home/opam/datakit
-RUN sudo chown opam /home/opam/datakit
-RUN opam pin add datakit-client.dev /home/opam/datakit -y
-RUN opam pin add datakit-client-9p.dev /home/opam/datakit -y
-RUN opam pin add datakit-server.dev /home/opam/datakit -y
-RUN opam pin add datakit-server-9p.dev /home/opam/datakit -y
-RUN opam pin add datakit-github.dev /home/opam/datakit -y
-RUN opam pin add datakit.dev /home/opam/datakit -y
+# cache opam install of dependencies
 
-RUN opam pin add datakit-ci.dev /home/opam/datakit -yt
+COPY *.opam /home/opam/src/datakit/
+RUN  opam pin add /home/opam/src/datakit/ -n
+
+# install dependencies
+
+RUN sudo apk add --no-cache libressl-dev linux-headers pcre-dev
+RUN opam install datakit-ci --deps -t
+
+# copy local sources
+
+COPY . /home/opam/src/datakit
+RUN sudo chown opam.nogroup -R /home/opam/src/datakit
+
+RUN opam update --dev && opam upgrade
+
+RUN opam install datakit-ci -ytv
 
 VOLUME /secrets

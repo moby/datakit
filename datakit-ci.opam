@@ -24,14 +24,15 @@ depends: [
   "logs"
   "tyxml" {>= "4.0.0"}
   "tls"
-  "conduit"
+  "conduit-lwt-unix" {>= "1.0.0"}
   "io-page"
   "pbkdf"
   "webmachine" {>= "0.4.0"}
-  "session" {>= "0.3.0"}
+  "session-redis-lwt" {>= "0.4.0"}
+  "session-webmachine" {>= "0.4.0"}
   "redis-lwt"
   "asetmap"
-  "github" {>= "2.2.0"}
+  "github-unix" {>= "3.0.0"}
   "prometheus-app"
   "lwt" {>= "3.0.0"}
   "ppx_sexp_conv" {build}

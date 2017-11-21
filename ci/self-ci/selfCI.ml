@@ -19,23 +19,6 @@ module Dockerfile = struct
   let datakit     = v ~timeout:(30. *. minute) "Dockerfile"
 end
 
-let alpine_4_03 = Term.return (Docker.Image.of_published "ocaml/opam:alpine_ocaml-4.03.0")
-
-let pp_packages = Fmt.(list ~sep:(const string " ") String.dump)
-
-let opam_test ?depexts pkg =
-  let depexts =
-    match depexts with
-    | None -> ""
-    | Some depexts -> Fmt.strf " && opam depext -i -y %a" pp_packages depexts
-  in
-  let cmd =
-    Fmt.strf "opam remove -y %S%s&& opam install -y -t --deps-only %S && opam install -y -v -t %S"
-      pkg depexts pkg pkg in
-  let entrypoint = "/bin/sh" in
-  Docker.command ~logs ~pool ~user:"opam" ~timeout:(30. *. minute) ~label:("test-" ^ pkg) ~entrypoint ["-c"; cmd]
-
-let opam_test_ci = opam_test "datakit-ci" ~depexts:["conf-autoconf"; "conf-libpcre"; "camlzip"]
 module Tests = struct
   open Term.Infix
 
@@ -52,7 +35,6 @@ module Tests = struct
     in
     object(self)
       method client      = build Dockerfile.client
-      method client_4_03 = build Dockerfile.client     ~from:alpine_4_03
       method local_git   = build Dockerfile.local_git  ~from:self#client
       method ci          = build Dockerfile.ci
       method self_ci     = build Dockerfile.self_ci    ~from:self#ci
@@ -63,9 +45,6 @@ module Tests = struct
   let check_builds term =
     term >|= fun (_:Docker.Image.t) -> "Build succeeded"
 
-  let run_tests image tests =
-    image >>= Docker.run tests >|= fun () -> "Tests passed"
-
   (* [datakit repo target] is the set of tests to run on [target]. *)
   let datakit repo = function
     | `Ref (_, ["heads"; "gh-pages"]) -> []       (* Don't try to build the gh-pages branch *)
@@ -73,14 +52,13 @@ module Tests = struct
       let src = Git.fetch_head repo target in
       let images = images src in
       [
-        "ci",          run_tests    images#ci           opam_test_ci;
+        "ci",          check_builds images#ci;
         "self-ci",     check_builds images#self_ci;
         "github",      check_builds images#github;
         "datakit",     check_builds images#datakit;
         "local-git",   check_builds images#local_git;
         "libraries",   Term.wait_for_all [
           "client",      check_builds images#client;
-          "client-4.03", check_builds images#client_4_03;
         ] >|= fun () -> "Library tests succeeded"
       ]
 end

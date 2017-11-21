@@ -1,20 +1,11 @@
 FROM datakit/client
 
-RUN opam pin add github --dev -n
-RUN opam pin add datakit-github.dev /home/opam/src/datakit -n
-RUN opam pin add datakit-bridge-local-git.dev /home/opam/src/datakit -n
-RUN opam depext datakit-bridge-local-git && opam install datakit-client --deps
-
-COPY . /home/opam/src/datakit/
+COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit
-RUN cd /home/opam/src/datakit && \
-    scripts/watermark.sh && \
-    git status --porcelain
 
-RUN opam update datakit-bridge-local-git
-RUN opam install datakit-bridge-local-git -vv
+RUN opam update --dev && opam upgrade
 
-RUN opam config exec -- ocaml /home/opam/src/datakit/check-libev.ml
+RUN opam install datakit-bridge-local-git -tyv
 RUN sudo cp $(opam config exec -- which datakit-bridge-local-git) /usr/bin/
 
 FROM alpine:3.5

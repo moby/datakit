@@ -4,5 +4,5 @@ module type S = sig
 end
 
 module Make (DK: S): sig
-  val test_set : Alcotest.test_case list
+  val test_set : unit Alcotest.test_case list
 end

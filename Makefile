@@ -23,8 +23,7 @@ depends:
 	  datakit-ci datakit-bridge-github datakit-bridge-local-git -y
 
 datakit:
-	$(BUILD) -n datakit
-	$(RUNTEST) test/datakit
+	$(BUILD) -p datakit
 
 client:
 	$(BUILD) -p datakit-client
@@ -50,7 +49,7 @@ ci:
 	$(RUNTEST) ci/tests
 
 clean:
-	rm -rf _build
+	jbuilder clean
 	rm -rf com.docker.db com.docker.db.exe COMMIT _tests
 	rm -f examples/ocaml-client/*.native
 	rm -f ci/skeleton/exampleCI.native

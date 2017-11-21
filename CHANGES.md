@@ -1,3 +1,19 @@
+### 0.12.0 (2017-11-21)
+
+- all: update to latest version of alcotest, conduit, session, ocaml-github,
+  ocaml-github-hooks and cohttp (#612, @samoht and @djs55)
+
+- github: make `User.t` abstract (#594, @samoht)
+- github: turn `Webhook.events` into a promise (#598, @samoht)
+- github: add a `Comment` module to model PR and issue comments (#595, @samoht)
+- github: change `PR.owner` to be of type `User.t` (#599, @samoht)
+
+- github-bridge: add the ability to sync PR's coments (#595, @samoht)
+
+- go-client: handle large values when reading / writing in 9db (#292, @simonferquel)
+- go-client: fix the handling of defaults over upgrade (#605, @djs55)
+- go-client: improve transaction API (#606, @djs55)
+
 ### 0.11.0 (2017-07-07)
 
 The main change in this release is the addition of `datakit-client-git`

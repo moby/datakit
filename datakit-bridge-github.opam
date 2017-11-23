@@ -15,9 +15,10 @@ depends: [
   "jbuilder" {build & >= "1.0+beta10"}
   "cmdliner"
   "lwt" {>= "3.0.0"}
-  "datakit-github"    {>= "0.11.0"}
-  "datakit-client-9p" {>= "0.11.0"}
-  "datakit-client-git"
+  "datakit-github"     {>= "0.12.0"}
+  "datakit-client"     {>= "0.12.0"}
+  "datakit-client-9p"  {>= "0.12.0"}
+  "datakit-client-git" {>= "0.12.0"}
   "logs" "fmt"
   "mtime" {>= "1.0.0"}
   "asl" "win-eventlog"
@@ -26,9 +27,8 @@ depends: [
   "hex" "nocrypto"
   "prometheus-app"
   "protocol-9p-unix" {>= "0.11.0"}
-  "datakit-client" {>= "0.10.0"}
   "github-hooks-unix" {>= "0.2.0"}
   "github" {>= "2.1.0"}
   "alcotest" {test}
-  "datakit"  {test & >= "0.11.0"}
+  "datakit"  {test & >= "0.12.0"}
 ]

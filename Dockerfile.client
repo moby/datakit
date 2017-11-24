@@ -2,7 +2,7 @@ FROM ocaml/opam-dev:alpine-3.5_ocaml-4.05.0
 RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset beba7fea --hard && \
+    git -C /home/opam/opam-repository reset 68b69980 --hard && \
     opam update -u
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1

@@ -37,8 +37,8 @@ depends: [
   "irmin-watcher" {>= "0.2.0"}
   "prometheus-app"
   "protocol-9p-unix"  {>= "0.11.0"}
-  "datakit-server-9p" {>= "0.11.0"}
-  "datakit-client-9p" {test & >= "0.11.0"}
+  "datakit-server-9p" {>= "0.12.0"}
+  "datakit-client-9p" {test & >= "0.12.0"}
   "alcotest"          {test & >= "0.8.0"}
 ]
 available: [ocaml-version >= "4.02.0"]

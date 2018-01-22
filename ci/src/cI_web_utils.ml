@@ -49,7 +49,7 @@ end
 
 module Wm = struct
   module Rd = Webmachine.Rd
-  include Webmachine.Make(Cohttp_lwt_unix_io)
+  include Webmachine.Make(Cohttp_lwt_unix.IO)
 end
 module Session = struct
   module Memory = Session.Lift.IO(Lwt)(Session.Memory)
@@ -362,14 +362,14 @@ let server ~auth ~web_config ~session_backend ~public_address =
 let web_config t = t.web_config
 
 class type resource = object
-  inherit [Cohttp_lwt_body.t] Wm.resource
-  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+  inherit [Cohttp_lwt.Body.t] Wm.resource
+  method content_types_accepted : ((string * Cohttp_lwt.Body.t Wm.acceptor) list, Cohttp_lwt.Body.t) Wm.op
+  method content_types_provided : ((string * Cohttp_lwt.Body.t Wm.provider) list, Cohttp_lwt.Body.t) Wm.op
 end
 
 class static ~valid ~mime_type dir =
   object(self)
-    inherit [Cohttp_lwt_body.t] Wm.resource
+    inherit [Cohttp_lwt.Body.t] Wm.resource
 
     method content_types_provided rd =
       match mime_type rd.Wm.Rd.uri with
@@ -400,7 +400,7 @@ class static ~valid ~mime_type dir =
 
 class static_crunch ~mime_type read =
   object(self)
-    inherit [Cohttp_lwt_body.t] Wm.resource
+    inherit [Cohttp_lwt.Body.t] Wm.resource
 
     method content_types_provided rd =
       match mime_type rd.Wm.Rd.uri with
@@ -438,8 +438,8 @@ end
 
 class virtual resource_with_session t =
   object(self)
-    inherit [Cohttp_lwt_body.t] Wm.resource
-    inherit [Cohttp_lwt_body.t] Session.manager ~cookie_key:(cookie_key t) t.session_backend
+    inherit [Cohttp_lwt.Body.t] Wm.resource
+    inherit [Cohttp_lwt.Body.t] Session.manager ~cookie_key:(cookie_key t) t.session_backend
 
     method private session rd =
       let generate_new_session () =
@@ -668,7 +668,7 @@ let serve ~mode ~routes =
 class virtual html_page t = object(self)
   inherit protected_page t
 
-  method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt_body.t) Wm.op
+  method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt.Body.t) Wm.op
 
   method content_types_provided rd =
     Wm.continue [
@@ -694,7 +694,7 @@ class virtual ['a] form_page t = object(self)
   method virtual private default : CI_form.State.t Lwt.t
   method virtual private render : csrf_token:string -> CI_form.State.t -> CI_web_templates.t -> CI_web_templates.page
   method virtual private validate : 'a CI_form.Validator.t
-  method virtual private process : 'a -> Cohttp_lwt_body.t Wm.acceptor
+  method virtual private process : 'a -> Cohttp_lwt.Body.t Wm.acceptor
 
   method! allowed_methods rd =
     Wm.continue [`GET; `POST] rd
@@ -722,7 +722,7 @@ class virtual ['a] form_page t = object(self)
       | None -> Wm.respond 403 ~body:(`String "Missing Content-Type header") rd
       | Some content_type ->
         let body = rd.Wm.Rd.req_body in
-        Multipart.parse_stream ~stream:(Cohttp_lwt_body.to_stream body) ~content_type >>= fun parts ->
+        Multipart.parse_stream ~stream:(Cohttp_lwt.Body.to_stream body) ~content_type >>= fun parts ->
         Multipart.get_parts parts >>= fun parts ->
         match CI_form.Validator.run self#validate parts with
         | Ok data -> self#process data rd

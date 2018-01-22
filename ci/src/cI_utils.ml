@@ -143,3 +143,7 @@ let cancel_when_off switch fn =
     (fun () -> Lwt.cancel th; Lwt.return ())
   >>= fun () ->
   th
+
+let opt_get f = function
+  | None -> f ()
+  | Some x -> x

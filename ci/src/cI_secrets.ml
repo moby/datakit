@@ -47,16 +47,10 @@ let ensure_crt ~private_key path =
   else (
     let dn = [`CN "DataKitCI"] in
     let csr = X509.CA.request dn private_key in
-    let valid_from = { Asn.Time.
-                       date = (2016, 07, 25);
-                       time = (12, 0, 0, 0.0);
-                       tz = None;
-                     } in
-    let valid_until = { Asn.Time.
-                        date = (3000, 01, 01);
-                        time = (15, 0, 0, 0.0);
-                        tz = None;
-                      } in
+    let valid_from = Ptime.of_date_time ((2016, 07, 25), ((12, 0, 0), 0)) in
+    let valid_from = opt_get (fun () -> assert false) valid_from in
+    let valid_until = Ptime.of_date_time ((3000, 01, 01), ((15, 0, 0), 0)) in
+    let valid_until = opt_get (fun () -> assert false) valid_until in
     let crt = X509.CA.sign csr ~valid_from ~valid_until private_key dn in
     let data = X509.Encoding.Pem.Certificate.to_pem_cstruct1 crt |> Cstruct.to_string in
     Lwt_io.with_file ~mode:Lwt_io.output path (fun ch -> Lwt_io.write ch data)

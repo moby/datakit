@@ -568,7 +568,7 @@ let test_live_logs conn =
   let log = CI_live_log.create ~pending:"Building" ~branch ~title:"Test" logs in
   CI_live_log.printf log "TEST-\027[1;31mOUTPUT\027[m-1\n";
   let path = "/log/live/test%2flog" in
-  get path >|= Cohttp_lwt_body.to_stream >>= fun log_page ->
+  get path >|= Cohttp_lwt.Body.to_stream >>= fun log_page ->
   read_to log_page "TEST-<span class='fg-bright-red bold'>OUTPUT</span>-1" >>= fun () ->
   CI_live_log.printf log "TEST-OUTPUT-<&2>\n";
   read_to log_page "TEST-OUTPUT-&lt;&amp;2" >>= fun () ->
@@ -588,7 +588,7 @@ let test_live_logs conn =
   | Some (code, header, _body, _path) ->
     Alcotest.(check status_code) "Web response" `Temporary_redirect code;
     let path = Cohttp.Header.get header "location" |> Test_utils.or_fail "Missing location" in
-    get path >>= Cohttp_lwt_body.to_string >>= fun body ->
+    get path >>= Cohttp_lwt.Body.to_string >>= fun body ->
     if not (String.is_infix ~affix:"TEST-OUTPUT-&lt;&amp;" body) then
       Alcotest.fail ("Missing saved data in: " ^body);
     Lwt.return ()

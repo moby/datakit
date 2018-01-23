@@ -48,3 +48,5 @@ val ls: string -> string list Lwt.t
 val with_switch: (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
 
 val cancel_when_off: Lwt_switch.t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+
+val opt_get : (unit -> 'a) -> 'a option -> 'a

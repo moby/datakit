@@ -48,9 +48,9 @@ module Session_data : sig
 end
 
 class type resource = object
-  inherit [Cohttp_lwt_body.t] Wm.resource
-  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+  inherit [Cohttp_lwt.Body.t] Wm.resource
+  method content_types_accepted : ((string * Cohttp_lwt.Body.t Wm.acceptor) list, Cohttp_lwt.Body.t) Wm.op
+  method content_types_provided : ((string * Cohttp_lwt.Body.t Wm.provider) list, Cohttp_lwt.Body.t) Wm.op
 end
 
 class static : valid:Str.regexp -> mime_type:(Uri.t -> string option) -> string -> resource
@@ -62,8 +62,8 @@ class static_crunch : mime_type:(Uri.t -> string option) -> (string -> string op
     The MIME type returned will be [mime_type uri]. *)
 
 class virtual resource_with_session : server -> object
-    inherit [Cohttp_lwt_body.t] Wm.resource
-    method private session : Cohttp_lwt_body.t Webmachine.Rd.t -> Session_data.t Lwt.t
+    inherit [Cohttp_lwt.Body.t] Wm.resource
+    method private session : Cohttp_lwt.Body.t Webmachine.Rd.t -> Session_data.t Lwt.t
   end
 (** [resource_with_session] ensures there is a session for each request. *)
 
@@ -94,8 +94,8 @@ class virtual protected_page : server -> object
 
 class virtual post_page : server -> object
     inherit protected_page
-    method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-    method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+    method content_types_accepted : ((string * Cohttp_lwt.Body.t Wm.acceptor) list, Cohttp_lwt.Body.t) Wm.op
+    method content_types_provided : ((string * Cohttp_lwt.Body.t Wm.provider) list, Cohttp_lwt.Body.t) Wm.op
   end
 (** [post_page] accepts form POST submissions.
     It overrides [forbidden] to check that the CSRF token is present and correct. *)
@@ -105,15 +105,15 @@ class logout_page : server -> resource
 
 val serve :
   mode:Conduit_lwt_unix.server ->
-  routes:(string * (unit -> Cohttp_lwt_body.t Wm.resource)) list ->
+  routes:(string * (unit -> Cohttp_lwt.Body.t Wm.resource)) list ->
   unit Lwt.t
 (** [serve ~mode ~routes] runs a web-server listening on [mode] that dispatches incoming requests using [routes]. *)
 
 class virtual html_page : server -> object
     inherit protected_page
-    method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt_body.t) Wm.op
-    method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-    method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+    method virtual private render : (CI_web_templates.t -> CI_web_templates.page, Cohttp_lwt.Body.t) Wm.op
+    method content_types_accepted : ((string * Cohttp_lwt.Body.t Wm.acceptor) list, Cohttp_lwt.Body.t) Wm.op
+    method content_types_provided : ((string * Cohttp_lwt.Body.t Wm.provider) list, Cohttp_lwt.Body.t) Wm.op
   end
 
 class virtual ['a] form_page : server -> object
@@ -133,11 +133,11 @@ class virtual ['a] form_page : server -> object
   (** [validate] is a validator that returns a validated result from a form submission
       (or produces suitable errors if the form is not valid). *)
 
-  method virtual private process : 'a -> Cohttp_lwt_body.t Wm.acceptor
+  method virtual private process : 'a -> Cohttp_lwt.Body.t Wm.acceptor
   (** [process data] should act on the valid form data [data], which has been produced by [validate]. *)
 
-  method content_types_accepted : ((string * Cohttp_lwt_body.t Wm.acceptor) list, Cohttp_lwt_body.t) Wm.op
-  method content_types_provided : ((string * Cohttp_lwt_body.t Wm.provider) list, Cohttp_lwt_body.t) Wm.op
+  method content_types_accepted : ((string * Cohttp_lwt.Body.t Wm.acceptor) list, Cohttp_lwt.Body.t) Wm.op
+  method content_types_provided : ((string * Cohttp_lwt.Body.t Wm.provider) list, Cohttp_lwt.Body.t) Wm.op
 end
 
 class github_auth_settings : server -> resource

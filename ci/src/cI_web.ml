@@ -73,7 +73,7 @@ let check_metrics_token server provided =
     false
 
 class metrics t = object(self)
-  inherit [Cohttp_lwt_body.t] Wm.resource
+  inherit [Cohttp_lwt.Body.t] Wm.resource
 
   method content_types_provided rd =
     Wm.continue [

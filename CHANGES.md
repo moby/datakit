@@ -1,3 +1,7 @@
+### 0.12.1 (2018-01-23)
+
+- Upgrade to Tls >= 0.9.0 and Cohttp-lwt-unix >= 1.0.0 (#615, @jpdeplaix)
+
 ### 0.12.0 (2017-11-21)
 
 - all: update to latest version of alcotest, conduit, session, ocaml-github,

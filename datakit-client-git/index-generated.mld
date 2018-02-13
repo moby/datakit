@@ -1,0 +1,2 @@
+{1 Library datakit-client-git}
+This library exposes the following toplevel modules: {!modules:Datakit_client_git}.

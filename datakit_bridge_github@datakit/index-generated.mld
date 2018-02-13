@@ -1,0 +1,2 @@
+{1 Library datakit_bridge_github}
+This library exposes the following toplevel modules: {!modules:Datakit_github_api Datakit_github_state Datakit_github_sync}.

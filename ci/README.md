@@ -219,6 +219,57 @@ This will allow read access to the CI if the user is the local "admin" user, or
 is a GitHub user who can read the "my-org/my-private-repository" repository.
 
 
+## Trouble-shooting
+
+### Can't create new live log on branch "..."
+
+Most build steps take some time to run, and therefore cache the results in memory and on disk.
+When the CI needs a result, it asks the cache for it.
+If the result isn't in the cache, it will start building it, creating a live log for the results.
+When done, it writes the results to a branch in the DataKit database
+(there is a different branch for each build step, e.g. `docker-build-for-source-hash-123` -
+rebuilding creates more commits on the same branch).
+
+This error means that two different caches tried to build the same branch at the same time.
+This is usually caused by a configuration that creates a new cache on each evaluation,
+instead of creating the cache once at the start. e.g.
+
+```ocaml
+let my_test target =
+  build >>= fun result ->
+  test (make_cache ~logs) result	(* WRONG! *)
+```
+
+To fix it, move the `make_cache` step to the top-level, e.g.
+
+```ocaml
+let my_cache = make_cache ~logs
+
+let my_test target =
+  build >>= fun result ->
+  test my_cache result			(* Correct *)
+```
+
+To find functions that make caches, search for `~logs`.
+Taking a `logs` argument is a strong indicator that a function creates a cache.
+
+### ENAMETOOLONG when using datakit-bridge-local-git
+
+It's important to understand that there are *two* Git repositories being used when you test a Git project:
+
+- The repository with the code you want to test.
+- The repository where the CI stores the results (logs, etc).
+
+If you accidentally tell DataKit to store the build results in your source repository then
+every time it creates a new result, it will trigger a CI test of the results branch, which
+will create a loop.
+
+In this case, you will see an error like this (with a repeating path) in the logs:
+
+```
+9p error: Unix.Unix_error(Unix.ENAMETOOLONG, "open", "/data/.git/lock/refs/heads/status-me-my_2dproject-ref-heads-status_2dme_2dmy_5f2dproject_2dref_2dheads_2dstatus_5f2dme_5f2dmy_5f5f2dproject_5f2dref_5f2dheads_5f2dstatus_5f5f2dme_5f5f2dmy_5f5f5f2dproject_5f5f2dref_5f5f2dheads_5f5f2dstatus_5f5f5f2dme_5f5f5f2dmy_5f5f5f5f2dproject_5f5f5f2dref_5f5f5f2dheads_5f5f5f2dgithub_5f5f5f5f2dmetadata")
+```
+
 
 [DataKit]: https://github.com/moby/datakit
 [cmdliner]: http://erratique.ch/software/cmdliner/doc/Cmdliner

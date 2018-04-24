@@ -4,7 +4,7 @@ RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset 68b69980 --hard && \
+    git -C /home/opam/opam-repository reset 818ebb219 --hard && \
     opam update -u
 
 RUN opam install alcotest lwt conf-libev inotify

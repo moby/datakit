@@ -18,7 +18,7 @@ depends: [
   "jbuilder" {build & >= "1.0+beta10"}
   "cmdliner"
   "rresult" "astring" "fmt" "asetmap"
-  "git"         {>= "1.11.0"}
+  "git"         {>= "1.11.5"}
   "uri"
   "irmin"       {>= "1.2.0"}
   "irmin-mem"   {>= "1.2.0"}

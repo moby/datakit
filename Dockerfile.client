@@ -19,7 +19,7 @@ RUN  opam pin add /home/opam/src/datakit/ -n
 
 # install dependencies
 
-RUN opam install datakit-client-git datakit-client-9p --deps -t
+RUN OPAMSOLVERTIMEOUT=120 opam install datakit-client-git datakit-client-9p --deps -t
 
 COPY . /home/opam/src/datakit
 RUN sudo chown opam.nogroup -R /home/opam/src/datakit

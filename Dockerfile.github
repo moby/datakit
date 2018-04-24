@@ -7,7 +7,7 @@ RUN git -C /home/opam/opam-repository fetch origin && \
     git -C /home/opam/opam-repository reset 818ebb219 --hard && \
     opam update -u
 
-RUN opam install alcotest lwt conf-libev inotify
+RUN opam install alcotest lwt conf-libev inotify tls
 
 COPY check-libev.ml /tmp/check-libev.ml
 RUN opam config exec -- ocaml /tmp/check-libev.ml

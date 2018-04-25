@@ -9,7 +9,7 @@ services:
     links:
       - datakit
     volumes:
-      - '../../.git:/data/repos/datakit/.git:ro'
+      - '../../.git:/data/repos/datakit/.git'   # XXX: should really be :ro (see #622)
   ci:
     command: '--profile=localhost --metadata-store tcp:datakit:5640 --web-ui=http://localhost:8080/ --canary=moby/datakit/heads/master'
     build: .

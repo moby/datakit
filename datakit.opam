@@ -20,7 +20,7 @@ depends: [
   "rresult" "astring" "fmt" "asetmap"
   "git"         {>= "1.11.5"}
   "uri"
-  "irmin"       {>= "1.2.0"}
+  "irmin"       {>= "1.2.0" & <"1.4.0"}
   "irmin-mem"   {>= "1.2.0"}
   "irmin-git"   {>= "1.2.0"}
   "cstruct"     {>= "2.2"}

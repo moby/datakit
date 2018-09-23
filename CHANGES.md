@@ -1,3 +1,7 @@
+### 0.12.2
+
+- Support the latest GitHub and Atd bindings (>=2.0.0) (@avsm)
+
 ### 0.12.1 (2018-01-23)
 
 - Upgrade to Tls >= 0.9.0 and Cohttp-lwt-unix >= 1.0.0 (#615, @jpdeplaix)

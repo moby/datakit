@@ -4,4 +4,4 @@
  ((name      datakit_conduit)
   (wrapped   false)
   (libraries (uri fmt lwt astring protocol-9p-unix hvsock.lwt-unix
-              datakit-server-9p))))
+              datakit-server-9p named-pipe.lwt))))

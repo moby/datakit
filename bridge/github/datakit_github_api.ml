@@ -149,7 +149,7 @@ module Status = struct
     | l           -> Some (String.concat ~sep:"/" l)
 
   let of_gh_state = function
-    | `Unknown (s, _) -> failwith ("unknown: " ^ s)
+    | `Unknown s -> failwith ("unknown: " ^ s)
     | #Status_state.t as s -> s
 
   let to_gh_state s = (s :> Github_t.status_state)

@@ -1,0 +1,8 @@
+(executable
+ (name      test)
+ (libraries test str datakit-client-git))
+
+(alias
+ (name runtest)
+ (deps test.exe)
+ (action (run %{exe:test.exe} -q --color=always)))

@@ -9,7 +9,7 @@ doc: "https://docker.github.io/datakit/"
 bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
   "ocaml"
-  "jbuilder" {build & >= "1.0+beta10"}
+  "dune" {build}
   "cmdliner"
   "lwt" {>= "3.0.0"}
   "datakit-github" {>= "0.12.0"}
@@ -21,7 +21,7 @@ depends: [
   "mtime" {>= "1.0.0"}
   "asl"
   "win-eventlog"
-  "uri" {>= "1.8.0"}
+  "uri" {>= "2.0.0"}
   "hvsock" {>= "0.8.1"}
   "hex"
   "nocrypto"
@@ -33,7 +33,7 @@ depends: [
   "datakit" {with-test & >= "0.12.0"}
 ]
 build: [
-  ["jbuilder" "build" "-p" name "-j" jobs]
-  ["jbuilder" "runtest" "tests/%{name}%"] {with-test}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "tests/%{name}%"] {with-test}
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"

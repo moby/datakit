@@ -8,15 +8,15 @@ homepage: "https://github.com/moby/datakit"
 doc: "https://docker.github.io/datakit/"
 bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
-  "ocaml" {>= "4.02.0"}
-  "jbuilder" {build & >= "1.0+beta10"}
+  "ocaml" {>= "4.03.0"}
+  "dune" {build}
   "cmdliner"
   "rresult"
   "astring"
   "fmt"
   "asetmap"
   "git" {>= "1.11.5"}
-  "uri" 
+  "uri" {>="2.0.0"}
   "irmin" {>= "1.2.0" & < "1.4.0"}
   "irmin-mem" {>= "1.2.0"}
   "irmin-git" {>= "1.2.0"}
@@ -39,8 +39,8 @@ depends: [
   "alcotest" {with-test & >= "0.8.0"}
 ]
 build: [
-  ["jbuilder" "build" "-p" name "-j" jobs]
-  ["jbuilder" "runtest" "tests/datakit"] {with-test}
-  ["jbuilder" "runtest" "tests/datakit-9p"] {with-test}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "tests/datakit"] {with-test}
+  ["dune" "runtest" "tests/datakit-9p"] {with-test}
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"

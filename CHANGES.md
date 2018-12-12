@@ -5,6 +5,7 @@
 - Port build to Dune from Jbuilder (@avsm). 
 - Remove use of deprecated Tyxml `pcdata` function in favour of `txt` (@avsm)
 - Add watermarking of versions in the build system (@avsm)
+- Remove topkg build targets in favour of using `dune-release` (@avsm)
 
 ### 0.12.1 (2018-01-23)
 

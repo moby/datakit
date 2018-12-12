@@ -656,7 +656,7 @@ let tree t h =
   match S.Tree.Hash.of_string h with
   | Error e -> Lwt.return (Error (e :> error))
   | Ok hash ->
-    S.Tree.of_hash t.repo hash >|= function
+    S.Tree.of_hash t.repo (`Node hash) >|= function
     | None   -> err_msg "%s is not a valid tree" h
     | Some x -> Ok x
 

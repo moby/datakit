@@ -11,7 +11,7 @@ type t = {
 type github_auth = {
   client_id : string;
   client_secret : string;
-  callback : Uri.t option;
+  callback : Uri_sexp.t option;
 } [@@deriving sexp]
 
 class type ['a] disk_secret = object

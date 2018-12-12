@@ -69,12 +69,12 @@ module Html = struct
     let err =
       match s.State.error with
       | None -> []
-      | Some err -> [div ~a:[a_class ["alert"; "alert-danger"]] [pcdata err]]
+      | Some err -> [div ~a:[a_class ["alert"; "alert-danger"]] [txt err]]
     in
     let init = s.State.data |> CI_utils.default "" in
     let id = "field-" ^ name in
     div ~a:[a_class ["form-group"]] ([
-        label ~a:[a_label_for id] [pcdata descr];
+        label ~a:[a_label_for id] [txt descr];
         input ~a:[a_class ["form-control"]; a_id id; a_input_type ty; a_name name; a_value init] ()
       ] @ err)
 
@@ -86,7 +86,7 @@ module Html = struct
     let warnings =
       State.bindings state |> List.map (fun (name, field) ->
           let err = field.State.error |> CI_utils.default "Unexpected field" in
-          div ~a:[a_class ["alert"; "alert-danger"]] [pcdata (Fmt.strf "%s: %s" name err)]
+          div ~a:[a_class ["alert"; "alert-danger"]] [txt (Fmt.strf "%s: %s" name err)]
         )
     in
     form ~a:[a_class form_class; a_action action; a_method `Post; a_enctype "multipart/form-data"]

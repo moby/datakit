@@ -1,44 +1,46 @@
-opam-version: "1.2"
-maintainer:   "thomas@gazagnaire.org"
-authors:      ["Thomas Leonard" "Magnus Skjegstad"
-               "David Scott" "Thomas Gazagnaire"]
-license:      "Apache"
-homepage:     "https://github.com/moby/datakit"
-bug-reports:  "https://github.com/moby/datakit/issues"
-dev-repo:     "https://github.com/moby/datakit.git"
-doc:          "https://docker.github.io/datakit/"
-
-build: ["jbuilder" "build" "-p" name "-j" jobs]
-build-test: [
-  ["jbuilder" "runtest" "tests/datakit"]
-  ["jbuilder" "runtest" "tests/datakit-9p"]
+opam-version: "2.0"
+maintainer: "thomas@gazagnaire.org"
+authors: [
+  "Thomas Leonard" "Magnus Skjegstad" "David Scott" "Thomas Gazagnaire"
 ]
-
+license: "Apache"
+homepage: "https://github.com/moby/datakit"
+doc: "https://docker.github.io/datakit/"
+bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
+  "ocaml" {>= "4.02.0"}
   "jbuilder" {build & >= "1.0+beta10"}
   "cmdliner"
-  "rresult" "astring" "fmt" "asetmap"
-  "git"         {>= "1.11.5"}
-  "uri"
-  "irmin"       {>= "1.2.0" & <"1.4.0"}
-  "irmin-mem"   {>= "1.2.0"}
-  "irmin-git"   {>= "1.2.0"}
-  "cstruct"     {>= "2.2"}
+  "rresult"
+  "astring"
+  "fmt"
+  "asetmap"
+  "git" {>= "1.11.5"}
+  "uri" 
+  "irmin" {>= "1.2.0" & < "1.4.0"}
+  "irmin-mem" {>= "1.2.0"}
+  "irmin-git" {>= "1.2.0"}
+  "cstruct" {>= "2.2"}
   "result"
-  "lwt"         {>= "3.0.0"}
+  "lwt" {>= "3.0.0"}
   "conduit-lwt-unix" {>= "1.0.0"}
   "mirage-flow"
-  "named-pipe"  {>= "0.4.0"}
-  "hvsock"      {>= "0.8.1"}
-  "logs"        {>= "0.5.0"}
+  "named-pipe" {>= "0.4.0"}
+  "hvsock" {>= "0.8.1"}
+  "logs" {>= "0.5.0"}
   "win-eventlog"
-  "asl"         {>= "0.10"}
-  "mtime"       {>= "1.0.0"}
+  "asl" {>= "0.10"}
+  "mtime" {>= "1.0.0"}
   "irmin-watcher" {>= "0.2.0"}
   "prometheus-app"
-  "protocol-9p-unix"  {>= "0.11.0"}
+  "protocol-9p-unix" {>= "0.11.0"}
   "datakit-server-9p" {>= "0.12.0"}
-  "datakit-client-9p" {test & >= "0.12.0"}
-  "alcotest"          {test & >= "0.8.0"}
+  "datakit-client-9p" {with-test & >= "0.12.0"}
+  "alcotest" {with-test & >= "0.8.0"}
 ]
-available: [ocaml-version >= "4.02.0"]
+build: [
+  ["jbuilder" "build" "-p" name "-j" jobs]
+  ["jbuilder" "runtest" "tests/datakit"] {with-test}
+  ["jbuilder" "runtest" "tests/datakit-9p"] {with-test}
+]
+dev-repo: "git+https://github.com/moby/datakit.git"

@@ -1,17 +1,14 @@
-opam-version: "1.2"
-maintainer:   "thomas@gazagnaire.org"
-authors:      ["Thomas© Leonard" "Anil Madhavapeddy"
-               "Dave Tucker" "Thomas Gazagnaire" ]
-license:      "Apache"
-homepage:     "https://github.com/moby/datakit"
-bug-reports:  "https://github.com/moby/datakit/issues"
-dev-repo:     "https://github.com/moby/datakit.git"
-doc:          "https://docker.github.io/datakit/"
-
-build: ["jbuilder" "build" "-p" name "-j" jobs]
-build-test: ["jbuilder" "runtest" "ci/tests"]
-
+opam-version: "2.0"
+maintainer: "thomas@gazagnaire.org"
+authors: [
+  "Thomas© Leonard" "Anil Madhavapeddy" "Dave Tucker" "Thomas Gazagnaire"
+]
+license: "Apache"
+homepage: "https://github.com/moby/datakit"
+doc: "https://docker.github.io/datakit/"
+bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
+  "ocaml" {>= "4.03.0"}
   "jbuilder" {build & >= "1.0+beta10"}
   "multipart-form-data"
   "datakit-client" {>= "0.12.0"}
@@ -37,9 +34,13 @@ depends: [
   "lwt" {>= "3.0.0"}
   "ppx_sexp_conv" {build}
   "crunch" {build}
-  "datakit" {test & >= "0.12.0"}
-  "irmin-unix" {test & >= "1.2.0"}
-  "alcotest" {test}
+  "datakit" {with-test & >= "0.12.0"}
+  "irmin-unix" {with-test & >= "1.2.0"}
+  "alcotest" {with-test}
   "cohttp-lwt-unix" {>= "1.0.0"}
 ]
-available: [ocaml-version >= "4.03.0"]
+build: [
+  ["jbuilder" "build" "-p" name "-j" jobs]
+  ["jbuilder" "runtest" "ci/tests"] {with-test}
+]
+dev-repo: "git+https://github.com/moby/datakit.git"

@@ -1,7 +1,7 @@
 PINOPTS=-yn -k git
 
-BUILD=jbuilder build --dev
-RUNTEST=jbuilder runtest
+BUILD=dune build --profile=release
+RUNTEST=dune runtest
 
 .PHONY: all clean test bundle COMMIT exe ci
 

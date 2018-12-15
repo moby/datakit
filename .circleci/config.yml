@@ -1,0 +1,33 @@
+version: 2
+jobs:
+  build:
+    macos:
+      xcode: "9.0"
+    environment:
+      OPAMYES: "1"
+      OPAMJOBS: "2"
+      MACOSX_DEPLOYMENT_TARGET: "10.10"
+      TERM: vt100
+    steps:
+      - checkout
+      - run: brew uninstall python # remove files in /usr/local/bin
+      - run: brew install gmp wget ocaml opam pkg-config dylibbundler
+      - run: opam init -n https://github.com/ocaml/opam-repository.git
+      - run: opam switch create 4.05.0
+      - run: opam switch 4.05.0
+      - run: opam pin add -n .
+      - run: opam update && opam upgrade --fixup && opam upgrade
+      - run: opam install depext && opam config exec -- opam depext osx-fsevents datakit
+      - run: opam list
+      - run: opam install .
+      - run: mkdir -p _build/src/datakit
+      - run: opam exec -- make bundle COMMIT
+      - store_artifacts:
+          path: com.docker.db
+      - store_artifacts:
+          path: COMMIT
+workflows:
+  version: 2
+  build-test-datakit:
+    jobs:
+      - build

@@ -138,7 +138,7 @@ let status state =
     | `Pending -> "label-warning", "glyphicon-hourglass", "Pending"
     | `Failure -> "label-danger", "glyphicon-remove", "Failure"
   in
-  span ~a:[a_class ["label"; colour;]] [span ~a:[a_class ["glyphicon"; icon]] []; pcdata status]
+  span ~a:[a_class ["label"; colour;]] [span ~a:[a_class ["glyphicon"; icon]] []; txt status]
 
 let status_flag ?label stat =
   let cl, icon, status =
@@ -200,10 +200,10 @@ let dashboard_widget (_repo, id) ref =
     | x -> x
   in
   div ~a:[a_class ["col-md-4"; "text-center"; "dashboard"; cls]] [
-    h2 ~a:[a_id "title"] [ pcdata (String.concat ~sep:"/" title) ];
+    h2 ~a:[a_id "title"] [ txt (String.concat ~sep:"/" title) ];
     h2 ~a:[a_id "icon"] [ span ~a:[a_class["glyphicon"; icon]] [] ];
-    h2 ~a:[a_id "status"] [ pcdata status ];
-    small [ pcdata comment ];
+    h2 ~a:[a_id "status"] [ txt status ];
+    small [ txt comment ];
   ]
 
 let ref_job (_repo, id) ref =
@@ -214,9 +214,9 @@ let ref_job (_repo, id) ref =
     let ref_url = Uri.to_string (CI_target.path_v (CI_engine.target ref)) in
     [
       tr [
-        td [a ~a:[a_href ref_url] [pcdata (Fmt.to_to_string Ref.pp_name id)]];
+        td [a ~a:[a_href ref_url] [txt (Fmt.to_to_string Ref.pp_name id)]];
         td [status_list jobs];
-        td [pcdata (CI_result.descr summary)];
+        td [txt (CI_result.descr summary)];
       ]
     ]
 
@@ -228,17 +228,17 @@ let pr_job (_repo, id) open_pr =
     let pr_url = Uri.to_string (CI_target.path_v (CI_engine.target open_pr)) in
     [
       tr [
-        td [a ~a:[a_href pr_url] [pcdata (string_of_int id)]];
-        td [pcdata (CI_engine.title open_pr)];
+        td [a ~a:[a_href pr_url] [txt (string_of_int id)]];
+        td [txt (CI_engine.title open_pr)];
         td [status_list jobs];
-        td [pcdata (CI_result.descr summary)];
+        td [txt (CI_result.descr summary)];
       ]
     ]
 
-let heading x = th [pcdata x]
+let heading x = th [txt x]
 
 let url x =
-  a ~a:[a_href x] [pcdata x]
+  a ~a:[a_href x] [txt x]
 
 module Nav = struct
   type t =
@@ -259,7 +259,7 @@ end
 let build_navbar active =
   let item name href =
     let cl = if name = active then ["active"] else [] in
-    li ~a:[a_class cl] [a ~a:[a_href href] [pcdata (Nav.to_string name)]];
+    li ~a:[a_class cl] [a ~a:[a_href href] [txt (Nav.to_string name)]];
   in
   Nav.[
     item Home "/";
@@ -278,18 +278,18 @@ let page page_title active children t ~user =
         div ~a:[a_class["navbar-header"]] [
           button ~a:[a_user_data "toggle" "collapse"; a_user_data "target" "#navbar"; a_class ["navbar-toggle"]; a_button_type `Button;] [
 
-            span ~a:[a_class["sr-only"]] [pcdata "Toggle Navigation"];
+            span ~a:[a_class["sr-only"]] [txt "Toggle Navigation"];
             span ~a:[a_class["icon-bar"]] [];
             span ~a:[a_class["icon-bar"]] [];
             span ~a:[a_class["icon-bar"]] [];
 
           ];
-          a ~a:[a_class["navbar-brand"]; a_href "/"] [pcdata t.name];
+          a ~a:[a_class["navbar-brand"]; a_href "/"] [txt t.name];
         ];
         div ~a:[a_id "navbar"; a_class["collapse"; "navbar-collapse"]] [
           ul ~a:[a_class ["nav"; "navbar-nav"]] navbar;
           ul ~a:[a_class ["nav"; "navbar-nav"; "navbar-right"]] [
-            li [a ~a:[a_href "/user/profile"] [pcdata user]]
+            li [a ~a:[a_href "/user/profile"] [txt user]]
           ];
         ];
       ];
@@ -300,15 +300,15 @@ let page page_title active children t ~user =
       div ~a:[a_class ["container"]] [
         div ~a:[a_class ["content"]] children;
       ];
-      script ~a:[a_mime_type "text/javascript"; a_src "/js/ci.js"] (pcdata "");
+      script ~a:[a_mime_type "text/javascript"; a_src "/js/ci.js"] (txt "");
       script ~a:[a_mime_type "text/javascript";
-                 a_src "https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"] (pcdata "");
-      script ~a:[a_mime_type "text/javascript"; a_src "/js/bootstrap.min.js"] (pcdata "");
+                 a_src "https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"] (txt "");
+      script ~a:[a_mime_type "text/javascript"; a_src "/js/bootstrap.min.js"] (txt "");
     ]
   in
   let body = body (nav_header :: content) in
   html
-    (head (title (pcdata page_title)) [
+    (head (title (txt page_title)) [
         meta ~a:[a_charset "utf-8"] ();
         meta ~a:[a_http_equiv "X-UA-Compatible"; a_content "IE=edge"] ();
         meta ~a:[a_name "viewport"; a_content "width=device-width, initial-scale=1"] ();
@@ -322,14 +322,14 @@ let opt_warning ci =
   let dk = CI_engine.dk ci in
   match Lwt.state dk with
   | Lwt.Return _ -> []
-  | Lwt.Sleep -> [div ~a:[a_class ["warning"]] [pcdata "Connecting to DataKit..."]]
+  | Lwt.Sleep -> [div ~a:[a_class ["warning"]] [txt "Connecting to DataKit..."]]
   | Lwt.Fail ex ->
     let msg = Fmt.strf "DataKit connection is down: %s" (Printexc.to_string ex) in
-    [div ~a:[a_class ["warning"]] [pcdata msg]]
+    [div ~a:[a_class ["warning"]] [txt msg]]
 
 let pr_table (id, prs) =
   div [
-    h2 [pcdata (Fmt.strf "PR status for %a" Repo.pp id)];
+    h2 [txt (Fmt.strf "PR status for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "PR"; heading "Title"; heading "State"; heading "Details"] ::
       (pr_map pr_job prs)
@@ -338,7 +338,7 @@ let pr_table (id, prs) =
 
 let branch_table (id, refs) =
   div [
-    h2 [pcdata (Fmt.strf "Branches for %a" Repo.pp id)];
+    h2 [txt (Fmt.strf "Branches for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
       (branch_map ref_job refs)
@@ -347,7 +347,7 @@ let branch_table (id, refs) =
 
 let tag_table (id, refs) =
   div [
-    h2 [pcdata (Fmt.strf "Tags for %a" Repo.pp id)];
+    h2 [txt (Fmt.strf "Tags for %a" Repo.pp id)];
     table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
       tr [heading "Ref"; heading "State"; heading "Details"] ::
       (tag_map ref_job refs)
@@ -396,7 +396,7 @@ let html_of_user ~csrf_token ((job, label), log) =
   in
   let log_link =
     match log with
-    | Some log -> [pcdata "[ "; a ~a:[a_href (logs_link (`Live log))] [pcdata "log"]; pcdata " ] "]
+    | Some log -> [txt "[ "; a ~a:[a_href (logs_link (`Live log))] [txt "log"]; txt " ] "]
     | None -> []
   in
   let branch = Uri.pct_encode ~scheme:"http" branch in
@@ -411,11 +411,11 @@ let html_of_user ~csrf_token ((job, label), log) =
     br ();
     form ~a:[a_class ["cancel"]; a_action action; a_method `Post] [
       button ~a:(a_class ["btn"; "btn-default"] :: a_button_type `Submit :: cancel_attrs) [
-        span ~a:[a_class ["glyphicon"; "glyphicon-remove"]] []; pcdata "Cancel"
+        span ~a:[a_class ["glyphicon"; "glyphicon-remove"]] []; txt "Cancel"
       ];
     ];
   ] @ log_link @ [
-    a ~a:[a_href link] [pcdata reason];
+    a ~a:[a_href link] [txt reason];
   ]
 
 let resource_pools ~csrf_token =
@@ -429,11 +429,11 @@ let resource_pools ~csrf_token =
           else Fmt.strf "%d / %d [%d queued]" active capacity qlen
         in
         let uses = CI_monitored_pool.users pool |> List.map (html_of_user ~csrf_token) |> List.concat in
-        tr [th [pcdata name]; td (pcdata used :: uses)];
+        tr [th [txt name]; td (txt used :: uses)];
       )
   in
   table ~a:[a_class["table"; "table-bordered"; "table-hover"]] (
-    tr [th [pcdata "Name"]; th [pcdata "Utilisation"]] ::
+    tr [th [txt "Name"]; th [txt "Utilisation"]] ::
     items
   )
 
@@ -443,17 +443,17 @@ let login_page ?github ~csrf_token state ~is_configured t ~user =
   let github_login =
     match github with
     | None ->
-      p [pcdata "(configure webauth to allow GitHub logins)"]
+      p [txt "(configure webauth to allow GitHub logins)"]
     | Some github ->
       p [
-        a ~a:[a_href (Uri.to_string github)] [pcdata "Log in with GitHub"];
+        a ~a:[a_href (Uri.to_string github)] [txt "Log in with GitHub"];
       ]
   in
   let warnings =
     if is_configured then []
     else [
       div ~a:[a_class ["alert"; "alert-warning"]] [
-        pcdata
+        txt
           "The CI has not yet been configured with an administrator user. \
            In the CI's logs you should find a URL containing a token - open this \
            URL to create an 'admin' user."
@@ -461,11 +461,11 @@ let login_page ?github ~csrf_token state ~is_configured t ~user =
     ]
   in
   page "Login" Nav.Home ~user ([
-    h2 [pcdata "Login"];
+    h2 [txt "Login"];
     CI_form.Html.form ~csrf_token state ~form_class:["login-form"] ~action [
       field "Username" `Text "user";
       field "Password" `Password "password";
-      div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Log in"]];
+      div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [txt "Log in"]];
     ];
     github_login;
   ] @ warnings) t
@@ -476,14 +476,14 @@ let auth_setup ~csrf_token state =
   page "Auth Setup" Nav.Home [
     CI_form.Html.form state ~csrf_token ~form_class:["auth-setup-form"] ~action [
       div ~a:[a_class ["form-group"]] [
-        label ~a:[a_label_for "user"] [pcdata "Username"];
+        label ~a:[a_label_for "user"] [txt "Username"];
         input ~a:[a_class ["form-control"]; a_id "user"; a_input_type `Text;
                   a_disabled (); a_name "name"; a_value "admin"] ()
       ];
       field "Password" `Password "password";
       field "Confirm" `Password "password2";
       button ~a:[a_class ["btn"; "btn-default"]; a_button_type `Submit] [
-        pcdata "Submit"
+        txt "Submit"
       ]
     ]
   ]
@@ -496,7 +496,7 @@ let user_page ~csrf_token =
   page "Profile" Nav.Home [
     form ~a:[a_class ["logout-form"]; a_action action; a_method `Post] [
       button ~a:[a_class ["btn"; "btn-default"]; a_button_type `Submit] [
-        pcdata "Log out"
+        txt "Log out"
       ]
     ]
   ]
@@ -521,7 +521,7 @@ let main_page ~csrf_token ~ci ~dashboards =
     Repo.Map.fold dashboard_table combined []
   in
   page title Nav.Home @@ opt_warning ci @ dashboard_widgets @ [
-      h2 [pcdata "Resource pools"];
+      h2 [txt "Resource pools"];
       resource_pools ~csrf_token;
     ]
 
@@ -547,12 +547,12 @@ let tags_page ~ci =
   page title Nav.Tags @@ opt_warning ci @ sections
 
 let history_button url =
-  a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href url;] [span ~a:[a_class["glyphicon"; "glyphicon-time"]] []; pcdata "History"]
+  a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href url;] [span ~a:[a_class["glyphicon"; "glyphicon-time"]] []; txt "History"]
 
 let log_button_group history log_url =
   div ~a:[a_class["btn-group";"pull-right"]] [
     history;
-    a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href log_url;] [span ~a:[a_class["glyphicon"; "glyphicon-book"]] []; pcdata "Artefacts"];
+    a ~a:[a_class["btn"; "btn-default"; "btn-sm"]; a_href log_url;] [span ~a:[a_class["glyphicon"; "glyphicon-book"]] []; txt "Artefacts"];
   ]
 
 let logs ~csrf_token ~page_url state =
@@ -564,10 +564,10 @@ let logs ~csrf_token ~page_url state =
     let cl = ["log-link"] in
     let href = logs_link log in
     span [
-      pcdata "[ ";
-      a ~a:[a_href href; a_target "iframe_log"; a_class cl] [pcdata "logs"];
-      pcdata " ] ";
-      pcdata title;
+      txt "[ ";
+      a ~a:[a_href href; a_target "iframe_log"; a_class cl] [txt "logs"];
+      txt " ] ";
+      txt title;
     ]
   in
   let rec aux = function
@@ -583,7 +583,7 @@ let logs ~csrf_token ~page_url state =
         form [
           status_flag `Pending;
           button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit; a_disabled ()] [
-            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
+            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; txt "Rebuild"];
           log_link ~title (`Live live_log);
         ];
       ]
@@ -602,9 +602,9 @@ let logs ~csrf_token ~page_url state =
         match rebuild with
         | `Rebuildable _ ->
           button ~a:[a_class ["btn"; "btn-default"; "btn-xs"; "rebuild"]; a_button_type `Submit] [
-            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; pcdata "Rebuild"];
-        | `Rebuilding -> pcdata "(rebuild queued) "
-        | `Archived -> pcdata "(archived) "
+            span ~a:[a_class ["glyphicon"; "glyphicon-refresh"; "pull-left"]] []; txt "Rebuild"];
+        | `Rebuilding -> txt "(rebuild queued) "
+        | `Archived -> txt "(archived) "
       in
       last_title := Some title;
       [
@@ -626,7 +626,7 @@ let logs ~csrf_token ~page_url state =
   | _ ->
     let status = CI_output.status state in
     let descr = CI_output.descr state in
-    items @ [p [status_flag status; pcdata descr]]
+    items @ [p [status_flag status; txt descr]]
 
 let job_row ?selected ~csrf_token ~page_url (job_name, state) =
   let output =
@@ -639,7 +639,7 @@ let job_row ?selected ~csrf_token ~page_url (job_name, state) =
     else []
   in
   tr ~a:attrs [
-    th [pcdata job_name];
+    th [txt job_name];
     td [status (CI_output.status output)];
     td (
       logs ~csrf_token ~page_url output
@@ -651,7 +651,7 @@ let target_title ~title = function
   | `Ref (_, r) -> Fmt.strf "Ref %a" Ref.pp_name r
 
 let map_or_none f = function
-  | [] -> [li [pcdata "(none)"]]
+  | [] -> [li [txt "(none)"]]
   | xs -> List.map f xs
 
 let commit_page ?test ~commit ~archived_targets targets t =
@@ -660,7 +660,7 @@ let commit_page ?test ~commit ~archived_targets targets t =
     let uri = Uri.to_string (CI_target.path ?test target) in
     li [
       a ~a:[a_href uri] [
-        pcdata (Fmt.to_to_string CI_target.pp target)
+        txt (Fmt.to_to_string CI_target.pp target)
       ]
     ]
   in
@@ -669,15 +669,15 @@ let commit_page ?test ~commit ~archived_targets targets t =
     let uri = Uri.to_string (Uri.add_query_param' (CI_target.path ?test target) ("history", commit)) in
     li [
       a ~a:[a_href uri] [
-        pcdata (Fmt.to_to_string CI_target.pp target)
+        txt (Fmt.to_to_string CI_target.pp target)
       ]
     ]
   in
   page title Nav.Home [
-    h2 [pcdata (Fmt.strf "Commit %s" commit)];
-    p [pcdata "Current builds:"];
+    h2 [txt (Fmt.strf "Commit %s" commit)];
+    p [txt "Current builds:"];
     ul (map_or_none target_link targets);
-    p [pcdata "Archived builds:"];
+    p [txt "Archived builds:"];
     ul (map_or_none archive_target_link archived_targets);
   ] t
 
@@ -685,7 +685,7 @@ let target_page_url = CI_target.path
 
 let state_link commit =
   let url = Fmt.strf "?history=%s" commit in
-  a ~a:[a_href url] [pcdata (short_commit commit)]
+  a ~a:[a_href url] [txt (short_commit commit)]
 
 let rec intersperse sep = function
   | [] -> []
@@ -695,14 +695,14 @@ let rec intersperse sep = function
 let history_nav t target state =
   let history_link = status_history_url t target in
   let links = [
-      pcdata " [ "; a ~a:[a_href "?"] [pcdata "latest"]; pcdata " | ";
-      a ~a:[a_href history_link] [pcdata "history"]; pcdata " ]";
+      txt " [ "; a ~a:[a_href "?"] [txt "latest"]; txt " | ";
+      a ~a:[a_href history_link] [txt "history"]; txt " ]";
     ]
   in
   match CI_history.State.parents state with
-  | [] -> p (pcdata "No previous states" :: links)
-  | [x] -> p (pcdata "Previous state: " :: state_link x :: links)
-  | xs -> p (pcdata "Previous states: " :: (intersperse (pcdata ", ") (List.map state_link xs)) @ links)
+  | [] -> p (txt "No previous states" :: links)
+  | [x] -> p (txt "Previous state: " :: state_link x :: links)
+  | xs -> p (txt "Previous states: " :: (intersperse (txt ", ") (List.map state_link xs)) @ links)
 
 let target_page ?test ~csrf_token ?(title="(no title)") ~(target:CI_target.t) state t =
   let jobs = CI_history.State.jobs state |> String.Map.bindings |> List.map (fun (name, s) -> name, Some s) in
@@ -726,22 +726,22 @@ let target_page ?test ~csrf_token ?(title="(no title)") ~(target:CI_target.t) st
   page title nav (
     history_nav t target state
     :: p [
-      a ~a:[a_href (gh_target_url target)] [pcdata title];
-      pcdata " has head commit ";
-      a ~a:[a_href (commit_url ~repo src_commit)] [pcdata (short_commit src_commit)];
-      pcdata " [ ";
-      a ~a:[a_href (metadata_url t target)] [pcdata "head history"];
-      pcdata " ]";
-      pcdata " [ ";
-      a ~a:[a_href (commit_history_url t target ~metadata_commit ~src_commit)] [pcdata "status history for this head"];
-      pcdata " ]";
+      a ~a:[a_href (gh_target_url target)] [txt title];
+      txt " has head commit ";
+      a ~a:[a_href (commit_url ~repo src_commit)] [txt (short_commit src_commit)];
+      txt " [ ";
+      a ~a:[a_href (metadata_url t target)] [txt "head history"];
+      txt " ]";
+      txt " [ ";
+      a ~a:[a_href (commit_history_url t target ~metadata_commit ~src_commit)] [txt "status history for this head"];
+      txt " ]";
     ]
     :: state_summary
   ) t
 
 let plain_page ~page_title =
   html
-    (head (title (pcdata page_title)) [
+    (head (title (txt page_title)) [
         meta ~a:[a_charset "utf-8"] ();
         link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
         link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
@@ -749,16 +749,16 @@ let plain_page ~page_title =
 
 let iframe_page ~page_title =
   html
-    (head (title (pcdata page_title)) [
+    (head (title (txt page_title)) [
         meta ~a:[a_charset "utf-8"] ();
         link ~rel:[`Stylesheet] ~href:"/css/style.css" ();
         link ~rel:[`Stylesheet] ~href:"/css/bootstrap.min.css" ();
         base ~a:[a_target "_parent"] ();
-        script (pcdata "window.top.highlight_log()");
+        script (txt "window.top.highlight_log()");
       ])
 
 let plain_error msg _t ~user:_ =
-  plain_page ~page_title:"Error" (body [pcdata msg])
+  plain_page ~page_title:"Error" (body [txt msg])
 
 let live_log_frame ~branch ~have_history t ~user:_ =
   let buttons =
@@ -770,14 +770,14 @@ let live_log_frame ~branch ~have_history t ~user:_ =
     (body ~a:[a_class ["log"]] [
         div ~a:[a_class ["row"]] [
           div ~a:[a_class ["col-md-9"]] [
-            p [pcdata "Still running..."];
+            p [txt "Still running..."];
           ];
           div ~a:[a_class ["col-md-3"]] [
             div ~a:[a_class["btn-group";"pull-right"]] buttons
           ]
         ];
-        pre [pcdata "@STREAM-GOES-HERE@"];
-        p [pcdata "This log is now complete."];
+        pre [txt "@STREAM-GOES-HERE@"];
+        p [txt "This log is now complete."];
       ]
     )
 
@@ -790,13 +790,13 @@ let saved_log_frame ~commit ~branch t ~user:_ =
     (body ~a:[a_class ["log"]] [
         div ~a:[a_class ["row"]] [
           div ~a:[a_class ["col-md-9"]] [
-            p [pcdata "Loaded from commit "; a ~a:[a_href commit_url] [pcdata commit]]
+            p [txt "Loaded from commit "; a ~a:[a_href commit_url] [txt commit]]
           ];
           div ~a:[a_class ["col-md-3"]] [
             log_button_group history log_url;
           ];
         ];
-        pre [pcdata "@STREAM-GOES-HERE@"];
+        pre [txt "@STREAM-GOES-HERE@"];
       ]
     )
 
@@ -804,25 +804,25 @@ let error_page id =
   page "Error" Nav.Home (
     if id = Error.no_state_repo then
       [
-        p [pcdata "No web mirror of the state repository has been configured, so can't link to it."];
-        p [pcdata "Configure DataKit to push to a GitHub repository and then pass the repository's URL using ";
-           code [pcdata "Web.config ~state_repo"];
-           pcdata "."
+        p [txt "No web mirror of the state repository has been configured, so can't link to it."];
+        p [txt "Configure DataKit to push to a GitHub repository and then pass the repository's URL using ";
+           code [txt "Web.config ~state_repo"];
+           txt "."
           ];
       ]
     else if id = Error.permission_denied then
       [
-        p [pcdata "Permission denied"];
+        p [txt "Permission denied"];
       ]
     else if id = Error.logout_needed then
       [
-        p [pcdata
+        p [txt
              "Access policy has changed - please log out and log back in so we can \
               check your credentials against the new policy."];
       ]
     else
       [
-        p [pcdata (Printf.sprintf "Unknown error code %S" id)]
+        p [txt (Printf.sprintf "Unknown error code %S" id)]
       ]
   )
 
@@ -831,7 +831,7 @@ module Settings = struct
     page "Settings" Nav.Settings [
       ul [
         li [
-          a ~a:[a_href "/settings/github-auth"] [pcdata "Configure GitHub authentication"]
+          a ~a:[a_href "/settings/github-auth"] [txt "Configure GitHub authentication"]
         ]
       ]
     ]
@@ -841,17 +841,17 @@ module Settings = struct
     let field = CI_form.Html.field state in
     page "GitHub authentication" Nav.Settings [
       div ~a:[a_class ["github-auth"]] [
-        h2 [pcdata "GitHub authentication"];
-        p [pcdata "You can configure the CI to allow users to authenticate using their GitHub accounts. To do this:"];
+        h2 [txt "GitHub authentication"];
+        p [txt "You can configure the CI to allow users to authenticate using their GitHub accounts. To do this:"];
         ol [
           li [
-            p [pcdata "Go to "; url "https://github.com/settings/applications/new"; pcdata " and register your CI. "];
-            p [pcdata "Give the callback URL as <https://HOST:PORT/auth/github-callback> \
+            p [txt "Go to "; url "https://github.com/settings/applications/new"; txt " and register your CI. "];
+            p [txt "Give the callback URL as <https://HOST:PORT/auth/github-callback> \
                        (you can use 'localhost' for testing)."];
           ];
           li [
-            p [pcdata "Enter the Client ID and Client Secret below."];
-            p [pcdata
+            p [txt "Enter the Client ID and Client Secret below."];
+            p [txt
                  "You can also specify a callback here, if you want to override the one you registered with GitHub above. \
                   This might be useful if you have several CI instances using a single Client ID.";
               ]
@@ -861,7 +861,7 @@ module Settings = struct
           field "Client ID" `Text "client-id";
           field "Client Secret" `Password "client-secret";
           field "Callback (optional)" `Url "callback";
-          div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [pcdata "Submit"]];
+          div [button ~a:[a_class ["btn"; "btn-primary"]; a_button_type `Submit] [txt "Submit"]];
         ];
       ]
     ]

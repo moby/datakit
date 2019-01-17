@@ -23,3 +23,4 @@ build: [
   ["dune" "runtest" "tests/datakit-git"] {with-test}
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A library for connecting Datakit client using Git"

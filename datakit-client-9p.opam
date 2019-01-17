@@ -20,3 +20,4 @@ depends: [
 ]
 build: ["dune" "build" "-p" name "-j" jobs]
 dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A library for Datakit clients over 9P"

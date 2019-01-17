@@ -44,3 +44,11 @@ build: [
   ["dune" "runtest" "ci/tests"] {with-test}
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "Continuous Integration service using DataKit"
+description: """
+DataKitCI is a continuous integration service that monitors your
+GitHub project and tests each branch, tag and pull request. It
+displays the test results as status indicators in the GitHub UI. It
+keeps all of its state and logs in DataKit, rather than a traditional
+relational database, allowing review with the usual Git tools.
+"""

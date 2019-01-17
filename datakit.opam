@@ -44,3 +44,4 @@ build: [
   ["dune" "runtest" "tests/datakit-9p"] {with-test}
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "Orchestrate applications using a Git-like dataflow"

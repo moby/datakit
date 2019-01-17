@@ -37,3 +37,12 @@ build: [
   ["dune" "runtest" "tests/%{name}%"] {with-test}
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A bidirectional bridge between the GitHub API and Datakit"
+description: """
+The package provides a bi-directional bridge between the GitHub API
+and Datakit, so you can talk to the GitHub API using filesystem and
+Git-like commands only. The `datakit-github` programs can start a
+webhook server to listen for GitHub events in real time, and project
+it into a Git repository. It also monitors that Git repository for
+user-provided changes, and translate them into GitHub API calls.
+"""

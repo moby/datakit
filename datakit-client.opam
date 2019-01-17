@@ -18,3 +18,9 @@ depends: [
 ]
 build: ["dune" "build" "-p" name "-j" jobs]
 dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A library to construct Datakit clients"
+description: """
+The library currently only provides only a 9p client to talk to
+Datakit, but other filesystem protocols will be available in the
+future.
+"""

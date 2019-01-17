@@ -645,7 +645,7 @@ module Vfs (Store : Store.S) = struct
     | Some (`Node _ as dir) ->
       Store.Tree.hash repo dir >|= function
        | `Node n -> Fmt.strf "D-%a\n" Store.Tree.Hash.pp n
-       | `Contents (c,m) -> Fmt.strf "D-%a\n" Store.Contents.Hash.pp c
+       | `Contents (c, _m) -> Fmt.strf "D-%a\n" Store.Contents.Hash.pp c
 
   let watch_tree_stream store ~path ~init =
     let session = Vfs.File.Stream.session init in

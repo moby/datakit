@@ -1,4 +1,4 @@
-FROM ocaml/opam2
+FROM ocaml/opam2:alpine
 RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1

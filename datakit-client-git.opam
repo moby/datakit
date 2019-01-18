@@ -24,3 +24,7 @@ build: [
 ]
 dev-repo: "git+https://github.com/moby/datakit.git"
 synopsis: "A library for connecting Datakit client using Git"
+description: """
+This library allows for creating DataKit clients that
+use the Git protocol for communication.
+"""

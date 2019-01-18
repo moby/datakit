@@ -18,3 +18,7 @@ depends: [
 build: ["dune" "build" "-p" name "-j" jobs]
 dev-repo: "git+https://github.com/moby/datakit.git"
 synopsis: "Build Datakit servers using the 9P filesystem protocol"
+description: """
+This library allows for the construction of DataKit servers
+that can be accessed over the 9P filesystem protocol.
+"""

@@ -21,3 +21,6 @@ depends: [
 build: ["dune" "build" "-p" name "-j" jobs]
 dev-repo: "git+https://github.com/moby/datakit.git"
 synopsis: "A library for Datakit clients over 9P"
+description: """
+Connect to DataKit clients using the 9P filesystem protocol.
+"""

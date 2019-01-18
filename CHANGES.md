@@ -1,4 +1,4 @@
-### 0.12.2
+### 0.12.2 (2019-01-18)
 
 - Support the latest GitHub and Atd bindings (>=2.0.0) (@avsm)
 - Support the Uri 2.0.0+ API (@avsm)

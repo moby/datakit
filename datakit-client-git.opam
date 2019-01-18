@@ -1,23 +1,26 @@
-opam-version: "1.2"
-maintainer:   "thomas@gazagnaire.org"
-authors:      ["Thomas Leonard" "Magnus Skjegstad"
-               "David Scott" "Thomas Gazagnaire"]
-license:      "Apache"
-homepage:     "https://github.com/moby/datakit"
-bug-reports:  "https://github.com/moby/datakit/issues"
-dev-repo:     "https://github.com/moby/datakit.git"
-doc:          "https://docker.github.io/datakit/"
-
-build: ["jbuilder" "build" "-p" name "-j" jobs]
-build-test: ["jbuilder" "runtest" "tests/datakit-git"]
-
+opam-version: "2.0"
+maintainer: "thomas@gazagnaire.org"
+authors: [
+  "Thomas Leonard" "Magnus Skjegstad" "David Scott" "Thomas Gazagnaire"
+]
+license: "Apache"
+homepage: "https://github.com/moby/datakit"
+doc: "https://docker.github.io/datakit/"
+bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
-  "jbuilder" {build & >= "1.0+beta10"}
+  "ocaml"
+  "dune" {build}
   "datakit-client" {>= "0.12.0"}
   "irmin-git" {>= "1.2.0"}
   "irmin-watcher"
   "git-unix"
-  "alcotest"  {test}
-  "irmin-mem" {test}
-  "irmin-git" {test}
+  "alcotest" {with-test}
+  "irmin-mem" {with-test}
+  "irmin-git" {with-test}
 ]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "tests/datakit-git"] {with-test}
+]
+dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A library for connecting Datakit client using Git"

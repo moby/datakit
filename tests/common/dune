@@ -1,0 +1,5 @@
+(library
+  (name      test)
+  (wrapped   false)
+  (libraries alcotest mtime mtime.clock.os logs.fmt io-page.unix mirage-flow
+               datakit-client datakit_io irmin-mem irmin-git))

@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name        datakit_client)
-  (public_name datakit-client)
-  (wrapped     false)
-  (libraries   (fmt lwt cstruct astring))))

@@ -1,0 +1,5 @@
+(library
+ (name        datakit)
+ (public_name datakit)
+ (libraries   lwt astring logs result cstruct fmt rresult
+              irmin-mem datakit-server asetmap prometheus-app))

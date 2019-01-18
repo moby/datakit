@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name        datakit_client_9p)
-  (public_name datakit-client-9p)
-  (wrapped     false)
-  (libraries   (datakit-client protocol-9p-unix))))

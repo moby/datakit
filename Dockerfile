@@ -1,16 +1,16 @@
-FROM ocaml/opam-dev:alpine-3.5_ocaml-4.05.0
+FROM ocaml/opam2:alpine
 RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset 818ebb219 --hard && \
+    git -C /home/opam/opam-repository reset da99aec5e0ecc83bd86926b620eff45b99c82c26 --hard && \
     opam update -u
 
 RUN opam install alcotest lwt conf-libev inotify
 
 COPY check-libev.ml /tmp/check-libev.ml
-RUN opam config exec -- ocaml /tmp/check-libev.ml
+RUN opam exec -- ocaml /tmp/check-libev.ml
 
 # cache opam install of dependencies
 
@@ -33,7 +33,7 @@ RUN opam install datakit -ytv
 RUN sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \
     sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
 
-FROM alpine:3.5
+FROM alpine:3.8
 RUN apk add --no-cache libev gmp tzdata ca-certificates git openssh-client bash
 EXPOSE 5640
 ENTRYPOINT ["/usr/bin/datakit"]

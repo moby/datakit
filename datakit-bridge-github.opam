@@ -1,34 +1,48 @@
-opam-version: "1.2"
-maintainer:   "thomas@gazagnaire.org"
-authors:      ["Thomas Leonard" "Magnus Skjegstad"
-               "David Scott" "Thomas Gazagnaire"]
-license:      "Apache"
-homepage:     "https://github.com/moby/datakit"
-bug-reports:  "https://github.com/moby/datakit/issues"
-dev-repo:     "https://github.com/moby/datakit.git"
-doc:          "https://docker.github.io/datakit/"
-
-build: ["jbuilder" "build" "-p" name "-j" jobs]
-build-test: ["jbuilder" "runtest" "tests/%{name}%"]
-
+opam-version: "2.0"
+maintainer: "thomas@gazagnaire.org"
+authors: [
+  "Thomas Leonard" "Magnus Skjegstad" "David Scott" "Thomas Gazagnaire"
+]
+license: "Apache"
+homepage: "https://github.com/moby/datakit"
+doc: "https://docker.github.io/datakit/"
+bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
-  "jbuilder" {build & >= "1.0+beta10"}
+  "ocaml"
+  "dune" {build}
   "cmdliner"
   "lwt" {>= "3.0.0"}
-  "datakit-github"     {>= "0.12.0"}
-  "datakit-client"     {>= "0.12.0"}
-  "datakit-client-9p"  {>= "0.12.0"}
+  "datakit-github" {>= "0.12.0"}
+  "datakit-client" {>= "0.12.0"}
+  "datakit-client-9p" {>= "0.12.0"}
   "datakit-client-git" {>= "0.12.0"}
-  "logs" "fmt"
+  "logs"
+  "fmt"
   "mtime" {>= "1.0.0"}
-  "asl" "win-eventlog"
-  "uri" {>= "1.8.0"}
+  "asl"
+  "win-eventlog"
+  "uri" {>= "2.0.0"}
   "hvsock" {>= "0.8.1"}
-  "hex" "nocrypto"
+  "hex"
+  "nocrypto"
   "prometheus-app"
   "protocol-9p-unix" {>= "0.11.0"}
   "github-hooks-unix" {>= "0.2.0"}
   "github" {>= "2.1.0"}
-  "alcotest" {test}
-  "datakit"  {test & >= "0.12.0"}
+  "alcotest" {with-test}
+  "datakit" {with-test & >= "0.12.0"}
 ]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "tests/%{name}%"] {with-test}
+]
+dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A bidirectional bridge between the GitHub API and Datakit"
+description: """
+The package provides a bi-directional bridge between the GitHub API
+and Datakit, so you can talk to the GitHub API using filesystem and
+Git-like commands only. The `datakit-github` programs can start a
+webhook server to listen for GitHub events in real time, and project
+it into a Git repository. It also monitors that Git repository for
+user-provided changes, and translate them into GitHub API calls.
+"""

@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name        datakit_client_git)
-  (public_name datakit-client-git)
-  (wrapped     false)
-  (libraries   (datakit-client irmin-git git-unix irmin-watcher))))

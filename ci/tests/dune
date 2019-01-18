@@ -1,0 +1,9 @@
+(executable
+ (name      test_ci)
+ (libraries datakit-github datakit-ci datakit-server-9p alcotest
+              datakit_io datakit irmin-git))
+
+(alias
+ (name runtest)
+ (deps test_ci.exe)
+ (action (run %{exe:test_ci.exe} -q --color=always)))

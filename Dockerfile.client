@@ -1,10 +1,10 @@
-FROM ocaml/opam-dev:alpine-3.5_ocaml-4.05.0
+FROM ocaml/opam2:alpine
 RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset 818ebb219 --hard && \
+    git -C /home/opam/opam-repository reset da99aec5e0ecc83bd86926b620eff45b99c82c26 --hard && \
     opam update -u
 
 RUN opam install alcotest lwt conf-libev inotify

@@ -1,20 +1,26 @@
-opam-version: "1.2"
-maintainer:   "thomas@gazagnaire.org"
-authors:      ["Thomas Leonard" "Magnus Skjegstad"
-               "David Scott" "Thomas Gazagnaire"]
-license:      "Apache"
-homepage:     "https://github.com/moby/datakit"
-bug-reports:  "https://github.com/moby/datakit/issues"
-dev-repo:     "https://github.com/moby/datakit.git"
-doc:          "https://docker.github.io/datakit/"
-
-build: ["jbuilder" "build" "-p" name "-j" jobs]
-
+opam-version: "2.0"
+maintainer: "thomas@gazagnaire.org"
+authors: [
+  "Thomas Leonard" "Magnus Skjegstad" "David Scott" "Thomas Gazagnaire"
+]
+license: "Apache"
+homepage: "https://github.com/moby/datakit"
+doc: "https://docker.github.io/datakit/"
+bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
-  "jbuilder" {build & >= "1.0+beta10"}
+  "ocaml"
+  "dune" {build}
   "astring"
   "result"
   "fmt"
   "lwt"
   "cstruct" {> "2.2.0"}
 ]
+build: ["dune" "build" "-p" name "-j" jobs]
+dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "A library to construct Datakit clients"
+description: """
+The library currently only provides only a 9p client to talk to
+Datakit, but other filesystem protocols will be available in the
+future.
+"""

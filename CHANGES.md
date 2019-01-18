@@ -1,6 +1,11 @@
 ### 0.12.2
 
 - Support the latest GitHub and Atd bindings (>=2.0.0) (@avsm)
+- Support the Uri 2.0.0+ API (@avsm)
+- Port build to Dune from Jbuilder (@avsm). 
+- Remove use of deprecated Tyxml `pcdata` function in favour of `txt` (@avsm)
+- Add watermarking of versions in the build system (@avsm)
+- Remove topkg build targets in favour of using `dune-release` (@avsm)
 
 ### 0.12.1 (2018-01-23)
 

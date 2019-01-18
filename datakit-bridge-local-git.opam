@@ -1,24 +1,46 @@
-opam-version: "1.2"
-maintainer:   "thomas.leonard@docker.com"
-authors:      ["Thomas Leonard"]
-license:      "Apache"
-homepage:     "https://github.com/moby/datakit"
-bug-reports:  "https://github.com/moby/datakit/issues"
-dev-repo:     "https://github.com/moby/datakit.git"
-doc:          "https://docker.github.io/datakit/"
-
-build: ["jbuilder" "build" "-p" name "-j" jobs]
-
+opam-version: "2.0"
+maintainer: "thomas.leonard@docker.com"
+authors: "Thomas Leonard"
+license: "Apache"
+homepage: "https://github.com/moby/datakit"
+doc: "https://docker.github.io/datakit/"
+bug-reports: "https://github.com/moby/datakit/issues"
 depends: [
-  "jbuilder" {build & >= "1.0+beta10"}
+  "ocaml"
+  "dune" {build}
   "cmdliner"
   "irmin-watcher"
-  "irmin"      {>= "1.2.0"}
+  "irmin" {>= "1.2.0"}
   "irmin-unix" {>= "1.2.0"}
   "lwt" {>= "3.0.0"}
-  "logs" "fmt"
+  "logs"
+  "fmt"
   "protocol-9p-unix" {>= "0.11.0"}
   "datakit-client" {>= "0.12.0"}
   "datakit-client-9p" {>= "0.12.0"}
   "datakit-github" {>= "0.12.0"}
 ]
+build: ["dune" "build" "-p" name "-j" jobs]
+dev-repo: "git+https://github.com/moby/datakit.git"
+synopsis: "DataKit Local-Git bridge"
+description: """
+This service is a drop-in replacement for the DataKit-GitHub bridge
+that instead just monitors a local Git repository. It is useful for
+testing a new DataKitCI configuration without having to configure
+GitHub integration first.
+
+The local bridge monitors the state of one or more local Git
+repositories, writing the current head of each branch to
+DataKit. DataKitCI can be configured to run the CI tests against the
+project each time a commit is made.
+
+Once you are happy with the way the CI is working, you can replace
+this service with the GitHub bridge service to have the CI test a
+project hosted on GitHub instead.
+
+Unlike the GitHub bridge, this service:
+
+- only reports on branches, not tags or pull requests;
+- does not report build statuses from other CI systems; and
+- does not push the statuses set by the CI anywhere.
+"""

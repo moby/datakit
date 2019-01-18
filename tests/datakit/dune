@@ -1,0 +1,8 @@
+(executable
+ (name      test)
+ (libraries test datakit_conduit datakit))
+
+(alias
+ (name runtest)
+ (deps test.exe)
+ (action (run %{exe:test.exe} -q --color=always)))

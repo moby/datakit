@@ -1,8 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name        datakit_server_9p)
-  (public_name datakit-server-9p)
-  (wrapped     false)
-  (libraries   (datakit-server protocol-9p mirage-flow))
- ))

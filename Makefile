@@ -1,7 +1,7 @@
 PINOPTS=-yn -k git
 
-BUILD=jbuilder build --dev
-RUNTEST=jbuilder runtest
+BUILD=dune build --profile=release
+RUNTEST=dune runtest
 
 .PHONY: all clean test bundle COMMIT exe ci
 
@@ -49,14 +49,14 @@ ci:
 	$(RUNTEST) ci/tests
 
 clean:
-	jbuilder clean
+	dune clean
 	rm -rf com.docker.db com.docker.db.exe COMMIT _tests
 	rm -f examples/ocaml-client/*.native
 	rm -f ci/skeleton/exampleCI.native
 	rm -f com.docker.db
 
 test:
-	jbuilder runtest --dev
+	dune runtest
 
 bundle:
 	opam remove tls ssl -y
@@ -73,17 +73,3 @@ exe:
 	rm -rf _build/
 	$(BUILD) src/datakit/bin/main.exe
 	cp _build/default/src/datakit/bin/main.exe com.docker.db.exe
-
-REPO=../opam-repository
-PACKAGES=$(REPO)/packages
-
-# until we have https://github.com/ocaml/opam-publish/issues/38
-pkg-%:
-	topkg opam pkg -n $*
-	mkdir -p $(PACKAGES)/$*
-	cp -r _build/$*.* $(PACKAGES)/$*/
-	cd $(PACKAGES) && git add $*
-
-PKGS=$(basename $(wildcard *.opam))
-opam-pkg:
-	$(MAKE) $(PKGS:%=pkg-%)

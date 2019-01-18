@@ -1,5 +1,0 @@
-A library to connect to DataKit servers
-
-The library currently only provides only a 9p client to talk to
-Datakit, but other filesystem protocols will be available in the
-future.

@@ -643,8 +643,9 @@ module Vfs (Store : Store.S) = struct
     | Some (`Contents (f, `Exec))   -> hash f >|= Fmt.strf "X-%a\n" pp_hash
     | Some (`Contents (f, `Link))   -> hash f >|= Fmt.strf "L-%a\n" pp_hash
     | Some (`Node _ as dir) ->
-      Store.Tree.hash repo dir >|= fun h ->
-      Fmt.strf "D-%a\n" Store.Tree.Hash.pp h
+      Store.Tree.hash repo dir >|= function
+       | `Node n -> Fmt.strf "D-%a\n" Store.Tree.Hash.pp n
+       | `Contents (c, _m) -> Fmt.strf "D-%a\n" Store.Contents.Hash.pp c
 
   let watch_tree_stream store ~path ~init =
     let session = Vfs.File.Stream.session init in
@@ -880,7 +881,7 @@ module Vfs (Store : Store.S) = struct
             Ok (Vfs.File.ro_of_string ~perm data |> Vfs.Inode.file name)
         end
       | `Node hash ->
-        Store.Tree.of_hash repo hash >|= function
+        Store.Tree.of_hash repo (`Node hash) >|= function
         | None      -> Vfs.Error.no_entry
         | Some data ->
           Ok (ro_tree ~name:"ro" ~get_root:(fun () -> Lwt.return data))

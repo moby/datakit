@@ -1,0 +1,9 @@
+(executable
+ (name      test)
+ (libraries test datakit-github datakit-client datakit_bridge_github
+              datakit-client-9p datakit-server-9p datakit))
+
+(alias
+ (name runtest)
+ (deps test.exe)
+ (action (run %{exe:test.exe} -q --color=always)))

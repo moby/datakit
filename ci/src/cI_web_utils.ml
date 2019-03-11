@@ -190,7 +190,7 @@ module Auth = struct
     if Sys.file_exists passwd_file then (
       load_local_users passwd_file >|= fun db -> `Configured db
     ) else (
-      let token = B64.(encode ~alphabet:uri_safe_alphabet) (Nocrypto.Rng.generate 24 |> Cstruct.to_string) in
+      let token = Base64.(encode_string ~alphabet:uri_safe_alphabet) (Nocrypto.Rng.generate 24 |> Cstruct.to_string) in
       let setup_url = Uri.with_path web_ui ("/auth/intro/" ^ token) in
       Log.app (fun f -> f ">>> Configure the CI by visiting@\n%a" Uri.pp_hum setup_url);
       Lwt.return (`Config_token token)
@@ -444,7 +444,7 @@ class virtual resource_with_session t =
     method private session rd =
       let generate_new_session () =
         Log.info (fun f -> f "Generating new session");
-        let csrf_token = B64.encode (Nocrypto.Rng.generate 16 |> Cstruct.to_string) in
+        let csrf_token = Base64.encode_string (Nocrypto.Rng.generate 16 |> Cstruct.to_string) in
         let value = { Session_data.csrf_token; username = None; login_redirect = None; attrs = Auth.empty_attrs } in
         self#session_set (Session_data.to_string value) rd >>= fun () ->
         Lwt.return value

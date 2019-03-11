@@ -23,7 +23,7 @@ val equal : string t -> string t -> bool
 (** [equal a b] is [true] iff [a] and [b] are equal for the purposes of saving the output metadata to disk.
     i.e. they have the same JSON representation. *)
 
-val json_of : string t -> Yojson.Basic.json
-val of_json : Yojson.Basic.json -> string t
+val json_of : string t -> Yojson.Basic.t
+val of_json : Yojson.Basic.t -> string t
 
 val pp : 'a Fmt.t -> 'a t Fmt.t

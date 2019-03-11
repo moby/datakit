@@ -4,7 +4,7 @@ RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN git -C /home/opam/opam-repository fetch origin && \
-    git -C /home/opam/opam-repository reset da99aec5e0ecc83bd86926b620eff45b99c82c26 --hard && \
+    git -C /home/opam/opam-repository reset b01a2e4e1ac2fb545d593ad40bc95b4a78dec9e2 --hard && \
     opam update -u
 
 RUN opam install alcotest lwt conf-libev inotify
@@ -33,7 +33,7 @@ RUN opam install datakit -ytv
 RUN sudo cp $(opam config exec -- which datakit) /usr/bin/datakit && \
     sudo cp $(opam config exec -- which datakit-mount) /usr/bin/datakit-mount
 
-FROM alpine:3.8
+FROM alpine:3.9
 RUN apk add --no-cache libev gmp tzdata ca-certificates git openssh-client bash
 EXPOSE 5640
 ENTRYPOINT ["/usr/bin/datakit"]

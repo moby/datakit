@@ -20,7 +20,7 @@ let logs = snd
 let status t = CI_result.status (result t)
 let descr t = CI_result.descr (result t)
 
-let rec json_of_logs : logs -> Yojson.Basic.json = function
+let rec json_of_logs : logs -> Yojson.Basic.t = function
   | Empty -> `Null
   | Live x ->
     `Assoc [

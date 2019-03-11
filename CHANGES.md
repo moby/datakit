@@ -1,6 +1,8 @@
 ### v0.12.3
 
 - Add missing dependency on Base64 and port to >=3.0.0 interface (@avsm)
+- Adapt to crunch.3.0.0 interface (@hannesm)
+- Use non-deprecated Yojson types in 1.7.0 and higher (@avsm)
 
 ### 0.12.2 (2019-01-18)
 

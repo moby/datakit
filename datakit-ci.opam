@@ -39,6 +39,7 @@ depends: [
   "alcotest" {with-test}
   "cohttp-lwt-unix" {>= "1.0.0"}
   "base64" {>="3.1.0"}
+  "yojson" {>="1.7.0"}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

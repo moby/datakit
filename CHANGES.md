@@ -1,3 +1,7 @@
+### dev
+
+- fix io-page-unix usage in tests (@avsm)
+
 ### v0.12.3 (2019-03-11)
 
 - ci: Add missing dependency on Base64 and port to >=3.0.0 interface (#642 @avsm)

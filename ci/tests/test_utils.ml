@@ -265,7 +265,7 @@ let strip_times log =
   Str.global_replace re_timestamp "" log
 
 module Json = struct
-  type t = Yojson.Basic.json
+  type t = Yojson.Basic.t
   let pp f v = Yojson.Basic.pretty_print f v
   let equal = (=)
 end

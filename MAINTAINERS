@@ -14,6 +14,7 @@
 		people = [
 			"samoht",
 			"talex5",
+                        "avsm"
 		]
 
 [people]
@@ -33,4 +34,9 @@
 	Name = "Thomas Leonard"
 	Email = "thomas.leonard@docker.com"
 	GitHub = "talex5"
+
+	[people.avsm]
+	Name = "Anil Madhavapeddy"
+	Email = "anil@recoil.org"
+	GitHub = "avsm"
 

@@ -13,8 +13,6 @@ jobs:
       - run: brew uninstall python # remove files in /usr/local/bin
       - run: brew install gmp wget ocaml opam pkg-config dylibbundler
       - run: opam init -n https://github.com/ocaml/opam-repository.git
-      - run: opam switch create 4.05.0
-      - run: opam switch 4.05.0
       - run: opam pin add -n .
       - run: opam update && opam upgrade --fixup && opam upgrade
       - run: opam install depext && opam config exec -- opam depext osx-fsevents datakit

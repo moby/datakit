@@ -100,8 +100,8 @@ type role = [`Reader | `LoggedIn | `Builder | `Admin]
 module Hashed_password = struct
   type t = {
     prf : [`SHA1];
-    salt : Cstruct.t;
-    hashed_password : Cstruct.t;
+    salt : Cstruct_sexp.t;
+    hashed_password : Cstruct_sexp.t;
     count : int;
     dk_len : int32;
   } [@@deriving sexp]

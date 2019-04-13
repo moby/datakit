@@ -18,6 +18,8 @@ depends: [
   "astring"
   "cmdliner"
   "fmt"
+  "cstruct" {>="4.0.0"}
+  "cstruct-sexp"
   "logs"
   "tyxml" {>= "4.0.0"}
   "tls" {>= "0.9.0"}

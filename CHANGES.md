@@ -1,6 +1,7 @@
-### dev
+### v0.12.4 (2019-04-13)
 
-- fix io-page-unix usage in tests (@avsm)
+- ci: fix io-page-unix usage in tests (@avsm)
+- ci: support Cstruct 4.0.0 interface with optional sexp (@avsm)
 
 ### v0.12.3 (2019-03-11)
 

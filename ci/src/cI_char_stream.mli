@@ -1,5 +1,5 @@
-type t
 (** A base string with an index into it, representing the rest of the string from that point. *)
+type t
 
 val of_string : string -> t
 (** [of_string s] is a cursor at the start of [s]. *)
@@ -29,10 +29,10 @@ val next : t -> (char * t) option
 val equal : t -> t -> bool
 (** [equal a b] is [true] iff the streams [a] and [b] are at the same offset in the same base string. *)
 
-type span = string * int * int
 (** [(s, a, b)] represents the span of [s] from index [a] up to but excluding [b]. *)
+type span = string * int * int
 
-val (--) : t -> t -> span
+val ( -- ) : t -> t -> span
 (** [a -- b] is the span from [a] (inclusive) to [b] (exclusive).
     [a] must not have a higher offset than [b]. *)
 

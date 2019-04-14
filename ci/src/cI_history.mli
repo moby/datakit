@@ -1,15 +1,15 @@
 open Astring
 open CI_utils
 
-type t
 (** A cache of states. *)
+type t
 
-type target
 (** A mutable holder for the current state of a target. *)
+type target
 
 module State : sig
-  type t
   (** An immutable snapshot of a target's state. *)
+  type t
 
   val parents : t -> string list
   (** [parents t] is the list of hashes of [t]'s parent commits. *)
@@ -35,7 +35,13 @@ val create : unit -> t
 
 val lookup : t -> DK.t -> CI_target.t -> target Lwt.t
 
-val record : target -> DK.t -> source_commit:string -> DK.Commit.t -> string CI_output.t String.Map.t -> unit Lwt.t
+val record :
+  target ->
+  DK.t ->
+  source_commit:string ->
+  DK.Commit.t ->
+  string CI_output.t String.Map.t ->
+  unit Lwt.t
 (** [record target dk ~source_commit input jobs] records the new output of each job in [jobs]
     as a new commit of [target], and records that it was calculated using metadata snapshot [input].
     The commit index of [source_commit] is updated to include the new result (for [builds_of_commit]). *)
@@ -46,5 +52,6 @@ val load : DK.Commit.t -> State.t Lwt.t
 val head : target -> State.t option
 (** [head t] is the current state of [t]. *)
 
-val builds_of_commit : DK.t -> Datakit_github.Commit.t -> DK.Commit.t CI_target.Map.t Lwt.t
+val builds_of_commit :
+  DK.t -> Datakit_github.Commit.t -> DK.Commit.t CI_target.Map.t Lwt.t
 (** [builds_of_commit dk c] finds the latest build results for source commit [c]. *)

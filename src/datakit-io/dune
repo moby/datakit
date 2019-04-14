@@ -1,4 +1,4 @@
 (library
- (name        datakit_io)
- (wrapped     false)
- (libraries   irmin-git conduit-lwt-unix))
+ (name datakit_io)
+ (wrapped false)
+ (libraries irmin-git conduit-lwt-unix))

@@ -2,14 +2,14 @@ open Datakit_github
 open Astring
 open CI_utils
 
-type t
 (** A DataKit CI instance. *)
+type t
 
-type target
 (** The state of an open PR or branch. *)
+type target
 
-type job
 (** A job keeps up-to-date one state within an open PR. *)
+type job
 
 val create :
   web_ui:Uri.t ->
@@ -23,7 +23,7 @@ val create :
     [web_ui] is the URL of the main web-page (used when adding links to PRs on GitHub).
     If [canaries] is given, only those targets will be considered. *)
 
-val listen : ?switch:Lwt_switch.t -> t -> [`Abort] Lwt.t
+val listen : ?switch:Lwt_switch.t -> t -> [ `Abort ] Lwt.t
 (** [listen t] runs a loop that watches for PRs and branches that need building.
     Returns [`Abort] if the switch is turned off. *)
 
@@ -31,10 +31,10 @@ val dk : t -> DK.t Lwt.t
 (** [dk t] is the connection to DataKit. If not currently connected, this will be a sleeping
     thread that will resolve to the next successful connection. *)
 
-val prs: t -> target PR.Index.t Repo.Map.t
+val prs : t -> target PR.Index.t Repo.Map.t
 (** [prs t] is a snapshot of the current state of all known PRs. *)
 
-val refs: t -> target Ref.Index.t Repo.Map.t
+val refs : t -> target Ref.Index.t Repo.Map.t
 (** [targets t] is a snapshot of the current state of all branches. *)
 
 val latest_state : t -> CI_target.t -> CI_history.State.t option Lwt.t

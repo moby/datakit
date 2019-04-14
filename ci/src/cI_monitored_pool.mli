@@ -6,7 +6,13 @@ val pools : unit -> t String.Map.t
 
 val create : string -> int -> t
 
-val use : t -> ?log:CI_live_log.t -> ?label:string -> CI_s.job_id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+val use :
+  t ->
+  ?log:CI_live_log.t ->
+  ?label:string ->
+  CI_s.job_id ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
 (** [use t job fn] evaluates [fn ()] with one pool resource held.
     [job] (and [label]) will be displayed as the reason why the resource is in use.
     If [log] is provided then a message will be logged if we have to wait, and

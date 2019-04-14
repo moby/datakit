@@ -5,33 +5,35 @@ open Datakit_github
 type t = private {
   name : string;
   state_repo : Uri.t option;
-  metrics_token : [`SHA256 of Cstruct.t] option;
-  listen_addr: [`HTTP of int | `HTTPS of int];
+  metrics_token : [ `SHA256 of Cstruct.t ] option;
+  listen_addr : [ `HTTP of int | `HTTPS of int ];
   github_scopes_needed : Github_t.scope list;
   can_read : CI_ACL.t;
-  can_build : CI_ACL.t;
+  can_build : CI_ACL.t
 }
 
-val config:
+val config :
   ?name:string ->
   ?state_repo:Uri.t ->
-  ?metrics_token:[`SHA256 of string] ->
-  ?listen_addr:[`HTTP of int | `HTTPS of int] ->
+  ?metrics_token:[ `SHA256 of string ] ->
+  ?listen_addr:[ `HTTP of int | `HTTPS of int ] ->
   ?github_scopes_needed:Github_t.scope list ->
   can_read:CI_ACL.t ->
   can_build:CI_ACL.t ->
-  unit -> t
+  unit ->
+  t
 (** [config ~name ~state_repo ()] is a web configuration.
     If [name] is given, it is used as the main heading, and also as the name of the session cookie
     (useful if you run multiple CIs on the same host, on different ports).
     If [state_repo] is given, it is used to construct links to the state repository on GitHub. *)
 
-type page = user:string option -> [`Html] Tyxml.Html.elt
+type page = user:string option -> [ `Html ] Tyxml.Html.elt
 
 module Error : sig
   type t
 
   val permission_denied : t
+
   val logout_needed : t
 
   val uri_path : t -> string
@@ -49,16 +51,9 @@ val login_page :
   t ->
   page
 
-val auth_setup :
-  csrf_token:string ->
-  CI_form.State.t ->
-  t ->
-  page
+val auth_setup : csrf_token:string -> CI_form.State.t -> t -> page
 
-val user_page :
-  csrf_token:string ->
-  t ->
-  page
+val user_page : csrf_token:string -> t -> page
 
 val main_page :
   csrf_token:string ->
@@ -67,20 +62,11 @@ val main_page :
   t ->
   page
 
-val prs_page :
-  ci:CI_engine.t ->
-  t ->
-  page
+val prs_page : ci:CI_engine.t -> t -> page
 
-val branches_page :
-  ci:CI_engine.t ->
-  t ->
-  page
+val branches_page : ci:CI_engine.t -> t -> page
 
-val tags_page :
-  ci:CI_engine.t ->
-  t ->
-  page
+val tags_page : ci:CI_engine.t -> t -> page
 
 val commit_page :
   ?test:string ->
@@ -99,39 +85,19 @@ val target_page :
   t ->
   page
 
-val live_log_frame :
-  branch:string ->
-  have_history:bool ->
-  t ->
-  page
+val live_log_frame : branch:string -> have_history:bool -> t -> page
 
-val saved_log_frame :
-  commit:string ->
-  branch:string ->
-  t ->
-  page
+val saved_log_frame : commit:string -> branch:string -> t -> page
 
+val plain_error : string -> t -> page
 (** A basic page just the error text and no header, footer, etc. *)
-val plain_error :
-  string ->
-  t ->
-  page
 
-val error_page :
-  string ->
-  t ->
-  page
+val error_page : string -> t -> page
 
 module Settings : sig
-  val index :
-    t ->
-    page
+  val index : t -> page
 
-  val github_auth :
-    csrf_token:string ->
-    CI_form.State.t ->
-    t ->
-    page
+  val github_auth : csrf_token:string -> CI_form.State.t -> t -> page
 end
 
 val saved_log_frame_link : branch:string -> commit:string -> string

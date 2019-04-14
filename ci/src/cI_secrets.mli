@@ -1,16 +1,18 @@
-type t
 (** A collection of secrets. *)
+type t
 
 type github_auth = {
   client_id : string;
   client_secret : string;
-  callback : Uri.t option;
+  callback : Uri.t option
 }
 
 type 'a secret
+
 (* A secret that can be read or written. *)
 
 val get : 'a secret -> 'a option
+
 (* Read the current value of the secret. This operation is quick (does not access the disk). *)
 
 val set : 'a secret -> 'a option -> unit Lwt.t

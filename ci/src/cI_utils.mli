@@ -1,52 +1,63 @@
 open! Result
 
-module Log: Logs.LOG
-val src: Logs.src
+module Log : Logs.LOG
 
-module Client9p: sig
+val src : Logs.src
+
+module Client9p : sig
   include Protocol_9p.Client.S
-  val connect:
-    string -> string ->
-    ?msize:int32 -> ?username:string -> ?aname:string -> ?max_fids:int32 -> ?send_pings:bool -> unit ->
+
+  val connect :
+    string ->
+    string ->
+    ?msize:int32 ->
+    ?username:string ->
+    ?aname:string ->
+    ?max_fids:int32 ->
+    ?send_pings:bool ->
+    unit ->
     t Protocol_9p.Error.t Lwt.t
 end
-module DK: sig
+
+module DK : sig
   include Datakit_client.S
-  val connect: Client9p.t -> t
+
+  val connect : Client9p.t -> t
 end
 
-module Infix: sig
-  val ( >>*= ): ('a, DK.error) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-  val ( >|*= ): ('a, DK.error) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+module Infix : sig
+  val ( >>*= ) : ('a, DK.error) result Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  val ( >|*= ) : ('a, DK.error) result Lwt.t -> ('a -> 'b) -> 'b Lwt.t
 end
 
-val chdir_lock: Lwt_mutex.t
+val chdir_lock : Lwt_mutex.t
 
-val ok: 'a -> ('a, 'b) result Lwt.t
+val ok : 'a -> ('a, 'b) result Lwt.t
 
-val return_error:
+val return_error :
   ('a, Format.formatter, unit, ('b, string) result Lwt.t) format4 -> 'a
 
-val failf: ('a, Format.formatter, unit, 'b) format4 -> 'a
+val failf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
-val pp_exn: exn Fmt.t
+val pp_exn : exn Fmt.t
 
-val with_timeout:
+val with_timeout :
   ?switch:Lwt_switch.t -> float -> (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
 
-val abs_path: string -> string
+val abs_path : string -> string
 
-val ensure_dir: mode:Unix.file_perm -> string -> unit
+val ensure_dir : mode:Unix.file_perm -> string -> unit
 
-val default: 'a -> 'a option -> 'a
+val default : 'a -> 'a option -> 'a
 
-val with_tmpdir:
+val with_tmpdir :
   ?prefix:string -> ?mode:Unix.file_perm -> (string -> 'a Lwt.t) -> 'a Lwt.t
 
-val ls: string -> string list Lwt.t
+val ls : string -> string list Lwt.t
 
-val with_switch: (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
+val with_switch : (Lwt_switch.t -> 'a Lwt.t) -> 'a Lwt.t
 
-val cancel_when_off: Lwt_switch.t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+val cancel_when_off : Lwt_switch.t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
 val opt_get : (unit -> 'a) -> 'a option -> 'a

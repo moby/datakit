@@ -1,5 +1,5 @@
 (library
- (name        datakit_github)
+ (name datakit_github)
  (public_name datakit-github)
- (wrapped     false)
- (libraries   fmt asetmap uri lwt astring logs datakit-client))
+ (wrapped false)
+ (libraries fmt asetmap uri lwt astring logs datakit-client))

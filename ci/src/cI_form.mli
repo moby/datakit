@@ -1,13 +1,10 @@
 type 'a or_error = ('a, string) result
 
 module State : sig
-  type t
   (** The state of a form upload from the user. *)
+  type t
 
-  type field = {
-    data : string option;
-    error : string option;
-  }
+  type field = { data : string option; error : string option }
 
   val empty : t
   (** A state with no fields. *)
@@ -49,7 +46,11 @@ module Html : sig
     | `Color
     | `Button ]
 
-  val form : State.t -> csrf_token:string -> form_class:string list -> action:string ->
+  val form :
+    State.t ->
+    csrf_token:string ->
+    form_class:string list ->
+    action:string ->
     [< Html_types.form_content_fun > `Div ] Tyxml.Html.elt list ->
     [> Html_types.form ] Tyxml.Html.elt
   (** [form state ~csrf_token ~form_class ~action controls] is an HTML form
@@ -57,15 +58,20 @@ module Html : sig
       If [state] still contains any fields, they are reported as unknown-field
       errors. *)
 
-  val field : State.t -> string -> field_type -> string -> [> Html_types.div] Tyxml.Html.elt
+  val field :
+    State.t ->
+    string ->
+    field_type ->
+    string ->
+    [> Html_types.div ] Tyxml.Html.elt
   (** [field state label type name] is an HTML form control for entering a value of type [type].
       If [state] contains a value for this field, that will be the initial value.
       If [state] contains an error for this field, it will be displayed (and removed from [state]). *)
 end
 
 module Validator : sig
-  type 'a t
   (** An ['a t] is a validator that parses a form and, on success, returns an ['a]. *)
+  type 'a t
 
   type 'a reader = string -> 'a or_error
 
@@ -102,7 +108,10 @@ module Validator : sig
   (** [x <*> y] validates [x] and [y] and, if both are successful, returns the pair of values.
       If either fails, all errors are reported. *)
 
-  val run : 'a t -> [`String of string | `File of Multipart.file] Multipart.StringMap.t -> ('a, State.t) result
+  val run :
+    'a t ->
+    [ `String of string | `File of Multipart.file ] Multipart.StringMap.t ->
+    ('a, State.t) result
   (** [run v form_data] runs validator [v] on form data uploaded by the user.
       It returns ['a] on success, or a [State.t] if there were any validation errors. *)
 end

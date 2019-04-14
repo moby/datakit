@@ -34,7 +34,7 @@ depends: [
   "github-unix" {>= "3.0.0"}
   "prometheus-app"
   "lwt" {>= "3.0.0"}
-  "ppx_sexp_conv" {build}
+  "ppx_sexp_conv" {build & >="v0.9.0"}
   "crunch" {build}
   "datakit" {with-test & >= "0.12.0"}
   "irmin-unix" {with-test & >= "1.2.0"}

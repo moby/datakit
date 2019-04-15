@@ -3,35 +3,33 @@ open Result
 type t = Cstruct.t list ref (* (reversed) *)
 
 let pp_buf ppf buf = Fmt.string ppf (Cstruct.to_string buf)
+
 let pp ppf t = Fmt.pf ppf "%a" Fmt.(list ~sep:nop pp_buf) !t
 
 (* FIXME: very expensive! *)
 let compare x y =
   String.compare (Cstruct.copyv @@ List.rev !x) (Cstruct.copyv @@ List.rev !y)
 
-let ( >>!= ) x f =
-  match x with
-  | Ok x -> f x
-  | Error _ as e -> e
+let ( >>!= ) x f = match x with Ok x -> f x | Error _ as e -> e
 
 let len t = Cstruct.lenv !t
 
 let empty_cs = Cstruct.create 0
+
 let empty = ref []
 
-let string s = ref [Cstruct.of_string s]
+let string s = ref [ Cstruct.of_string s ]
 
-let ro_cstruct cs = ref [cs]
+let ro_cstruct cs = ref [ cs ]
 
 let to_ro_cstruct t =
   let cs = Cstruct.concat (List.rev !t) in
-  t := [cs];
+  t := [ cs ];
   cs
 
 let t = Irmin.Type.(like cstruct) ro_cstruct to_ro_cstruct
 
-let to_string t =
-  Cstruct.to_string (to_ro_cstruct t)
+let to_string t = Cstruct.to_string (to_ro_cstruct t)
 
 (* [overwrite orig (new, offset)] is a buffer [start; padding; new;
     end] where [new] is at position [offset], [start] and [end] are
@@ -40,19 +38,20 @@ let overwrite orig (data, offset) =
   let orig_len = Cstruct.len orig in
   let data_len = Cstruct.len data in
   if offset = 0 && data_len >= orig_len then data (* Common, fast case *)
-  else (
+  else
     let padding = Cstruct.create (max 0 (offset - orig_len)) in
     let tail =
       let data_end = offset + data_len in
-      if orig_len > data_end then Cstruct.sub orig data_end (orig_len - data_end)
-      else empty_cs in
-    Cstruct.concat [
-      Cstruct.sub orig 0 (min offset (Cstruct.len orig));
-      padding;
-      data;
-      tail
-    ]
-  )
+      if orig_len > data_end then
+        Cstruct.sub orig data_end (orig_len - data_end)
+      else empty_cs
+    in
+    Cstruct.concat
+      [ Cstruct.sub orig 0 (min offset (Cstruct.len orig));
+        padding;
+        data;
+        tail
+      ]
 
 let check_offset ~offset len =
   let len = Int64.of_int len in
@@ -69,27 +68,26 @@ let read t ~offset ~count =
 
 let write old ~offset data =
   if offset < 0L then Vfs.Error.negative_offset offset
-  else (
+  else
     let offset = Int64.to_int offset in
     if offset = len old then Ok (ref (data :: !old))
     else Ok (ro_cstruct (overwrite (to_ro_cstruct old) (data, offset)))
-  )
 
 let truncate old = function
   | n when n < 0L -> Vfs.Error.negative_offset n
   | 0L -> Ok empty
   | new_len ->
-    let new_len = Int64.to_int new_len in
-    let extra = new_len - len old in
-    if extra = 0 then Ok old
-    else if extra < 0 then (
-      Ok (ro_cstruct (Cstruct.sub (to_ro_cstruct old) 0 new_len))
-    ) else (
-      let padding = Cstruct.create extra in
-      Ok (ref (padding :: !old))
-    )
+      let new_len = Int64.to_int new_len in
+      let extra = new_len - len old in
+      if extra = 0 then Ok old
+      else if extra < 0 then
+        Ok (ro_cstruct (Cstruct.sub (to_ro_cstruct old) 0 new_len))
+      else
+        let padding = Cstruct.create extra in
+        Ok (ref (padding :: !old))
 
 let len t = Int64.of_int (len t)
 
 let merge = Irmin.Merge.(option @@ default t)
+
 let of_string x = Ok (string x)

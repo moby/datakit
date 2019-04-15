@@ -1,5 +1,5 @@
 (library
- (name        datakit_client)
+ (name datakit_client)
  (public_name datakit-client)
- (wrapped     false)
- (libraries   fmt lwt cstruct astring))
+ (wrapped false)
+ (libraries fmt lwt cstruct astring))

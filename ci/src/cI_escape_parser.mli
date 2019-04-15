@@ -1,17 +1,10 @@
 type colour =
-  [ `Black
-  | `Blue
-  | `Cyan
-  | `Green
-  | `Magenta
-  | `Red
-  | `White
-  | `Yellow ]
+  [ `Black | `Blue | `Cyan | `Green | `Magenta | `Red | `White | `Yellow ]
 
 type sgr =
-  [ `BgCol of [`Default | colour]
+  [ `BgCol of [ `Default | colour ]
   | `Bold
-  | `FgCol of [`Default | colour]
+  | `FgCol of [ `Default | colour ]
   | `Italic
   | `NoBold
   | `NoItalic
@@ -21,11 +14,10 @@ type sgr =
   | `Reverse
   | `Underline ]
 
-type escape =
-  [ `Reset
-  | `Ctrl of [ `SelectGraphicRendition of sgr list] ]
+type escape = [ `Reset | `Ctrl of [ `SelectGraphicRendition of sgr list ] ]
 
-val parse : CI_char_stream.t ->
+val parse :
+  CI_char_stream.t ->
   [ `Literal of CI_char_stream.t
   | `Escape of escape * CI_char_stream.t
   | `Invalid of CI_char_stream.t

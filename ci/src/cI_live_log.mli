@@ -5,12 +5,16 @@ type manager
 val create_manager : unit -> manager
 
 type t
-type stream = {
-  data : string;
-  next : stream option Lwt.t Lazy.t;
-}
 
-val create : ?switch:Lwt_switch.t -> pending:string -> branch:string -> title:string -> manager -> t
+type stream = { data : string; next : stream option Lwt.t Lazy.t }
+
+val create :
+  ?switch:Lwt_switch.t ->
+  pending:string ->
+  branch:string ->
+  title:string ->
+  manager ->
+  t
 (** [create ~pending ~branch ~title manager] is a fresh, empty log with pending reason [pending].
     It is an error to have two live logs on the same branch at the same time (finish the other one first). *)
 
@@ -41,7 +45,7 @@ val heading : t -> ('a, Format.formatter, unit, unit) format4 -> 'a
 val contents : t -> string
 (** [contents t] is the current contents of the buffer. *)
 
-val pending : t -> string * [`Continue of unit Lwt.t | `Stop]
+val pending : t -> string * [ `Continue of unit Lwt.t | `Stop ]
 (** [pending t] is the current pending reason of the buffer and a thread that will
     resolve next time it changes. If it returns [`Stop] then there will be no further changes. *)
 
@@ -50,7 +54,8 @@ val with_pending_reason : t -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t
     pushes [msg] onto the pending-reason stack, waits for the thread to finish, and then
     removes the pending message. *)
 
-val enter_with_pending_reason : t -> string -> (('a -> 'b Lwt.t) -> 'b Lwt.t) -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+val enter_with_pending_reason :
+  t -> string -> (('a -> 'b Lwt.t) -> 'b Lwt.t) -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 (** [enter_with_pending_reason t msg use fn] is like [use fn], but posts [msg] as the pending reason until [fn] is called
     (or [use] fails).
     This is useful to give a pending reason while getting a mutex or pool resource. *)

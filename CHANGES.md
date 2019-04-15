@@ -1,3 +1,8 @@
+### v1.0.0
+
+- format source code using ocamlformat 0.9 and the `conventional`
+  profile (@avsm).
+
 ### v0.12.4 (2019-04-13)
 
 - ci: fix io-page-unix usage in tests (@avsm)

@@ -1,10 +1,12 @@
 (executable
-  (name        mount)
-  (public_name datakit-mount)
-  (package     datakit-client-9p)
-  (libraries   cmdliner unix))
+ (name mount)
+ (public_name datakit-mount)
+ (package datakit-client-9p)
+ (libraries cmdliner unix))
 
 (rule
  (targets version.ml)
- (action (with-stdout-to %{targets}
-  (echo "let v = \"%{version:datakit-client-9p}\""))))
+ (action
+  (with-stdout-to
+   %{targets}
+   (echo "let v = \"%{version:datakit-client-9p}\""))))

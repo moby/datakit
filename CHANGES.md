@@ -2,6 +2,7 @@
 
 - format source code using ocamlformat 0.9 and the `conventional`
   profile (@avsm).
+- support uri>=3.0.0 (@avsm)
 
 ### v0.12.4 (2019-04-13)
 

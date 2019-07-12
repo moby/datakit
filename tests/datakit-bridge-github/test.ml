@@ -24,17 +24,18 @@ module Make (DK : Test_client.S) = struct
       mutable refs : int;
       mutable set_status : int;
       mutable set_pr : int;
-      mutable set_ref : int
+      mutable set_ref : int;
     }
 
     let zero () =
-      { events = 0;
+      {
+        events = 0;
         prs = 0;
         status = 0;
         refs = 0;
         set_status = 0;
         set_pr = 0;
-        set_ref = 0
+        set_ref = 0;
       }
 
     let sets t = t.set_status + t.set_pr + t.set_ref
@@ -54,7 +55,7 @@ module Make (DK : Test_client.S) = struct
       mutable commits : (string * Status.t list) list;
       mutable prs : PR.t list;
       mutable refs : Ref.t list;
-      mutable events : Event.t list
+      mutable events : Event.t list;
     }
 
     let v { Repo.user; repo } =
@@ -71,8 +72,7 @@ module Make (DK : Test_client.S) = struct
       let commits =
         List.filter
           (fun (id, s) ->
-            s <> [] && Commit.Set.exists (fun c -> Commit.hash c = id) commits
-            )
+            s <> [] && Commit.Set.exists (fun c -> Commit.hash c = id) commits)
           r.commits
       in
       { r with prs; commits }
@@ -178,7 +178,7 @@ module Make (DK : Test_client.S) = struct
         String.Map.filter
           (fun _ { R.user; repo; _ } ->
             let user = User.v user in
-            Repo.Set.mem (Repo.v ~user ~repo) monitored_repos )
+            Repo.Set.mem (Repo.v ~user ~repo) monitored_repos)
           t.repos
       in
       let repos = String.Map.map R.prune repos in
@@ -191,7 +191,7 @@ module Make (DK : Test_client.S) = struct
       fold
         (fun { R.user; repo; _ } acc ->
           let user = User.v user in
-          Repo.Set.add (Repo.v ~user ~repo) acc )
+          Repo.Set.add (Repo.v ~user ~repo) acc)
         t Repo.Set.empty
 
     let commits t =
@@ -200,7 +200,7 @@ module Make (DK : Test_client.S) = struct
           let repo = Repo.v ~user:(User.v r.R.user) ~repo:r.R.repo in
           List.fold_left
             (fun acc (id, _) -> Commit.Set.add (Commit.v repo id) acc)
-            acc r.R.commits )
+            acc r.R.commits)
         t Commit.Set.empty
 
     let prs t =
@@ -213,7 +213,7 @@ module Make (DK : Test_client.S) = struct
         (fun r acc ->
           List.fold_left
             (fun acc (_, s) -> Status.Set.union acc (Status.Set.of_list s))
-            acc r.R.commits )
+            acc r.R.commits)
         t Status.Set.empty
 
     let refs t =
@@ -249,9 +249,10 @@ module Make (DK : Test_client.S) = struct
         (fun ({ Repo.user; repo } as r) acc ->
           let u = User.Map.get user acc in
           let u = { User.repos = String.Map.add repo (R.v r) u.User.repos } in
-          User.Map.add user u acc )
+          User.Map.add user u acc)
         repos users
-      |> fun users -> { users }
+      |> fun users ->
+      { users }
 
     let empty () = { users = User.Map.empty }
 
@@ -316,7 +317,7 @@ module Make (DK : Test_client.S) = struct
       let repos = Repo.Set.diff (repos x) (repos y) in
       let commits = Commit.Set.diff (commits x) (commits y) in
       Log.debug (fun l ->
-          l "XXX diff %a %a" PR.Set.pp (prs x) PR.Set.pp (prs y) );
+          l "XXX diff %a %a" PR.Set.pp (prs x) PR.Set.pp (prs y));
       let prs = PR.Set.diff (prs x) (prs y) in
       let status = Status.Set.diff (status x) (status y) in
       let refs = Ref.Set.diff (refs x) (refs y) in
@@ -351,8 +352,7 @@ module Make (DK : Test_client.S) = struct
       let close_prs =
         Snapshot.prs olds
         |> PR.Set.filter (fun pr ->
-               keep PR.repo pr && not (PR.Set.exists (PR.same_id pr) new_prs)
-           )
+               keep PR.repo pr && not (PR.Set.exists (PR.same_id pr) new_prs))
         |> PR.Set.elements
         |> List.map (fun pr ->
                let title = pr.PR.title in
@@ -365,13 +365,12 @@ module Make (DK : Test_client.S) = struct
                  PR.v ~state:`Closed ~title ~base ~owner ~comments commit
                    number
                in
-               Event.PR pr )
+               Event.PR pr)
       in
       let close_refs =
         Snapshot.refs olds
         |> Ref.Set.filter (fun r ->
-               keep Ref.repo r && not (Ref.Set.exists (Ref.same_id r) new_refs)
-           )
+               keep Ref.repo r && not (Ref.Set.exists (Ref.same_id r) new_refs))
         |> Ref.Set.elements
         |> List.map (fun r -> Event.Ref (`Removed (Ref.id r)))
       in
@@ -498,8 +497,8 @@ module Make (DK : Test_client.S) = struct
       match lookup_opt t (Commit.repo commit) with
       | None -> return []
       | Some r -> (
-        try return (List.assoc (Commit.hash commit) r.R.commits)
-        with Not_found -> return [] )
+          try return (List.assoc (Commit.hash commit) r.R.commits)
+          with Not_found -> return [] )
 
     let prs t repo =
       t.ctx.Counter.prs <- t.ctx.Counter.prs + 1;
@@ -512,10 +511,11 @@ module Make (DK : Test_client.S) = struct
       match lookup_opt t repo with
       | None -> return None
       | Some r -> (
-        try
-          List.find (fun pr -> PR.compare_id id (PR.id pr) = 0) r.R.prs
-          |> fun pr -> return @@ Some pr
-        with Not_found -> return None )
+          try
+            List.find (fun pr -> PR.compare_id id (PR.id pr) = 0) r.R.prs
+            |> fun pr ->
+            return @@ Some pr
+          with Not_found -> return None )
 
     let events t repo =
       t.ctx.Counter.events <- t.ctx.Counter.events + 1;
@@ -534,10 +534,11 @@ module Make (DK : Test_client.S) = struct
       match lookup_opt t repo with
       | None -> return None
       | Some r -> (
-        try
-          List.find (fun r -> Ref.compare_id id (Ref.id r) = 0) r.R.refs
-          |> fun r -> return (Some r)
-        with Not_found -> return None )
+          try
+            List.find (fun r -> Ref.compare_id id (Ref.id r) = 0) r.R.refs
+            |> fun r ->
+            return (Some r)
+          with Not_found -> return None )
 
     let apply_events t =
       t.users
@@ -867,7 +868,7 @@ module Make (DK : Test_client.S) = struct
                      [ Ref.v head (Ref.name old_ref) ]
              else
                let head = commit ~random ~repo () in
-               [ Ref.v head name ] )
+               [ Ref.v head name ])
       |> List.concat
 
     let statuses ~random ~old_status commit =
@@ -888,7 +889,7 @@ module Make (DK : Test_client.S) = struct
              else
                let state = build_state ~random in
                let description = description ~random in
-               [ Status.v ?description commit context state ] )
+               [ Status.v ?description commit context state ])
       |> List.concat
 
     let prs ~random ~repo ~old_prs =
@@ -934,7 +935,7 @@ module Make (DK : Test_client.S) = struct
                   PR.v ~state ~title ~base ~owner ~comments head n
               | _ -> pr
             in
-            pr :: prs )
+            pr :: prs)
           [] old_prs
       in
       let next_pr =
@@ -972,7 +973,7 @@ module Make (DK : Test_client.S) = struct
           (fun c acc ->
             match statuses ~random ~old_status c with
             | [] -> acc
-            | s -> (Commit.hash c, s) :: acc )
+            | s -> (Commit.hash c, s) :: acc)
           commits []
       in
       (prs, commits, refs)
@@ -997,13 +998,13 @@ module Make (DK : Test_client.S) = struct
                         state ~random ~repo:r ~old_prs ~old_status ~old_refs
                       in
                       let user = User.name user in
-                      (repo, { R.user; repo; commits; prs; refs; events = [] })
-                  )
+                      (repo, { R.user; repo; commits; prs; refs; events = [] }))
                |> String.Map.of_list
              in
-             (user, { User.repos }) )
+             (user, { User.repos }))
       |> User.Map.of_list
-      |> fun users -> { Users.users }
+      |> fun users ->
+      { Users.users }
 
     let snapshot ~random =
       let rec mk acc f = function 0 -> acc | n -> mk (f acc) f (n - 1) in
@@ -1045,6 +1046,7 @@ module Make (DK : Test_client.S) = struct
     let d = Snapshot.diff s1 s2 in
     let x = mk_diff [ `Update (`Repo r1); `Remove (`Repo r2) ] in
     Alcotest.(check diff) "repos" x d;
+
     (* prs *)
     let repo = Gen.repo ~random () in
     let pr1 = Gen.pr ~random ~repo () in
@@ -1061,6 +1063,7 @@ module Make (DK : Test_client.S) = struct
             [ PR.commit pr2; PR.commit pr3 ] )
     in
     Alcotest.(check diff) "prs" x d;
+
     (* refs *)
     let repo = Gen.repo ~random () in
     let r1 = Gen.ref ~random ~repo () in
@@ -1080,6 +1083,7 @@ module Make (DK : Test_client.S) = struct
             [ Ref.commit r1; Ref.commit r3 ] )
     in
     Alcotest.(check diff) "refs" x d;
+
     (* status *)
     let repo = Gen.repo ~random () in
     let b1 = Gen.status ~random ~repo () in
@@ -1099,6 +1103,7 @@ module Make (DK : Test_client.S) = struct
             [ Status.commit b3 ] )
     in
     Alcotest.(check diff) "status" x d;
+
     (* diff *)
     let s1 = Gen.snapshot ~random in
     let s2 = Gen.snapshot ~random in
@@ -1130,7 +1135,7 @@ module Make (DK : Test_client.S) = struct
     List.iter
       (fun str ->
         let c = cap str in
-        Alcotest.(check string) str str (to_string c) )
+        Alcotest.(check string) str str (to_string c))
       caps;
     let caps =
       [ Capabilities.all;
@@ -1143,7 +1148,7 @@ module Make (DK : Test_client.S) = struct
       (fun c ->
         let str = Fmt.to_to_string Capabilities.pp c in
         let d = cap str in
-        Alcotest.(check capabilities) str c d )
+        Alcotest.(check capabilities) str c d)
       caps;
     let checks =
       [ (cap "*:rw", `Read, `Status [ "foo" ], true);
@@ -1177,7 +1182,7 @@ module Make (DK : Test_client.S) = struct
           Fmt.strf "%a - %a - %a" Capabilities.pp c Capabilities.pp_op op
             Capabilities.pp_resource r
         in
-        Alcotest.(check bool) msg b Capabilities.(check c op r) )
+        Alcotest.(check bool) msg b Capabilities.(check c op r))
       checks
 
   let ( >>*= ) x f =
@@ -1213,7 +1218,7 @@ module Make (DK : Test_client.S) = struct
               Conv.stain tr (Elt.IdSet.of_list dirty) >>= fun () ->
               DK.Transaction.commit tr ~message:"init" >>*= fun () ->
               Conv.of_branch ~debug:"init" br >>= fun (_, s) ->
-              ok (Conv.snapshot s) )
+              ok (Conv.snapshot s))
         in
         update ~prs:prs0 ~status:status0 ~refs:refs0 ~dirty:[] >>*= fun s ->
         expect_head br >>*= fun head ->
@@ -1260,12 +1265,13 @@ module Make (DK : Test_client.S) = struct
         DK.Branch.with_transaction br (fun tr ->
             DK.Transaction.make_dirs tr (p "test/toto") >>*= fun () ->
             DK.Transaction.create_or_replace_file tr (p "test/toto/FOO") (v "")
-            >>*= fun () -> DK.Transaction.commit tr ~message:"test/foo" )
+            >>*= fun () ->
+            DK.Transaction.commit tr ~message:"test/foo")
         >>*= fun () ->
         expect_head br >>*= fun head3 ->
         Conv.diff head3 head2 >>= fun (diff3, _) ->
         Alcotest.(check diff) "diff3" Diff.empty diff3;
-        Lwt.return_unit )
+        Lwt.return_unit)
 
   let init_github status refs events =
     let tbl = Hashtbl.create (List.length status) in
@@ -1274,22 +1280,24 @@ module Make (DK : Test_client.S) = struct
         let v =
           try Hashtbl.find tbl (Status.commit s) with Not_found -> []
         in
-        Hashtbl.replace tbl (Status.commit s) (s :: v) )
+        Hashtbl.replace tbl (Status.commit s) (s :: v))
       status;
     let commits =
       Hashtbl.fold (fun k v acc -> (Commit.hash k, v) :: acc) tbl []
     in
     let users =
       User.Map.singleton user
-        { User.repos =
+        {
+          User.repos =
             String.Map.singleton repo.Repo.repo
-              { R.user = User.name user;
+              {
+                R.user = User.name user;
                 repo = repo.Repo.repo;
                 commits;
                 refs;
                 prs = [];
-                events
-              }
+                events;
+              };
         }
     in
     let t = API.create { Users.users } in
@@ -1306,8 +1314,9 @@ module Make (DK : Test_client.S) = struct
         Bridge.sync ~policy:`Once ~token:gh br b >>= fun _s ->
         DK.Branch.with_transaction br (fun tr ->
             Conv.update_elt tr (`Repo repo) >>= fun () ->
-            DK.Transaction.commit tr ~message:"init" )
-        >>*= fun () -> f dkt )
+            DK.Transaction.commit tr ~message:"init")
+        >>*= fun () ->
+        f dkt)
 
   let check_dirs = Alcotest.(check (slist string String.compare))
 
@@ -1341,6 +1350,7 @@ module Make (DK : Test_client.S) = struct
     DK.Tree.read_dir tree (commit / "bar" / "status" / "foo" / "bar" / "toto")
     >>*= fun dirs ->
     check_dirs "status 3" [ "target_url"; "state" ] dirs;
+
     (* check test/test/pr *)
     let pr = root repo / "pr" in
     DK.Tree.exists_dir tree pr >>*= fun exists ->
@@ -1364,13 +1374,14 @@ module Make (DK : Test_client.S) = struct
     let sync b = Bridge.sync ~policy:`Once ~token:gh branch b in
     Alcotest.(check counter)
       "counter: 0"
-      { events = 0;
+      {
+        events = 0;
         prs = 0;
         status = 0;
         refs = 0;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
@@ -1382,29 +1393,32 @@ module Make (DK : Test_client.S) = struct
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 1"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 1;
         refs = 1;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun _b ->
     Alcotest.(check counter)
       "counter: 2"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 1;
         refs = 1;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     expect_head branch >>*= fun head ->
-    DK.Commit.tree head >>*= fun tree -> check tree
+    DK.Commit.tree head >>*= fun tree ->
+    check tree
 
   let update_status br commit context state =
     DK.Branch.with_transaction br (fun tr ->
@@ -1414,7 +1428,8 @@ module Make (DK : Test_client.S) = struct
         DK.Transaction.make_dirs tr dir >>*= fun () ->
         let state = Cstruct.of_string (Status_state.to_string state ^ "\n") in
         DK.Transaction.create_or_replace_file tr (dir / "state") state
-        >>*= fun () -> DK.Transaction.commit tr ~message:"Test" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"Test")
 
   let find_status t repo =
     let repo = API.lookup t repo in
@@ -1441,13 +1456,14 @@ module Make (DK : Test_client.S) = struct
     let gh = init_github [] [ ref1 ] [] in
     Alcotest.(check counter)
       "counter: 0"
-      { events = 0;
+      {
+        events = 0;
         prs = 0;
         status = 0;
         refs = 0;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     Bridge.sync ?cap ~policy:`Once ~token:gh branch b >>= fun b ->
@@ -1460,13 +1476,14 @@ module Make (DK : Test_client.S) = struct
     Alcotest.(check ref_t) "heho is bar" ref1 (find_ref gh repo [ "heho" ]);
     Alcotest.(check counter)
       "counter: 1"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 1;
         refs = 1;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     let ref2 = Ref.v (Commit.v repo "foo") [ "heho" ] in
@@ -1499,39 +1516,43 @@ module Make (DK : Test_client.S) = struct
     let sync b = Bridge.sync ~policy:`Once ~token:gh branch b in
     Alcotest.(check counter)
       "counter: 0"
-      { events = 0;
+      {
+        events = 0;
         prs = 0;
         status = 0;
         refs = 0;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 1"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 1'"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
+
     (* test status update *)
     let commit_foo = root repo / "commit" / "foo" in
     expect_head branch >>*= fun h ->
@@ -1542,30 +1563,33 @@ module Make (DK : Test_client.S) = struct
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 2"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 3"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     let status = find_status gh repo in
     Alcotest.(check status_state)
       "update status" `Pending (Status.state status);
+
     (* test PR update *)
     let dir = root repo / "pr" / "2" in
     expect_head branch >>*= fun h ->
@@ -1579,18 +1603,20 @@ module Make (DK : Test_client.S) = struct
     DK.Branch.with_transaction branch (fun tr ->
         DK.Transaction.create_or_replace_file tr (dir / "title")
           (Cstruct.of_string "hahaha\n")
-        >>*= fun () -> DK.Transaction.commit tr ~message:"Test" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"Test")
     >>*= fun () ->
     sync b >>= fun _b ->
     Alcotest.(check counter)
       "counter: 4"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 1;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     let pr = find_pr gh repo in
@@ -1606,7 +1632,7 @@ module Make (DK : Test_client.S) = struct
         match cap with
         | None -> None
         | Some s -> (
-          match Capabilities.parse s with `Ok s -> Some s | _ -> None )
+            match Capabilities.parse s with `Ok s -> Some s | _ -> None )
       in
       Bridge.sync ~policy:`Once ~token:gh ?cap branch b
     in
@@ -1614,38 +1640,41 @@ module Make (DK : Test_client.S) = struct
     (* start from scratch *)
     Alcotest.(check counter)
       "counter: 1"
-      { events = 0;
+      {
+        events = 0;
         prs = 0;
         status = 0;
         refs = 0;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 2"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 0;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     update_status branch "foo" [ "foo"; "bar"; "baz" ] `Pending >>*= fun () ->
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 3"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
@@ -1653,42 +1682,47 @@ module Make (DK : Test_client.S) = struct
     sync b >>= fun _b ->
     Alcotest.(check counter)
       "counter: 3'"
-      { events = 0;
+      {
+        events = 0;
         prs = 1;
         status = 2;
         refs = 1;
         set_pr = 0;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
+
     (* restart *)
     let b = Bridge.empty in
     sync b >>= fun b ->
     Alcotest.(check counter)
       "counter: 4"
-      { events = 0;
+      {
+        events = 0;
         prs = 2;
         status = 4;
         refs = 2;
         set_pr = 0;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     sync b >>= fun b ->
     sync b >>= fun _b ->
     Alcotest.(check counter)
       "counter: 4'"
-      { events = 0;
+      {
+        events = 0;
         prs = 2;
         status = 4;
         refs = 2;
         set_pr = 0;
         set_status = 1;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
+
     (* restart with dirty datakit branch + exclusive access  *)
     let b = Bridge.empty in
     let cap = "*:r,status[foo/bar/baz]:x" in
@@ -1698,13 +1732,14 @@ module Make (DK : Test_client.S) = struct
     sync ~cap b >>= fun b ->
     Alcotest.(check counter)
       "counter: 5"
-      { events = 0;
+      {
+        events = 0;
         prs = 3;
         status = 6;
         refs = 3;
         set_pr = 0;
         set_status = 2;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     let status = find_status gh repo in
@@ -1714,13 +1749,14 @@ module Make (DK : Test_client.S) = struct
     sync b >>= fun _b ->
     Alcotest.(check counter)
       "counter: 6"
-      { events = 0;
+      {
+        events = 0;
         prs = 3;
         status = 6;
         refs = 3;
         set_pr = 0;
         set_status = 2;
-        set_ref = 0
+        set_ref = 0;
       }
       gh.API.ctx;
     let status_dir = dir / "status" / "foo" / "bar" / "baz" in
@@ -1771,8 +1807,9 @@ module Make (DK : Test_client.S) = struct
              | "status" | "description" | "target_url" -> Lwt.return []
              | item ->
                  read_state ~user ~repo ~commit tree (path / item)
-                   (context @ [ item ]) )
-        >>= fun children -> Lwt.return (this_state @ List.concat children)
+                   (context @ [ item ]))
+        >>= fun children ->
+        Lwt.return (this_state @ List.concat children)
 
   let read_opt_dir tree path =
     DK.Tree.read_dir tree path >|= function
@@ -1789,7 +1826,7 @@ module Make (DK : Test_client.S) = struct
               Path.of_steps_exn [ name; repo; "commit"; commit; "status" ]
             in
             read_state ~user ~repo ~commit tree path [] >>= fun states ->
-            Lwt.return (commit, states) )
+            Lwt.return (commit, states))
 
   let read_comments tree path =
     read_opt_dir tree path
@@ -1804,7 +1841,7 @@ module Make (DK : Test_client.S) = struct
             read ~trim:false "body" >|= fun body ->
             let id = int_of_string id in
             let user = User.v user in
-            Comment.v ~id ~user ~body )
+            Comment.v ~id ~user ~body)
     >|= Array.of_list
 
   let read_prs tree ~user ~repo =
@@ -1826,7 +1863,7 @@ module Make (DK : Test_client.S) = struct
             let owner = User.v owner in
             let repo = Repo.v ~user ~repo in
             let head = Commit.v repo head in
-            PR.v ~state:`Open ~title ~base ~owner ~comments head number )
+            PR.v ~state:`Open ~title ~base ~owner ~comments head number)
 
   let read_refs tree ~user ~repo =
     let name = User.name user in
@@ -1877,26 +1914,28 @@ module Make (DK : Test_client.S) = struct
                               read_prs tree ~user ~repo >>= fun prs ->
                               read_refs tree ~user ~repo >>= fun refs ->
                               let v =
-                                { R.user = name;
+                                {
+                                  R.user = name;
                                   repo;
                                   commits;
                                   prs;
                                   refs;
-                                  events = []
+                                  events = [];
                                 }
                               in
-                              String.Map.add repo v acc |> Lwt.return )
+                              String.Map.add repo v acc |> Lwt.return)
                         String.Map.empty
                  >>= fun repos ->
-                 Lwt.return (User.Map.add user { User.repos } acc) )
+                 Lwt.return (User.Map.add user { User.repos } acc))
            User.Map.empty
-    >|= fun users -> { Users.users }
+    >|= fun users ->
+    { Users.users }
 
   let ensure_datakit_in_sync ~msg github datakit =
     state_of_branch datakit >>= fun dkt_users ->
     Log.info (fun l ->
         l "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@." Users.pp github.API.users
-          Users.pp dkt_users );
+          Users.pp dkt_users);
     let repos = Users.repos dkt_users in
     let github = Users.prune repos github.API.users in
     let dkt_users = Users.prune repos dkt_users in
@@ -1910,7 +1949,7 @@ module Make (DK : Test_client.S) = struct
   let ensure_github_in_sync ~msg github datakit =
     Log.info (fun l ->
         l "GitHub:@\n@[%a@]@.DataKit:@\n@[%a@]@." Users.pp github.API.users
-          Users.pp datakit );
+          Users.pp datakit);
     let repos = Users.repos github.API.users in
     let github = Users.prune repos github.API.users in
     Alcotest.check snapshot (msg ^ "[github-datakit]") Snapshot.empty
@@ -1925,7 +1964,7 @@ module Make (DK : Test_client.S) = struct
       (fun acc user ->
         Array.fold_left
           (fun acc repo -> Repo.Set.add (Repo.v ~user ~repo) acc)
-          acc Data.repos )
+          acc Data.repos)
       Repo.Set.empty Data.users
 
   exception DK_error of DK.error
@@ -1936,7 +1975,8 @@ module Make (DK : Test_client.S) = struct
           Conv.update_elt t (`Repo (Repo.v ~user ~repo))
         in
         Lwt_list.iter_p (fun { Repo.user; repo } -> monitor ~user ~repo) repos
-        >>= fun () -> DK.Transaction.commit t ~message:"Monitor repos" )
+        >>= fun () ->
+        DK.Transaction.commit t ~message:"Monitor repos")
 
   let random_monitor ~random branch =
     DK.Branch.with_transaction branch (fun t ->
@@ -1949,7 +1989,8 @@ module Make (DK : Test_client.S) = struct
         Lwt_list.iter_p
           (fun { Repo.user; repo } -> monitor ~user ~repo)
           (Repo.Set.elements all_repos)
-        >>= fun () -> DK.Transaction.commit t ~message:"Monitor repos" )
+        >>= fun () ->
+        DK.Transaction.commit t ~message:"Monitor repos")
     >>= function
     | Ok () -> Lwt.return_unit
     | Error e -> Lwt.fail_with @@ Fmt.to_to_string DK.pp_error e
@@ -1999,7 +2040,8 @@ module Make (DK : Test_client.S) = struct
     let events = Users.diff_events users gh.API.users in
     let gh = API.create ~events users in
     sync (gh, b) >>= fun _s ->
-    ensure_datakit_in_sync ~msg:"empty" gh branch >>= fun () -> Lwt.return_unit
+    ensure_datakit_in_sync ~msg:"empty" gh branch >>= fun () ->
+    Lwt.return_unit
 
   (* Generate a random datakit state and ensure that GitHub converges:
      in that test, the source of truth is DataKit. *)
@@ -2016,11 +2058,11 @@ module Make (DK : Test_client.S) = struct
       DK.Branch.with_transaction branch (fun tr ->
           Lwt_list.iter_p
             (fun { Repo.user; repo } ->
-              safe_remove tr Path.(empty / User.name user / repo) )
+              safe_remove tr Path.(empty / User.name user / repo))
             (Repo.Set.elements all_repos)
           >>= fun () ->
           Lwt_list.iter_p (Conv.update_event tr) events >>= fun () ->
-          DK.Transaction.commit tr ~message:"User updates" )
+          DK.Transaction.commit tr ~message:"User updates")
       >>= function
       | Error e -> Lwt.fail (DK_error e)
       | Ok () -> Lwt.return_unit
@@ -2031,7 +2073,8 @@ module Make (DK : Test_client.S) = struct
       monitor (Repo.Set.elements (Users.repos users)) branch >>*= fun () ->
       Bridge.sync ~cap ~policy:`Once ~token:gh branch b >>= fun b ->
       Log.debug (fun l -> l "API.set-* = %d" (Counter.sets gh.API.ctx));
-      ensure_github_in_sync ~msg gh (prune users) >|= fun () -> (b, gh)
+      ensure_github_in_sync ~msg gh (prune users) >|= fun () ->
+      (b, gh)
     in
     let nsync n users x =
       let rec aux k users x =
@@ -2090,10 +2133,11 @@ let run fn =
         Server.accept ~root ~msg:"test" for_server >>*= Lwt.return
       in
       Lwt.finalize
-        (fun () -> Client.connect for_client ~max_fids:Int32.max_int () >>*= fn)
+        (fun () ->
+          Client.connect for_client ~max_fids:Int32.max_int () >>*= fn)
         (fun () ->
           Lwt.cancel server_thread;
-          Lwt.return () ) )
+          Lwt.return ()) )
 
 module DK = struct
   include Datakit_client_9p.Make (Client)

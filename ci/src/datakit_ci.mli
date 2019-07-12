@@ -19,17 +19,17 @@
 
 (** {1:core Core} *)
 
-(** Datakit client library. *)
 module DK : Datakit_client.S
+(** Datakit client library. *)
 
 module Live_log : sig
   (** {1:livelogs Live Logs} *)
 
-  (** The type for live-log manager. *)
   type manager
+  (** The type for live-log manager. *)
 
-  (** The type for live-logs. *)
   type t
+  (** The type for live-logs. *)
 
   val create :
     ?switch:Lwt_switch.t ->
@@ -85,8 +85,8 @@ end
 module Output : sig
   (** {1:output Computation Output} *)
 
-  (** The type for {!term} output saved in Datakit. *)
   type saved
+  (** The type for {!term} output saved in Datakit. *)
 
   (** The type for {!term}'s output. *)
   type logs =
@@ -96,32 +96,32 @@ module Output : sig
     | Pair of logs * logs
 end
 
+type 'a status = {
+  result :
+    ('a, [ `Pending of string * unit Lwt.t | `Failure of string ]) result;
+  output : Output.logs;
+}
 (** The type for term status. It is a mix between the usual error
     monad, but where we also keep a local log for every
     computation. Morever, computation can be long-running, so there is
     a new [`Pending] state with an indication of when the term is
     complete. *)
-type 'a status = {
-  result :
-    ('a, [ `Pending of string * unit Lwt.t | `Failure of string ]) result;
-  output : Output.logs
-}
 
+type job_id
 (** The type for job IDs. They are used to identfy the worker actually
     doing the computation. *)
-type job_id
 
 module Target : sig
   (** {1:target Job Targets} *)
 
   open Datakit_github
 
+  type t = [ `PR of PR.id | `Ref of Ref.id ]
   (** The type for computation targets. A target can either be a
       pull-request ID, e.g. a GitHub repository and a number; or a
       reference ID, e.g. a GitHub repository and a reference name
       (given as a list of string, e.g. ["heads/master"] should be
       split into [["heads"]; ["master"]]). *)
-  type t = [ `PR of PR.id | `Ref of Ref.id ]
 
   val compare : t -> t -> int
   (** [compare] is the comparison function for GitHub targets. *)
@@ -136,10 +136,10 @@ module Target : sig
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for GitHub targets. *)
 
+  type v = [ `PR of PR.t | `Ref of Ref.t ]
   (** The type for resolved GitHub targets. Resolved pull-request and
       references contains the head commit and other metadata (see
       {!Datakit_github}'s documentation for more details). *)
-  type v = [ `PR of PR.t | `Ref of Ref.t ]
 
   val head : v -> Commit.t
   (** [head v] is the head commit of [v]. *)
@@ -160,10 +160,10 @@ module Term : sig
       A term is a unit of computation, which can have various state
       and a log output. Terms can be short-lived or long-running.  *)
 
+  type 'a t
   (** The type for computation terms. A ['a t] is a term that
       evaluates to an ['a], fails, or explains what it's waiting
       for. *)
-  type 'a t
 
   val return : 'a -> 'a t
   (** [return x] is a term that evaluates successfully to [x]. *)
@@ -307,8 +307,8 @@ end
 module ACL : sig
   (** {1:acl Access Control List} *)
 
-  (** The type for GitHub ACLs. *)
   type t
+  (** The type for GitHub ACLs. *)
 
   val everyone : t
   (** [everyone] is the ACL granting access to everyone *)
@@ -333,8 +333,8 @@ end
 module Web : sig
   (** {1:web Web Configuration} *)
 
-  (** The type for web configuration. *)
   type config
+  (** The type for web configuration. *)
 
   val config :
     ?name:string ->
@@ -366,14 +366,14 @@ end
 module Config : sig
   (** {1:config Configuration} *)
 
-  (** The type for the project configuration. *)
   type t
+  (** The type for the project configuration. *)
 
-  (** The type for projects. *)
   type project
+  (** The type for projects. *)
 
-  (** The type for individual tests. *)
   type test = string Term.t
+  (** The type for individual tests. *)
 
   val project :
     id:string ->
@@ -450,8 +450,8 @@ end
 module Monitored_pool : sig
   (** {1:pool Monitored Pool of Workers} *)
 
-  (** The type for pools of workers. *)
   type t
+  (** The type for pools of workers. *)
 
   val create : string -> int -> t
   (** [create s n] create a new pool with [n] workers. *)
@@ -478,9 +478,9 @@ module Git : sig
       commits} inside these repositories and {{!command}shell command}
       to run on a given checkout. *)
 
+  type t
   (** The type for local non-bare git working directory (with a .git
       sub-directory). *)
-  type t
 
   val v : ?remote:string -> logs:Live_log.manager -> string -> t
   (** [v ~remote ~logs dir] is the local Git repository at [dir].
@@ -488,8 +488,8 @@ module Git : sig
       If [remote] is not given and [dir] does not exist, an exception
       is raised. *)
 
-  (** The type for Git commits. *)
   type commit
+  (** The type for Git commits. *)
 
   val hash : commit -> string
   (** [hash c] is [c]'s hash. *)
@@ -525,8 +525,8 @@ module Git : sig
       repository does not need to be locked while the callback function
       runs. *)
 
-  (** A cache of executions of a shell command. *)
   type command
+  (** A cache of executions of a shell command. *)
 
   val command :
     logs:Live_log.manager ->
@@ -565,8 +565,8 @@ module Docker : sig
       For the common case, use [create ~logs ~label:"Dockerfile" "Dockerfile"]. *)
 
   module Image : sig
-    (** A Docker image. *)
     type t
+    (** A Docker image. *)
 
     val of_published : string -> t
     (** [of_published name] refers to the image [name] (as published on Docker Hub or similar). *)
@@ -605,10 +605,10 @@ end
 module type BUILDER = sig
   (** {1 Builder} *)
 
+  type t
   (** The type for builder values. A builder generates values from
       inputs (keys). A builder is typically used with a
       {{!Cache}cache}. *)
-  type t
 
   (** Input describing what is to be built.
       Any change to the key will trigger a rebuild. If you want to use
@@ -618,12 +618,12 @@ module type BUILDER = sig
     type t
   end
 
+  type context
   (** For passing context parameters to the builder which aren't part
       of the key (e.g. timeouts or resource pools). *)
-  type context
 
-  (** Output of the builder. *)
   type value
+  (** Output of the builder. *)
 
   val name : t -> string
   (** A unique name for this builder. This is used for metric
@@ -672,8 +672,8 @@ module Cache : sig
   end
 
   module Make (B : BUILDER) : sig
-    (** A [t] is a cache of values created by [B]. *)
     type t
+    (** A [t] is a cache of values created by [B]. *)
 
     val create : logs:Live_log.manager -> B.t -> t
     (** [create ~logs b] is a fresh cache that maps keys of type

@@ -19,7 +19,7 @@ module Context = struct
     job_id : CI_s.job_id;
     mutable recalc : unit -> unit;
     (* Call this to schedule a recalculation. *)
-    dk : unit -> CI_utils.DK.t Lwt.t
+    dk : unit -> CI_utils.DK.t Lwt.t;
   }
 
   let dk t = t.dk
@@ -29,10 +29,10 @@ module Context = struct
   let job_id t = t.job_id
 
   let disable t =
-    t.recalc
-    <- (fun () ->
-         CI_utils.Log.debug (fun f ->
-             f "recalculate called, but term is finished" ) )
+    t.recalc <-
+      (fun () ->
+        CI_utils.Log.debug (fun f ->
+            f "recalculate called, but term is finished"))
 
   let watch t ready =
     (* When [ready] is done, call the then-current [recalc] function. *)
@@ -53,8 +53,12 @@ let pp_target f = function `PR pr -> PR.pp f pr | `Ref r -> Ref.pp f r
 let ( >?= ) x f = Lwt.map (function None -> None | Some x -> Some (f x)) x
 
 let target t = function
-  | `PR x -> Conv.pr t x >?= fun x -> `PR x
-  | `Ref x -> Conv.ref t x >?= fun x -> `Ref x
+  | `PR x ->
+      Conv.pr t x >?= fun x ->
+      `PR x
+  | `Ref x ->
+      Conv.ref t x >?= fun x ->
+      `Ref x
 
 let target id =
   github >>= fun gh ->

@@ -5,7 +5,7 @@ module Output = CI_output
 type 'a status = 'a CI_s.status = {
   result :
     ('a, [ `Pending of string * unit Lwt.t | `Failure of string ]) result;
-  output : Output.logs
+  output : Output.logs;
 }
 
 type job_id = CI_s.job_id

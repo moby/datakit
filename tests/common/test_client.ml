@@ -17,7 +17,7 @@ module Make (DK : S) = struct
         match acc with
         | Error _ as e -> Lwt.return e
         | Ok acc -> (
-            f e >|= function Ok r -> Ok (r :: acc) | Error _ as e -> e ) )
+            f e >|= function Ok r -> Ok (r :: acc) | Error _ as e -> e ))
       (Ok []) (List.rev l)
 
   let ( >>*= ) x f =
@@ -48,7 +48,7 @@ module Make (DK : S) = struct
         DK.Transaction.read_dir t (p "") >>*= fun existing ->
         existing
         |> Lwt_list.iter_s (fun name ->
-               DK.Transaction.remove t (p name) >>*= Lwt.return )
+               DK.Transaction.remove t (p name) >>*= Lwt.return)
         >>= fun () ->
         DK.Transaction.read_dir t (p "") >>*= fun existing ->
         Alcotest.(check (list string)) "rw is empty" [] existing;
@@ -71,8 +71,9 @@ module Make (DK : S) = struct
                let dir = Path.of_steps_exn dir in
                DK.Transaction.create_file t (dir / name)
                  (Cstruct.of_string value)
-               >>*= Lwt.return )
-        >>= fun () -> DK.Transaction.commit t ~message:"init" )
+               >>*= Lwt.return)
+        >>= fun () ->
+        DK.Transaction.commit t ~message:"init")
 
   let try_merge_client dk ~base ~ours ~theirs fn =
     DK.branch dk "master" >>*= fun master ->
@@ -86,7 +87,7 @@ module Make (DK : S) = struct
         expect_head their_branch >>*= fun theirs_head ->
         DK.Transaction.merge t theirs_head >>*= fun (merge, _conflicts) ->
         fn t merge >>*= fun () ->
-        DK.Transaction.commit t ~message:"try_merge_client" )
+        DK.Transaction.commit t ~message:"try_merge_client")
     >>*= Lwt.return
 
   module File_event = struct
@@ -137,7 +138,7 @@ module Make (DK : S) = struct
         >>*= fun () ->
         DK.Transaction.parents tr >>*= fun parents ->
         Alcotest.(check (list pass)) "Parents" [] parents;
-        DK.Transaction.commit tr ~message:"My commit" )
+        DK.Transaction.commit tr ~message:"My commit")
     >>*= fun () ->
     DK.Branch.head master >>*= function
     | None -> Alcotest.fail "Branch does not exist!"
@@ -158,7 +159,7 @@ module Make (DK : S) = struct
              | None -> Lwt.return []
              | Some commit ->
                  DK.Commit.parents commit >|*= fun parents ->
-                 List.map DK.Commit.id parents )
+                 List.map DK.Commit.id parents)
       >|= Alcotest.(check (list string)) name expected
     in
     DK.branch dk "dev" >>*= fun dev ->
@@ -171,13 +172,15 @@ module Make (DK : S) = struct
     check_parents "master empty" master [] >>= fun () ->
     DK.Branch.with_transaction master (fun tr ->
         DK.Transaction.create_file tr ~executable:false (p "file") (v "data")
-        >>*= fun () -> DK.Transaction.commit tr ~message:"commit1" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"commit1")
     >>*= fun () ->
     check_parents "master no parent" master [] >>= fun () ->
     expect_head master >>*= fun master_commit1 ->
     DK.Branch.with_transaction master (fun tr ->
         DK.Transaction.create_file tr ~executable:false (p "file") (v "data2")
-        >>*= fun () -> DK.Transaction.commit tr ~message:"commit2" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"commit2")
     >>*= fun () ->
     check_parents "master second commit" master [ master_commit1 ]
     >>= fun () ->
@@ -186,7 +189,7 @@ module Make (DK : S) = struct
         DK.Transaction.create_file tr ~executable:false (p "file") (v "dev")
         >>*= fun () ->
         DK.Transaction.set_parents tr [ master_commit2 ] >>*= fun () ->
-        DK.Transaction.commit tr ~message:"commit3" )
+        DK.Transaction.commit tr ~message:"commit3")
     >>*= fun () ->
     check_parents "dev from master" dev [ master_commit2 ] >>= fun () ->
     check_fails "Invalid hash" [ "hello" ] >>*= fun () ->
@@ -197,7 +200,8 @@ module Make (DK : S) = struct
         DK.Branch.with_transaction master (fun t2 ->
             DK.Transaction.create_file t2 ~executable:false (p "from_inner")
               (v "inner")
-            >>*= fun () -> DK.Transaction.commit t2 ~message:"From inner" )
+            >>*= fun () ->
+            DK.Transaction.commit t2 ~message:"From inner")
         >>*= fun () ->
         expect_head master >>*= fun after_inner ->
         DK.Transaction.create_file t1 ~executable:false (p "from_outer")
@@ -209,7 +213,7 @@ module Make (DK : S) = struct
             DK.Transaction.set_parents t1 [ real_parent; dev_head ]
             >>*= fun () ->
             DK.Transaction.commit t1 ~message:"From outer" >>*= fun () ->
-            Lwt.return (Ok (real_parent, after_inner)) )
+            Lwt.return (Ok (real_parent, after_inner)))
     >>*= fun (orig_parent, after_inner) ->
     (* Now we should have two merges: master is a merge of t1 and t2,
        and t1 is a merge of master and dev. *)
@@ -220,12 +224,12 @@ module Make (DK : S) = struct
       | { id = _;
           msg = _;
           parents =
-            [ { id = inner; msg = "From inner"; parents = [ _ ] }
-            ; { id = _;
+            [ { id = inner; msg = "From inner"; parents = [ _ ] };
+              { id = _;
                 msg = "From outer";
                 parents =
-                  [ { id = c2; msg = "commit2"; parents = [ _ ] }
-                  ; { id = c3; msg = "commit3"; parents = [ _ ] }
+                  [ { id = c2; msg = "commit2"; parents = [ _ ] };
+                    { id = c3; msg = "commit3"; parents = [ _ ] }
                   ]
               }
             ]
@@ -260,7 +264,8 @@ module Make (DK : S) = struct
     DK.branch dk "master" >>*= fun master ->
     DK.Branch.with_transaction master (fun tr ->
         DK.Transaction.create_file tr (p "file") (v "from-master")
-        >>*= fun () -> DK.Transaction.commit tr ~message:"init" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"init")
     >>*= fun () ->
     (* Fork and put "from-master+pr" on pr branch *)
     DK.branch dk "pr" >>*= fun pr ->
@@ -273,7 +278,8 @@ module Make (DK : S) = struct
             DK.Transaction.read_file tr (p "file") >>*= fun old ->
             DK.Transaction.replace_file tr (p "file")
               (Cstruct.append old (v "+pr"))
-            >>*= fun () -> DK.Transaction.commit tr ~message:"mod" )
+            >>*= fun () ->
+            DK.Transaction.commit tr ~message:"mod")
         >>*= fun () ->
         expect_head pr >>*= fun merge_b ->
         (* Merge pr into master *)
@@ -290,7 +296,8 @@ module Make (DK : S) = struct
             >>= fun () ->
             DK.Tree.read_file base (p "file")
             |> check_file "Base" "from-master"
-            >>= fun () -> DK.Transaction.commit tr ~message:"merge" )
+            >>= fun () ->
+            DK.Transaction.commit tr ~message:"merge")
         >>*= fun () ->
         expect_head master >>*= fun merge_commit ->
         DK.Commit.parents merge_commit >>*= fun parents ->
@@ -324,7 +331,8 @@ module Make (DK : S) = struct
         let makefile = Cstruct.of_string "all: build test" in
         DK.Transaction.create_file tr ~executable:false (p "src/Makefile")
           makefile
-        >>*= fun () -> DK.Transaction.commit tr ~message:"init" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"init")
     >>*= fun () ->
     DK.Branch.head master >>*= fun head1 ->
     let head1 =
@@ -336,7 +344,8 @@ module Make (DK : S) = struct
         DK.Transaction.read_file tr (p "file") >>*= fun old ->
         DK.Transaction.replace_file tr (p "file")
           (Cstruct.append old (v "+pr"))
-        >>*= fun () -> DK.Transaction.commit tr ~message:"mod" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"mod")
     >>*= fun () ->
     DK.Branch.head master >>*= fun head2 ->
     let head2 =
@@ -360,8 +369,9 @@ module Make (DK : S) = struct
         >>*= fun () ->
         DK.Transaction.diff tr head2 >>*= fun diff5 ->
         Alcotest.(check diffs) "diff5" [] diff5;
-        DK.Transaction.abort tr )
-    >|*= fun () -> ()
+        DK.Transaction.abort tr)
+    >|*= fun () ->
+    ()
 
   let test_merge_metadata dk =
     (* Put "from-master" on master branch *)
@@ -376,7 +386,7 @@ module Make (DK : S) = struct
         DK.Transaction.create_file t ~executable:true (p "c") (v "from-master")
         >>*= fun () ->
         (* Base: exec, link, exec *)
-        DK.Transaction.commit t ~message:"init" )
+        DK.Transaction.commit t ~message:"init")
     >>*= fun () ->
     (* Fork and make some changes on pr branch *)
     DK.branch dk "pr" >>*= fun pr ->
@@ -389,7 +399,7 @@ module Make (DK : S) = struct
         DK.Transaction.set_executable t (p "b") true >>*= fun () ->
         DK.Transaction.remove t (p "c") >>*= fun () ->
         DK.Transaction.create_symlink t (p "c") "foo" >>*= fun () ->
-        DK.Transaction.commit t ~message:"mod" )
+        DK.Transaction.commit t ~message:"mod")
     >>*= fun () ->
     expect_head pr >>*= fun merge_b ->
     (* Merge pr into master *)
@@ -412,7 +422,7 @@ module Make (DK : S) = struct
         >>= fun () ->
         DK.Transaction.replace_file t (p "c") (v "Resolved") >>*= fun () ->
         DK.Transaction.set_executable t (p "c") true >>*= fun () ->
-        DK.Transaction.commit t ~message:"merge" )
+        DK.Transaction.commit t ~message:"merge")
     >>*= fun () ->
     expect_head master >>*= fun head ->
     DK.Commit.tree head >>*= fun tree ->
@@ -425,14 +435,15 @@ module Make (DK : S) = struct
     DK.branch dk "master" >>*= fun master ->
     DK.Branch.with_transaction master (fun tr ->
         DK.Transaction.create_file tr (p "file") (v "from-master")
-        >>*= fun () -> DK.Transaction.commit tr ~message:"init" )
+        >>*= fun () ->
+        DK.Transaction.commit tr ~message:"init")
     >>*= fun () ->
     expect_head master >>*= fun head ->
     (* Create a new branch, and merge from this *)
     DK.branch dk "new" >>*= fun new_br ->
     DK.Branch.with_transaction new_br (fun tr ->
         DK.Transaction.merge tr head >>*= fun _ ->
-        DK.Transaction.commit tr ~message:"init" )
+        DK.Transaction.commit tr ~message:"init")
     >>*= fun () ->
     expect_head master >>*= fun head ->
     DK.Commit.tree head >>*= fun tree ->
@@ -532,7 +543,7 @@ module Make (DK : S) = struct
             DK.Transaction.conflicts t >>*= fun conflicts ->
             let conflicts = List.map Path.to_hum conflicts in
             Alcotest.(check (list string)) "conflicts" [ "h" ] conflicts;
-            DK.Transaction.remove t (p "h") )
+            DK.Transaction.remove t (p "h"))
     >>= fun () ->
     DK.branch dk "master" >>*= fun master ->
     expect_head master >>*= fun head ->
@@ -556,7 +567,7 @@ module Make (DK : S) = struct
         |> check_kind "Dir exists" `Dir
         >>= fun () ->
         DK.Transaction.make_dirs tr (p "foo/bar/baz") >>*= fun () ->
-        DK.Transaction.commit tr ~message:"mkdirs" )
+        DK.Transaction.commit tr ~message:"mkdirs")
     >>*= Lwt.return
 
   let watch_thread ~switch branch path =
@@ -565,12 +576,11 @@ module Make (DK : S) = struct
       DK.Branch.wait_for_path branch ~switch path (fun node ->
           Logs.warn (fun f -> f "Update: %a" Path.pp path);
           push (Some node);
-          Lwt.return (Ok `Again) )
+          Lwt.return (Ok `Again))
       >>*= Lwt.return
     in
     Lwt.on_failure th (fun ex ->
-        Logs.err (fun f -> f "Watch thread failed: %s" (Printexc.to_string ex))
-    );
+        Logs.err (fun f -> f "Watch thread failed: %s" (Printexc.to_string ex)));
     (events, th)
 
   let with_events branch path fn =
@@ -578,7 +588,8 @@ module Make (DK : S) = struct
     Lwt.finalize
       (fun () ->
         let events, th = watch_thread branch ~switch path in
-        fn events >>= fun () -> Lwt.return (Ok th) )
+        fn events >>= fun () ->
+        Lwt.return (Ok th))
       (fun () -> Lwt_switch.turn_off switch)
     >>*= fun th ->
     th >>= function
@@ -589,7 +600,7 @@ module Make (DK : S) = struct
     DK.Branch.with_transaction branch (fun tr ->
         DK.Transaction.make_dirs tr dir >>= fun _ ->
         DK.Transaction.create_file tr (dir / leaf) contents >>*= fun () ->
-        DK.Transaction.commit tr ~message:"Add file" )
+        DK.Transaction.commit tr ~message:"Add file")
 
   let expect_dir_event msg events expected =
     Lwt_stream.next events >>= function
@@ -640,21 +651,25 @@ module Make (DK : S) = struct
         Alcotest.(check bool)
           "No Makefile update" true
           (Lwt.state next_makefile_event = Lwt.Sleep);
+
         (* Make executable *)
         DK.Branch.with_transaction master (fun t ->
             DK.Transaction.set_executable t (p "src/Makefile") true
-            >>*= fun () -> DK.Transaction.commit t ~message:"exec" )
+            >>*= fun () ->
+            DK.Transaction.commit t ~message:"exec")
         >>*= fun () ->
         next_makefile_event >>= fun event ->
         Alcotest.(check (option file_event))
           "Makefile is an exe"
           (Some (`Exec (v "all: build")))
           event;
+
         (* Make symlink *)
         DK.Branch.with_transaction master (fun t ->
             DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
             DK.Transaction.create_symlink t (p "src/Makefile") "my-target"
-            >>*= fun () -> DK.Transaction.commit t ~message:"symlink" )
+            >>*= fun () ->
+            DK.Transaction.commit t ~message:"symlink")
         >>*= fun () ->
         expect_file_event "Makefile is a symlink" makefile_events
           (Some (`Link "my-target"))
@@ -662,7 +677,7 @@ module Make (DK : S) = struct
         (* Remove *)
         DK.Branch.with_transaction master (fun t ->
             DK.Transaction.remove t (p "src/Makefile") >>*= fun () ->
-            DK.Transaction.commit t ~message:"symlink" )
+            DK.Transaction.commit t ~message:"symlink")
         >>*= fun () ->
         expect_file_event "Makefile removed" makefile_events None >>= fun () ->
         Lwt.return_unit
@@ -683,7 +698,7 @@ module Make (DK : S) = struct
         check "Extend to 6" "Hell\x00\x00" >>= fun () ->
         DK.Transaction.truncate t (p "file") 0L >>*= fun () ->
         check "Truncate to 0" "" >>= fun () ->
-        DK.Transaction.commit t ~message:"truncate" )
+        DK.Transaction.commit t ~message:"truncate")
     >>*= Lwt.return
 
   (* FIXME: automaticall run ./scripts/git-dumb-server *)
@@ -706,7 +721,7 @@ module Make (DK : S) = struct
         DK.Transaction.remove t (p "foo/bar") >>*= fun () ->
         DK.Transaction.read_dir t (p "foo") >>*= fun items ->
         Alcotest.(check (list string)) "Remaining entries" [ "file1" ] items;
-        DK.Transaction.abort t )
+        DK.Transaction.abort t)
     >>*= fun () ->
     DK.Branch.head master >|*= fun head ->
     Alcotest.(check (option reject)) "Aborted" None head
@@ -716,7 +731,7 @@ module Make (DK : S) = struct
     DK.branch dk "master" >>*= fun master ->
     DK.Branch.with_transaction master (fun t ->
         DK.Transaction.create_file t (p "test") data >>*= fun () ->
-        DK.Transaction.commit t ~message:"big-write" )
+        DK.Transaction.commit t ~message:"big-write")
     >>*= fun () ->
     expect_head master >>*= fun head ->
     DK.Commit.tree head >>*= fun tree ->
@@ -734,7 +749,8 @@ module Make (DK : S) = struct
         DK.Transaction.exists t (p "README") >>*= fun exists ->
         Alcotest.(check bool) "Now exists" true exists;
         DK.Transaction.create_or_replace_file t (p "README") (v "Data2")
-        >>*= fun () -> DK.Transaction.commit t ~message:"create-or-replace" )
+        >>*= fun () ->
+        DK.Transaction.commit t ~message:"create-or-replace")
     >>*= fun () ->
     expect_head master >>*= fun head ->
     DK.Commit.tree head >>*= fun tree ->

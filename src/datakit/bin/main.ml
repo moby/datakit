@@ -10,7 +10,7 @@ let quiet_9p () =
   List.iter
     (fun src ->
       if Logs.Src.name src = "fs9p" then
-        Logs.Src.set_level src (Some Logs.Info) )
+        Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet_git () =
@@ -18,7 +18,7 @@ let quiet_git () =
   List.iter
     (fun src ->
       if Logs.Src.name src = "git.value" || Logs.Src.name src = "git.memory"
-      then Logs.Src.set_level src (Some Logs.Info) )
+      then Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet_irmin () =
@@ -29,7 +29,7 @@ let quiet_irmin () =
         Logs.Src.name src = "irmin.bc"
         || Logs.Src.name src = "irmin.commit"
         || Logs.Src.name src = "irmin.node"
-      then Logs.Src.set_level src (Some Logs.Info) )
+      then Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet () =
@@ -44,7 +44,7 @@ let error fmt =
   Printf.ksprintf
     (fun s ->
       Log.err (fun l -> l "error: %s" s);
-      Error (`Msg s) )
+      Error (`Msg s))
     fmt
 
 let max_chunk_size = Int32.of_int (100 * 1024)
@@ -72,7 +72,8 @@ module Git_fs_store = struct
   let connect path =
     Lazy.force listener;
     Log.debug (fun l -> l "Using Git-format store %s" path);
-    repo path >|= fun repo () -> Filesystem.create ~info repo
+    repo path >|= fun repo () ->
+    Filesystem.create ~info repo
 end
 
 module In_memory_store = struct
@@ -90,8 +91,9 @@ module In_memory_store = struct
 
   let connect () =
     Log.debug (fun l ->
-        l "Using in-memory store (use --git for a disk-backed store)" );
-    repo () >|= fun repo () -> Filesystem.create ~info repo
+        l "Using in-memory store (use --git for a disk-backed store)");
+    repo () >|= fun repo () ->
+    Filesystem.create ~info repo
 end
 
 let set_signal_if_supported signal handler =
@@ -118,14 +120,14 @@ let start ~listen_9p prometheus git =
          socket connection *)
          if Sys.os_type <> "Win32" then (
            Log.debug (fun l -> l "Caught SIGTERM, will exit");
-           exit 1 ) ));
+           exit 1 )));
   set_signal_if_supported Sys.sigint
     (Sys.Signal_handle
        (fun _ ->
          Log.debug (fun l -> l "Caught SIGINT, will exit");
-         exit 1 ));
+         exit 1));
   Log.app (fun l ->
-      l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v );
+      l "Starting %s %s ..." (Filename.basename Sys.argv.(0)) Version.v);
   let prometheus_threads = Prometheus_unix.serve prometheus in
   let serve_9p =
     ( match git with
@@ -136,7 +138,8 @@ let start ~listen_9p prometheus git =
       (fun addr -> Datakit_conduit.accept_forever ~make_root ~serviceid addr)
       listen_9p
   in
-  serve_9p >>= fun serve_9p -> Lwt.choose (serve_9p @ prometheus_threads)
+  serve_9p >>= fun serve_9p ->
+  Lwt.choose (serve_9p @ prometheus_threads)
 
 let start () listen_9p prometheus git auto_push =
   let start () = start ~listen_9p prometheus git in
@@ -144,16 +147,18 @@ let start () listen_9p prometheus git auto_push =
     ( match auto_push with
     | None -> start ()
     | Some remote -> (
-      match git with
-      | None -> Lwt.fail_with "TODO: push in-memory repositories"
-      | Some local ->
-          Lazy.force Git_fs_store.listener;
-          Git_fs_store.repo local >>= fun repo ->
-          let pusher = Autopush.create ~local ~remote in
-          Git_fs_store.Store.Branch.watch_all repo (fun branch _ ->
-              Autopush.push pusher ~branch;
-              Lwt.return_unit )
-          >>= fun w -> start () >>= fun () -> Git_fs_store.Store.unwatch w ) )
+        match git with
+        | None -> Lwt.fail_with "TODO: push in-memory repositories"
+        | Some local ->
+            Lazy.force Git_fs_store.listener;
+            Git_fs_store.repo local >>= fun repo ->
+            let pusher = Autopush.create ~local ~remote in
+            Git_fs_store.Store.Branch.watch_all repo (fun branch _ ->
+                Autopush.push pusher ~branch;
+                Lwt.return_unit)
+            >>= fun w ->
+            start () >>= fun () ->
+            Git_fs_store.Store.unwatch w ) )
 
 open Cmdliner
 

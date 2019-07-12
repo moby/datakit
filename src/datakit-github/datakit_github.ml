@@ -51,7 +51,7 @@ module Set (E : ELT) = struct
       (fun x ->
         let i = f x in
         let v = try Hashtbl.find tbl i with Not_found -> [] in
-        Hashtbl.replace tbl i (x :: v) )
+        Hashtbl.replace tbl i (x :: v))
       t;
     tbl
 end
@@ -204,18 +204,19 @@ module PR = struct
     title : string;
     base : string;
     owner : User.t;
-    comments : Comment.t array
+    comments : Comment.t array;
   }
 
   let v ?(state = `Open) ~title ?(base = "master") ~owner ~comments head number
       =
-    { state;
+    {
+      state;
       title = String.trim title;
       base = String.trim base;
       head;
       number;
       owner;
-      comments
+      comments;
     }
 
   type id = Repo.t * int
@@ -309,7 +310,7 @@ module PR = struct
           | None -> Index.singleton id t
           | Some idx -> Index.add id t idx
         in
-        Repo.Map.add repo idx acc )
+        Repo.Map.add repo idx acc)
       s Repo.Map.empty
 end
 
@@ -321,7 +322,7 @@ module Status = struct
     context : string list;
     url : Uri.t option;
     description : string option;
-    state : Status_state.t
+    state : Status_state.t;
   }
 
   type id = Commit.t * string list
@@ -380,11 +381,12 @@ module Status = struct
         Some (String.trim s)
 
   let v ?description ?url commit context state =
-    { description = truncate_and_trim description;
+    {
+      description = truncate_and_trim description;
       url;
       commit;
       context;
-      state
+      state;
     }
 
   let compare =
@@ -448,7 +450,7 @@ module Status = struct
           | None -> Index.singleton id t
           | Some idx -> Index.add id t idx
         in
-        Repo.Map.add repo idx acc )
+        Repo.Map.add repo idx acc)
       s Repo.Map.empty
 end
 
@@ -530,7 +532,7 @@ module Ref = struct
           | None -> Index.singleton id t
           | Some idx -> Index.add id t idx
         in
-        Repo.Map.add repo idx acc )
+        Repo.Map.add repo idx acc)
       s Repo.Map.empty
 
   type event = [ `Created of t | `Updated of t | `Removed of id ]
@@ -711,7 +713,7 @@ module Snapshot = struct
     commits : Commit.Set.t;
     status : Status.Set.t;
     prs : PR.Set.t;
-    refs : Ref.Set.t
+    refs : Ref.Set.t;
   }
 
   let repos t = t.repos
@@ -725,11 +727,12 @@ module Snapshot = struct
   let commits t = t.commits
 
   let empty =
-    { repos = Repo.Set.empty;
+    {
+      repos = Repo.Set.empty;
       commits = Commit.Set.empty;
       status = Status.Set.empty;
       prs = PR.Set.empty;
-      refs = Ref.Set.empty
+      refs = Ref.Set.empty;
     }
 
   let is_empty s =
@@ -768,11 +771,12 @@ module Snapshot = struct
         t.status
 
   let union x y =
-    { repos = Repo.Set.union x.repos y.repos;
+    {
+      repos = Repo.Set.union x.repos y.repos;
       commits = Commit.Set.union x.commits y.commits;
       status = Status.Set.union x.status y.status;
       prs = PR.Set.union x.prs y.prs;
-      refs = Ref.Set.union x.refs y.refs
+      refs = Ref.Set.union x.refs y.refs;
     }
 
   let v ~repos ~commits ~status ~prs ~refs =
@@ -830,9 +834,10 @@ module Snapshot = struct
     { t with commits = Commit.Set.filter keep t.commits }
 
   let with_commit c t =
-    { t with
+    {
+      t with
       commits = Commit.Set.add c t.commits;
-      repos = Repo.Set.add (Commit.repo c) t.repos
+      repos = Repo.Set.add (Commit.repo c) t.repos;
     }
 
   let without_pr (r, id) t =
@@ -840,10 +845,11 @@ module Snapshot = struct
     { t with prs = PR.Set.filter keep t.prs }
 
   let add_pr pr t =
-    { t with
+    {
+      t with
       prs = PR.Set.add pr t.prs;
       commits = Commit.Set.add (PR.commit pr) t.commits;
-      repos = Repo.Set.add (PR.repo pr) t.repos
+      repos = Repo.Set.add (PR.repo pr) t.repos;
     }
 
   let with_pr pr t =
@@ -855,10 +861,11 @@ module Snapshot = struct
     { t with status = Status.Set.filter keep t.status }
 
   let add_status t s =
-    { t with
+    {
+      t with
       status = Status.Set.add s t.status;
       commits = Commit.Set.add (Status.commit s) t.commits;
-      repos = Repo.Set.add (Status.repo s) t.repos
+      repos = Repo.Set.add (Status.repo s) t.repos;
     }
 
   let with_status s t = add_status (without_status (Status.id s) t) s
@@ -868,10 +875,11 @@ module Snapshot = struct
     { t with refs = Ref.Set.filter keep t.refs }
 
   let add_ref r t =
-    { t with
+    {
+      t with
       refs = Ref.Set.add r t.refs;
       commits = Commit.Set.add (Ref.commit r) t.commits;
-      repos = Repo.Set.add (Ref.repo r) t.repos
+      repos = Repo.Set.add (Ref.repo r) t.repos;
     }
 
   let with_ref r t = add_ref r (without_ref (Ref.id r) t)
@@ -934,7 +942,7 @@ module Snapshot = struct
           (fun pr (open_prs, closed_prs) ->
             match pr.PR.state with
             | `Open -> (PR.Set.add pr open_prs, closed_prs)
-            | `Closed -> (open_prs, PR.Set.add pr closed_prs) )
+            | `Closed -> (open_prs, PR.Set.add pr closed_prs))
           prs
           (PR.Set.empty, PR.Set.empty)
       in
@@ -949,12 +957,13 @@ module Snapshot = struct
           (fun c (open_commit, closed_commit) ->
             match is_commit_open c with
             | false -> (open_commit, Commit.Set.add c closed_commit)
-            | true -> (Commit.Set.add c open_commit, closed_commit) )
+            | true -> (Commit.Set.add c open_commit, closed_commit))
           commits
           (Commit.Set.empty, Commit.Set.empty)
       in
       Log.debug (fun l -> l "[prune]+commits:@;%a" Commit.Set.pp open_commits);
-      Log.debug (fun l -> l "[prune]-commits:@;%a" Commit.Set.pp closed_commits);
+      Log.debug (fun l ->
+          l "[prune]-commits:@;%a" Commit.Set.pp closed_commits);
       let is_status_open s =
         Commit.Set.exists (fun c -> s.Status.commit = c) open_commits
       in
@@ -963,7 +972,7 @@ module Snapshot = struct
           (fun s (open_status, closed_status) ->
             match is_status_open s with
             | false -> (open_status, Status.Set.add s closed_status)
-            | true -> (Status.Set.add s open_status, closed_status) )
+            | true -> (Status.Set.add s open_status, closed_status))
           status
           (Status.Set.empty, Status.Set.empty)
       in
@@ -1011,7 +1020,8 @@ module Snapshot = struct
       mk x repos skip_pr skip_ref skip_status skip_commit |> elts
     in
     let r = { remove; update } in
-    Log.debug (fun l -> l "Snapshot.diff@;x=%a@;y=%a@;r=%a" pp x pp y pp_diff r);
+    Log.debug (fun l ->
+        l "Snapshot.diff@;x=%a@;y=%a@;r=%a" pp x pp y pp_diff r);
     r
 end
 
@@ -1100,10 +1110,10 @@ module Capabilities = struct
     | "webhook" -> `Webhook
     | "*" -> `Default
     | s -> (
-      match parse_kv s with
-      | Some ("status", l) -> `Status l
-      | Some ("repo", l) -> `Repo l
-      | _ -> raise (Error (s, "invalid resource")) )
+        match parse_kv s with
+        | Some ("status", l) -> `Status l
+        | Some ("repo", l) -> `Repo l
+        | _ -> raise (Error (s, "invalid resource")) )
 
   let pp_op ppf = function
     | `Read -> Fmt.string ppf "read"
@@ -1142,7 +1152,7 @@ module Capabilities = struct
       String.fold_left
         (fun acc -> function 'x' -> { acc with excl = true }
           | 'r' -> { acc with read = true } | 'w' -> { acc with write = true }
-          | _ -> raise (Error (s, "invalid capacities")) )
+          | _ -> raise (Error (s, "invalid capacities")))
         none s
 
     let check t op =
@@ -1199,7 +1209,7 @@ module Capabilities = struct
       let extra =
         List.fold_left
           (fun acc -> function `Default, _ -> acc
-            | (#resource as r), x -> (r, x) :: acc )
+            | (#resource as r), x -> (r, x) :: acc)
           [] caps
       in
       `Ok (v default ~extra)
@@ -1208,14 +1218,14 @@ module Capabilities = struct
   let apply f t op = function
     | `Default -> { t with default = f t.default op }
     | #resource as r -> (
-      try
-        let x = List.assoc r t.extra in
-        let x = f x op in
-        let extra = List.filter (fun (s, _) -> s <> r) t.extra in
-        v t.default ~extra:((r, x) :: extra)
-      with Not_found ->
-        let x = f X.none op in
-        v t.default ~extra:((r, x) :: t.extra) )
+        try
+          let x = List.assoc r t.extra in
+          let x = f x op in
+          let extra = List.filter (fun (s, _) -> s <> r) t.extra in
+          v t.default ~extra:((r, x) :: extra)
+        with Not_found ->
+          let x = f X.none op in
+          v t.default ~extra:((r, x) :: t.extra) )
 
   let allow = apply X.allow
 
@@ -1233,7 +1243,7 @@ module Capabilities = struct
         match k with
         | prefix when starts_with ~prefix l && List.length prefix > n ->
             (List.length prefix, Some v)
-        | _ -> acc )
+        | _ -> acc)
       (0, None) extra
     |> function
     | _, None -> default
@@ -1259,7 +1269,7 @@ module Capabilities = struct
     if not allowed then
       Log.info (fun l ->
           l "%a: %a is denied (current policy is %a)" pp_resource r pp_op op pp
-            t );
+            t);
     allowed
 
   let filter_aux t op = function

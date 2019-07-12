@@ -46,22 +46,22 @@ let colour = function
 let sgr = function
   | "" -> `Reset
   | x -> (
-    match int_of_string x with
-    | exception _ -> raise Unknown_escape
-    | 0 -> `Reset
-    | 1 -> `Bold
-    | 3 -> `Italic
-    | 4 -> `Underline
-    | 7 -> `Reverse
-    | 22 -> `NoBold
-    | 23 -> `NoItalic
-    | 24 -> `NoUnderline
-    | 27 -> `NoReverse
-    | x when x >= 30 && x <= 37 -> `FgCol (colour (x - 30))
-    | 39 -> `FgCol `Default
-    | x when x >= 40 && x <= 47 -> `BgCol (colour (x - 40))
-    | 49 -> `BgCol `Default
-    | _ -> raise Unknown_escape )
+      match int_of_string x with
+      | exception _ -> raise Unknown_escape
+      | 0 -> `Reset
+      | 1 -> `Bold
+      | 3 -> `Italic
+      | 4 -> `Underline
+      | 7 -> `Reverse
+      | 22 -> `NoBold
+      | 23 -> `NoItalic
+      | 24 -> `NoUnderline
+      | 27 -> `NoReverse
+      | x when x >= 30 && x <= 37 -> `FgCol (colour (x - 30))
+      | 39 -> `FgCol `Default
+      | x when x >= 40 && x <= 47 -> `BgCol (colour (x - 40))
+      | 49 -> `BgCol `Default
+      | _ -> raise Unknown_escape )
 
 let parse_ctrl ~params = function
   | "m" -> `SelectGraphicRendition (List.map sgr params)

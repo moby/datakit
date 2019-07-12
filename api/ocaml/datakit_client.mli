@@ -4,21 +4,21 @@ type stat = { kind : [ `File | `Dir | `Link | `Exec ]; size : int64 }
 
 type status_state = [ `Pending | `Success | `Error | `Failure ]
 
-(** The type for diffs. *)
 type 'a diff = [ `Added of 'a | `Removed of 'a | `Updated of 'a ]
+(** The type for diffs. *)
 
-(** The type for values. *)
 type value = [ `File of Cstruct.t | `Dir of string list | `Link of string ]
+(** The type for values. *)
 
 module Path : sig
   (** Locate files and directories within a DataKit tree. *)
 
   open Result
 
+  type t
   (** A [path] identifies a file or directory (relative to some other directory).
       No component may be empty or contain a '/' character. "." and ".." steps
       are not permitted in a path. *)
-  type t
 
   val empty : t
   (** The empty path. *)
@@ -56,11 +56,11 @@ module Path : sig
   val dirname : t -> t
   (** [dirname t] is [t]'s dirname. *)
 
-  (** Sets of paths. *)
   module Set : Set.S with type elt = t
+  (** Sets of paths. *)
 
-  (** Maps of paths. *)
   module Map : Map.S with type key = t
+  (** Maps of paths. *)
 
   module Infix : sig
     val ( / ) : t -> string -> t
@@ -74,11 +74,11 @@ module Path : sig
 end
 
 module type READABLE_TREE = sig
-  (** The type for trees. *)
   type t
+  (** The type for trees. *)
 
-  (** The type for results. *)
   type +'a result
+  (** The type for results. *)
 
   val read : t -> Path.t -> value result
   (** [read t path] is the contents of the object at the [path]. *)
@@ -111,10 +111,9 @@ module type READABLE_TREE = sig
 end
 
 module type S = sig
-  (** A [t] is a connection to a Datakit server. *)
   type t
+  (** A [t] is a connection to a Datakit server. *)
 
-  (** Attempt to use a non-symlink as a symlink *)
   type error =
     private
     [> `Already_exists  (** Attempt to create something that already exists *)
@@ -123,6 +122,7 @@ module type S = sig
     | `Not_dir  (** Attempt to use a non-directory as a directory *)
     | `Not_file  (** Attempt to use a non-file as a file *)
     | `Not_symlink ]
+  (** Attempt to use a non-symlink as a symlink *)
 
   val pp_error : error Fmt.t
   (** [pp_error] pretty-prints error values. *)
@@ -136,12 +136,12 @@ module type S = sig
     val ( >|= ) : 'a result -> ('a -> 'b) -> 'b result
   end
 
-  (** A read-only tree of files, directories and symlinks. *)
   module Tree : READABLE_TREE with type 'a result := 'a result
+  (** A read-only tree of files, directories and symlinks. *)
 
   module Commit : sig
-    (** A [t] is an immutable commit in the database. *)
     type t
+    (** A [t] is an immutable commit in the database. *)
 
     val pp : t Fmt.t
     (** [pp] is the pretty-printer for commits IDs. *)
@@ -228,12 +228,12 @@ module type S = sig
 
     (** {2 Merging and history} *)
 
+    type merge_inputs = { ours : Tree.t; theirs : Tree.t; base : Tree.t }
     (** When performing a merge, these three directories can be used
         to calculate the final result.  [ours] is the previous
         contents of the transaction, [theirs] is the commit being
         merged and [base] is a least common ancestor. If there is no
         common ancestor then [base] is an empty tree. *)
-    type merge_inputs = { ours : Tree.t; theirs : Tree.t; base : Tree.t }
 
     val merge : t -> Commit.t -> (merge_inputs * Path.t list) result
     (** [merge t commit] merges [commit] into the transaction. It
@@ -270,8 +270,8 @@ module type S = sig
   end
 
   module Branch : sig
-    (** A [t] is a named pointer to a commit. *)
     type t
+    (** A [t] is a named pointer to a commit. *)
 
     val name : t -> string
     (** [name t] is [t]'s name. *)
@@ -304,7 +304,7 @@ module type S = sig
        | `Link of string
        | `Exec of Cstruct.t ]
        option ->
-       [ `Finish of 'a | `Again | `Abort ] result) ->
+      [ `Finish of 'a | `Again | `Abort ] result) ->
       [ `Abort | `Finish of 'a ] result
     (** [wait_for_path] is similar to [wait_for_head], but waits for a
         particular sub-tree to change. *)

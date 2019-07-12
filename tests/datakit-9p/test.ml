@@ -36,10 +36,10 @@ let run fn =
       in
       Lwt.finalize
         (fun () ->
-          Client.connect for_client ~max_fids:Int32.max_int () >>*= fn repo )
+          Client.connect for_client ~max_fids:Int32.max_int () >>*= fn repo)
         (fun () ->
           Lwt.cancel server_thread;
-          Lwt.return () ) )
+          Lwt.return ()) )
 
 let check_dir conn path msg expected =
   Client.readdir conn path >>*= fun items ->
@@ -51,7 +51,8 @@ let with_file conn path fn =
   Client.with_fid conn (fun newfid ->
       Client.walk_from_root conn newfid path >>*= fun _resp ->
       fn newfid >>= fun result ->
-      Client.LowLevel.clunk conn newfid >>*= fun () -> ok result )
+      Client.LowLevel.clunk conn newfid >>*= fun () ->
+      ok result)
   >>*= Lwt.return
 
 let stream conn ?(off = 0L) fid =
@@ -73,13 +74,14 @@ let stream conn ?(off = 0L) fid =
   Lwt.async (fun () ->
       Lwt.catch
         (fun () -> read_line ~saw_flush:false ~buf:"" ~off)
-        (fun ex -> Lwt_mvar.put mvar (`Line (Printexc.to_string ex))) );
+        (fun ex -> Lwt_mvar.put mvar (`Line (Printexc.to_string ex))));
   fun () -> Lwt_mvar.take mvar
 
 let with_stream conn path fn =
   with_file conn path (fun fid ->
       Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.read_only
-      >>*= fun _resp -> fn (stream conn fid) )
+      >>*= fun _resp ->
+      fn (stream conn fid))
 
 let read_line_exn stream =
   stream () >|= function
@@ -108,13 +110,15 @@ let create_file ?(perm = rw_r__r__) conn path leaf contents =
       if perm.Protocol_9p.Types.FileMode.is_symlink then
         Client.LowLevel.create ~extension:contents conn fid leaf perm
           Protocol_9p.Types.OpenMode.write_only
-        >>*= fun _resp -> Lwt.return_unit
+        >>*= fun _resp ->
+        Lwt.return_unit
       else
         Client.LowLevel.create conn fid leaf perm
           Protocol_9p.Types.OpenMode.write_only
         >>*= fun _open ->
         Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
-        >>*= fun _resp -> Lwt.return_unit )
+        >>*= fun _resp ->
+        Lwt.return_unit)
 
 let write_file conn ?(truncate = false) path contents =
   let ( >>== ) = Protocol_9p.Infix.( >>*= ) in
@@ -125,7 +129,8 @@ let write_file conn ?(truncate = false) path contents =
       Client.LowLevel.openfid conn fid Protocol_9p.Types.OpenMode.write_only
       >>== fun _open ->
       Client.LowLevel.write conn fid 0L (Cstruct.of_string contents)
-      >>== fun _resp -> ok () )
+      >>== fun _resp ->
+      ok ())
 
 let chmod conn path perm =
   let mode =
@@ -137,7 +142,7 @@ let chmod conn path perm =
           ~is_symlink:true ()
   in
   with_file conn path (fun fid ->
-      Client.LowLevel.update ~mode conn fid >>*= Lwt.return )
+      Client.LowLevel.update ~mode conn fid >>*= Lwt.return)
 
 let read_file conn path =
   Client.stat conn path >>*= fun info ->
@@ -179,7 +184,8 @@ let echo conn str path =
       Client.LowLevel.openfid conn newfid Protocol_9p.Types.OpenMode.write_only
       >>*= fun _ ->
       Client.LowLevel.write conn newfid 0L (Cstruct.of_string (str ^ "\n"))
-      >>*= fun _ -> ok () )
+      >>*= fun _ ->
+      ok ())
   >>*= Lwt.return
 
 let with_transaction conn ~branch name fn =
@@ -190,8 +196,8 @@ let with_transaction conn ~branch name fn =
   Lwt.try_bind
     (fun () -> fn path)
     (fun r ->
-      write_file conn (path @ [ "ctl" ]) "commit" >>*= fun () -> Lwt.return r
-      )
+      write_file conn (path @ [ "ctl" ]) "commit" >>*= fun () ->
+      Lwt.return r)
     (fun ex ->
       Lwt.try_bind
         (fun () -> write_file conn (path @ [ "ctl" ]) "close" >>*= Lwt.return)
@@ -205,10 +211,11 @@ let with_transaction conn ~branch name fn =
                %s)"
               (Printexc.to_string ex2) (Printexc.to_string ex)
           in
-          failwith err ) )
+          failwith err))
 
 let head conn branch =
-  read_file conn [ "branch"; branch; "head" ] >|= fun s -> String.trim s
+  read_file conn [ "branch"; branch; "head" ] >|= fun s ->
+  String.trim s
 
 (* Get the history starting from commit [hash] *)
 let rec history conn id =
@@ -234,7 +241,7 @@ let populate conn ~branch files =
       existing
       |> Lwt_list.iter_s (fun stat ->
              let name = stat.Protocol_9p.Types.Stat.name in
-             Client.remove conn (t @ [ "rw"; name ]) >>*= Lwt.return )
+             Client.remove conn (t @ [ "rw"; name ]) >>*= Lwt.return)
       >>= fun () ->
       Client.readdir conn (t @ [ "rw" ]) >>*= fun existing ->
       existing
@@ -257,7 +264,7 @@ let populate conn ~branch files =
              let dir, name = split path in
              ensure_dir dir >>= fun () ->
              let dir = t @ [ "rw" ] @ dir in
-             create_file conn dir name value ) )
+             create_file conn dir name value))
 
 (* Commit [base] to master. Then fork a branch which replaces this
    with [theirs].  Replace [base] with [ours] on master, then merge
@@ -273,7 +280,8 @@ let try_merge conn ~base ~ours ~theirs fn =
   populate conn ~branch:"theirs" theirs >>= fun () ->
   with_transaction conn ~branch:"master" "merge" (fun t ->
       head conn "theirs" >>= fun theirs_head ->
-      write_file conn (t @ [ "merge" ]) theirs_head >>*= fun () -> fn t )
+      write_file conn (t @ [ "merge" ]) theirs_head >>*= fun () ->
+      fn t)
 
 let test_transaction repo conn =
   check_dir conn [] "Root entries" root_entries >>= fun () ->
@@ -322,32 +330,33 @@ let test_parents _repo conn =
         Lwt.return_unit
     | hash ->
         read_file conn [ "snapshots"; String.trim hash; "parents" ]
-        >|= fun parents -> Alcotest.(check string) "Parents" expected parents
+        >|= fun parents ->
+        Alcotest.(check string) "Parents" expected parents
   in
   let check_fails name parents =
     Lwt.try_bind
       (fun () ->
         with_transaction conn ~branch:"dev" name (fun dir ->
-            write_file conn (dir @ [ "parents" ]) parents >>*= Lwt.return ) )
+            write_file conn (dir @ [ "parents" ]) parents >>*= Lwt.return))
       (fun () -> Alcotest.fail "Should have been rejected")
       (fun _ex -> Lwt.return_unit)
   in
   Client.mkdir conn [ "branch" ] "master" rwxr_xr_x >>*= fun () ->
   check_parents ~branch:"master" "no-commit" >>= fun () ->
   with_transaction conn ~branch:"master" "commit1" (fun dir ->
-      create_file conn (dir @ [ "rw" ]) "file" "data" )
+      create_file conn (dir @ [ "rw" ]) "file" "data")
   >>= fun () ->
   check_parents ~branch:"master" "" >>= fun () ->
   read_file conn [ "branch"; "master"; "head" ] >>= fun master_head ->
   with_transaction conn ~branch:"master" "commit2" (fun dir ->
-      create_file conn (dir @ [ "rw" ]) "file" "data2" )
+      create_file conn (dir @ [ "rw" ]) "file" "data2")
   >>= fun () ->
   check_parents ~branch:"master" master_head >>= fun () ->
   read_file conn [ "branch"; "master"; "head" ] >>= fun master_head ->
   Client.mkdir conn [ "branch" ] "dev" rwxr_xr_x >>*= fun () ->
   with_transaction conn ~branch:"dev" "commit3" (fun dir ->
       create_file conn (dir @ [ "rw" ]) "file" "dev" >>= fun () ->
-      write_file conn (dir @ [ "parents" ]) master_head >>*= Lwt.return )
+      write_file conn (dir @ [ "parents" ]) master_head >>*= Lwt.return)
   >>= fun () ->
   check_parents ~branch:"dev" master_head >>= fun () ->
   check_fails "Invalid hash" "hello" >>= fun () ->
@@ -356,13 +365,14 @@ let test_parents _repo conn =
   read_file conn [ "branch"; "dev"; "head" ] >>= fun dev_head ->
   with_transaction conn ~branch:"master" "From outer" (fun t1 ->
       with_transaction conn ~branch:"master" "From inner" (fun t2 ->
-          create_file conn (t2 @ [ "rw" ]) "from_inner" "inner" )
+          create_file conn (t2 @ [ "rw" ]) "from_inner" "inner")
       >>= fun () ->
       read_file conn [ "branch"; "master"; "head" ] >>= fun after_inner ->
       create_file conn (t1 @ [ "rw" ]) "from_outer" "outer" >>= fun () ->
       read_file conn (t1 @ [ "parents" ]) >>= fun real_parent ->
       write_file conn (t1 @ [ "parents" ]) (real_parent ^ dev_head)
-      >>*= fun () -> Lwt.return (real_parent, after_inner) )
+      >>*= fun () ->
+      Lwt.return (real_parent, after_inner))
   >>= fun (orig_parent, after_inner) ->
   (* Now we should have two merges: master is a merge of t1 and t2,
      and t1 is a merge of master and dev. *)
@@ -374,12 +384,12 @@ let test_parents _repo conn =
     | { id = _;
         msg = _;
         parents =
-          [ { id = inner; msg = "From inner"; parents = [ _ ] }
-          ; { id = _;
+          [ { id = inner; msg = "From inner"; parents = [ _ ] };
+            { id = _;
               msg = "From outer";
               parents =
-                [ { id = c2; msg = "commit2"; parents = [ _ ] }
-                ; { id = c3; msg = "commit3"; parents = [ _ ] }
+                [ { id = c2; msg = "commit2"; parents = [ _ ] };
+                  { id = c3; msg = "commit3"; parents = [ _ ] }
                 ]
             }
           ]
@@ -396,7 +406,7 @@ let test_merge _repo conn =
   (* Put "from-master" on master branch *)
   Client.mkdir conn [ "branch" ] "master" rwxr_xr_x >>*= fun () ->
   with_transaction conn ~branch:"master" "init" (fun t ->
-      create_file conn (t @ [ "rw" ]) "file" "from-master" )
+      create_file conn (t @ [ "rw" ]) "file" "from-master")
   >>= fun () ->
   (* Fork and put "from-master+pr" on pr branch *)
   Client.mkdir conn [ "branch" ] "pr" rwxr_xr_x >>*= fun () ->
@@ -410,8 +420,7 @@ let test_merge _repo conn =
       write_file conn [ "branch"; "pr"; "fast-forward" ] merge_a >>*= fun () ->
       with_transaction conn ~branch:"pr" "mod" (fun t ->
           read_file conn (t @ [ "rw"; "file" ]) >>= fun old ->
-          write_file conn (t @ [ "rw"; "file" ]) (old ^ "+pr") >>*= Lwt.return
-      )
+          write_file conn (t @ [ "rw"; "file" ]) (old ^ "+pr") >>*= Lwt.return)
       >>= fun () ->
       head conn "pr" >>= fun merge_b ->
       (* Merge pr into master *)
@@ -422,7 +431,7 @@ let test_merge _repo conn =
           >>= fun () ->
           check_file conn (t @ [ "theirs"; "file" ]) "Theirs" "from-master+pr"
           >>= fun () ->
-          check_file conn (t @ [ "base"; "file" ]) "Base" "from-master" )
+          check_file conn (t @ [ "base"; "file" ]) "Base" "from-master")
       >>= fun () ->
       head conn "master" >>= fun merge_commit ->
       read_file conn [ "snapshots"; merge_commit; "parents" ]
@@ -446,7 +455,7 @@ let test_merge_metadata _repo conn =
       create_file conn (t @ [ "rw" ]) "c" "from-master" ~perm:rwxr_xr_x
       >>= fun () ->
       (* Base: exec, link, exec *)
-      Lwt.return () )
+      Lwt.return ())
   >>= fun () ->
   (* Fork and make some changes on pr branch *)
   Client.mkdir conn [ "branch" ] "pr" rwxr_xr_x >>*= fun () ->
@@ -457,7 +466,7 @@ let test_merge_metadata _repo conn =
       chmod conn (t @ [ "rw"; "b" ]) `Executable >>= fun () ->
       Client.remove conn (t @ [ "rw"; "c" ]) >>*= fun () ->
       create_file conn (t @ [ "rw" ]) "c" ~perm:symlink "foo" >>= fun () ->
-      Lwt.return () )
+      Lwt.return ())
   >>= fun () ->
   head conn "pr" >>= fun merge_b ->
   (* Merge pr into master *)
@@ -479,10 +488,12 @@ let test_merge_metadata _repo conn =
         "Conflict" "** Conflict **\nChanged on both branches\n"
       >>= fun () ->
       write_file conn (t @ [ "rw"; "c" ]) "Resolved" >>*= fun () ->
-      chmod conn (t @ [ "rw"; "c" ]) `Executable >>= fun () -> Lwt.return () )
+      chmod conn (t @ [ "rw"; "c" ]) `Executable >>= fun () ->
+      Lwt.return ())
   >>= fun () ->
   check_perm conn [ "branch"; "master"; "ro"; "c" ] "ro/c" `Executable
-  >>= fun () -> Lwt.return ()
+  >>= fun () ->
+  Lwt.return ()
 
 (* Irmin.Git.Commit: a commit with an empty filesystem... this is not
    supported by Git! *)
@@ -490,13 +501,13 @@ let test_merge_empty _repo conn =
   (* Put "from-master" on master branch *)
   Client.mkdir conn [ "branch" ] "master" rwxr_xr_x >>*= fun () ->
   with_transaction conn ~branch:"master" "init" (fun t ->
-      create_file conn (t @ [ "rw" ]) "file" "from-master" )
+      create_file conn (t @ [ "rw" ]) "file" "from-master")
   >>= fun () ->
   read_file conn [ "branch"; "master"; "head" ] >>= fun head ->
   (* Create a new branch, and merge from this *)
   Client.mkdir conn [ "branch" ] "new" rwxr_xr_x >>*= fun () ->
   with_transaction conn ~branch:"new" "init" (fun t ->
-      write_file conn (t @ [ "merge" ]) head )
+      write_file conn (t @ [ "merge" ]) head)
   >>*= fun () ->
   check_dir conn [ "branch"; "new"; "ro" ] "Final result" [ "file" ]
 
@@ -593,15 +604,16 @@ let test_conflicts _repo conn =
           >>= write_file ~truncate:true conn (t @ [ "rw"; "f" ])
           >>*= fun () ->
           check_file conn (t @ [ "conflicts" ]) "conflicts" "h\n" >>= fun () ->
-          Client.remove conn (t @ [ "rw"; "h" ]) >>*= fun () -> Lwt.return ()
-  )
+          Client.remove conn (t @ [ "rw"; "h" ]) >>*= fun () ->
+          Lwt.return ())
   >>= fun () ->
   check_dir conn
     [ "branch"; "master"; "ro" ]
     "Final merge result" [ "b"; "c"; "f"; "g" ]
   >>= fun () ->
   check_file conn [ "branch"; "master"; "ro"; "f" ] "f" "f-theirs"
-  >>= fun () -> Lwt.return_unit
+  >>= fun () ->
+  Lwt.return_unit
 
 let test_bad_range _repo conn =
   Client.mkdir conn [ "branch" ] "master" rwxr_xr_x >>*= fun () ->
@@ -618,7 +630,7 @@ let test_bad_range _repo conn =
       | Error (`Msg msg) ->
           Alcotest.(check string)
             "Out-of-range" "Offset 100 beyond end-of-file (len = 0)" msg;
-          Lwt.return (Ok ()) )
+          Lwt.return (Ok ()))
   >>*= Lwt.return
 
 let test_qids _repo conn =
@@ -631,7 +643,7 @@ let test_qids _repo conn =
         (fun q -> List.mem Qid.Directory q.Qid.flags)
         resp.Protocol_9p.Response.Walk.wqids
       |> Alcotest.(check (list bool)) "Correct Qid flags" [ true; true; false ];
-      Lwt.return (Ok ()) )
+      Lwt.return (Ok ()))
   >>*= Lwt.return
 
 let info = Irmin.Info.none
@@ -660,6 +672,7 @@ let test_watch repo conn =
   read_line_exn makefile >>= fun makefile_init ->
   Alcotest.(check string)
     "Makefile hash" "F-d81e367f87ee314bcd3e449b1c6641efda5bc269" makefile_init;
+
   (* Modify file under doc *)
   let next_make = makefile () in
   Store.set ~info master (p [ "doc"; "README" ]) (v "Instructions")
@@ -687,7 +700,7 @@ let test_rename_branch repo conn =
       Client.walk_from_root conn newfid [ "branch"; "old" ] >>*= fun _ ->
       Client.LowLevel.update conn ~name:"new" newfid >|= function
       | Error (`Msg x) -> Alcotest.fail x
-      | Ok () -> Ok () )
+      | Ok () -> Ok ())
   >>*= fun () ->
   check_dir conn [ "branch" ] "New branches" [ "new" ] >>= fun () ->
   Client.stat conn [ "branch"; "new" ] >>*= fun info ->
@@ -719,6 +732,7 @@ let test_rename_file _repo conn =
               Alcotest.fail "Shouldn't be able to rename over a directory"
           | Error (`Msg e) -> (
               Alcotest.(check string) "Rename over dir" "Is a directory" e;
+
               (* Rename when source has been deleted. Ideally, we should also
                check it hasn't been replaced by something with the same
                name. *)
@@ -729,7 +743,7 @@ let test_rename_file _repo conn =
               | Error (`Msg e) ->
                   Alcotest.(check string)
                     "Source deleted" "No such file or directory" e;
-                  Lwt.return (Ok ()) ) ) )
+                  Lwt.return (Ok ()) )))
   >>*= fun () ->
   check_dir conn [ "branch"; "master"; "ro" ] "New files" [ "dir" ]
 
@@ -755,7 +769,8 @@ let test_truncate _repo conn =
       Client.LowLevel.update conn ~length:6L newfid >>*= fun () ->
       check "Extend to 6" "Hell\x00\x00" >>= fun () ->
       Client.LowLevel.update conn ~length:0L newfid >>*= fun () ->
-      check "Truncate to 0" "" >>= fun () -> Lwt.return (Ok ()) )
+      check "Truncate to 0" "" >>= fun () ->
+      Lwt.return (Ok ()))
   >>*= Lwt.return
 
 (* FIXME: automaticall run ./scripts/git-dumb-server *)
@@ -772,16 +787,17 @@ let test_remotes _repo conn =
   let remote_head = "ecf6b63a94681222b1be76c0f95159122ce80db1" in
   with_stream conn [ "remotes"; "origin"; "head" ] (fun head ->
       read_line_exn head >|= fun head ->
-      Alcotest.(check string) "remote head 1" remote_head head )
+      Alcotest.(check string) "remote head 1" remote_head head)
   >>= fun () ->
   with_stream conn [ "remotes"; "origin"; "head" ] (fun head ->
       read_line_exn head >|= fun head ->
-      Alcotest.(check string) "remote head 2" remote_head head )
+      Alcotest.(check string) "remote head 2" remote_head head)
   >>= fun () ->
   check_dir conn
     [ "snapshots"; remote_head; "ro" ]
     "Remote entries" [ "foo"; "x" ]
-  >>= fun () -> Lwt.return_unit
+  >>= fun () ->
+  Lwt.return_unit
 
 let test_debug _repo conn =
   let src = Logs.Src.create "test.debug" ~doc:"Debug test log" in
@@ -795,8 +811,9 @@ let test_debug _repo conn =
   let write path value =
     Client.with_fid conn (fun fid ->
         Client.walk_from_root conn fid path >>*= fun _ ->
-        Client.LowLevel.update conn ~length:0L fid )
-    >>*= fun () -> Client.write conn path 0L (Cstruct.of_string value)
+        Client.LowLevel.update conn ~length:0L fid)
+    >>*= fun () ->
+    Client.write conn path 0L (Cstruct.of_string value)
   in
   let test_level = [ "debug"; "src"; "test.debug"; "level" ] in
   read test_level "Initially quiet" ~expect:"quiet\n" >>= fun () ->
@@ -819,7 +836,7 @@ let test_stable_inodes _repo conn =
         [ "branch"; "master"; "transactions"; "stable"; "rw"; "file" ]
       >>*= fun info2 ->
       Alcotest.(check string) "Inode same" (inode info1) (inode info2);
-      Lwt.return (Ok ()) )
+      Lwt.return (Ok ()))
   >>*= Lwt.return
 
 let run f () = run f

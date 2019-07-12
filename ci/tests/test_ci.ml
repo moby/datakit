@@ -42,7 +42,8 @@ module Workflows = struct
   let pass check_build _target = T.of_lwt_slow (check_build "pass")
 
   let fetch_only ~local_repo check_build t =
-    Git.fetch_head local_repo t >>= fun _ -> T.of_lwt_slow (check_build "a")
+    Git.fetch_head local_repo t >>= fun _ ->
+    T.of_lwt_slow (check_build "a")
 end
 
 open Lwt.Infix
@@ -88,7 +89,7 @@ let test_simple conn =
         "CircleCI ready; enqueued pitfall job"
       >>= fun () ->
       (* The PinataCI job completes *)
-      Lwt.return (Ok "Pitfall tests passed!") )
+      Lwt.return (Ok "Pitfall tests passed!"))
   >>= fun () ->
   (* PinataCI updates the status to success *)
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "success"
@@ -130,7 +131,7 @@ let test_branch conn =
       >>= fun () ->
       (* PinataCI adds a pending status *)
       wait_for ~commit:"123" "ci/datakit/test/state" "pending" >>= fun () ->
-      Lwt.return (Ok "Pass") )
+      Lwt.return (Ok "Pass"))
   >>= fun () ->
   (* PinataCI updates the status to success *)
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "success"
@@ -142,7 +143,7 @@ let test_branch conn =
       >>= fun () ->
       (* PinataCI adds a pending status *)
       wait_for ~commit:"456" "ci/datakit/test/state" "pending" >>= fun () ->
-      Lwt.return (Ok "Pass") )
+      Lwt.return (Ok "Pass"))
   >>= fun () ->
   (* PinataCI updates the status to success *)
   wait_for ~commit:"456" "ci/datakit/test/state" ~old:"pending" "success"
@@ -172,7 +173,7 @@ let test_cancel conn =
               Lwt.return
                 (Error
                    (`Failure (Fmt.strf "Switch:%b" (Lwt_switch.is_on switch))))
-          ) )
+          ))
   >>= fun () ->
   (* PinataCI updates the status to cancelled *)
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "failure"
@@ -200,7 +201,8 @@ let test_circle_rebuild conn =
       wait_for ~commit:"123" "ci/datakit/test/description"
         ~old:"Waiting for ci/circleci to complete"
         "CircleCI ready; enqueued pitfall job"
-      >>= fun () -> Lwt.return (Ok "Pitfall tests passed!") )
+      >>= fun () ->
+      Lwt.return (Ok "Pitfall tests passed!"))
   >>= fun () ->
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "success"
   >>= fun () ->
@@ -216,7 +218,8 @@ let test_circle_rebuild conn =
       >>= fun () ->
       (* PinataCI triggers new tests for the new CircleCI build *)
       wait_for ~commit:"123" "ci/datakit/test/state" ~old:"success" "pending"
-      >>= fun () -> Lwt.return (Error (`Failure "Pitfall tests failed!")) )
+      >>= fun () ->
+      Lwt.return (Error (`Failure "Pitfall tests failed!")))
   >>= fun () ->
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "failure"
 
@@ -232,19 +235,20 @@ let test_logs conn =
       Live_log.log a_log "output from a";
       with_handler ~logs "b" (fun ~switch:_ b_log ->
           Live_log.log b_log "output from b";
-          Lwt.return (Ok "b completed") )
+          Lwt.return (Ok "b completed"))
       >>= fun () ->
       Live_log.log a_log "more output from a";
       Test_utils.update_pr hooks ~message:"Init" ~id:1 ~head:"123" ~states:[]
       >>= fun () ->
       wait_for ~commit:"123" "ci/datakit/test/state" "pending" >>= fun () ->
-      Lwt.return (Error (`Failure "a failed")) )
+      Lwt.return (Error (`Failure "a failed")))
   >>= fun () ->
   wait_for ~commit:"123" "ci/datakit/test/state" ~old:"pending" "failure"
   >>= fun () ->
   Test_utils.assert_file hooks
     "user/project/commit/123/status/ci/datakit/test/description" "a failed"
-  >>= fun () -> Lwt.return ()
+  >>= fun () ->
+  Lwt.return ()
 
 module Builder = struct
   type t = { mutable time : int; mutable step : unit Lwt_stream.t option }
@@ -265,8 +269,9 @@ module Builder = struct
     | Some step ->
         Lwt_stream.next step >>= fun () ->
         Live_log.with_pending_reason log "Paused" (fun () ->
-            Lwt_stream.next step )
-        >>= fun () -> Lwt_stream.next step
+            Lwt_stream.next step)
+        >>= fun () ->
+        Lwt_stream.next step
 
   let generate t ~switch ~log trans NoContext key =
     Utils.cancel_when_off switch @@ fun () ->
@@ -275,11 +280,13 @@ module Builder = struct
     t.time <- t.time + 1;
     let data = Cstruct.of_string key in
     DK.Transaction.create_or_replace_file trans (Cache.Path.value / "x") data
-    >>*= fun () -> Lwt.return @@ Ok (int_of_string key)
+    >>*= fun () ->
+    Lwt.return @@ Ok (int_of_string key)
 
   let load _t tr _key =
     DK.Tree.read_file tr (Datakit_client.Path.of_string_exn "value/x")
-    >>*= fun data -> Lwt.return (int_of_string (Cstruct.to_string data))
+    >>*= fun data ->
+    Lwt.return (int_of_string (Cstruct.to_string data))
 
   let branch _t key = Printf.sprintf "cache-of-%s" key
 end
@@ -292,7 +299,8 @@ let rec read_logs dk = function
   | Output.Saved saved -> Private.read_log dk saved >>*= Lwt.return
   | Output.Pair (a, b) ->
       read_logs dk a >>= fun a ->
-      read_logs dk b >>= fun b -> Lwt.return (Printf.sprintf "(%s,%s)" a b)
+      read_logs dk b >>= fun b ->
+      Lwt.return (Printf.sprintf "(%s,%s)" a b)
 
 let rec rebuild_logs = function
   | Output.Empty -> Lwt.return ()
@@ -326,7 +334,8 @@ let test_cache ~regen =
       | { result = Error (`Failure msg); _ } -> Alcotest.fail msg
       | { result = Error (`Pending (msg, ready)); _ } ->
           Log.debug (fun f -> f "Waiting for result to be returned: %s" msg);
-          ready >>= fun () -> aux ()
+          ready >>= fun () ->
+          aux ()
     in
     aux ()
   in
@@ -335,22 +344,26 @@ let test_cache ~regen =
   Alcotest.(check int) "First 1 lookup" 1 value;
   Alcotest.(check string)
     "First 1 lookup log" "=== Get key\nStarting...\nTime=0\nSuccess\n" log;
+
   (* First check of "2" *)
   test_lookup "2" >>= fun (value, log, _) ->
   Alcotest.(check int) "First 2 lookup" 2 value;
   Alcotest.(check string)
     "First 2 lookup log" "=== Get key\nStarting...\nTime=1\nSuccess\n" log;
+
   (* Second check of "1" *)
   test_lookup "1" >>= fun (value, log, out) ->
   Alcotest.(check int) "Second 1 lookup" 1 value;
   Alcotest.(check string)
     "Second 1 lookup log" "=== Get key\nStarting...\nTime=0\nSuccess\n" log;
+
   (* Rebuild "1" *)
   rebuild_logs out >>= fun () ->
   test_lookup "1" >>= fun (value, log, out) ->
   Alcotest.(check int) "Rebuild 1 lookup" 1 value;
   Alcotest.(check string)
     "Rebuild 1 lookup log" "=== Get key\nStarting...\nTime=2\nSuccess\n" log;
+
   (* Parallel rebuilds *)
   if not regen then (
     let stream, push = Lwt_stream.create () in
@@ -412,18 +425,19 @@ let with_git_remote fn =
           let remote_dir = tmpdir / "my-repo" in
           run [ "git"; "init"; remote_dir ] >>= fun () ->
           Sys.chdir remote_dir;
+
           (* Add a test file *)
           Lwt_io.with_file ~mode:Lwt_io.output "src" (fun ch ->
-              Lwt_io.write ch "Test" )
+              Lwt_io.write ch "Test")
           >>= fun () ->
           run [ "git"; "add"; "src" ] >>= fun () ->
           run [ "git"; "commit"; "-m"; "Initial commit" ] >>= fun () ->
           (* Clone a "local" copy *)
           let local_clone = tmpdir / "clone" in
-          fn ~remote_dir ~local_clone ) )
+          fn ~remote_dir ~local_clone))
     (fun () ->
       Sys.chdir old_cwd;
-      Lwt.return () )
+      Lwt.return ())
 
 let test_git_dir conn ~clone =
   let logs = Private.create_logs () in
@@ -445,7 +459,7 @@ let test_git_dir conn ~clone =
       Test_utils.update_pr hooks ~message:"Init" ~id:1 ~head:hash ~states:[]
       >>= fun () ->
       wait_for ~commit:hash "ci/datakit/test/state" "pending" >>= fun () ->
-      Lwt.return (Ok "Success!") )
+      Lwt.return (Ok "Success!"))
   >>= fun () ->
   wait_for ~commit:hash "ci/datakit/test/state" ~old:"pending" "success"
   >>= fun () ->
@@ -483,10 +497,11 @@ let test_git_tag conn =
         ~states:[]
       >>= fun () ->
       wait_for ~commit:hash "ci/datakit/test/state" "pending" >>= fun () ->
-      Lwt.return (Ok "Success") )
+      Lwt.return (Ok "Success"))
   >>= fun () ->
   wait_for ~old:"pending" ~commit:hash "ci/datakit/test/state" "success"
-  >>= fun () -> Lwt.return ()
+  >>= fun () ->
+  Lwt.return ()
 
 let test_cross_project conn =
   Test_utils.with_ci conn Workflows.test_cross_project
@@ -539,7 +554,7 @@ let with_test_auth fn =
       CI_web_utils.Auth.create ~github ~github_scopes_needed:[]
         ~web_ui:(Uri.of_string "https://localhost")
         path
-      >>= fn )
+      >>= fn)
 
 let test_auth () =
   Lwt_main.run
@@ -547,19 +562,19 @@ let test_auth () =
       match CI_web_utils.Auth.lookup auth ~user:"foo" ~password:"bar" with
       | Some _ -> Alcotest.fail "Invalid user!"
       | None -> (
-        match
-          CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred!"
-        with
-        | Some _ -> Alcotest.fail "Invalid password!"
-        | None -> (
           match
-            CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred"
+            CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred!"
           with
-          | None -> Alcotest.fail "Valid user!"
-          | Some u ->
-              Alcotest.(check string)
-                "Got user" "admin" (CI_web_utils.User.name u);
-              Lwt.return () ) ) )
+          | Some _ -> Alcotest.fail "Invalid password!"
+          | None -> (
+              match
+                CI_web_utils.Auth.lookup auth ~user:"admin" ~password:"fred"
+              with
+              | None -> Alcotest.fail "Valid user!"
+              | Some u ->
+                  Alcotest.(check string)
+                    "Got user" "admin" (CI_web_utils.User.name u);
+                  Lwt.return () ) ) )
 
 let status_code =
   Alcotest.of_pp (Fmt.of_to_string Cohttp.Code.string_of_status)
@@ -669,8 +684,8 @@ let test_live_logs conn =
   CI_utils.DK.Branch.with_transaction dk_branch (fun trans ->
       let data = Cstruct.of_string (CI_live_log.contents log) in
       CI_utils.DK.Transaction.create_file trans CI_cache.Path.log data
-      >>*= fun () -> CI_utils.DK.Transaction.commit trans ~message:"Log saved"
-  )
+      >>*= fun () ->
+      CI_utils.DK.Transaction.commit trans ~message:"Log saved")
   >>*= fun () ->
   let request = Cohttp.Request.make (Uri.make ~path ()) in
   CI_web_utils.Wm.dispatch' routes ~request ~body:`Empty >>= function
@@ -704,7 +719,8 @@ let empty_commit () =
   let open Test_utils in
   Store.Repo.v config >>= fun repo ->
   Store.Commit.v repo ~info:Irmin.Info.empty ~parents:[] Store.Tree.empty
-  >|= fun c -> Fmt.to_to_string Store.Commit.pp c
+  >|= fun c ->
+  Fmt.to_to_string Store.Commit.pp c
 
 let test_history conn =
   let module DK = CI_utils.DK in
@@ -715,8 +731,7 @@ let test_history conn =
   in
   let logs = CI_live_log.create_manager () in
   let state_t =
-    (module CI_history.State
-    : Alcotest.TESTABLE
+    (module CI_history.State : Alcotest.TESTABLE
       with type t = CI_history.State.t )
   in
   let jobs_t = (module Jobs : Alcotest.TESTABLE with type t = Jobs.t) in
@@ -739,16 +754,18 @@ let test_history conn =
   CI_history.builds_of_commit dk head >|= CI_target.Map.bindings
   >>= fun builds ->
   Alcotest.(check (list (pair target_t commit_t))) "Empty index" [] builds;
+
   (* Record s1 *)
   let live =
     CI_live_log.create ~pending:"Pending" ~branch:"log-123" ~title:"Build" logs
   in
   let saved =
-    { CI_output.title = "Build";
+    {
+      CI_output.title = "Build";
       commit = "567";
       branch = "build-of-123";
       failed = false;
-      rebuild = `Rebuildable (lazy Lwt.return_unit)
+      rebuild = `Rebuildable (lazy Lwt.return_unit);
     }
   in
   let s1 =
@@ -771,6 +788,7 @@ let test_history conn =
   |> Test_utils.or_fail "No head state!"
   |> CI_history.State.parents
   |> Alcotest.(check (list string)) "No changes" [];
+
   (* Record s2 *)
   let s2 =
     String.Map.of_list
@@ -791,6 +809,7 @@ let test_history conn =
           (Fmt.strf "Expected one parent, not %a" (Fmt.Dump.list Fmt.string) x)
   in
   Alcotest.check jobs_t "Updated commit" s2 (CI_history.State.jobs head2);
+
   (* Check saved s1 *)
   DK.commit dk head1 >>*= fun tree ->
   CI_history.load tree >>= fun loaded1 ->
@@ -801,6 +820,7 @@ let test_history conn =
     s1 |> String.Map.add "three" (Error (`Pending "Testing"), CI_output.Empty)
   in
   Alcotest.check jobs_t "Loaded" s1_expected (CI_history.State.jobs loaded1);
+
   (* Check index *)
   CI_history.builds_of_commit dk head >|= CI_target.Map.bindings
   >>= fun builds ->

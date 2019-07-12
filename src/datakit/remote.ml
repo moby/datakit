@@ -15,7 +15,7 @@ module Make (Store : Store.S) = struct
 
   type t = {
     remote_url : unit -> string option;
-    update_head : Store.commit option -> unit
+    update_head : Store.commit option -> unit;
   }
 
   let mk_head session =

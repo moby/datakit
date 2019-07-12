@@ -35,11 +35,12 @@ let main () =
       DK.Branch.with_transaction test_branch (fun t ->
           let contents = Cstruct.of_string "This is a test" in
           DK.Transaction.create_file t (p "README") contents >>*= fun () ->
-          DK.Transaction.commit t ~message:"My first commit" )
+          DK.Transaction.commit t ~message:"My first commit")
       >>*= fun () ->
       (* See what branches we've got *)
       DK.branches dk >>*= fun branches ->
       Fmt.pr "Branches: %a@." Fmt.(Dump.list string) branches;
+
       (* Look at the head commit *)
       DK.Branch.head test_branch >>*= function
       | None -> failwith "Branch no longer exists!"

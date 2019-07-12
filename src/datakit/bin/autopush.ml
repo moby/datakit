@@ -22,7 +22,7 @@ type t = {
   (* Remote repository *)
   mutable dirty : String.Set.t;
   (* Branches to be pushed *)
-  cond : unit Lwt_condition.t
+  cond : unit Lwt_condition.t;
       (* Fires whenever something is added to [dirty]. *)
 }
 
@@ -55,12 +55,12 @@ let daemon_thread t =
             let t0 = Unix.gettimeofday () in
             exec ~name ("", Array.of_list cmd) >|= fun () ->
             let t1 = Unix.gettimeofday () in
-            Prometheus.Summary.observe Metrics.push_duration_seconds (t1 -. t0)
-            )
+            Prometheus.Summary.observe Metrics.push_duration_seconds (t1 -. t0))
           (fun ex ->
             Log.err (fun l -> l "git push failed: %a" Fmt.exn ex);
+
             (* Should we re-queue [dirty] here? *)
-            Lwt.return () )
+            Lwt.return ())
         >>= loop
   in
   loop ()

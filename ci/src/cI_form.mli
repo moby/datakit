@@ -1,8 +1,8 @@
 type 'a or_error = ('a, string) result
 
 module State : sig
-  (** The state of a form upload from the user. *)
   type t
+  (** The state of a form upload from the user. *)
 
   type field = { data : string option; error : string option }
 
@@ -70,8 +70,8 @@ module Html : sig
 end
 
 module Validator : sig
-  (** An ['a t] is a validator that parses a form and, on success, returns an ['a]. *)
   type 'a t
+  (** An ['a t] is a validator that parses a form and, on success, returns an ['a]. *)
 
   type 'a reader = string -> 'a or_error
 

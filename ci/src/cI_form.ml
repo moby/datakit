@@ -26,7 +26,7 @@ module State = struct
       List.fold_left
         (fun acc (key, data) ->
           let field = { data = Some data; error = None } in
-          Multipart.StringMap.add key field acc )
+          Multipart.StringMap.add key field acc)
         Multipart.StringMap.empty vs
     in
     ref map
@@ -96,7 +96,7 @@ module Html = struct
              in
              div
                ~a:[ a_class [ "alert"; "alert-danger" ] ]
-               [ txt (Fmt.strf "%s: %s" name err) ] )
+               [ txt (Fmt.strf "%s: %s" name err) ])
     in
     form
       ~a:
@@ -152,9 +152,9 @@ module Validator = struct
   let ( <*> ) a b parts acc =
     match a parts acc with
     | Ok a -> (
-      match b parts acc with Ok b -> Ok (a, b) | Error _ as e -> e )
+        match b parts acc with Ok b -> Ok (a, b) | Error _ as e -> e )
     | Error acc -> (
-      match b parts acc with Ok _ -> Error acc | Error _ as e -> e )
+        match b parts acc with Ok _ -> Error acc | Error _ as e -> e )
 
   let run (x : 'a t) parts : ('a, State.t) result =
     match x parts Multipart.StringMap.empty with

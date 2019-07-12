@@ -49,7 +49,7 @@ module Make (Store : Store.S) (RW : RW) = struct
             | Some _, Some _ -> Some `Conflict
             | Some `Contents, None | None, Some `Contents -> Some `Contents
             | Some `Node, None | None, Some `Node -> Some `Node
-            | None, None -> assert false )
+            | None, None -> assert false)
           our_files their_files
       in
       String.Map.bindings types
@@ -67,14 +67,15 @@ module Make (Store : Store.S) (RW : RW) = struct
                  Dir.find_all ours step >>= fun ours ->
                  Dir.find_all theirs step >>= fun theirs ->
                  let old () =
-                   Dir.find_all base step >|= fun f -> Ok (Some f)
+                   Dir.find_all base step >|= fun f ->
+                   Ok (Some f)
                  in
                  Irmin.Merge.f merge_file ~old ours theirs >>= function
                  | Ok (Some x) -> RW.update_force result path leaf x
                  | Ok None -> RW.remove_force result path leaf
                  | Error (`Conflict "default") ->
                      note_conflict path leaf "Changed on both branches"
-                 | Error (`Conflict x) -> note_conflict path leaf x ) )
+                 | Error (`Conflict x) -> note_conflict path leaf x ))
     in
     Store.tree ours >>= fun ours ->
     Store.tree theirs >>= fun theirs ->

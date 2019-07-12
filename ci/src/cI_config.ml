@@ -5,7 +5,7 @@ type test = string CI_term.t
 
 type project = {
   dashboards : CI_target.Set.t;
-  tests : CI_target.t -> test String.Map.t
+  tests : CI_target.t -> test String.Map.t;
 }
 
 type t = { web_config : CI_web_templates.t; projects : project Repo.Map.t }

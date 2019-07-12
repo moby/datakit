@@ -31,7 +31,7 @@ module Make (API : API) (DK : Datakit_client.S) = struct
   type state = {
     bridge : Snapshot.t;
     (* in-memory representation of the bridge state. *)
-    datakit : Conv.t (* datakit state. *)
+    datakit : Conv.t; (* datakit state. *)
   }
 
   let pp_state ppf t =
@@ -61,7 +61,8 @@ module Make (API : API) (DK : Datakit_client.S) = struct
         if retry <> 0 then safe_commit ~retry:(retry - 1) tr ~message
         else (
           Log.info (fun l -> l "Abort: %a" DK.pp_error e);
-          DK.Transaction.abort tr >|= fun _ -> false )
+          DK.Transaction.abort tr >|= fun _ ->
+          false )
 
   (* Create and init [br] if it doesn't exist. *)
   let init_sync br =
@@ -77,7 +78,7 @@ module Make (API : API) (DK : Datakit_client.S) = struct
               | Ok () -> DK.Transaction.commit tr ~message:"Initial commit"
               | Error e ->
                   DK.Transaction.abort tr >>*= fun () ->
-                  Lwt.fail_with @@ Fmt.strf "init_sync: %a" DK.pp_error e )
+                  Lwt.fail_with @@ Fmt.strf "init_sync: %a" DK.pp_error e)
     in
     init >>= function
     | Ok () -> Lwt.return_unit
@@ -87,7 +88,7 @@ module Make (API : API) (DK : Datakit_client.S) = struct
 
   type webhook = {
     watch : Repo.t -> unit Lwt.t;
-    events : unit -> Event.t list Lwt.t
+    events : unit -> Event.t list Lwt.t;
   }
 
   let ( >|*= ) x f =
@@ -99,7 +100,8 @@ module Make (API : API) (DK : Datakit_client.S) = struct
     let diff = Snapshot.diff t.bridge (Conv.snapshot t.datakit) in
     let dirty = Conv.dirty t.datakit in
     if Diff.is_empty diff && Elt.IdSet.is_empty dirty then
-      safe_abort tr >|*= fun () -> true
+      safe_abort tr >|*= fun () ->
+      true
     else if not (Elt.IdSet.is_empty dirty) then
       let message = "Cleaning up .dirty files" in
       safe_commit tr ~message
@@ -107,7 +109,9 @@ module Make (API : API) (DK : Datakit_client.S) = struct
       let message = Diff.commit_message diff in
       Conv.apply ~debug:"commit" diff tr >>= fun updated ->
       if updated then safe_commit tr ~message
-      else safe_abort tr >|*= fun () -> true
+      else
+        safe_abort tr >|*= fun () ->
+        true
 
   let process_webhooks ~token ~webhook t repos =
     match webhook with
@@ -135,7 +139,7 @@ module Make (API : API) (DK : Datakit_client.S) = struct
     let full_diff = Snapshot.diff datakit t.bridge in
     let diff = Capabilities.filter_diff caps op full_diff in
     Log.debug (fun l ->
-        l "call_github_api: %a %a" Diff.pp full_diff Diff.pp diff );
+        l "call_github_api: %a %a" Diff.pp full_diff Diff.pp diff);
     State.apply token diff >|= fun () ->
     let bridge = Diff.apply diff t.bridge in
     { t with bridge }
@@ -159,7 +163,8 @@ module Make (API : API) (DK : Datakit_client.S) = struct
     (* FIXME: we should be able to configure if we want to
        prune or not. *)
     let t = { t with bridge = Snapshot.prune t.bridge } in
-    Conv.clean tr dirty >>= fun () -> update_datakit t tr
+    Conv.clean tr dirty >>= fun () ->
+    update_datakit t tr
 
   (* On startup, build the initial state by looking at the active
      repository in datakit. Import the new repositories and call the
@@ -168,14 +173,17 @@ module Make (API : API) (DK : Datakit_client.S) = struct
     create ~debug:"first-sync" ?old:None br >>= fun (tr, t) ->
     Log.debug (fun l -> l "[first_sync]@ %a" pp_state t);
     let repos = Snapshot.repos (Conv.snapshot t.datakit) in
-    if Repo.Set.is_empty repos then safe_abort tr >|= fun _ -> t
+    if Repo.Set.is_empty repos then
+      safe_abort tr >|= fun _ ->
+      t
     else sync ~token ~webhook ~first_sync:true ~resync t repos tr
 
   (* The main synchonisation function: it is called on every change in
      the datakit branch and when new webhook events are received. *)
   let sync_once ~token ~webhook ~resync old br =
     create ~debug:"sync-once" ~old br >>= fun (tr, t) ->
-    Log.debug (fun l -> l "[sync_once]@;old:%a@;new:%a" pp_state old pp_state t);
+    Log.debug (fun l ->
+        l "[sync_once]@;old:%a@;new:%a" pp_state old pp_state t);
     let repos =
       Repo.Set.diff
         (Snapshot.repos @@ Conv.snapshot t.datakit)
@@ -213,7 +221,9 @@ module Make (API : API) (DK : Datakit_client.S) = struct
       | State t -> sync_once ~token ~webhook t br
     in
     match policy with
-    | `Once -> sync_once ~resync:false t >|= fun t -> State t
+    | `Once ->
+        sync_once ~resync:false t >|= fun t ->
+        State t
     | `Repeat ->
         let t = ref t in
         let updates = ref `None in
@@ -251,17 +261,18 @@ module Make (API : API) (DK : Datakit_client.S) = struct
             Log.info (fun l -> l "Processing new entry -- %a" pp !t);
             Lwt.catch
               (fun () ->
-                sync_once ~resync:(u = `Timer) !t >|= fun s -> t := State s )
+                sync_once ~resync:(u = `Timer) !t >|= fun s ->
+                t := State s)
               (fun e ->
                 Log.err (fun l -> l "error: %s" (Printexc.to_string e));
-                Lwt.return_unit )
+                Lwt.return_unit)
             >>= react
         in
         let webhook () =
           run_webhook (fun () ->
               Log.debug (fun l -> l "webhook event received!");
               updates := `Webhook;
-              Lwt_condition.signal cond () )
+              Lwt_condition.signal cond ())
         in
         let watch br =
           let notify _ =

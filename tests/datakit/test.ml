@@ -64,7 +64,8 @@ let test_writes () =
       check "hi" 0 "hillo" >>= fun () ->
       check "E" 1 "hEllo" >>= fun () ->
       check "!" 5 "hEllo!" >>= fun () ->
-      check "!" 7 "hEllo!\x00!" >>= fun () -> Lwt.return_unit )
+      check "!" 7 "hEllo!\x00!" >>= fun () ->
+      Lwt.return_unit )
 
 let test_rw () =
   let v x = (Datakit.Blob.string x, `Normal) in
@@ -103,7 +104,8 @@ let test_rw () =
       Store.Tree.list root Store.Key.empty
       >|= List.map fst
       >|= Alcotest.(check (slist string String.compare)) "ls /" [ "foo"; "sub" ]
-      >>= fun () -> Lwt.return () )
+      >>= fun () ->
+      Lwt.return () )
 
 let test_blobs_fast_path () =
   let correct = ref (Cstruct.create 0) in
@@ -115,7 +117,8 @@ let test_blobs_fast_path () =
     done;
     correct := Cstruct.append !correct data;
     Datakit.Blob.write !blob ~offset:(Datakit.Blob.len !blob) data
-    >>!= fun b -> blob := b
+    >>!= fun b ->
+    blob := b
   done;
   let correct = Cstruct.to_string !correct in
   let actual = Datakit.Blob.to_string !blob in
@@ -128,12 +131,17 @@ let test_blobs_random () =
     Datakit.Blob.read b ~offset ~count >>!= Cstruct.to_string
   in
   let write_ok b ~offset data =
-    Datakit.Blob.write b ~offset (Cstruct.of_string data) >>!= fun x -> x
+    Datakit.Blob.write b ~offset (Cstruct.of_string data) >>!= fun x ->
+    x
   in
-  let truncate_ok b len = Datakit.Blob.truncate b len >>!= fun x -> x in
+  let truncate_ok b len =
+    Datakit.Blob.truncate b len >>!= fun x ->
+    x
+  in
   (* Empty *)
   let b = Datakit.Blob.empty in
   Alcotest.check int64 "Empty" 0L (Datakit.Blob.len b);
+
   (* Negative offset write *)
   let bad_write =
     Datakit.Blob.write b ~offset:(-2L) (Cstruct.of_string "bad")
@@ -141,6 +149,7 @@ let test_blobs_random () =
   Alcotest.check (vfs_result reject) "Negative offset"
     (Vfs.Error.negative_offset (-2L))
     bad_write;
+
   (* Write *)
   let b = write_ok b ~offset:2L "1st" in
   Alcotest.check int64 "1st write" 5L (Datakit.Blob.len b);
@@ -153,6 +162,7 @@ let test_blobs_random () =
   Alcotest.(check string)
     "Overwrite extend" "AB1sEF"
     (str (write_ok b ~offset:4L "EF"));
+
   (* Truncate *)
   Alcotest.(check string)
     "Truncate extend" "AB1st\x00"
@@ -163,6 +173,7 @@ let test_blobs_random () =
   Alcotest.check (vfs_result reject) "Truncate negative"
     (Vfs.Error.negative_offset (-1L))
     (Datakit.Blob.truncate b (-1L));
+
   (* Read *)
   Alcotest.(check string) "Read neg" "" (read_ok b ~offset:2L ~count:(-3));
   Alcotest.(check string) "Read zero" "" (read_ok b ~offset:2L ~count:0);
@@ -206,7 +217,8 @@ let test_streams () =
      read "3" >>= fun () ->
      let th = read "4" in
      Vfs.File.Stream.publish session 4;
-     th >>= fun () -> Lwt.return ())
+     th >>= fun () ->
+     Lwt.return ())
 
 let test_set =
   [ ("Writes", `Quick, test_writes);

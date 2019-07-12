@@ -2,14 +2,14 @@ open Datakit_github
 open Astring
 open CI_utils
 
-(** A DataKit CI instance. *)
 type t
+(** A DataKit CI instance. *)
 
-(** The state of an open PR or branch. *)
 type target
+(** The state of an open PR or branch. *)
 
-(** A job keeps up-to-date one state within an open PR. *)
 type job
+(** A job keeps up-to-date one state within an open PR. *)
 
 val create :
   web_ui:Uri.t ->

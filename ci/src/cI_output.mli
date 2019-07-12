@@ -4,7 +4,7 @@ type saved = {
   branch : string;
   failed : bool;
   mutable rebuild :
-    [ `Rebuildable of unit Lwt.t Lazy.t | `Rebuilding | `Archived ]
+    [ `Rebuildable of unit Lwt.t Lazy.t | `Rebuilding | `Archived ];
 }
 
 type logs =

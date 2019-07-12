@@ -24,10 +24,15 @@ module Infix = struct
     | Ok x -> f x
     | Error e -> Lwt.fail (Failure (Fmt.to_to_string DK.pp_error e))
 
-  let ( >|*= ) x f = x >>*= fun x -> Lwt.return (f x)
+  let ( >|*= ) x f =
+    x >>*= fun x ->
+    Lwt.return (f x)
 end
 
-let return_error fmt = fmt |> Fmt.kstrf @@ fun msg -> Lwt.return (Error msg)
+let return_error fmt =
+  fmt
+  |> Fmt.kstrf @@ fun msg ->
+     Lwt.return (Error msg)
 
 let failf fmt = Fmt.kstrf failwith fmt
 
@@ -49,24 +54,25 @@ let with_child_switch ?switch fn =
   | Some parent ->
       with_switch (fun child ->
           Lwt_switch.add_hook_or_exec (Some parent) (fun () ->
-              Lwt_switch.turn_off child )
-          >>= fun () -> fn child )
+              Lwt_switch.turn_off child)
+          >>= fun () ->
+          fn child)
 
 let with_timeout ?switch duration fn =
   with_child_switch ?switch @@ fun switch ->
   let timeout = Lwt_unix.sleep duration in
   Lwt_switch.add_hook (Some switch) (fun () ->
       Lwt.cancel timeout;
-      Lwt.return () );
+      Lwt.return ());
   Lwt.on_success timeout (fun () ->
       Log.info (fun f -> f "Timeout (of %a) expired" pp_duration duration);
-      Lwt.async (fun () -> Lwt_switch.turn_off switch) );
+      Lwt.async (fun () -> Lwt_switch.turn_off switch));
   Lwt.catch
     (fun () -> fn switch)
     (fun ex ->
       match Lwt.state timeout with
       | Lwt.Return () -> failf "Exceeded timeout of %a" pp_duration duration
-      | _ -> Lwt.fail ex )
+      | _ -> Lwt.fail ex)
 
 let default d = function None -> d | Some x -> x
 
@@ -91,13 +97,13 @@ let make_tmp_dir ?(prefix = "tmp-") ?(mode = 0o700) parent =
   let rec mktmp = function
     | 0 -> failf "Failed to generate temporary directroy name!"
     | n -> (
-      try
-        let tmppath =
-          Printf.sprintf "%s/%s%x" parent prefix (Random.int 0x3fffffff)
-        in
-        Unix.mkdir tmppath mode;
-        tmppath
-      with Unix.Unix_error (Unix.EEXIST, _, _) -> mktmp (n - 1) )
+        try
+          let tmppath =
+            Printf.sprintf "%s/%s%x" parent prefix (Random.int 0x3fffffff)
+          in
+          Unix.mkdir tmppath mode;
+          tmppath
+        with Unix.Unix_error (Unix.EEXIST, _, _) -> mktmp (n - 1) )
   in
   mktmp 10
 
@@ -123,7 +129,7 @@ let with_tmpdir ?prefix ?mode fn =
     (fun () -> fn tmpdir)
     (fun () ->
       rm_f_tree tmpdir;
-      Lwt.return () )
+      Lwt.return ())
 
 let ls path =
   let rec read_files acc fd =
@@ -139,7 +145,8 @@ let cancel_when_off switch fn =
   let th = fn () in
   Lwt_switch.add_hook_or_exec (Some switch) (fun () ->
       Lwt.cancel th;
-      Lwt.return () )
-  >>= fun () -> th
+      Lwt.return ())
+  >>= fun () ->
+  th
 
 let opt_get f = function None -> f () | Some x -> x

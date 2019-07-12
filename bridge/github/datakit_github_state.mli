@@ -4,8 +4,8 @@ open Datakit_github
 module Make (API : API) : sig
   (** {1 Token} *)
 
-  (** The type for state token. *)
   type token
+  (** The type for state token. *)
 
   val token : API.token -> Capabilities.t -> token
   (** [token t c] is the token using the GitHub API token [t] limited

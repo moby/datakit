@@ -40,8 +40,9 @@ let open_in ?cwd ?env ?stdin ?stderr cmd =
            See: http://stackoverflow.com/questions/30862802/how-to-correctly-start-a-process-from-a-specific-directory-with-lwt
            and  https://github.com/ocsigen/lwt/issues/163 *)
           Sys.chdir "/";
+
           (* Just to detect problems with this scheme early *)
-          Lwt.return child )
+          Lwt.return child)
 
 (* Copy to [dst] until end-of-file or [switch] is turned off. *)
 let copy ?switch ~dst stream =
@@ -52,6 +53,7 @@ let copy ?switch ~dst stream =
     | data ->
         dst data;
         Child.debug (fun f -> f "%S" data);
+
         (* Hack because child#terminate may not kill sub-children.
          Hopefully closing [stream] will encourage them to exit. *)
         Lwt_switch.check switch;
@@ -90,7 +92,7 @@ let run_with_exit_status ?switch ?log ?cwd ?env ?stdin ~output ?stderr ?log_cmd
                     info "Switch was turned off, so killing process %a" pp_cmd
                       log_cmd;
                     child#terminate );
-                  Lwt.return () )
+                  Lwt.return ())
               >>= fun () ->
               let copy_stdout = copy ?switch ~dst:output child#stdout in
               match stderr_r with
@@ -98,22 +100,23 @@ let run_with_exit_status ?switch ?log ?cwd ?env ?stdin ~output ?stderr ?log_cmd
               | Some (dst, stderr_r) ->
                   let copy_stderr = copy ?switch ~dst stderr_r in
                   (* Wait for both streams to finish *)
-                  copy_stdout >>= fun `Eof -> copy_stderr )
+                  copy_stdout >>= fun `Eof ->
+                  copy_stderr)
             (fun `Eof ->
               child#close >|= fun stat ->
               is_running := false;
-              stat )
+              stat)
             (fun ex ->
               child#close >>= fun _stat ->
               is_running := false;
-              Lwt.fail ex ) )
+              Lwt.fail ex))
         (fun ex ->
           info "Error %s from %a" (Printexc.to_string ex) pp_cmd log_cmd;
-          Lwt.fail ex ) )
+          Lwt.fail ex))
     (fun () ->
       match stderr_r with
       | None -> Lwt.return ()
-      | Some (_, c) -> Lwt_io.close c )
+      | Some (_, c) -> Lwt_io.close c)
 
 let run ?switch ?log ?cwd ?env ?stdin ~output ?stderr ?log_cmd cmd =
   run_with_exit_status ?switch ?log ?cwd ?env ?stdin ~output ?stderr ?log_cmd

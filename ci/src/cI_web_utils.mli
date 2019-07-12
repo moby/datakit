@@ -1,12 +1,12 @@
 module Wm : Webmachine.S with type 'a io = 'a Lwt.t
 
+type role = [ `Reader | `LoggedIn | `Builder | `Admin ]
 (** Roles are:
     - [Reader] permitted to look at the CI state, build logs, etc
     - [LoggedIn] must be logged in (not anonymous)
     - [Builder] permitted to control the builds (cancel, rebuild)
     - [Admin] is an administrator
 *)
-type role = [ `Reader | `LoggedIn | `Builder | `Admin ]
 
 module User : sig
   type t
@@ -63,15 +63,15 @@ class type resource =
       ((string * Cohttp_lwt.Body.t Wm.provider) list, Cohttp_lwt.Body.t) Wm.op
   end
 
-(** [new static ~valid ~mime_type dir] serves up files from the directory [dir], taking the leafname from the context.
-    Names must match the RE [valid] and the MIME type returned will be [mime_type uri]. *)
 class static :
   valid:Str.regexp -> mime_type:(Uri.t -> string option) -> string -> resource
+(** [new static ~valid ~mime_type dir] serves up files from the directory [dir], taking the leafname from the context.
+    Names must match the RE [valid] and the MIME type returned will be [mime_type uri]. *)
 
-(** [new static_crunch ~mime_type read] serves up files using the function [read], taking the path from the context.
-    The MIME type returned will be [mime_type uri]. *)
 class static_crunch :
   mime_type:(Uri.t -> string option) -> (string -> string option) -> resource
+(** [new static_crunch ~mime_type read] serves up files using the function [read], taking the path from the context.
+    The MIME type returned will be [mime_type uri]. *)
 
 (** [resource_with_session] ensures there is a session for each request. *)
 class virtual resource_with_session :
@@ -83,17 +83,17 @@ class virtual resource_with_session :
          Cohttp_lwt.Body.t Webmachine.Rd.t -> Session_data.t Lwt.t
      end
 
-(** Page to serve at [/auth/login]. *)
 class login_page : server -> resource
+(** Page to serve at [/auth/login]. *)
 
-(** Page to serve at [/auth/intro/:token]. *)
 class auth_intro : server -> resource
+(** Page to serve at [/auth/intro/:token]. *)
 
-(** Page to serve at [/auth/setup]. *)
 class auth_setup : server -> resource
+(** Page to serve at [/auth/setup]. *)
 
-(** Page to serve at [/auth/github-callback] *)
 class github_callback : server -> resource
+(** Page to serve at [/auth/github-callback] *)
 
 (** The [is_authorized] method checks that the session has an associated user and asks the
     user to log in if not.
@@ -128,8 +128,8 @@ class virtual post_page :
          Wm.op
      end
 
-(** Posting to this page logs the user out and redirects to [/]. *)
 class logout_page : server -> resource
+(** Posting to this page logs the user out and redirects to [/]. *)
 
 val serve :
   mode:Conduit_lwt_unix.server ->
@@ -191,5 +191,5 @@ class virtual ['a] form_page :
          Wm.op
      end
 
-(** The GitHub authentication settings page. *)
 class github_auth_settings : server -> resource
+(** The GitHub authentication settings page. *)

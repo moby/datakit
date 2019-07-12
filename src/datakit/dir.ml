@@ -17,7 +17,7 @@ module Make (Store : Store.S) = struct
   type t = {
     repo : Store.Repo.t;
     mutable root : Store.tree;
-    mutex : Lwt_mutex.t
+    mutex : Lwt_mutex.t;
   }
 
   let v repo root = { repo; root; mutex = Lwt_mutex.create () }
@@ -37,9 +37,12 @@ module Make (Store : Store.S) = struct
           (Store.Tree.find_tree base step >>= function
            | None -> aux empty ps
            | Some (`Node subdir) -> aux (Store.Tree.of_node subdir) ps
-           | Some (`Contents f) -> file_on_path f >>*= fun () -> aux empty ps)
+           | Some (`Contents f) ->
+               file_on_path f >>*= fun () ->
+               aux empty ps)
           >>*= fun new_subdir ->
-          Store.Tree.add_tree base step new_subdir >|= fun x -> Ok x
+          Store.Tree.add_tree base step new_subdir >|= fun x ->
+          Ok x
     in
     aux t.root path >>*= fun new_root ->
     t.root <- new_root;
@@ -76,24 +79,27 @@ module Make (Store : Store.S) = struct
           | (`Normal | `Exec) as perm -> `Contents (f, perm)
           | `Link target -> `Contents (Blob.string target, `Link)
         in
-        Store.Tree.add_tree dir step file >|= fun new_dir -> Ok new_dir
+        Store.Tree.add_tree dir step file >|= fun new_dir ->
+        Ok new_dir
 
   let remove t path leaf =
     let step = Store.Key.v [ leaf ] in
     update_dir ~file_on_path:err_not_a_directory t path @@ fun dir ->
-    Store.Tree.remove dir step >|= fun new_dir -> Ok new_dir
+    Store.Tree.remove dir step >|= fun new_dir ->
+    Ok new_dir
 
   let update_force t path leaf (value, perm) =
     let step = Store.Key.v [ leaf ] in
     update_dir ~file_on_path:replace_with_dir t path (fun dir ->
         Store.Tree.add dir step ~metadata:perm value >|= fun new_dir ->
-        Ok new_dir )
+        Ok new_dir)
     >|= doesnt_fail
 
   let remove_force t path leaf =
     let step = Store.Key.v [ leaf ] in
     update_dir ~file_on_path:replace_with_dir t path (fun dir ->
-        Store.Tree.remove dir step >|= fun new_dir -> Ok new_dir )
+        Store.Tree.remove dir step >|= fun new_dir ->
+        Ok new_dir)
     >|= doesnt_fail
 
   let rename t path ~old_name ~new_name =
@@ -108,5 +114,5 @@ module Make (Store : Store.S) = struct
             | None | Some (`Contents _) ->
                 Store.Tree.remove dir old_step >>= fun dir' ->
                 Store.Tree.add_tree dir' new_step value >|= fun new_dir ->
-                Ok new_dir ) )
+                Ok new_dir ))
 end

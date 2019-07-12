@@ -115,7 +115,7 @@ module Hashed_password = struct
     salt : Cstruct_sexp.t;
     hashed_password : Cstruct_sexp.t;
     count : int;
-    dk_len : int32
+    dk_len : int32;
   }
   [@@deriving sexp]
 
@@ -168,7 +168,7 @@ module Auth = struct
 
   type user_attributes = {
     github_orgs : string list;
-    can_read_github : (Repo.t * bool) list
+    can_read_github : (Repo.t * bool) list;
   }
   [@@deriving sexp]
 
@@ -177,7 +177,7 @@ module Auth = struct
     github : CI_secrets.github_auth CI_secrets.secret;
     github_scopes_needed : Github_t.scope list;
     mutable local_users :
-      [ `Configured of User.t String.Map.t | `Config_token of string ]
+      [ `Configured of User.t String.Map.t | `Config_token of string ];
   }
 
   let empty_attrs = { github_orgs = []; can_read_github = [] }
@@ -191,16 +191,16 @@ module Auth = struct
         Log.info (fun f -> f "Local users not configured yet");
         None
     | `Configured user_db -> (
-      match String.Map.find user user_db with
-      | Some ({ User.password = stored_pw; _ } as user)
-        when Hashed_password.matches ~password stored_pw ->
-          Some user
-      | Some _ ->
-          Log.info (fun f -> f "Incorrect password for user %S" user);
-          None
-      | None ->
-          Log.info (fun f -> f "No such user %S" user);
-          None )
+        match String.Map.find user user_db with
+        | Some ({ User.password = stored_pw; _ } as user)
+          when Hashed_password.matches ~password stored_pw ->
+            Some user
+        | Some _ ->
+            Log.info (fun f -> f "Incorrect password for user %S" user);
+            None
+        | None ->
+            Log.info (fun f -> f "No such user %S" user);
+            None )
 
   let load_local_users passwd_file =
     Lwt_io.with_file ~mode:Lwt_io.input passwd_file (fun ch -> Lwt_io.read ch)
@@ -211,7 +211,8 @@ module Auth = struct
 
   let try_load_local_users ~web_ui ~passwd_file =
     if Sys.file_exists passwd_file then
-      load_local_users passwd_file >|= fun db -> `Configured db
+      load_local_users passwd_file >|= fun db ->
+      `Configured db
     else
       let token =
         Base64.(encode_string ~alphabet:uri_safe_alphabet)
@@ -219,7 +220,7 @@ module Auth = struct
       in
       let setup_url = Uri.with_path web_ui ("/auth/intro/" ^ token) in
       Log.app (fun f ->
-          f ">>> Configure the CI by visiting@\n%a" Uri.pp_hum setup_url );
+          f ">>> Configure the CI by visiting@\n%a" Uri.pp_hum setup_url);
       Lwt.return (`Config_token token)
 
   let tokens_equal a b =
@@ -244,7 +245,7 @@ module Auth = struct
           [ (user, entry) ] |> sexp_of_password_file |> Sexplib.Sexp.to_string
         in
         Lwt_io.with_file ~mode:Lwt_io.output t.passwd_file (fun ch ->
-            Lwt_io.write ch contents )
+            Lwt_io.write ch contents)
         >>= fun () ->
         load_local_users t.passwd_file >>= fun local_users ->
         t.local_users <- `Configured local_users;
@@ -292,7 +293,7 @@ module Auth = struct
               let orgs = List.map (fun org -> org.Github_t.org_login) orgs in
               Log.info (fun f ->
                   f "User %S belongs to %a" user (Fmt.Dump.list Fmt.string)
-                    orgs );
+                    orgs);
               orgs)
             >>= fun github_orgs ->
             let user = "github:" ^ user_info.Github_t.user_info_login in
@@ -304,19 +305,20 @@ module Auth = struct
                     let { Repo.user; repo } = project in
                     let user = Datakit_github.User.name user in
                     Github.Repo.info ~token ~user ~repo ()
-                    >|= Github.Response.value) )
+                    >|= Github.Response.value))
                 (fun (_ : Github_t.repository) ->
                   Log.info (fun f -> f "%S can read %a" user Repo.pp project);
-                  Lwt.return true )
+                  Lwt.return true)
                 (fun ex ->
                   Log.info (fun f -> f "%S can't read %a" user Repo.pp project);
                   Log.debug (fun f ->
-                      f "%S can't read %a: %a" user Repo.pp project Fmt.exn ex
-                  );
-                  Lwt.return false )
+                      f "%S can't read %a: %a" user Repo.pp project Fmt.exn ex);
+                  Lwt.return false)
             in
             Lwt_list.map_s
-              (fun p -> can_read_github p >|= fun flag -> (p, flag))
+              (fun p ->
+                can_read_github p >|= fun flag ->
+                (p, flag))
               repos
             >>= fun can_read_github ->
             let attributes = { github_orgs; can_read_github } in
@@ -333,7 +335,7 @@ type server = {
     user:string option ->
     attrs:Auth.user_attributes ->
     (bool, CI_web_templates.Error.t) result;
-  acl_github_repos : Repo.t list (* Repositories we need info about *)
+  acl_github_repos : Repo.t list; (* Repositories we need info about *)
 }
 
 let cookie_key t = "__ci_session:" ^ t.web_config.CI_web_templates.name
@@ -355,9 +357,9 @@ let rec matches_acl ~user ~attrs = function
       let rec aux = function
         | [] -> Ok false
         | x :: xs -> (
-          match matches_acl ~user ~attrs x with
-          | Ok false -> aux xs
-          | (Ok true | Error _) as r -> r )
+            match matches_acl ~user ~attrs x with
+            | Ok false -> aux xs
+            | (Ok true | Error _) as r -> r )
       in
       aux xs
 
@@ -395,12 +397,13 @@ let server ~auth ~web_config ~session_backend ~public_address =
     | None -> CI_utils.failf "Missing scheme in public address"
     | Some s -> CI_utils.failf "Unknown scheme %S" s
   in
-  { auth;
+  {
+    auth;
     session_backend;
     web_config;
     has_role;
     acl_github_repos;
-    secure_cookies
+    secure_cookies;
   }
 
 let web_config t = t.web_config
@@ -435,7 +438,8 @@ class static ~valid ~mime_type dir =
         let path = dir / name in
         if Sys.file_exists path then
           Lwt_io.with_file ~mode:Lwt_io.input path (fun ch -> Lwt_io.read ch)
-          >>= fun body -> Wm.continue (`String body) rd
+          >>= fun body ->
+          Wm.continue (`String body) rd
         else (
           Log.debug (fun f -> f "Missing static resource %S" name);
           Wm.respond 404 rd ~body:(`String "No such static resource") )
@@ -471,7 +475,7 @@ module Session_data = struct
     login_redirect : string option;
     (* Redirect here when login succeeeds. *)
     username : string option;
-    attrs : Auth.user_attributes [@default Auth.empty_attrs]
+    attrs : Auth.user_attributes; [@default Auth.empty_attrs]
   }
   [@@deriving sexp]
 
@@ -498,10 +502,11 @@ class virtual resource_with_session t =
           Base64.encode_string (Nocrypto.Rng.generate 16 |> Cstruct.to_string)
         in
         let value =
-          { Session_data.csrf_token;
+          {
+            Session_data.csrf_token;
             username = None;
             login_redirect = None;
-            attrs = Auth.empty_attrs
+            attrs = Auth.empty_attrs;
           }
         in
         self#session_set (Session_data.to_string value) rd >>= fun () ->
@@ -510,13 +515,13 @@ class virtual resource_with_session t =
       self#session_of_rd rd >>= function
       | Ok None | Error _ -> generate_new_session ()
       | Ok (Some session) -> (
-        match Session_data.of_string session.Session.value with
-        | Ok data -> Lwt.return data
-        | Error ex ->
-            Log.warn (fun f ->
-                f "Failed to load session data %S: %a" session.Session.value
-                  CI_utils.pp_exn ex );
-            generate_new_session () )
+          match Session_data.of_string session.Session.value with
+          | Ok data -> Lwt.return data
+          | Error ex ->
+              Log.warn (fun f ->
+                  f "Failed to load session data %S: %a" session.Session.value
+                    CI_utils.pp_exn ex);
+              generate_new_session () )
 
     method! finish_request rd =
       let rd = self#session_set_hdrs ~path:"/" ~secure:t.secure_cookies rd in
@@ -527,9 +532,9 @@ let all_roles t ~user ~attrs roles =
   let rec aux = function
     | [] -> Ok true
     | x :: xs -> (
-      match t.has_role ~user ~attrs x with
-      | Ok true -> aux xs
-      | (Ok false | Error _) as r -> r )
+        match t.has_role ~user ~attrs x with
+        | Ok true -> aux xs
+        | (Ok false | Error _) as r -> r )
   in
   aux roles
 
@@ -559,19 +564,21 @@ class virtual protected_page t =
           | Error err ->
               Wm.continue (`Redirect CI_web_templates.Error.(uri err)) rd )
       | None -> (
-        match all_roles t ~user:None ~attrs:Auth.empty_attrs roles_needed with
-        | Ok true -> Wm.continue `Authorized rd
-        | Ok false ->
-            let login_redirect =
-              match Uri.path rd.Wm.Rd.uri with
-              | "/auth/logout" -> None
-              | _ -> Some (Uri.path_and_query rd.Wm.Rd.uri)
-            in
-            let value = { session with Session_data.login_redirect } in
-            self#session_set (Session_data.to_string value) rd >>= fun () ->
-            Wm.continue (`Redirect (Uri.of_string "/auth/login")) rd
-        | Error err ->
-            Wm.continue (`Redirect CI_web_templates.Error.(uri err)) rd )
+          match
+            all_roles t ~user:None ~attrs:Auth.empty_attrs roles_needed
+          with
+          | Ok true -> Wm.continue `Authorized rd
+          | Ok false ->
+              let login_redirect =
+                match Uri.path rd.Wm.Rd.uri with
+                | "/auth/logout" -> None
+                | _ -> Some (Uri.path_and_query rd.Wm.Rd.uri)
+              in
+              let value = { session with Session_data.login_redirect } in
+              self#session_set (Session_data.to_string value) rd >>= fun () ->
+              Wm.continue (`Redirect (Uri.of_string "/auth/login")) rd
+          | Error err ->
+              Wm.continue (`Redirect CI_web_templates.Error.(uri err)) rd )
   end
 
 let check_csrf session_data rd =
@@ -582,7 +589,7 @@ let check_csrf session_data rd =
   | None -> Wm.respond 403 ~body:(`String "Missing CSRFToken") rd
   | Some provided_token ->
       Log.info (fun f ->
-          f "Expecting CSRFToken %S; got %S" expected_token provided_token );
+          f "Expecting CSRFToken %S; got %S" expected_token provided_token);
       Wm.respond 403 ~body:(`String "Incorrect CSRFToken") rd
 
 class virtual post_page t =
@@ -669,35 +676,38 @@ class github_callback t =
       | None -> reject "Missing state"
       | Some provided_token when provided_token <> expected_token ->
           Log.info (fun f ->
-              f "Expecting state %S; got %S" expected_token provided_token );
+              f "Expecting state %S; got %S" expected_token provided_token);
           reject "Incorrect state"
       | Some _ -> (
-        match Uri.get_query_param rd.Wm.Rd.uri "code" with
-        | None -> reject "Missing code"
-        | Some code -> (
-            Auth.handle_github_callback t.auth ~code ~repos:t.acl_github_repos
-            >>= function
-            | Error err -> reject err
-            | Ok (user, attrs) ->
-                let session =
-                  { session_data with
-                    Session_data.username = Some user;
-                    attrs
-                  }
-                in
-                self#session_set (Session_data.to_string session) rd
-                >>= fun () ->
-                ( match session.Session_data.login_redirect with
-                | None -> Lwt.return "/"
-                | Some redirect ->
-                    let value =
-                      { session with Session_data.login_redirect = None }
-                    in
-                    self#session_set (Session_data.to_string value) rd
-                    >>= fun () -> Lwt.return redirect )
-                >>= fun redirect ->
-                Prometheus.Counter.inc_one Metrics.github_login_ok_total;
-                Wm.respond 303 (Wm.Rd.redirect redirect rd) ) )
+          match Uri.get_query_param rd.Wm.Rd.uri "code" with
+          | None -> reject "Missing code"
+          | Some code -> (
+              Auth.handle_github_callback t.auth ~code
+                ~repos:t.acl_github_repos
+              >>= function
+              | Error err -> reject err
+              | Ok (user, attrs) ->
+                  let session =
+                    {
+                      session_data with
+                      Session_data.username = Some user;
+                      attrs;
+                    }
+                  in
+                  self#session_set (Session_data.to_string session) rd
+                  >>= fun () ->
+                  ( match session.Session_data.login_redirect with
+                  | None -> Lwt.return "/"
+                  | Some redirect ->
+                      let value =
+                        { session with Session_data.login_redirect = None }
+                      in
+                      self#session_set (Session_data.to_string value) rd
+                      >>= fun () ->
+                      Lwt.return redirect )
+                  >>= fun redirect ->
+                  Prometheus.Counter.inc_one Metrics.github_login_ok_total;
+                  Wm.respond 303 (Wm.Rd.redirect redirect rd) ) )
   end
 
 let pp_path = Fmt.list ~sep:(Fmt.(const string) ", ") Fmt.string
@@ -716,7 +726,7 @@ let callback ~routes _conn request body =
       f "%d - %s %s"
         (Code.code_of_status status)
         (Code.string_of_method (Request.meth request))
-        (Uri.path (Request.uri request)) );
+        (Uri.path (Request.uri request)));
   Log.debug (fun f -> f "Webmachine path: %a" pp_path path);
   Metrics.record_response status;
   Server.respond ~headers ~body ~status ()
@@ -730,8 +740,8 @@ let serve ~mode ~routes =
         (fun () -> Server.callback http flow ic oc)
         (fun ex ->
           Log.info (fun f ->
-              f "Error handling HTTP connection: %s" (Printexc.to_string ex) );
-          Lwt.return () ) )
+              f "Error handling HTTP connection: %s" (Printexc.to_string ex));
+          Lwt.return ()))
 
 class virtual html_page t =
   object (self)
@@ -792,25 +802,24 @@ class virtual ['a] form_page t =
       | None -> Wm.respond 403 ~body:(`String "Missing CSRFToken") rd
       | Some provided_token when provided_token <> expected_token ->
           Log.info (fun f ->
-              f "Expecting CSRFToken %S; got %S" expected_token provided_token
-          );
+              f "Expecting CSRFToken %S; got %S" expected_token provided_token);
           Wm.respond 403 ~body:(`String "Incorrect CSRFToken") rd
       | Some _ -> (
-        match Cohttp.Header.get rd.Wm.Rd.req_headers "content-type" with
-        | None ->
-            Wm.respond 403 ~body:(`String "Missing Content-Type header") rd
-        | Some content_type -> (
-            let body = rd.Wm.Rd.req_body in
-            Multipart.parse_stream
-              ~stream:(Cohttp_lwt.Body.to_stream body)
-              ~content_type
-            >>= fun parts ->
-            Multipart.get_parts parts >>= fun parts ->
-            match CI_form.Validator.run self#validate parts with
-            | Ok data -> self#process data rd
-            | Error state ->
-                self#html_of_form state rd >>= fun body ->
-                Wm.respond 400 ~body:(`String body) rd ) )
+          match Cohttp.Header.get rd.Wm.Rd.req_headers "content-type" with
+          | None ->
+              Wm.respond 403 ~body:(`String "Missing Content-Type header") rd
+          | Some content_type -> (
+              let body = rd.Wm.Rd.req_body in
+              Multipart.parse_stream
+                ~stream:(Cohttp_lwt.Body.to_stream body)
+                ~content_type
+              >>= fun parts ->
+              Multipart.get_parts parts >>= fun parts ->
+              match CI_form.Validator.run self#validate parts with
+              | Ok data -> self#process data rd
+              | Error state ->
+                  self#html_of_form state rd >>= fun body ->
+                  Wm.respond 400 ~body:(`String body) rd ) )
 
     method private html_of_form state rd =
       self#session rd >|= fun session_data ->
@@ -821,7 +830,8 @@ class virtual ['a] form_page t =
 
     method private to_html rd =
       self#default >>= fun state ->
-      self#html_of_form state rd >>= fun body -> Wm.continue (`String body) rd
+      self#html_of_form state rd >>= fun body ->
+      Wm.continue (`String body) rd
   end
 
 class auth_setup t =
@@ -837,7 +847,8 @@ class auth_setup t =
     method private validate =
       let open CI_form.Validator in
       get "password" non_empty >>!= fun password ->
-      get "password2" (confirm password) >>!= fun () -> maybe password
+      get "password2" (confirm password) >>!= fun () ->
+      maybe password
 
     method private process password rd =
       Auth.initialise_local_users t.auth ~password >>= function
@@ -845,10 +856,11 @@ class auth_setup t =
       | Ok () ->
           self#session rd >>= fun session_data ->
           let session =
-            { session_data with
+            {
+              session_data with
               Session_data.username = None;
               attrs = Auth.empty_attrs;
-              login_redirect = Some "/"
+              login_redirect = Some "/";
             }
           in
           self#session_set (Session_data.to_string session) rd >>= fun () ->
@@ -890,7 +902,8 @@ class login_page t =
           let value = { session with Session_data.login_redirect = None } in
           self#session_set (Session_data.to_string value) rd >>= fun () ->
           Lwt.return redirect )
-      >>= fun redirect -> Wm.continue true (Wm.Rd.redirect redirect rd)
+      >>= fun redirect ->
+      Wm.continue true (Wm.Rd.redirect redirect rd)
   end
 
 class github_auth_settings t =

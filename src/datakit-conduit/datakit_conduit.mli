@@ -1,6 +1,5 @@
 (** Conduit helpers. *)
 
-(** The type for supported conduit endpoints. *)
 type t =
   [ `NamedPipe of string
   | `Fd of int
@@ -8,6 +7,7 @@ type t =
   | `Tcp of string * int
   | `HyperV_connect of Uri.t
   | `HyperV_accept of Uri.t ]
+(** The type for supported conduit endpoints. *)
 
 val pp : t Fmt.t
 (** [pp] is the pretty-printer for conduit endpoits. *)

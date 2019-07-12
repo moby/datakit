@@ -10,7 +10,7 @@ type t = {
   ci : CI_engine.t;
   logs : CI_live_log.manager;
   server : CI_web_utils.server;
-  dashboards : CI_target.Set.t Repo.Map.t
+  dashboards : CI_target.Set.t Repo.Map.t;
 }
 
 let opt_query_decode name rd =
@@ -59,19 +59,20 @@ class error t =
 let check_metrics_token server provided =
   match String.cut ~sep:" " provided with
   | Some (typ, provided) when String.Ascii.lowercase typ = "bearer" -> (
-    match (CI_web_utils.web_config server).CI_web_templates.metrics_token with
-    | None -> false
-    | Some (`SHA256 expected_hash) ->
-        let user_hash =
-          Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)
-        in
-        if Cstruct.equal expected_hash user_hash then true
-        else (
-          Log.info (fun f ->
-              f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
-                Cstruct.hexdump_pp expected_hash Cstruct.hexdump_pp user_hash
-          );
-          false ) )
+      match
+        (CI_web_utils.web_config server).CI_web_templates.metrics_token
+      with
+      | None -> false
+      | Some (`SHA256 expected_hash) ->
+          let user_hash =
+            Nocrypto.Hash.SHA256.digest (Cstruct.of_string provided)
+          in
+          if Cstruct.equal expected_hash user_hash then true
+          else (
+            Log.info (fun f ->
+                f "Bad /metrics token. Expected:@\n%aGot:@\n%a"
+                  Cstruct.hexdump_pp expected_hash Cstruct.hexdump_pp user_hash);
+            false ) )
   | _ ->
       Log.info (fun f -> f "Bad token %S" provided);
       false
@@ -137,7 +138,8 @@ let load_jobs t target rd =
       CI_engine.latest_state t.ci target >|= default CI_history.State.empty
   | Some commit ->
       CI_engine.dk t.ci >>= fun dk ->
-      DK.commit dk commit >>*= fun commit -> CI_history.load commit
+      DK.commit dk commit >>*= fun commit ->
+      CI_history.load commit
 
 class pr_page t =
   object (self)
@@ -165,9 +167,9 @@ class pr_page t =
             match PR.Index.find (repo, id) prs with
             | None -> None
             | Some engine_target -> (
-              match CI_engine.target engine_target with
-              | `PR pr -> Some (PR.title pr)
-              | _ -> assert false )
+                match CI_engine.target engine_target with
+                | `PR pr -> Some (PR.title pr)
+                | _ -> assert false )
           in
           Wm.continue
             (CI_web_templates.target_page ?test ~csrf_token ?title ~target
@@ -326,19 +328,19 @@ class live_log_page t =
       DK.Branch.head b >>*= fun head ->
       match CI_live_log.lookup t.logs ~branch with
       | None -> (
-        (* todo: find out what commit it turned into and serve that instead *)
-        match head with
-        | Some head ->
-            let path =
-              CI_web_templates.saved_log_frame_link ~branch
-                ~commit:(DK.Commit.id head)
-            in
-            Wm.respond 307 (Rd.redirect path rd)
-        | None ->
-            Log.warn (fun f ->
-                f "Live log %S not found, and no saved branch either" branch );
-            Wm.respond 500 rd ~body:(`String "Log finished, but wasn't saved!")
-        )
+          (* todo: find out what commit it turned into and serve that instead *)
+          match head with
+          | Some head ->
+              let path =
+                CI_web_templates.saved_log_frame_link ~branch
+                  ~commit:(DK.Commit.id head)
+              in
+              Wm.respond 307 (Rd.redirect path rd)
+          | None ->
+              Log.warn (fun f ->
+                  f "Live log %S not found, and no saved branch either" branch);
+              Wm.respond 500 rd
+                ~body:(`String "Log finished, but wasn't saved!") )
       | Some live_log -> (
           let have_history = head <> None in
           let html = CI_web_templates.live_log_frame ~branch ~have_history in
@@ -364,19 +366,21 @@ class live_log_page t =
                         | Some { CI_live_log.data; next } ->
                             let data = process_escapes ~gfx_state ~buf data in
                             (if data = "" then Lwt.return () else out#push data)
-                            >>= fun () -> Lazy.force next >>= aux
+                            >>= fun () ->
+                            Lazy.force next >>= aux
                       in
-                      aux src )
+                      aux src)
                     (fun ex ->
                       Log.warn (fun f ->
-                          f "Error streaming log: %a" CI_utils.pp_exn ex );
-                      Lwt.return () ) );
+                          f "Error streaming log: %a" CI_utils.pp_exn ex);
+                      Lwt.return ()));
               Wm.continue (`Stream stream)
-                { rd with
+                {
+                  rd with
                   (* Otherwise, an nginx reverse proxy will wait for the whole log before sending anything. *)
                   Rd.resp_headers =
                     Cohttp.Header.add rd.Rd.resp_headers "X-Accel-Buffering"
-                      "no"
+                      "no";
                 } )
   end
 
@@ -434,19 +438,21 @@ class saved_log_page t =
                           in
                           let data = process_escapes ~gfx_state ~buf data in
                           (if data = "" then Lwt.return () else out#push data)
-                          >>= fun () -> aux (i + len)
+                          >>= fun () ->
+                          aux (i + len)
                       in
-                      aux 0 )
+                      aux 0)
                     (fun ex ->
                       Log.warn (fun f ->
-                          f "Error streaming log: %a" CI_utils.pp_exn ex );
-                      Lwt.return () ) );
+                          f "Error streaming log: %a" CI_utils.pp_exn ex);
+                      Lwt.return ()));
               Wm.continue (`Stream stream)
-                { rd with
+                {
+                  rd with
                   (* Otherwise, an nginx reverse proxy will wait for the whole log before sending anything. *)
                   Rd.resp_headers =
                     Cohttp.Header.add rd.Rd.resp_headers "X-Accel-Buffering"
-                      "no"
+                      "no";
                 } )
   end
 

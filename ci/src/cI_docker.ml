@@ -51,7 +51,7 @@ module Builder = struct
     label : string;
     dockerfile : string;
     timeout : float;
-    pool : CI_monitored_pool.t
+    pool : CI_monitored_pool.t;
   }
 
   type context = CI_s.job_id
@@ -90,21 +90,21 @@ module Builder = struct
         match String.cut ~sep:"\n" contents with
         | None -> CI_utils.failf "Missing newline in %S" path
         | Some (first, rest) -> (
-          match String.cuts ~sep:" " first with
-          | "FROM" :: _base :: trailing ->
-              let first =
-                Fmt.strf "FROM %a"
-                  (Fmt.list ~sep:Fmt.(const string " ") Fmt.string)
-                  (Image.id base :: trailing)
-              in
-              CI_live_log.log log "Rewrite Dockerfile's first line to:@\n%s"
-                first;
-              let contents = Printf.sprintf "%s\n%s" first rest in
-              Lwt_io.with_file ~mode:Lwt_io.output path (fun ch ->
-                  Lwt_io.write ch contents )
-          | _ ->
-              CI_utils.failf "Dockerfile %S starts %S, not 'FROM '" path first
-          ) )
+            match String.cuts ~sep:" " first with
+            | "FROM" :: _base :: trailing ->
+                let first =
+                  Fmt.strf "FROM %a"
+                    (Fmt.list ~sep:Fmt.(const string " ") Fmt.string)
+                    (Image.id base :: trailing)
+                in
+                CI_live_log.log log "Rewrite Dockerfile's first line to:@\n%s"
+                  first;
+                let contents = Printf.sprintf "%s\n%s" first rest in
+                Lwt_io.with_file ~mode:Lwt_io.output path (fun ch ->
+                    Lwt_io.write ch contents)
+            | _ ->
+                CI_utils.failf "Dockerfile %S starts %S, not 'FROM '" path
+                  first ) )
 
   let build ~pull ~q dockerfile =
     let pull = if pull then [ "--pull" ] else [] in
@@ -133,7 +133,8 @@ module Builder = struct
         let image = Image.v (String.trim (Buffer.contents buffer)) in
         let data = Cstruct.of_string (Image.id image) in
         DK.Transaction.create_file trans CI_cache.Path.value data
-        >>*= fun () -> Lwt.return (Ok image) )
+        >>*= fun () ->
+        Lwt.return (Ok image))
 end
 
 module Build_cache = CI_cache.Make (Builder)
@@ -160,7 +161,7 @@ module Runner = struct
     network : string option;
     command : string list;
     timeout : float;
-    pool : CI_monitored_pool.t
+    pool : CI_monitored_pool.t;
   }
 
   type context = CI_s.job_id
@@ -219,4 +220,5 @@ let command ~logs ~pool ~timeout ~label ?entrypoint ?user ?network command =
 
 let run t image =
   let open! CI_term.Infix in
-  CI_term.job_id >>= fun job_id -> Run_cache.find t job_id { Runner.Key.image }
+  CI_term.job_id >>= fun job_id ->
+  Run_cache.find t job_id { Runner.Key.image }

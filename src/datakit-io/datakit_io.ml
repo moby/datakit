@@ -26,14 +26,14 @@ module IO = struct
       | Some x -> [| "ssh"; user ^ host; x |]
     in
     Log.info (fun f ->
-        f "Executing '%s'" (String.concat " " (Array.to_list cmd)) );
+        f "Executing '%s'" (String.concat " " (Array.to_list cmd)));
     let env = Unix.environment () in
     let p = Lwt_process.open_process_full ~env ("ssh", cmd) in
     Lwt.finalize
       (fun () -> fn (p#stdout, p#stdin))
       (fun () ->
         let _ = p#close in
-        Lwt.return_unit )
+        Lwt.return_unit)
 
   let with_conduit ?init uri fn =
     Log.debug (fun f -> f "Connecting to %s" (Uri.to_string uri));
@@ -45,11 +45,12 @@ module IO = struct
     Lwt.finalize
       (fun () ->
         (match init with None -> Lwt.return_unit | Some s -> write oc s)
-        >>= fun () -> fn (ic, oc) )
+        >>= fun () ->
+        fn (ic, oc))
       (fun () ->
         Lwt.catch
           (fun () -> Lwt_io.close ic)
-          (function Unix.Unix_error _ -> Lwt.return_unit | e -> Lwt.fail e) )
+          (function Unix.Unix_error _ -> Lwt.return_unit | e -> Lwt.fail e))
 
   let with_connection ?ctx:_ uri ?init fn =
     match Git.Sync.protocol uri with
@@ -123,7 +124,7 @@ module FS = struct
         let clear =
           if Sys.file_exists dir then (
             Log.debug (fun l ->
-                l "%s already exists but is a file, removing." dir );
+                l "%s already exists but is a file, removing." dir);
             safe Lwt_unix.unlink dir )
           else Lwt.return_unit
         in
@@ -144,10 +145,10 @@ module FS = struct
           (fun () ->
             Lwt_unix.stat file >>= fun s ->
             let stale = Unix.gettimeofday () -. s.Unix.st_mtime > max_age in
-            Lwt.return stale )
+            Lwt.return stale)
           (function
             | Unix.Unix_error (Unix.ENOENT, _, _) -> Lwt.return false
-            | e -> Lwt.fail e )
+            | e -> Lwt.fail e)
       else Lwt.return false
 
     let unlock file = Lwt_unix.unlink file
@@ -158,7 +159,8 @@ module FS = struct
         is_stale max_age file >>= fun is_stale ->
         if is_stale then (
           Log.err (fun f -> f "%s is stale, removing it." file);
-          unlock file >>= fun () -> aux 1 )
+          unlock file >>= fun () ->
+          aux 1 )
         else
           let create () =
             let pid = Unix.getpid () in
@@ -168,7 +170,8 @@ module FS = struct
               0o600
             >>= fun fd ->
             let oc = Lwt_io.of_fd ~mode:Lwt_io.Output fd in
-            Lwt_io.write_int oc pid >>= fun () -> Lwt_unix.close fd
+            Lwt_io.write_int oc pid >>= fun () ->
+            Lwt_unix.close fd
           in
           Lwt.catch create (function
             | Unix.Unix_error (Unix.EEXIST, _, _) ->
@@ -178,15 +181,18 @@ module FS = struct
                        (let i = float i in
                         i *. i)
                 in
-                Lwt_unix.sleep (sleep *. backoff) >>= fun () -> aux (i + 1)
-            | e -> Lwt.fail e )
+                Lwt_unix.sleep (sleep *. backoff) >>= fun () ->
+                aux (i + 1)
+            | e -> Lwt.fail e)
       in
       aux 1
 
     let with_lock file fn =
       match file with
       | None -> fn ()
-      | Some f -> lock f >>= fun () -> Lwt.finalize fn (fun () -> unlock f)
+      | Some f ->
+          lock f >>= fun () ->
+          Lwt.finalize fn (fun () -> unlock f)
   end
 
   let mkdir = mkdir
@@ -239,7 +245,7 @@ module FS = struct
         Log.debug (fun l -> l "[exec] %s" str);
         let i = Sys.command str in
         if i <> 0 then Log.debug (fun l -> l "[exec] error %d" i);
-        Lwt.return_unit )
+        Lwt.return_unit)
       fmt
 
   let remove_dir dir =
@@ -258,7 +264,7 @@ module FS = struct
             | Unix.Unix_error (Unix.EISDIR, _, _) ->
                 remove_dir file
             | Unix.Unix_error (Unix.ENOENT, _, _) -> Lwt.return_unit
-            | e -> Lwt.fail e ) )
+            | e -> Lwt.fail e))
 
   let rename =
     if Sys.os_type <> "Win32" then Lwt_unix.rename
@@ -275,12 +281,14 @@ module FS = struct
                 else
                   file_exists file >>= fun exists ->
                   if exists && Sys.is_directory file then
-                    remove_dir file >>= fun () -> aux (i + 1)
+                    remove_dir file >>= fun () ->
+                    aux (i + 1)
                   else (
                     Log.debug (fun l ->
-                        l "Got EACCES, retrying in %.1fs" delays.(i) );
-                    Lwt_unix.sleep delays.(i) >>= fun () -> aux (i + 1) )
-            | e -> Lwt.fail e )
+                        l "Got EACCES, retrying in %.1fs" delays.(i));
+                    Lwt_unix.sleep delays.(i) >>= fun () ->
+                    aux (i + 1) )
+            | e -> Lwt.fail e)
       in
       aux 0
 
@@ -296,7 +304,8 @@ module FS = struct
           openfile tmp [ O_WRONLY; O_NONBLOCK; O_CREAT; O_TRUNC ] 0o644)
         >>= fun fd ->
         Lwt.finalize (fun () -> protect fn fd) (fun () -> Lwt_unix.close fd)
-        >>= fun () -> rename tmp file )
+        >>= fun () ->
+        rename tmp file)
 
   let read_file_with_read file size =
     let chunk_size = max 4096 (min size 0x100000) in
@@ -330,10 +339,10 @@ module FS = struct
             let size = stats.Lwt_unix.st_size in
             ( if size >= mmap_threshold then read_file_with_mmap file
             else read_file_with_read file size )
-            >|= fun buf -> Some buf ) )
+            >|= fun buf ->
+            Some buf))
       (function
-        | Unix.Unix_error _ | Sys_error _ -> Lwt.return_none | e -> Lwt.fail e
-        )
+        | Unix.Unix_error _ | Sys_error _ -> Lwt.return_none | e -> Lwt.fail e)
 
   let stat_info_unsafe path =
     let open Git.Index in
@@ -373,8 +382,7 @@ module FS = struct
     Lwt.catch
       (fun () -> Lwt.return (Some (stat_info_unsafe path)))
       (function
-        | Sys_error _ | Unix.Unix_error _ -> Lwt.return_none | e -> Lwt.fail e
-        )
+        | Sys_error _ | Unix.Unix_error _ -> Lwt.return_none | e -> Lwt.fail e)
 
   let chmod ?lock f `Exec =
     Lock.with_lock lock (fun () -> Lwt_unix.chmod f 0o755)
@@ -386,7 +394,7 @@ module FS = struct
     Lock.with_lock lock (fun () ->
         Lwt.catch write (function
           | Unix.Unix_error (Unix.EISDIR, _, _) -> remove_dir file >>= write
-          | e -> Lwt.fail e ) )
+          | e -> Lwt.fail e))
 
   let trim s =
     let len = Cstruct.len s in
@@ -413,5 +421,6 @@ module FS = struct
           ( match set with
           | None -> remove_file file
           | Some v -> write_file ?temp_dir file v )
-          >|= fun () -> true )
+          >|= fun () ->
+          true)
 end

@@ -63,7 +63,8 @@ let default_author = "datakit@mobyproject.org"
 let connect ?head ?bare ?level ?dot_git ?(author = default_author) path =
   let head = head >?= Git.Reference.of_raw in
   let config = Irmin_git.config ?head ?bare ?level ?dot_git path in
-  S.Repo.v config >|= fun repo -> { repo; author }
+  S.Repo.v config >|= fun repo ->
+  { repo; author }
 
 type error =
   [ `Already_exists
@@ -111,7 +112,8 @@ module Tree = struct
     | Some (`Contents (x, `Link)) -> Lwt.return (Ok (`Link (str x)))
     | Some (`Contents (x, _)) -> Lwt.return (Ok (`File x))
     | Some (`Node _ as dir) ->
-        S.Tree.list dir [] >|= fun ls -> Ok (`Dir (List.map fst ls))
+        S.Tree.list dir [] >|= fun ls ->
+        Ok (`Dir (List.map fst ls))
 
   let link l =
     { Datakit_client.kind = `Link; size = Int64.of_int (Cstruct.len l) }
@@ -133,7 +135,8 @@ module Tree = struct
 
   let exists t path =
     let path = Path.unwrap path in
-    S.Tree.mem t path >|= fun b -> Ok b
+    S.Tree.mem t path >|= fun b ->
+    Ok b
 
   let read_file t path =
     read t path >|= function
@@ -176,7 +179,7 @@ module Tree = struct
           match diff with
           | `Added _ -> `Added path
           | `Removed _ -> `Removed path
-          | `Updated _ -> `Updated path )
+          | `Updated _ -> `Updated path)
         diff
     in
     Ok diff
@@ -205,7 +208,9 @@ module Commit = struct
 
   let diff x y =
     let open Infix in
-    tree x >>= fun x -> tree y >>= fun y -> Tree.diff x y
+    tree x >>= fun x ->
+    tree y >>= fun y ->
+    Tree.diff x y
 end
 
 type transaction = {
@@ -215,7 +220,7 @@ type transaction = {
   mutable conflicts : PathSet.t;
   store : S.t;
   t : t;
-  lock : Lwt_mutex.t
+  lock : Lwt_mutex.t;
 }
 
 module Merge = struct
@@ -232,9 +237,12 @@ module Merge = struct
   let map tree = S.Tree.list tree S.Key.empty >|= String.Map.of_list
 
   let update t path (f, metadata) =
-    S.Tree.add t.tree path ~metadata f >|= fun tree -> t.tree <- tree
+    S.Tree.add t.tree path ~metadata f >|= fun tree ->
+    t.tree <- tree
 
-  let remove t path = S.Tree.remove t.tree path >|= fun tree -> t.tree <- tree
+  let remove t path =
+    S.Tree.remove t.tree path >|= fun tree ->
+    t.tree <- tree
 
   let ( / ) = S.Key.rcons
 
@@ -261,7 +269,7 @@ module Merge = struct
             | Some _, Some _ -> Some `Conflict
             | Some `Contents, None | None, Some `Contents -> Some `Contents
             | Some `Node, None | None, Some `Node -> Some `Node
-            | None, None -> assert false )
+            | None, None -> assert false)
           our_files their_files
       in
       String.Map.bindings types
@@ -279,14 +287,15 @@ module Merge = struct
                  S.Tree.find_all ours step >>= fun ours ->
                  S.Tree.find_all theirs step >>= fun theirs ->
                  let old () =
-                   S.Tree.find_all base step >|= fun f -> Ok (Some f)
+                   S.Tree.find_all base step >|= fun f ->
+                   Ok (Some f)
                  in
                  Irmin.Merge.f merge_file ~old ours theirs >>= function
                  | Ok (Some x) -> update result (path / leaf) x
                  | Ok None -> remove result (path / leaf)
                  | Error (`Conflict "default") ->
                      note_conflict path leaf "Changed on both branches"
-                 | Error (`Conflict x) -> note_conflict path leaf x ) )
+                 | Error (`Conflict x) -> note_conflict path leaf x ))
     in
     S.tree ours >>= fun ours ->
     S.tree theirs >>= fun theirs ->
@@ -307,7 +316,9 @@ module Transaction = struct
     let conflicts = PathSet.empty in
     (S.Head.find store >>= function
      | None -> Lwt.return ([], S.Tree.empty)
-     | Some head -> S.Commit.tree head >|= fun tree -> ([ head ], tree))
+     | Some head ->
+         S.Commit.tree head >|= fun tree ->
+         ([ head ], tree))
     >|= fun (parents, tree) ->
     Ok { closed; tree; parents; store; t; lock; conflicts }
 
@@ -339,7 +350,7 @@ module Transaction = struct
           f t.tree path >|= fun tree ->
           t.tree <- tree;
           t.conflicts <- PathSet.remove_rec path t.conflicts;
-          Ok () )
+          Ok ())
 
   let replace t path f =
     if t.closed then err_transaction_closed
@@ -352,7 +363,7 @@ module Transaction = struct
               f t.tree path >|= fun tree ->
               t.tree <- tree;
               t.conflicts <- PathSet.remove_rec path t.conflicts;
-              Ok () )
+              Ok ())
 
   let update t path f =
     if t.closed then err_transaction_closed
@@ -365,7 +376,7 @@ module Transaction = struct
               f t.tree path x >|= fun tree ->
               t.tree <- tree;
               t.conflicts <- PathSet.remove_rec path t.conflicts;
-              Ok () )
+              Ok ())
 
   let create_or_replace t path f =
     if t.closed then err_transaction_closed
@@ -375,21 +386,21 @@ module Transaction = struct
           f t.tree path >|= fun tree ->
           t.tree <- tree;
           t.conflicts <- PathSet.remove_rec path t.conflicts;
-          Ok () )
+          Ok ())
 
   let create_dir t path =
     create t path (fun t path ->
         (* FIXME: it's probably a no-op currently *)
-        S.Tree.add_tree t path S.Tree.empty )
+        S.Tree.add_tree t path S.Tree.empty)
 
   let create_file t path ?(executable = false) f =
     create t path (fun t path ->
         let metadata = if executable then `Exec else `Normal in
-        S.Tree.add t ~metadata path f )
+        S.Tree.add t ~metadata path f)
 
   let create_symlink t path l =
     create t path (fun t path ->
-        S.Tree.add t path ~metadata:`Link (Cstruct.of_string l) )
+        S.Tree.add t path ~metadata:`Link (Cstruct.of_string l))
 
   let replace_file t path f =
     replace t path (fun t path -> S.Tree.add t path f)
@@ -400,7 +411,7 @@ module Transaction = struct
   let set_executable t path b =
     let metadata = if b then `Exec else `Normal in
     update t path (fun t path (f, m) ->
-        if m = metadata then Lwt.return t else S.Tree.add t path ~metadata f )
+        if m = metadata then Lwt.return t else S.Tree.add t path ~metadata f)
 
   let remove t path = create_or_replace t path S.Tree.remove
 
@@ -417,12 +428,12 @@ module Transaction = struct
           Cstruct.memset buf 0;
           Cstruct.blit f 0 buf 0 c;
           Log.debug (fun l -> l "extend %S" (Cstruct.to_string buf));
-          S.Tree.add t path ~metadata buf )
+          S.Tree.add t path ~metadata buf)
 
   let make_dirs t path =
     create_or_replace t path (fun t path ->
         (* FIXME: this is probably a no-op *)
-        S.Tree.add_tree t path S.Tree.empty )
+        S.Tree.add_tree t path S.Tree.empty)
 
   let info t msg () =
     let date = Int64.of_float (Unix.gettimeofday ()) in
@@ -435,6 +446,7 @@ module Transaction = struct
       let info = info t message () in
       S.Commit.v t.t.repo ~info ~parents:t.parents t.tree >>= fun c ->
       t.closed <- true;
+
       (* FIXME(samoht): why do we reuse the same commit message here? *)
       S.Head.merge ~info:(fun () -> info) ~into:t.store c >|= function
       | Error (`Conflict _) as e -> e
@@ -458,7 +470,9 @@ module Transaction = struct
         S.lcas_with_commit ours ~n:1 their_commit >>= function
         | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
         | Ok [] -> Lwt.return None
-        | Ok (base :: _) -> S.of_commit base >|= fun s -> Some s )
+        | Ok (base :: _) ->
+            S.of_commit base >|= fun s ->
+            Some s )
 
   let paths conflicts =
     PathSet.elements conflicts |> List.map Path.of_steps_exn
@@ -493,7 +507,9 @@ module Transaction = struct
 
   let closed t = t.closed
 
-  let diff t c = S.Commit.tree c >>= fun tree -> Tree.diff t.tree tree
+  let diff t c =
+    S.Commit.tree c >>= fun tree ->
+    Tree.diff t.tree tree
 end
 
 module Branch = struct
@@ -542,7 +558,7 @@ module Branch = struct
         let th, u = Lwt.task () in
         Lwt_switch.add_hook_or_exec switch (fun () ->
             Lwt.wakeup u ();
-            Lwt.return_unit )
+            Lwt.return_unit)
         >>= fun () ->
         Lwt.catch
           (fun () ->
@@ -551,10 +567,13 @@ module Branch = struct
                fun () ->
                  Lwt.wakeup u ();
                  S.unwatch w);
-            th >|= fun () -> Ok `Abort )
+            th >|= fun () ->
+            Ok `Abort)
           (function
-            | Stop -> !stop () >|= fun () -> !result
-            | e -> Lwt.return (err_msg "%a" Fmt.exn e) )
+            | Stop ->
+                !stop () >|= fun () ->
+                !result
+            | e -> Lwt.return (err_msg "%a" Fmt.exn e))
 
   let wait_for_path t ?switch path f =
     let stop = ref (fun () -> Lwt.return_unit) in
@@ -589,7 +608,7 @@ module Branch = struct
         let th, u = Lwt.task () in
         Lwt_switch.add_hook_or_exec switch (fun () ->
             Lwt.wakeup u ();
-            Lwt.return_unit )
+            Lwt.return_unit)
         >>= fun () ->
         Lwt.catch
           (fun () ->
@@ -598,10 +617,13 @@ module Branch = struct
                fun () ->
                  Lwt.wakeup u ();
                  S.unwatch w);
-            th >|= fun () -> Ok `Abort )
+            th >|= fun () ->
+            Ok `Abort)
           (function
-            | Stop -> !stop () >|= fun () -> !result
-            | e -> Lwt.return (err_msg "%a" Fmt.exn e) )
+            | Stop ->
+                !stop () >|= fun () ->
+                !result
+            | e -> Lwt.return (err_msg "%a" Fmt.exn e))
 
   let pp_ff_error = Irmin.Type.pp_json S.ff_error_t
 
@@ -612,7 +634,8 @@ module Branch = struct
     | Error e -> err_msg "ff error: %a" pp_ff_error e
 
   let transaction t =
-    S.of_branch (repo t) t.name >>= fun store -> Transaction.v t.t ~store
+    S.of_branch (repo t) t.name >>= fun store ->
+    Transaction.v t.t ~store
 
   let with_transaction t f =
     transaction t >>= function
@@ -622,7 +645,8 @@ module Branch = struct
         f tr >>= fun res ->
         ( if not (Transaction.closed tr) then Transaction.abort tr
         else Lwt.return (Ok ()) )
-        >|= fun () -> res
+        >|= fun () ->
+        res
 end
 
 let branches t = S.Branch.list t.repo >|= ok

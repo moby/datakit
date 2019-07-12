@@ -19,24 +19,26 @@ module Sync = Sync.Make (Store) (DK)
 let failf fmt = Fmt.kstrf failwith fmt
 
 let start () (protocol, address) repos =
-  Log.info (fun f -> f "Connecting to DataKit server on %s:%s" protocol address);
+  Log.info (fun f ->
+      f "Connecting to DataKit server on %s:%s" protocol address);
   Irmin.Private.Watch.set_listen_dir_hook Irmin_watcher.hook;
   Lwt_main.run
     ( Lwt.catch
         (fun () ->
           Client9p.connect ~send_pings:true protocol address () >|= function
           | Ok c -> c
-          | Error (`Msg m) -> failwith m )
+          | Error (`Msg m) -> failwith m)
         (fun ex ->
           failf "Failed to connect to DataKit server at proto=%S addr=%S: %s"
-            protocol address (Printexc.to_string ex) )
+            protocol address (Printexc.to_string ex))
     >|= DK.connect
     >>= fun dk ->
       repos
       |> Lwt_list.map_p (fun (name, root) ->
              Log.info (fun f -> f "Monitoring local repository %S" root);
              let config = Irmin_git.config root ~bare:true in
-             Store.Repo.v config >|= fun store -> (name, store) )
+             Store.Repo.v config >|= fun store ->
+             (name, store))
       >>= Sync.run dk )
 
 (* Command-line parsing *)

@@ -16,15 +16,16 @@ module State = struct
     parents : string list;
     jobs : string CI_output.t String.Map.t;
     metadata_commit : string option;
-    source_commit : string option
+    source_commit : string option;
         (* The Git source commit that led to the build *)
   }
 
   let empty =
-    { parents = [];
+    {
+      parents = [];
       jobs = String.Map.empty;
       source_commit = None;
-      metadata_commit = None
+      metadata_commit = None;
     }
 
   let jobs c = c.jobs
@@ -50,13 +51,13 @@ module State = struct
           (Fmt.Dump.option Fmt.string)
           source_commit
           (Fmt.Dump.option Fmt.string)
-          metadata_commit )
+          metadata_commit)
 end
 
 type target = {
   branch_name : string;
   lock : Lwt_mutex.t;
-  mutable commit : State.t option
+  mutable commit : State.t option;
 }
 
 module Saved_output = struct
@@ -93,7 +94,7 @@ let load commit =
               DK.Tree.read_file tree path >|= function
               | Ok data -> Some (job_name, Saved_output.of_cstruct data)
               | Error `Does_not_exist -> None
-              | Error x -> failwith (Fmt.to_to_string DK.pp_error x) )
+              | Error x -> failwith (Fmt.to_to_string DK.pp_error x))
    | Error `Does_not_exist -> Lwt.return []
    | Error x -> failwith (Fmt.to_to_string DK.pp_error x))
   >>= fun jobs ->
@@ -111,14 +112,17 @@ let lookup t dk target =
         { lock = Lwt_mutex.create (); commit = None; branch_name }
       in
       Hashtbl.add t.cache branch_name target;
+
       (* No-one can interrupt us here, so we will certainly get the lock first. *)
       Lwt_mutex.with_lock target.lock (fun () ->
           DK.branch dk branch_name >>*= fun branch ->
           DK.Branch.head branch >>*= function
           | None -> Lwt.return ()
           | Some head ->
-              load head >|= fun commit -> target.commit <- Some commit )
-      >>= fun () -> Lwt.return target
+              load head >|= fun commit ->
+              target.commit <- Some commit)
+      >>= fun () ->
+      Lwt.return target
 
 let diff _id prev next =
   match (prev, next) with
@@ -174,7 +178,7 @@ let record t dk ~source_commit input jobs =
                  let data = Saved_output.to_cstruct json in
                  DK.Transaction.make_dirs tr dir >>*= fun () ->
                  DK.Transaction.create_or_replace_file tr (dir / "output") data
-                 >>*= Lwt.return )
+                 >>*= Lwt.return)
         >>= fun () ->
         DK.Transaction.parents tr >>*= fun parents ->
         ( match !messages with
@@ -191,16 +195,18 @@ let record t dk ~source_commit input jobs =
             DK.Transaction.commit tr ~message )
         >>*= fun () ->
         let parents = List.map DK.Commit.id parents in
-        Lwt.return (Ok parents) )
+        Lwt.return (Ok parents))
     >>*= fun parents ->
     let state =
-      { State.jobs;
+      {
+        State.jobs;
         parents;
         source_commit = Some source_commit;
-        metadata_commit = Some metadata_commit
+        metadata_commit = Some metadata_commit;
       }
     in
     t.commit <- Some state;
+
     (* todo: Transaction.commit should return the new commit object directly *)
     DK.Branch.head branch >>*= function
     | None -> assert false
@@ -220,7 +226,7 @@ let record t dk ~source_commit input jobs =
         DK.Branch.with_transaction index (fun tr ->
             DK.Transaction.make_dirs tr dir >>*= fun () ->
             DK.Transaction.create_file tr (dir / sub_name) data >>*= fun () ->
-            DK.Transaction.commit tr ~message )
+            DK.Transaction.commit tr ~message)
         >>*= Lwt.return
 
 let head t = t.commit
@@ -244,6 +250,5 @@ let builds_of_commit dk c =
                  DK.commit dk (Cstruct.to_string data) >>*= fun state_commit ->
                  match CI_target.Branch_escape.parse_sub ~repo b with
                  | Some target -> Lwt.return (target, state_commit)
-                 | None -> CI_utils.failf "Invalid branch name in index: %S" b
-             )
+                 | None -> CI_utils.failf "Invalid branch name in index: %S" b)
           >|= CI_target.Map.of_list )

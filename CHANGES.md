@@ -1,6 +1,6 @@
-### v1.0.0
+### v1.0.0 (2019-07-12)
 
-- format source code using ocamlformat 0.9 and the `conventional`
+- format source code using ocamlformat 0.10 and the `conventional`
   profile (@avsm).
 - support uri>=3.0.0 (@avsm)
 

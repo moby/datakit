@@ -33,7 +33,8 @@ let pp ppf t = Fmt.(list ~sep:(unit "/") string) ppf (List.rev t)
 
 (* XXX: slow *)
 let of_string s =
-  List.filter (( <> ) "") (String.cuts s ~sep:"/") |> List.rev |> fun x -> Ok x
+  List.filter (( <> ) "") (String.cuts s ~sep:"/") |> List.rev |> fun x ->
+  Ok x
 
 module X = struct
   type nonrec t = t

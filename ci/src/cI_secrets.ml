@@ -9,7 +9,7 @@ type t = { secrets_dir : string }
 type github_auth = {
   client_id : string;
   client_secret : string;
-  callback : Uri_sexp.t option
+  callback : Uri_sexp.t option;
 }
 [@@deriving sexp]
 
@@ -23,7 +23,7 @@ class type ['a] disk_secret =
 type 'a secret = {
   mutable value : 'a option;
   conv : 'a disk_secret;
-  lock : Lwt_mutex.t
+  lock : Lwt_mutex.t;
 }
 
 let private_key_path t = t.secrets_dir / "server.key"
@@ -46,7 +46,8 @@ let get_private_key ~key_bits path =
       X509.Encoding.Pem.Private_key.to_pem_cstruct1 priv |> Cstruct.to_string
     in
     Lwt_io.with_file ~mode:Lwt_io.output path (fun ch -> Lwt_io.write ch data)
-    >|= fun () -> priv )
+    >|= fun () ->
+    priv )
 
 let ensure_crt ~private_key path =
   if Sys.file_exists path then Lwt.return ()
@@ -87,7 +88,8 @@ let github_auth t =
          match Sys.file_exists path with
          | false -> Lwt.return None
          | true ->
-             Lwt_io.with_file ~mode:Lwt_io.input path (fun ch -> Lwt_io.read ch)
+             Lwt_io.with_file ~mode:Lwt_io.input path (fun ch ->
+                 Lwt_io.read ch)
              >|= fun data ->
              Some (github_auth_of_sexp (Sexplib.Sexp.of_string data))
 
@@ -101,16 +103,18 @@ let github_auth t =
                Sexplib.Sexp.to_string (sexp_of_github_auth settings)
              in
              Lwt_io.with_file ~mode:Lwt_io.output path (fun ch ->
-                 Lwt_io.write ch data )
+                 Lwt_io.write ch data)
      end
 
 let get secret = secret.value
 
 let set secret value =
   Lwt_mutex.with_lock secret.lock @@ fun () ->
-  (secret.conv)#write value >|= fun () -> secret.value <- value
+  (secret.conv)#write value >|= fun () ->
+  secret.value <- value
 
 let create ~key_bits secrets_dir =
   let t = { secrets_dir } in
   get_private_key ~key_bits (private_key_path t) >>= fun private_key ->
-  ensure_crt ~private_key (certificate_path t) >|= fun () -> t
+  ensure_crt ~private_key (certificate_path t) >|= fun () ->
+  t

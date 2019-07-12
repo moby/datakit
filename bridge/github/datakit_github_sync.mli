@@ -1,8 +1,8 @@
 open Datakit_github
 
 module Make (API : API) (DK : Datakit_client.S) : sig
-  (** The type for synchronizer state. *)
   type t
+  (** The type for synchronizer state. *)
 
   val empty : t
   (** Create an empty sync state. *)

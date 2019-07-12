@@ -22,7 +22,7 @@ module Path = struct
     let rec aux = function
       | [] -> Ok steps
       | x :: xs -> (
-        match validate x with Ok () -> aux xs | Error _ as e -> e )
+          match validate x with Ok () -> aux xs | Error _ as e -> e )
     in
     aux steps
 
@@ -211,7 +211,7 @@ module type S = sig
        | `Link of string
        | `Exec of Cstruct.t ]
        option ->
-       [ `Finish of 'a | `Again | `Abort ] result) ->
+      [ `Finish of 'a | `Again | `Abort ] result) ->
       [ `Abort | `Finish of 'a ] result
 
     val fast_forward : t -> Commit.t -> unit result

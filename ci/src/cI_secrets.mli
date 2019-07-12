@@ -1,10 +1,10 @@
-(** A collection of secrets. *)
 type t
+(** A collection of secrets. *)
 
 type github_auth = {
   client_id : string;
   client_secret : string;
-  callback : Uri.t option
+  callback : Uri.t option;
 }
 
 type 'a secret

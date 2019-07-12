@@ -9,7 +9,7 @@ type t = {
   listen_addr : [ `HTTP of int | `HTTPS of int ];
   github_scopes_needed : Github_t.scope list;
   can_read : CI_ACL.t;
-  can_build : CI_ACL.t
+  can_build : CI_ACL.t;
 }
 
 type page = user:string option -> [ `Html ] Tyxml.Html.elt
@@ -45,13 +45,14 @@ let config ?(name = "datakit-ci") ?state_repo ?metrics_token
     | None -> None
     | Some (`SHA256 str) -> Some (`SHA256 (Cstruct.of_string str))
   in
-  { name;
+  {
+    name;
     state_repo;
     metrics_token;
     listen_addr;
     github_scopes_needed;
     can_read;
-    can_build
+    can_build;
   }
 
 let state_repo_url t fmt =
@@ -124,13 +125,13 @@ let logs_link = function
 let tag_map f map =
   Ref.Index.fold
     (fun key value acc ->
-      match snd key with "tags" :: _ -> f key value @ acc | _ -> acc )
+      match snd key with "tags" :: _ -> f key value @ acc | _ -> acc)
     map []
 
 let branch_map f map =
   Ref.Index.fold
     (fun key value acc ->
-      match snd key with "heads" :: _ -> f key value @ acc | _ -> acc )
+      match snd key with "heads" :: _ -> f key value @ acc | _ -> acc)
     map []
 
 let pr_map f map =
@@ -141,7 +142,7 @@ let dash_map f map targets =
     (fun key value acc ->
       match CI_target.Set.mem (`Ref key) targets with
       | true -> [ f key value ] @ acc
-      | false -> acc )
+      | false -> acc)
     map []
 
 let status state =
@@ -177,7 +178,7 @@ let status_list jobs =
         |> List.map (fun job ->
                let state = job_state job in
                let label = CI_engine.job_name job in
-               td [ status_flag ~label (CI_output.status state) ] ) )
+               td [ status_flag ~label (CI_output.status state) ]) )
     ]
 
 let summarise jobs =
@@ -190,7 +191,7 @@ let summarise jobs =
            let old_names =
              String.Map.find descr !results |> CI_utils.default []
            in
-           results := String.Map.add descr (name :: old_names) !results );
+           results := String.Map.add descr (name :: old_names) !results);
     let results = String.Map.bindings !results in
     let pp_group f (descr, g) =
       Fmt.pf f "%s (%a)" descr
@@ -507,7 +508,7 @@ let resource_pools ~csrf_token =
              |> List.map (html_of_user ~csrf_token)
              |> List.concat
            in
-           tr [ th [ txt name ]; td (txt used :: uses) ] )
+           tr [ th [ txt name ]; td (txt used :: uses) ])
   in
   table
     ~a:[ a_class [ "table"; "table-bordered"; "table-hover" ] ]
@@ -608,7 +609,7 @@ let main_page ~csrf_token ~ci ~dashboards =
         (fun _ project_state dash_config ->
           match (project_state, dash_config) with
           | Some refs, Some y -> Some (refs, y)
-          | _ -> None )
+          | _ -> None)
         refs dashboards
     in
     Repo.Map.fold dashboard_table combined []
@@ -858,10 +859,10 @@ let target_page ?test ~csrf_token ?(title = "(no title)")
     match target with
     | `PR _ -> Nav.PRs
     | `Ref (_, r) -> (
-      match r with
-      | "heads" :: _ -> Nav.Branches
-      | "tags" :: _ -> Nav.Tags
-      | _ -> assert false )
+        match r with
+        | "heads" :: _ -> Nav.Branches
+        | "tags" :: _ -> Nav.Tags
+        | _ -> assert false )
   in
   page title nav
     ( history_nav t target state

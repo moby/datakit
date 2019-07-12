@@ -83,7 +83,7 @@ module File = struct
   module Stream = struct
     type t = {
       read : int -> Cstruct.t or_err;
-      write : Cstruct.t -> unit or_err
+      write : Cstruct.t -> unit or_err;
     }
 
     let read t = t.read
@@ -135,7 +135,7 @@ module File = struct
   module Fd = struct
     type t = {
       read : offset:int64 -> count:int -> Cstruct.t or_err;
-      write : offset:int64 -> Cstruct.t -> unit or_err
+      write : offset:int64 -> Cstruct.t -> unit or_err;
     }
 
     let create ~read ~write = { read; write }
@@ -201,7 +201,7 @@ module File = struct
     open_ : unit -> fd or_err;
     remove : unit -> unit or_err;
     truncate : int64 -> unit or_err;
-    chmod : perm -> unit or_err
+    chmod : perm -> unit or_err;
   }
 
   let pp ppf t = Fmt.pf ppf "Vfs.File.%s" t.debug
@@ -211,7 +211,9 @@ module File = struct
 
   let stat t = t.stat ()
 
-  let size t = stat t >>*= fun info -> Lwt.return (Ok info.length)
+  let size t =
+    stat t >>*= fun info ->
+    Lwt.return (Ok info.length)
 
   let open_ t = t.open_ ()
 
@@ -238,7 +240,10 @@ module File = struct
 
   let of_stream stream =
     let stat () = ok { length = 0L; perm = `Normal } in
-    let open_ () = stream () >>= fun s -> Fd.of_stream s in
+    let open_ () =
+      stream () >>= fun s ->
+      Fd.of_stream s
+    in
     read_only_aux ~debug:"of_stream" ~stat ~open_
 
   let normal_only = function
@@ -284,14 +289,19 @@ module File = struct
     let stat () =
       let length =
         match length with
-        | None -> fn () >|= fun data -> String.length data
+        | None ->
+            fn () >|= fun data ->
+            String.length data
         | Some f -> f ()
       in
       length >|= fun length ->
       Ok { length = length |> Int64.of_int; perm = `Normal }
     in
     let open_ () =
-      let data = fn () >|= fun result -> ref (Cstruct.of_string result) in
+      let data =
+        fn () >|= fun result ->
+        ref (Cstruct.of_string result)
+      in
       let read count =
         data >>= fun data ->
         let count = min count (Cstruct.len !data) in
@@ -341,7 +351,9 @@ module File = struct
       and write ~offset data =
         let offset = Int64.to_int offset in
         if offset < 0 then err_bad_write_offset offset
-        else read () >>*= fun old -> write (overwrite old (data, offset))
+        else
+          read () >>*= fun old ->
+          write (overwrite old (data, offset))
       in
       ok @@ Fd.create ~read ~write
     in
@@ -411,7 +423,7 @@ module Dir = struct
     lookup : string -> inode or_err;
     mkdir : string -> inode or_err;
     remove : unit -> unit or_err;
-    rename : inode -> string -> unit or_err
+    rename : inode -> string -> unit or_err;
   }
 
   and kind = [ `File of File.t | `Dir of t ]

@@ -3,18 +3,18 @@
 
 (** {1 Concrete Store} *)
 
-(** [Hash] is SHA1. *)
 module Hash : Irmin.Hash.S with type t = Irmin.Hash.SHA1.t
+(** [Hash] is SHA1. *)
 
+module Path : Irmin.Path.S with type step = string
 (** [Path] are list of strings, with constant-time [rdecons]
     operations (e.g. to have efficient basename/dirname split). *)
-module Path : Irmin.Path.S with type step = string
 
-(** [Metadata] are similar to Git metadata. *)
 module Metadata : Irmin.Metadata.S with type t = [ `Normal | `Exec | `Link ]
+(** [Metadata] are similar to Git metadata. *)
 
-(** [Branch] are ASCII strings where ['/'] is also allowed. *)
 module Branch : Irmin.Branch.S with type t = string
+(** [Branch] are ASCII strings where ['/'] is also allowed. *)
 
 (** [Blob] are lists of cstructs, with constant-time append
     operations. This is optimized to store large files where contents
@@ -68,66 +68,67 @@ end
 
 (** {1 Types} *)
 
-(** The type for SHA1 hashes. *)
 type hash = Hash.t
+(** The type for SHA1 hashes. *)
 
-(** The type for store paths *)
 type path = Path.t
+(** The type for store paths *)
 
-(** The type for store steps. *)
 type step = Path.step
+(** The type for store steps. *)
 
-(** The type for file permissions. *)
 type perm = Metadata.t
+(** The type for file permissions. *)
 
-(** The type for branch names. *)
 type branch = Branch.t
+(** The type for branch names. *)
 
-(** The type for blob contents. *)
 type blob = Blob.t
+(** The type for blob contents. *)
 
 (** The type for DataKit stores. Similar to [Irmin_git.S] but with
     specialized contents (optimized for append-operations), paths and
     branches. *)
 module type S =
   Irmin.S
-  with type key = path
-   and type contents = blob
-   and type branch = string
-   and type step = step
-   and type metadata = perm
-   and type Commit.Hash.t = hash
-   and type Tree.Hash.t = hash
-   and type Contents.Hash.t = hash
+    with type key = path
+     and type contents = blob
+     and type branch = string
+     and type step = step
+     and type metadata = perm
+     and type Commit.Hash.t = hash
+     and type Tree.Hash.t = hash
+     and type Contents.Hash.t = hash
 
-(** Make an DataKit store from a normal Irmin backend. *)
 module Make (M : Irmin.S_MAKER) : S
+(** Make an DataKit store from a normal Irmin backend. *)
 
 (** Similar to [Irmin_git.S_MAKER] *)
 module type GIT_S_MAKER = functor
   (C : Irmin.Contents.S)
   (P : Irmin.Path.S)
   (B : Irmin.Branch.S)
-  -> Irmin.S
-     with type key = P.t
-      and type step = P.step
-      and module Key = P
-      and type contents = C.t
-      and type branch = B.t
-      and type metadata = perm
-      and type Commit.Hash.t = hash
-      and type Tree.Hash.t = hash
-      and type Contents.Hash.t = hash
+  ->
+  Irmin.S
+    with type key = P.t
+     and type step = P.step
+     and module Key = P
+     and type contents = C.t
+     and type branch = B.t
+     and type metadata = perm
+     and type Commit.Hash.t = hash
+     and type Tree.Hash.t = hash
+     and type Contents.Hash.t = hash
 
-(** Make a DataKit store from a Git-like Irmin backend. *)
 module Make_git (M : GIT_S_MAKER) : S
+(** Make a DataKit store from a Git-like Irmin backend. *)
 
 (** {1 VFS} *)
 
 (** The signature of an Irmin VFS servers. *)
 module type VFS = sig
-  (** The type for repositories. *)
   type repo
+  (** The type for repositories. *)
 
   val create : info:(string -> Irmin.Info.t) -> repo -> Vfs.Dir.t
   (** [create ~info repo] is the root directory of the filesystem for
@@ -137,8 +138,8 @@ end
 
 (** Writable directories. *)
 module Dir (Store : S) : sig
-  (** The type for writable directories. *)
   type t
+  (** The type for writable directories. *)
 
   val v : Store.Repo.t -> Store.tree -> t
   (** [v t tree] is the directory initially containing the contents of
@@ -197,5 +198,5 @@ module Dir (Store : S) : sig
         exists as a directory. *)
 end
 
-(** Create a full VFS from a DataKit store. *)
 module Vfs (Store : S) : VFS with type repo = Store.Repo.t
+(** Create a full VFS from a DataKit store. *)

@@ -4,7 +4,7 @@ type saved = {
   branch : string;
   failed : bool;
   mutable rebuild :
-    [ `Rebuildable of unit Lwt.t Lazy.t | `Rebuilding | `Archived ]
+    [ `Rebuildable of unit Lwt.t Lazy.t | `Rebuilding | `Archived ];
 }
 
 type logs =
@@ -34,20 +34,20 @@ let rec json_of_logs : logs -> Yojson.Basic.t = function
           ("failed", `Bool x.failed)
         ]
   | Pair (a, b) -> (
-    match (json_of_logs a, json_of_logs b) with
-    | `Null, x -> x
-    | x, `Null -> x
-    | x, y -> `List [ x; y ] )
+      match (json_of_logs a, json_of_logs b) with
+      | `Null, x -> x
+      | x, `Null -> x
+      | x, y -> `List [ x; y ] )
 
 let rec logs_of_json = function
   | `Null -> Empty
   | `Assoc [ ("branch", `String _x) ] ->
       Empty (* Can't restore live logs currently *)
   | `Assoc
-      [ ("title", `String title)
-      ; ("branch", `String branch)
-      ; ("commit", `String commit)
-      ; ("failed", `Bool failed)
+      [ ("title", `String title);
+        ("branch", `String branch);
+        ("commit", `String commit);
+        ("failed", `Bool failed)
       ] ->
       Saved { title; commit; branch; failed; rebuild = `Archived }
   | `List [ a; b ] -> Pair (logs_of_json a, logs_of_json b)

@@ -20,7 +20,7 @@ struct
     repos : Repo.Set.t;
     metadata_branch : DK.Branch.t;
     mutable known : Commit.t Ref.Index.t;
-    cond : unit Lwt_condition.t (* Fires when [known] changes. *)
+    cond : unit Lwt_condition.t; (* Fires when [known] changes. *)
   }
 
   let on_change t repo_id irmin_repo branch =
@@ -98,7 +98,7 @@ struct
         | "" ->
             Log.info (fun f -> f "No updates needed");
             DK.Transaction.abort tr
-        | message -> DK.Transaction.commit tr ~message )
+        | message -> DK.Transaction.commit tr ~message)
     >>*= Lwt.return
 
   let run dk repos =
@@ -111,7 +111,8 @@ struct
     Lwt_list.iter_p (watch t) repos >>= fun () ->
     let rec aux () =
       let next = Lwt_condition.wait t.cond in
-      sync t t.known >>= fun () -> next >>= aux
+      sync t t.known >>= fun () ->
+      next >>= aux
     in
     aux ()
 end

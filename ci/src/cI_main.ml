@@ -10,17 +10,18 @@ let logs = CI_live_log.create_manager ()
 
 let connect protocol address =
   (* Connect to 9p server *)
-  Log.info (fun f -> f "Connecting to DataKit server on %s:%s" protocol address);
+  Log.info (fun f ->
+      f "Connecting to DataKit server on %s:%s" protocol address);
   Lwt.catch
     (fun () ->
       Client9p.connect protocol address ~send_pings:true
         ~max_fids:Int32.max_int ()
       >|= function
       | Ok x -> x
-      | Error (`Msg m) -> failwith m )
+      | Error (`Msg m) -> failwith m)
     (fun ex ->
       failf "Failed to connect to DataKit server at proto=%S addr=%S: %s"
-        protocol address (Printexc.to_string ex) )
+        protocol address (Printexc.to_string ex))
 
 let make_session_backend = function
   | `Memory -> `Memory
@@ -36,8 +37,8 @@ let make_session_backend = function
             Log.warn (fun f ->
                 let { Redis_lwt.Client.host; port } = addr in
                 f "Error connecting to Redis database at %s:%d: %a" host port
-                  CI_utils.pp_exn ex );
-            Lwt.fail ex )
+                  CI_utils.pp_exn ex);
+            Lwt.fail ex)
       in
       `Redis (Lwt_pool.create 4 ~check connect)
 
@@ -63,7 +64,10 @@ let start_lwt ~pr_store ~web_ui ~secrets_dir ~canaries ~config ~session_backend
     | canaries -> Some (CI_target.map_of_list canaries)
   in
   let ci = CI_engine.create ~web_ui ?canaries connect_dk projects in
-  let main_thread = CI_engine.listen ci >|= fun `Abort -> assert false in
+  let main_thread =
+    CI_engine.listen ci >|= fun `Abort ->
+    assert false
+  in
   let mode =
     match web_config.CI_web_templates.listen_addr with
     | `HTTP port -> `TCP (`Port port)

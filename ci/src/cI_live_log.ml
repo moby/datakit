@@ -15,7 +15,7 @@ type t = {
   mutable pending_waker : unit Lwt.u;
   branch : string;
   manager : manager;
-  switch : Lwt_switch.t option
+  switch : Lwt_switch.t option;
 }
 
 and manager = t String.Map.t ref
@@ -29,7 +29,8 @@ let create_manager () = ref String.Map.empty
 let create ?switch ~pending ~branch ~title manager =
   let pending_updated, pending_waker = Lwt.wait () in
   let t =
-    { title;
+    {
+      title;
       buffer = Buffer.create 10000;
       cond = Lwt_condition.create ();
       pending = [ pending ];
@@ -38,7 +39,7 @@ let create ?switch ~pending ~branch ~title manager =
       finished = false;
       branch;
       manager;
-      switch
+      switch;
     }
   in
   match String.Map.find branch !(t.manager) with
@@ -125,7 +126,7 @@ let with_pending_reason t reason fn =
       (fun () ->
         t.pending <- remove_first reason t.pending;
         notify_pending t;
-        Lwt.return () ) )
+        Lwt.return ()) )
   else result
 
 let enter_with_pending_reason t reason use fn =
@@ -136,10 +137,10 @@ let enter_with_pending_reason t reason use fn =
     (fun () ->
       use (fun x ->
           Lazy.force done_waiting;
-          fn x ) )
+          fn x))
     (fun () ->
       Lazy.force done_waiting;
-      Lwt.return () )
+      Lwt.return ())
 
 let finish t =
   if not t.finished then (
@@ -158,4 +159,5 @@ let cancel = function
       Lwt.return (Error (Fmt.strf "Branch %S cannot be cancelled" branch))
   | { switch = Some switch; _ } as t ->
       log t "Cancelled at user's request";
-      Lwt_switch.turn_off switch >|= fun () -> Ok ()
+      Lwt_switch.turn_off switch >|= fun () ->
+      Ok ()

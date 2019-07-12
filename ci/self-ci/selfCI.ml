@@ -55,7 +55,8 @@ module Tests = struct
     end
 
   let check_builds term =
-    term >|= fun (_ : Docker.Image.t) -> "Build succeeded"
+    term >|= fun (_ : Docker.Image.t) ->
+    "Build succeeded"
 
   (* [datakit repo target] is the set of tests to run on [target]. *)
   let datakit repo = function
@@ -71,7 +72,8 @@ module Tests = struct
           ("local-git", check_builds images#local_git);
           ( "libraries",
             Term.wait_for_all [ ("client", check_builds images#client) ]
-            >|= fun () -> "Library tests succeeded" )
+            >|= fun () ->
+            "Library tests succeeded" )
         ]
 end
 

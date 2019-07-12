@@ -50,7 +50,7 @@ module Test_flow = struct
 
   type flow = {
     from_remote : Cstruct.t Lwt_mvar.t;
-    to_remote : Cstruct.t Lwt_mvar.t
+    to_remote : Cstruct.t Lwt_mvar.t;
   }
 
   let create () =
@@ -70,7 +70,9 @@ module Test_flow = struct
 
   let writev t bufv = Lwt_list.iter_s (write1 t) bufv >|= ok
 
-  let read t = Lwt_mvar.take t.from_remote >|= fun x -> Ok (`Data x)
+  let read t =
+    Lwt_mvar.take t.from_remote >|= fun x ->
+    Ok (`Data x)
 end
 
 let reporter () =
@@ -93,7 +95,8 @@ let reporter () =
         (pad 10 @@ Logs.Src.name src)
         Logs_fmt.pp_header (level, h)
     in
-    msgf @@ fun ?header ?tags fmt -> with_stamp header tags k fmt
+    msgf @@ fun ?header ?tags fmt ->
+    with_stamp header tags k fmt
   in
   { Logs.report }
 
@@ -116,7 +119,7 @@ let quiet_9p src9p =
   List.iter
     (fun src ->
       if Logs.Src.name src = "fs9p" then
-        Logs.Src.set_level src (Some Logs.Info) )
+        Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet_git () =
@@ -124,7 +127,7 @@ let quiet_git () =
   List.iter
     (fun src ->
       if Logs.Src.name src = "git.value" || Logs.Src.name src = "git.memory"
-      then Logs.Src.set_level src (Some Logs.Info) )
+      then Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet_irmin () =
@@ -135,16 +138,16 @@ let quiet_irmin () =
         Logs.Src.name src = "irmin.bc"
         || Logs.Src.name src = "irmin.commit"
         || Logs.Src.name src = "irmin.node"
-      then Logs.Src.set_level src (Some Logs.Info) )
+      then Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let split path =
   match Irmin.Path.String_list.of_string path with
   | Error _ -> assert false
   | Ok path -> (
-    match Irmin.Path.String_list.rdecons path with
-    | None -> assert false
-    | Some (x, y) -> (x, y) )
+      match Irmin.Path.String_list.rdecons path with
+      | None -> assert false
+      | Some (x, y) -> (x, y) )
 
 let config = Irmin_mem.config ()
 

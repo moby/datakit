@@ -9,7 +9,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 type repo = {
   dir : string;
   dir_lock : CI_monitored_pool.t;
-  is_ancestor : (string * string, bool Lwt.t) Hashtbl.t (* (ancestor, desc) *)
+  is_ancestor : (string * string, bool Lwt.t) Hashtbl.t; (* (ancestor, desc) *)
 }
 
 (* Git sometimes says:
@@ -107,16 +107,17 @@ module Builder = struct
       (fun () ->
         Lwt_mutex.with_lock git_lock @@ fun () ->
         CI_process.run ~env ~output
-          ("", [| "git"; "branch"; "-f"; tmp_branch; hash |]) )
+          ("", [| "git"; "branch"; "-f"; tmp_branch; hash |]))
       (fun () ->
         CI_live_log.log log "Commit %s is available locally, so not fetching"
           hash;
-        Lwt.return @@ Ok { Commit.repo = t; hash } )
+        Lwt.return @@ Ok { Commit.repo = t; hash })
       (fun ex ->
         Log.info (fun f ->
             f "Commit %S did not resolve (%s); fetching..." hash
-              (Printexc.to_string ex) );
+              (Printexc.to_string ex));
         CI_live_log.log log "Fetching PR branch";
+
         (* We can't be sure the PR's head still exists, but we can fetch the current
             head and then try to switch to the one we want. *)
         (* We fetch to a tag rather than a branch in case the target is a tag object. *)
@@ -135,7 +136,8 @@ module Builder = struct
           ("", [| "git"; "branch"; "-f"; tmp_branch; hash |])
         >>= fun () ->
         CI_process.run ~env ~output ("", [| "git"; "tag"; "-d"; tmp_tag |])
-        >>= fun () -> Lwt.return @@ Ok { Commit.repo = t; hash } )
+        >>= fun () ->
+        Lwt.return @@ Ok { Commit.repo = t; hash })
 end
 
 module PR_Cache = CI_cache.Make (Builder)
@@ -174,16 +176,17 @@ let clone_if_missing ?remote ~dir =
           (fun () -> CI_process.run ~output ("", cmd))
           (fun ex ->
             Log.err (fun f ->
-                f "Failed to clone Git repository: %a" CI_utils.pp_exn ex );
-            Lwt.fail ex )
+                f "Failed to clone Git repository: %a" CI_utils.pp_exn ex);
+            Lwt.fail ex)
 
 let v ?remote ~logs dir =
   let dir = CI_utils.abs_path dir in
   clone_if_missing ?remote ~dir >|= fun () ->
   let repo =
-    { dir;
+    {
+      dir;
       dir_lock = CI_monitored_pool.create dir 1;
-      is_ancestor = Hashtbl.create 11
+      is_ancestor = Hashtbl.create 11;
     }
   in
   { repo; fetches = PR_Cache.create ~logs repo }
@@ -203,25 +206,27 @@ let with_checkout ~log ~job_id { Commit.repo = { dir; dir_lock; _ }; hash } fn
   Lwt_mutex.with_lock git_lock (fun () ->
       CI_process.run ~cwd:dir ~output ("", [| "git"; "reset"; "--hard"; hash |])
       >>= fun () ->
-      CI_process.run ~cwd:dir ~output ("", [| "git"; "clean"; "-xdf" |]) )
-  >>= fun () -> fn dir
+      CI_process.run ~cwd:dir ~output ("", [| "git"; "clean"; "-xdf" |]))
+  >>= fun () ->
+  fn dir
 
 let with_clone ~log ~job_id { Commit.repo = { dir; dir_lock; _ }; hash } fn =
   let output = CI_live_log.write log in
   CI_utils.with_tmpdir ~prefix:"with_clone" ~mode:0o700 @@ fun tmpdir ->
   CI_live_log.enter_with_pending_reason log ("Waiting for lock on " ^ dir)
     (CI_monitored_pool.use ~log dir_lock job_id) (fun () ->
-      CI_process.run ~output ("", [| "git"; "clone"; dir; tmpdir |]) )
+      CI_process.run ~output ("", [| "git"; "clone"; dir; tmpdir |]))
   >>= fun () ->
   CI_process.run ~cwd:tmpdir ~output ("", [| "git"; "reset"; "--hard"; hash |])
-  >>= fun () -> fn tmpdir
+  >>= fun () ->
+  fn tmpdir
 
 module Shell_builder = struct
   type t = {
     label : string;
     cmds : string array list;
     timeout : float;
-    clone : bool (* Whether to make a clone before running the commands *)
+    clone : bool; (* Whether to make a clone before running the commands *)
   }
 
   module Key = Commit
@@ -244,8 +249,9 @@ module Shell_builder = struct
                  CI_live_log.log log "Running @[<h>%a@]..."
                    (Fmt.array ~sep String.dump)
                    cmd;
-                 CI_process.run ~cwd:working_dir ~switch ~output ("", cmd) )
-          >|= fun () -> Ok () )
+                 CI_process.run ~cwd:working_dir ~switch ~output ("", cmd))
+          >|= fun () ->
+          Ok ())
     in
     if t.clone then with_clone ~job_id ~log git_dir build
     else with_checkout ~job_id ~log git_dir build
@@ -265,4 +271,5 @@ let command ~logs ~timeout ~label ~clone cmds =
 
 let run command git_dir =
   let open! CI_term.Infix in
-  CI_term.job_id >>= fun job_id -> Shell_cache.find command job_id git_dir
+  CI_term.job_id >>= fun job_id ->
+  Shell_cache.find command job_id git_dir

@@ -5,8 +5,8 @@ open Datakit_github
 
 (** Conversion between GitHub and DataKit states. *)
 module Make (DK : Datakit_client.S) : sig
-  (** The type for trees. *)
   type tree = DK.Tree.t
+  (** The type for trees. *)
 
   (** {1 Repositories} *)
 
@@ -58,11 +58,11 @@ module Make (DK : Datakit_client.S) : sig
 
   (** {1 Dirty} *)
 
-  (** The type for dirty elements. *)
   type dirty = Elt.IdSet.t
+  (** The type for dirty elements. *)
 
-  (** The type for filesystem snapshots. *)
   type t
+  (** The type for filesystem snapshots. *)
 
   val stain : DK.Transaction.t -> dirty -> unit Lwt.t
   (** [stain tr d] makes all the elements in [d] dirty. *)

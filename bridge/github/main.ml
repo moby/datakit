@@ -24,7 +24,7 @@ let quiet_9p () =
   List.iter
     (fun src ->
       if Logs.Src.name src = "fs9p" then
-        Logs.Src.set_level src (Some Logs.Info) )
+        Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet_git () =
@@ -32,7 +32,7 @@ let quiet_git () =
   List.iter
     (fun src ->
       if Logs.Src.name src = "git.value" || Logs.Src.name src = "git.memory"
-      then Logs.Src.set_level src (Some Logs.Info) )
+      then Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet_irmin () =
@@ -43,7 +43,7 @@ let quiet_irmin () =
         Logs.Src.name src = "irmin.bc"
         || Logs.Src.name src = "irmin.commit"
         || Logs.Src.name src = "irmin.node"
-      then Logs.Src.set_level src (Some Logs.Info) )
+      then Logs.Src.set_level src (Some Logs.Info))
     srcs
 
 let quiet () =
@@ -70,10 +70,10 @@ let token () =
          Github_cookie_jar.init ~jar_path () >>= fun jar ->
          Github_cookie_jar.get jar ~name:cookie >|= function
          | Some t -> Ok (Github.Token.of_string t.Github_t.auth_token)
-         | None -> Error (`Msg error_msg) )
+         | None -> Error (`Msg error_msg))
        (fun e ->
          Log.err (fun l -> l "%s\n%s%!" error_msg (Printexc.to_string e));
-         Lwt.return (Error (`Msg error_msg)) ))
+         Lwt.return (Error (`Msg error_msg))))
 
 let set_signal_if_supported signal handler =
   try Sys.set_signal signal handler with Invalid_argument _ -> ()
@@ -93,11 +93,11 @@ let endpoint_of_string ~default_tcp_port str =
   match String.cut ~sep:"://" str with
   | Some ("file", f) -> `Ok (`File f)
   | Some ("tcp", s) -> (
-    match String.cut ~rev:true ~sep:":" s with
-    | None -> `Ok (`Tcp (s, default_tcp_port))
-    | Some (host, port) -> (
-      try `Ok (`Tcp (host, int_of_string port))
-      with Failure _ -> `Error "use tcp://host:port" ) )
+      match String.cut ~rev:true ~sep:":" s with
+      | None -> `Ok (`Tcp (s, default_tcp_port))
+      | Some (host, port) -> (
+          try `Ok (`Tcp (host, int_of_string port))
+          with Failure _ -> `Error "use tcp://host:port" ) )
   | Some ("git", d) -> `Ok (`Git d)
   | _ -> `Error "invalid endpoint"
 
@@ -112,9 +112,10 @@ let monitor (type a) (module DK : Datakit_client.S with type Branch.t = a)
           (fun r ->
             match Datakit_github.Repo.of_string r with
             | None -> Lwt.return_unit
-            | Some r -> Conv.update_elt tr (`Repo r) )
+            | Some r -> Conv.update_elt tr (`Repo r))
           repos
-        >>= fun () -> DK.Transaction.commit tr ~message:"initial commit" )
+        >>= fun () ->
+        DK.Transaction.commit tr ~message:"initial commit")
     >>= function
     | Error e -> Fmt.kstrf Lwt.fail_with "%a" DK.pp_error e
     | Ok () -> Lwt.return_unit
@@ -131,7 +132,7 @@ let connect_9p ~token ?webhook ?resync_interval ~cap ~branch ~repositories
   Lwt.catch
     (fun () ->
       Client9p.connect proto address ~send_pings:true ~max_fids:Int32.max_int
-        () )
+        ())
     (fun e -> Lwt.fail_with @@ Fmt.strf "%a" Fmt.exn e)
   >>= function
   | Error (`Msg e) ->
@@ -177,16 +178,16 @@ let start () datakit repositories cap webhook resync_interval prometheus =
          (* On Win32 we receive this signal on every failed Hyper-V
          socket connection *)
          if Sys.os_type <> "Win32" then
-           Log.debug (fun l -> l "Caught SIGTERM, will exit") ));
+           Log.debug (fun l -> l "Caught SIGTERM, will exit")));
   set_signal_if_supported Sys.sigint
     (Sys.Signal_handle
        (fun _ ->
          Log.debug (fun l -> l "Caught SIGINT, will exit");
-         exit 1 ));
+         exit 1));
   Log.app (fun l ->
       l "Starting %s %s (%a)..."
         (Filename.basename Sys.argv.(0))
-        Version.v Datakit_github.Capabilities.pp cap );
+        Version.v Datakit_github.Capabilities.pp cap);
   let token =
     match token () with
     | Error (`Msg m) -> failwith m
@@ -199,7 +200,7 @@ let start () datakit repositories cap webhook resync_interval prometheus =
     | None -> None
     | Some u ->
         Log.app (fun l ->
-            l "Starting webhook server listening at %s" @@ Uri.to_string u );
+            l "Starting webhook server listening at %s" @@ Uri.to_string u);
         Some (Datakit_github_api.Webhook.v token u)
   in
   let connect_to_datakit () =
@@ -209,7 +210,7 @@ let start () datakit repositories cap webhook resync_interval prometheus =
         t
     | Some d ->
         Log.app (fun l ->
-            l "Connecting to %a [%s]." pp_endpoint d.endpoint d.branch );
+            l "Connecting to %a [%s]." pp_endpoint d.endpoint d.branch);
         connect ~token ?webhook ?resync_interval ~cap ~repositories d
   in
   Lwt_main.run @@ Lwt.choose ([ connect_to_datakit () ] @ prometheus_threads)

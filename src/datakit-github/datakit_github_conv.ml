@@ -128,7 +128,7 @@ module Make (DK : S) = struct
         match t with
         | None -> (acc, dirty)
         | Some (`Dirty d) -> (acc, Elt.IdSet.add d dirty)
-        | Some (#Elt.id as e) -> (Elt.IdSet.add e acc, dirty) )
+        | Some (#Elt.id as e) -> (Elt.IdSet.add e acc, dirty))
       (Elt.IdSet.empty, Elt.IdSet.empty)
       diff
 
@@ -144,20 +144,20 @@ module Make (DK : S) = struct
     let rec aux acc = function
       | [] -> Lwt.return acc
       | context :: todo -> (
-        match Path.of_steps context with
-        | Error e ->
-            Log.err (fun l -> l "%s" e);
-            aux acc todo
-        | Ok ctx -> (
-            let dir = root /@ ctx in
-            read_dir_if_exists tree dir >>= fun childs ->
-            let todo = List.map (fun c -> context @ [ c ]) childs @ todo in
-            exists_file tree (dir / file) >>= function
-            | false -> aux acc todo
-            | true -> (
-                fn (Path.unwrap ctx) >>= function
-                | None -> aux acc todo
-                | Some e -> aux (Set.add e acc) todo ) ) )
+          match Path.of_steps context with
+          | Error e ->
+              Log.err (fun l -> l "%s" e);
+              aux acc todo
+          | Ok ctx -> (
+              let dir = root /@ ctx in
+              read_dir_if_exists tree dir >>= fun childs ->
+              let todo = List.map (fun c -> context @ [ c ]) childs @ todo in
+              exists_file tree (dir / file) >>= function
+              | false -> aux acc todo
+              | true -> (
+                  fn (Path.unwrap ctx) >>= function
+                  | None -> aux acc todo
+                  | Some e -> aux (Set.add e acc) todo ) ) )
     in
     aux Set.empty [ [] ]
 
@@ -192,9 +192,9 @@ module Make (DK : S) = struct
             | Some _ ->
                 let user = User.v user in
                 let repo = Repo.v ~user ~repo in
-                Repo.Set.singleton repo )
+                Repo.Set.singleton repo)
           repos
-        >|= reduce_repos )
+        >|= reduce_repos)
       users
     >|= fun repos ->
     let repos = reduce_repos repos in
@@ -246,11 +246,13 @@ module Make (DK : S) = struct
           let user = User.name c.Comment.user in
           write ~prefix "id" (string_of_int c.Comment.id) >>*= fun () ->
           write ~prefix "user" user >>*= fun () ->
-          write ~newline:false ~prefix "body" c.Comment.body )
+          write ~newline:false ~prefix "body" c.Comment.body)
         (Array.to_list pr.PR.comments)
       >>= fun l ->
       List.fold_left
-        (fun acc x -> acc >>*= fun () -> Lwt.return x)
+        (fun acc x ->
+          acc >>*= fun () ->
+          Lwt.return x)
         (Lwt.return (Ok ())) l
     in
     lift_errors "update_pr" update
@@ -279,13 +281,12 @@ module Make (DK : S) = struct
             Some (Comment.v ~id ~user ~body)
         | Some id, None ->
             Log.debug (fun l ->
-                l "error: %a/comments/%d/author does not exist" Path.pp dir id
-            );
+                l "error: %a/comments/%d/author does not exist" Path.pp dir id);
             None
         | _ ->
             Log.debug (fun l ->
-                l "error: %a/comments: %s is not a valid id" Path.pp dir n );
-            None )
+                l "error: %a/comments: %s is not a valid id" Path.pp dir n);
+            None)
       ids
     >|= fun comments ->
     List.fold_left
@@ -305,15 +306,15 @@ module Make (DK : S) = struct
     match (head, state, owner) with
     | None, _, _ ->
         Log.debug (fun l ->
-            l "error: %a/pr/%d/head does not exist" Repo.pp repo number );
+            l "error: %a/pr/%d/head does not exist" Repo.pp repo number);
         None
     | _, None, _ ->
         Log.debug (fun l ->
-            l "error: %a/pr/%d/state does not exist" Repo.pp repo number );
+            l "error: %a/pr/%d/state does not exist" Repo.pp repo number);
         None
     | _, _, None ->
         Log.debug (fun l ->
-            l "error: %a/pr/%d/owner does not exist" Repo.pp repo number );
+            l "error: %a/pr/%d/owner does not exist" Repo.pp repo number);
         None
     | Some id, Some state, Some owner ->
         let base =
@@ -324,7 +325,7 @@ module Make (DK : S) = struct
                   l
                     "error: %a/pr/%d/base does not exist, using 'master' \
                      instead"
-                    Repo.pp repo number );
+                    Repo.pp repo number);
               "master"
         in
         let owner = User.v owner in
@@ -335,8 +336,7 @@ module Make (DK : S) = struct
           | Some s -> s
           | None ->
               Log.err (fun l ->
-                  l "%s is not a valid PR state, picking `Closed instead" state
-              );
+                  l "%s is not a valid PR state, picking `Closed instead" state);
               `Closed
         in
         Some (PR.v ~state ~title ~base ~owner ~comments head number)
@@ -350,12 +350,12 @@ module Make (DK : S) = struct
       (fun n ->
         pr tree (repo, int_of_string n) >|= function
         | None -> PR.Set.empty
-        | Some p -> PR.Set.singleton p )
+        | Some p -> PR.Set.singleton p)
       nums
     >|= fun prs ->
     let prs = reduce_prs prs in
     Log.debug (fun l ->
-        l "prs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo PR.Set.pp prs );
+        l "prs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo PR.Set.pp prs);
     prs
 
   let maybe_repos tree = function
@@ -389,7 +389,7 @@ module Make (DK : S) = struct
       Commit.Set.empty commits
     |> fun cs ->
     Log.debug (fun l ->
-        l "commits_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Commit.Set.pp cs );
+        l "commits_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Commit.Set.pp cs);
     cs
 
   let reduce_commits = List.fold_left Commit.Set.union Commit.Set.empty
@@ -430,7 +430,7 @@ module Make (DK : S) = struct
         | Some v ->
             let v = Cstruct.of_string (v ^ "\n") in
             lift_errors "update_status"
-            @@ DK.Transaction.create_or_replace_file t (dir / k) v )
+            @@ DK.Transaction.create_or_replace_file t (dir / k) v)
       kvs
 
   let status tree (commit, context) =
@@ -450,11 +450,11 @@ module Make (DK : S) = struct
           | Some s -> s
           | None ->
               Log.err (fun l ->
-                  l "%s: invalid state, using `Failure instead" str );
+                  l "%s: invalid state, using `Failure instead" str);
               `Failure
         in
         Log.debug (fun l ->
-            l "status %a -> %a" Path.pp context Status_state.pp state );
+            l "status %a -> %a" Path.pp context Status_state.pp state);
         read_file_if_exists tree (dir / "description") >>= fun description ->
         read_file_if_exists tree (dir / "target_url") >|= fun url ->
         let context = Path.unwrap context in
@@ -471,13 +471,13 @@ module Make (DK : S) = struct
         walk
           (module Status.Set)
           tree dir
-          ("state", fun c -> status tree (commit, c)) )
+          ("state", fun c -> status tree (commit, c)))
       (Commit.Set.elements commits)
     >|= fun status ->
     let status = reduce_status status in
     Log.debug (fun l ->
         l "statuses_of_commits %a -> @;@[<2>%a@]" Commit.Set.pp commits
-          Status.Set.pp status );
+          Status.Set.pp status);
     status
 
   let maybe_commits tree = function
@@ -509,7 +509,7 @@ module Make (DK : S) = struct
     walk (module Ref.Set) tree dir ("head", fun n -> ref tree (repo, n))
     >|= fun refs ->
     Log.debug (fun l ->
-        l "refs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Ref.Set.pp refs );
+        l "refs_of_repo %a -> @;@[<2>%a@]" Repo.pp repo Ref.Set.pp refs);
     refs
 
   let reduce_refs = List.fold_left Ref.Set.union Ref.Set.empty
@@ -560,7 +560,8 @@ module Make (DK : S) = struct
 
   let snapshot_of_commit c =
     safe_tree c >>= fun tree ->
-    repos tree >>= fun repos -> snapshot_of_repos tree repos
+    repos tree >>= fun repos ->
+    snapshot_of_repos tree repos
 
   (* Dirty *)
 
@@ -579,9 +580,9 @@ module Make (DK : S) = struct
             | true ->
                 let user = User.v user in
                 let repo = Repo.v ~user ~repo in
-                Elt.IdSet.singleton (`Repo repo) )
+                Elt.IdSet.singleton (`Repo repo))
           repos
-        >|= reduce_elts )
+        >|= reduce_elts)
       users
     >|= reduce_elts
 
@@ -594,8 +595,8 @@ module Make (DK : S) = struct
         exists_file tree d >|= function
         | false -> Elt.IdSet.empty
         | true -> (
-          try Elt.IdSet.singleton (`PR (repo, int_of_string n))
-          with Failure _ -> Elt.IdSet.empty ) )
+            try Elt.IdSet.singleton (`PR (repo, int_of_string n))
+            with Failure _ -> Elt.IdSet.empty ))
       nums
     >|= reduce_elts
 
@@ -613,10 +614,12 @@ module Make (DK : S) = struct
     (* we only check for dirty prs/refs for monitored repos only *)
     Lwt_list.map_p
       (fun r ->
-        dirty_prs t r >>= fun prs -> dirty_refs t r >|= fun refs -> prs ++ refs
-        )
+        dirty_prs t r >>= fun prs ->
+        dirty_refs t r >|= fun refs ->
+        prs ++ refs)
       (Repo.Set.elements repos)
-    >|= fun more -> dirty_repos ++ reduce_elts more
+    >|= fun more ->
+    dirty_repos ++ reduce_elts more
 
   let dirty_file : Elt.id -> Path.t = function
     | `Repo r -> root r / ".dirty"
@@ -685,11 +688,11 @@ module Make (DK : S) = struct
           | `Commit id -> combine_commit acc tree id
           | `Status id ->
               combine_status acc tree id >>= fun acc ->
-              combine_commit acc tree (fst id) )
+              combine_commit acc tree (fst id))
         Diff.empty (Elt.IdSet.elements diff)
       >|= fun r ->
       Log.debug (fun l ->
-          l "apply @[<2>%a@]@;@[<2>->%a@]" Elt.IdSet.pp diff Diff.pp r );
+          l "apply @[<2>%a@]@;@[<2>->%a@]" Elt.IdSet.pp diff Diff.pp r);
       r
 
   type t = { head : DK.Commit.t; snapshot : Snapshot.t; dirty : dirty }
@@ -705,7 +708,8 @@ module Make (DK : S) = struct
 
   let diff x y =
     safe_diff x y >>= fun (diff, dirty) ->
-    apply_on_commit diff x >|= fun s -> (s, dirty)
+    apply_on_commit diff x >|= fun s ->
+    (s, dirty)
 
   let tr_head tr =
     DK.Transaction.parents tr >>= function
@@ -720,14 +724,14 @@ module Make (DK : S) = struct
     DK.Branch.transaction branch >>= function
     | Error e ->
         Log.err (fun l ->
-            l "snpshot %s: %a" (DK.Branch.name branch) DK.pp_error e );
+            l "snpshot %s: %a" (DK.Branch.name branch) DK.pp_error e);
         Lwt.fail_with "snapshot"
     | Ok tr -> (
         Log.debug (fun l ->
             let c =
               match old with None -> "*" | Some t -> DK.Commit.id t.head
             in
-            l "snapshot %s old=%s" debug c );
+            l "snapshot %s old=%s" debug c);
         tr_head tr >>= fun head ->
         match old with
         | None ->
@@ -742,11 +746,12 @@ module Make (DK : S) = struct
   let of_commit ~debug ?old head =
     Log.debug (fun l ->
         let c = match old with None -> "*" | Some t -> DK.Commit.id t.head in
-        l "snapshot %s old=%s" debug c );
+        l "snapshot %s old=%s" debug c);
     match old with
     | None ->
         snapshot_of_commit head >>= fun snapshot ->
-        dirty_of_commit head >|= fun dirty -> { head; snapshot; dirty }
+        dirty_of_commit head >|= fun dirty ->
+        { head; snapshot; dirty }
     | Some old ->
         diff head old.head >|= fun (diff, dirty) ->
         let snapshot = Diff.apply diff old.snapshot in
@@ -777,7 +782,7 @@ module Make (DK : S) = struct
     else
       let f tr =
         Log.debug (fun l ->
-            l "remove_snapshot (from %s):@;%a" debug Elt.IdSet.pp t );
+            l "remove_snapshot (from %s):@;%a" debug Elt.IdSet.pp t);
         Lwt_list.iter_p (remove_elt tr) (Elt.IdSet.elements t)
       in
       Some f
@@ -787,7 +792,7 @@ module Make (DK : S) = struct
     else
       let f tr =
         Log.debug (fun l ->
-            l "update_snapshot (from %s):@;%a" debug Elt.Set.pp t );
+            l "update_snapshot (from %s):@;%a" debug Elt.Set.pp t);
         Lwt_list.iter_p (update_elt tr) (Elt.Set.elements t)
       in
       Some f
@@ -805,5 +810,7 @@ module Make (DK : S) = struct
     in
     tr_head tr >>= fun head ->
     clean () >>= fun () ->
-    update () >>= fun () -> tr_diff tr head >|= fun diff -> diff <> []
+    update () >>= fun () ->
+    tr_diff tr head >|= fun diff ->
+    diff <> []
 end

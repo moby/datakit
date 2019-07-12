@@ -23,14 +23,14 @@ module type MAP = sig
   val pp : 'a Fmt.t -> 'a t Fmt.t
 end
 
-(** [Set] is similar to {!Set.Make} but for pretty-printable sets. *)
 module Set (E : ELT) : SET with type elt = E.t
+(** [Set] is similar to {!Set.Make} but for pretty-printable sets. *)
 
 (** {1 Data-model} *)
 
 module Status_state : sig
-  (** The type for status states. *)
   type t = [ `Error | `Pending | `Success | `Failure ]
+  (** The type for status states. *)
 
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for status states. *)
@@ -44,8 +44,8 @@ module Status_state : sig
 end
 
 module User : sig
-  (** The type for GitHub users. *)
   type t = private { name : string }
+  (** The type for GitHub users. *)
 
   val v : string -> t
   (** [v n] is the user with name [n]. *)
@@ -56,19 +56,19 @@ module User : sig
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for users. *)
 
-  (** Sets of users. *)
   module Set : SET with type elt = t
+  (** Sets of users. *)
 
-  (** Maps of users. *)
   module Map : MAP with type key = t
+  (** Maps of users. *)
 end
 
 module Repo : sig
-  (** The type for Github repositories. *)
   type t = private { user : User.t; repo : string }
+  (** The type for Github repositories. *)
 
-  (** The type for repository state. *)
   type state = [ `Monitored | `Ignored ]
+  (** The type for repository state. *)
 
   val v : user:User.t -> repo:string -> t
   (** [v user string] will create a fresh {!t}. *)
@@ -85,16 +85,16 @@ module Repo : sig
   val pp_state : state Fmt.t
   (** [pp_state] is the pretty-printer for repository state. *)
 
-  (** Sets of repositories. *)
   module Set : SET with type elt = t
+  (** Sets of repositories. *)
 
-  (** Maps of repositories. *)
   module Map : MAP with type key = t
+  (** Maps of repositories. *)
 end
 
 module Commit : sig
-  (** The type for commits. *)
   type t = private { repo : Repo.t; hash : string }
+  (** The type for commits. *)
 
   val v : Repo.t -> string -> t
   (** [v repo id] builds a fresh {!t} with [repo] and [id]. *)
@@ -127,8 +127,8 @@ module Commit : sig
 end
 
 module Comment : sig
-  (** The type for comments. *)
   type t = private { id : int; user : User.t; body : string }
+  (** The type for comments. *)
 
   val v : id:int -> user:User.t -> body:string -> t
   (** [v ~id ~user ~body] is a comment done by [user] saying [body]. *)
@@ -148,7 +148,6 @@ module Comment : sig
 end
 
 module PR : sig
-  (** The type for pull-requests values. *)
   type t = private {
     head : Commit.t;
     number : int;
@@ -156,8 +155,9 @@ module PR : sig
     title : string;
     base : string;
     owner : User.t;
-    comments : Comment.t array
+    comments : Comment.t array;
   }
+  (** The type for pull-requests values. *)
 
   val v :
     ?state:[ `Open | `Closed ] ->
@@ -178,8 +178,8 @@ module PR : sig
   val compare : t -> t -> int
   (** [compare] compares pull requests. *)
 
-  (** The type for commit ids. *)
   type id = Repo.t * int
+  (** The type for commit ids. *)
 
   val pp_id : id Fmt.t
   (** [pp_id] is the pretty-printer for PR ids. *)
@@ -241,26 +241,26 @@ module PR : sig
 
   module IdSet : SET with type elt = id
 
-  (** Maps indexed by pull-request IDs. *)
   module Index : MAP with type key = id
+  (** Maps indexed by pull-request IDs. *)
 
   val index : Set.t -> t Index.t Repo.Map.t
   (** [index s] indexes [s] by pull-request IDs. *)
 end
 
 module Status : sig
+  type context = string list
   (** The type build build status contexts. ["ci/datakit"] is stored
       as ["ci"; "datakit"]. *)
-  type context = string list
 
-  (** The type for status values. *)
   type t = private {
     commit : Commit.t;
     context : context;
     url : Uri.t option;
     description : string option;
-    state : Status_state.t
+    state : Status_state.t;
   }
+  (** The type for status values. *)
 
   val v :
     ?description:string ->
@@ -277,8 +277,8 @@ module Status : sig
   val pp_context : context Fmt.t
   (** [pp_context] pretty-prints build status' contexts. *)
 
-  (** The type for build-status IDs. *)
   type id = Commit.t * context
+  (** The type for build-status IDs. *)
 
   val pp_id : id Fmt.t
   (** [pp_id] is the pretty-printer for build-status IDs. *)
@@ -325,20 +325,20 @@ module Status : sig
     val commits : t -> Commit.Set.t
   end
 
-  (** Maps indexed by build status IDs. *)
   module Index : MAP with type key = id
+  (** Maps indexed by build status IDs. *)
 
   val index : Set.t -> t Index.t Repo.Map.t
   (** [index s] indexes [s] by build status IDs. *)
 end
 
 module Ref : sig
+  type name = string list
   (** The type for reference names. ["heads/master"] is represented as
       ["heads";"master"]. *)
-  type name = string list
 
-  (** The type for Git references. *)
   type t = private { head : Commit.t; name : string list }
+  (** The type for Git references. *)
 
   val v : Commit.t -> name -> t
   (** [v head name] is a fresh {!t} with the [head] commit and
@@ -354,8 +354,8 @@ module Ref : sig
   val compare : t -> t -> int
   (** [compare] compares Git references. *)
 
-  (** The type for Git reference IDs. *)
   type id = Repo.t * name
+  (** The type for Git reference IDs. *)
 
   val pp_id : id Fmt.t
   (** [pp_id] is the pretty-printer for Git reference IDs. *)
@@ -392,14 +392,14 @@ module Ref : sig
 
   module IdSet : SET with type elt = id
 
-  (** The type for reference events' state. *)
   type event = [ `Created of t | `Updated of t | `Removed of id ]
+  (** The type for reference events' state. *)
 
   val pp_event : event Fmt.t
   (** [pp_event] is the pretty-printer for reference events' state.*)
 
-  (** Maps indexed by Git reference IDs. *)
   module Index : MAP with type key = id
+  (** Maps indexed by Git reference IDs. *)
 
   val index : Set.t -> t Index.t Repo.Map.t
   (** [index s] indexes [s] by Git reference IDs. *)
@@ -484,8 +484,8 @@ end
 module Snapshot : sig
   (** {1 GitHub snapshot} *)
 
-  (** The type for GitHub snapshot. *)
   type t
+  (** The type for GitHub snapshot. *)
 
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for snapshots. *)
@@ -519,8 +519,8 @@ module Snapshot : sig
 
   (** {1 Diffs} *)
 
-  (** The type for snapshot diffs. *)
   type diff
+  (** The type for snapshot diffs. *)
 
   val diff : t -> t -> diff
   (** [diff x y] is the difference between [x] and [y]. *)
@@ -563,8 +563,8 @@ end
 module Diff : sig
   (** {1 GitHub Diffs} *)
 
-  (** The type for differences between GitHub states. *)
   type t = Snapshot.diff
+  (** The type for differences between GitHub states. *)
 
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for diffs. *)
@@ -604,8 +604,8 @@ end
 (** API capabilities, used to restrict the scope of an
     {!API.token}. *)
 module Capabilities : sig
-  (** The type for API capabilities. *)
   type t
+  (** The type for API capabilities. *)
 
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for capabilities. *)
@@ -617,6 +617,7 @@ module Capabilities : sig
   (** [parse] is the parses capabilites, such that [parse
       (Fmt.to_to_string pp x) = `Ok x]. *)
 
+  type op = [ `Read | `Write | `Excl ]
   (** The type for API operations.
       {ul
       {- [`Read] allows the bridge to read the corresponding kind of
@@ -631,12 +632,10 @@ module Capabilities : sig
          by other GitHub users on this kind of resources.}
       ul}
   *)
-  type op = [ `Read | `Write | `Excl ]
 
   val pp_op : op Fmt.t
   (** [pp_op] is the pretty-printer for resource operations. *)
 
-  (** The type for API resources. *)
   type resource =
     [ `Repo of string list
     | `PR
@@ -644,6 +643,7 @@ module Capabilities : sig
     | `Status of string list
     | `Ref
     | `Webhook ]
+  (** The type for API resources. *)
 
   val pp_resource : resource Fmt.t
   (** [pp_resource] is the pretty-printer for resources. *)
@@ -677,10 +677,11 @@ end
 (** Signature for the GitHub API. *)
 module type API = sig
   (** {1 API tokens} *)
-  type token  (** The type for API tokens. *)
+  type token
+  (** The type for API tokens. *)
 
-  (** The type for results. *)
   type 'a result = ('a, string) Result.result Lwt.t
+  (** The type for results. *)
 
   val user_exists : token -> user:User.t -> bool result
   (** [exist_user t ~user] is true iff [user] exists. *)
@@ -727,8 +728,8 @@ module type API = sig
       [r]. Note: can be slow/costly if multiple pages of events. *)
 
   module Webhook : sig
-    (** The type for the webhook server state. *)
     type t
+    (** The type for the webhook server state. *)
 
     val v : token -> Uri.t -> t
     (** [v tok uri] is the webhook server state configured to listen

@@ -46,10 +46,13 @@ module Run = struct
     Github.Monad.embed (wait ()) >>+= fun (Run (x, send)) ->
     let worker () =
       Lwt.catch
-        (fun () -> Github.(Monad.run @@ x >|= fun x -> send (Ok x)))
+        (fun () ->
+          Github.(
+            Monad.run @@ x >|= fun x ->
+            send (Ok x)))
         (fun e ->
           send (Error e);
-          Lwt.return_unit )
+          Lwt.return_unit)
     in
     Lwt.async worker;
     schedule ()
@@ -59,7 +62,7 @@ module Run = struct
       (fun () -> Github.Monad.run @@ schedule ())
       (fun e ->
         Log.err (fun l -> l "GitHub scheduler caught %a, restarting" Fmt.exn e);
-        for_ever () )
+        for_ever ())
 end
 
 let () = Lwt.async Run.for_ever
@@ -92,7 +95,7 @@ module PR = struct
         let id = Int64.to_int c.issue_comment_id in
         let body = c.issue_comment_body in
         let user = User.v c.issue_comment_user.user_login in
-        Comment.v ~id ~user ~body )
+        Comment.v ~id ~user ~body)
       comments
     |> fun comments ->
     Log.debug (fun l -> l "XXX %a" Fmt.(Dump.list Comment.pp) comments);
@@ -111,10 +114,11 @@ module PR = struct
     PR.v ~state ~title ~base ~owner ~comments head num
 
   let to_gh pr =
-    { update_pull_title = Some pr.title;
+    {
+      update_pull_title = Some pr.title;
       update_pull_body = None;
       update_pull_state = Some pr.state;
-      update_pull_base = Some pr.base
+      update_pull_base = Some pr.base;
     }
 
   let of_event ~token repo pr =
@@ -175,10 +179,11 @@ module Status = struct
 
   let to_gh s =
     assert_short_description (Status.description s);
-    { new_status_context = of_list (Status.context s);
+    {
+      new_status_context = of_list (Status.context s);
       new_status_target_url = map Uri.to_string (Status.url s);
       new_status_description = Status.description s;
-      new_status_state = to_gh_state (Status.state s)
+      new_status_state = to_gh_state (Status.state s);
     }
 
   let of_event repo s =
@@ -254,7 +259,7 @@ module Ref = struct
     token.m
     >>+= (fun () ->
            Github.Repo.get_ref ~user ~repo ~name () >>+~ fun x ->
-           Github.Monad.return x )
+           Github.Monad.return x)
     |> run
     >|= function
     | Ok x -> Some x
@@ -376,7 +381,7 @@ let repos token ~user =
          |> Github.Monad.map
             @@ List.map (fun r ->
                    let user = User.v user in
-                   Repo.v ~user ~repo:r.repository_name ) )
+                   Repo.v ~user ~repo:r.repository_name))
   |> run
 
 let user_repo c = (c.Commit.repo.Repo.user, c.Commit.repo.Repo.repo)
@@ -388,10 +393,10 @@ let status token commit =
   token.m
   >>+= (fun () ->
          Github.Status.get ~user ~repo ~sha ()
-         |> Github.Monad.map Github.Response.value )
+         |> Github.Monad.map Github.Response.value)
   |> run
   >|= R.map (fun r ->
-          List.map (Status.of_gh commit) r.Github_t.combined_status_statuses )
+          List.map (Status.of_gh commit) r.Github_t.combined_status_statuses)
 
 let set_status token status =
   let new_status = Status.to_gh status in
@@ -422,11 +427,15 @@ let remove_ref _ _ _ = not_implemented ()
 let prs token r =
   let { Repo.user; repo } = r in
   let user = User.name user in
-  let of_gh x = Github.Monad.embed (PR.of_gh ~token r x >|= fun x -> [ x ]) in
+  let of_gh x =
+    Github.Monad.embed
+      ( PR.of_gh ~token r x >|= fun x ->
+        [ x ] )
+  in
   token.m
   >>+= (fun () ->
          Github.Pull.for_repo ~state:`Open ~user ~repo ()
-         |> Github.Stream.map of_gh |> Github.Stream.to_list )
+         |> Github.Stream.map of_gh |> Github.Stream.to_list)
   |> run
 
 let pr token (r, num) =
@@ -435,7 +444,7 @@ let pr token (r, num) =
   token.m
   >>+= (fun () ->
          Github.Pull.get ~user ~repo ~num () >>+~ fun pr ->
-         Github.Monad.embed (PR.of_gh ~token r pr) )
+         Github.Monad.embed (PR.of_gh ~token r pr))
   |> run
   >|= function
   | Error _ -> Ok None
@@ -447,22 +456,24 @@ let refs token r =
   let refs ty =
     token.m
     >>+= (fun () ->
-           Github.Repo.refs ~ty ~user ~repo () |> Github.Stream.to_list )
+           Github.Repo.refs ~ty ~user ~repo () |> Github.Stream.to_list)
     |> run
     >>= function
     | Error e ->
         Log.err (fun l ->
-            l "error while reading refs for %s/%s: %s" user repo e );
+            l "error while reading refs for %s/%s: %s" user repo e);
         Lwt.return_nil
     | Ok git_refs ->
         Lwt_list.fold_left_s
           (fun acc ref ->
             Ref.of_gh ~token ~repo:r ref >|= function
             | None -> acc
-            | Some r -> r :: acc )
+            | Some r -> r :: acc)
           [] git_refs
   in
-  refs "heads" >>= fun heads -> refs "tags" >|= fun tags -> Ok (heads @ tags)
+  refs "heads" >>= fun heads ->
+  refs "tags" >|= fun tags ->
+  Ok (heads @ tags)
 
 let ref token (r, name) =
   let name = String.concat ~sep:"/" name in
@@ -471,11 +482,13 @@ let ref token (r, name) =
   token.m
   >>+= (fun () ->
          Github.Repo.get_ref ~user ~repo ~name () >>+~ fun r ->
-         Github.Monad.return r )
+         Github.Monad.return r)
   |> run
   >>= function
   | Error _ -> Lwt.return (Ok None)
-  | Ok ref -> Ref.of_gh ~token ~repo:r ref >|= fun r -> Ok r
+  | Ok ref ->
+      Ref.of_gh ~token ~repo:r ref >|= fun r ->
+      Ok r
 
 let events token r =
   let { Repo.user; repo } = r in
@@ -484,7 +497,7 @@ let events token r =
   >>+= (fun () ->
          let events = Github.Event.for_repo ~user ~repo () in
          Github.Stream.to_list events >>+= fun events ->
-         Github.Monad.embed @@ Lwt_list.map_p (Event.of_gh ~token) events )
+         Github.Monad.embed @@ Lwt_list.map_p (Event.of_gh ~token) events)
   |> run
 
 module Webhook = struct

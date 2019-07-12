@@ -44,7 +44,7 @@ end
 let catch fn =
   Lwt.catch fn (function
     | Failure msg -> Lwt.return (Error (`Failure msg))
-    | ex -> Lwt.return (Error (`Failure (Printexc.to_string ex))) )
+    | ex -> Lwt.return (Error (`Failure (Printexc.to_string ex))))
 
 module Path = struct
   (* Each entry in the cache has a branch in the database:
@@ -113,7 +113,7 @@ module Make (B : CI_s.BUILDER) = struct
     logs : CI_live_log.manager;
     cache : Cache.t;
     (* In-memory cache, including pending items *)
-    builder : B.t (* The underlying builder *)
+    builder : B.t; (* The underlying builder *)
   }
 
   let create ~logs builder = { logs; cache = Cache.create (); builder }
@@ -121,14 +121,17 @@ module Make (B : CI_s.BUILDER) = struct
   let needs_rebuild tree = DK.Tree.exists tree Path.rebuild
 
   let ensure_removed tr path =
-    DK.Transaction.remove tr path >|= fun (Ok () | Error _) -> ()
+    DK.Transaction.remove tr path >|= fun (Ok () | Error _) ->
+    ()
 
   let load_from_tree builder tree key =
     DK.Tree.read_file tree Path.failure >>= function
     | Ok failure -> Lwt.return @@ Ok (`Failure (Cstruct.to_string failure))
     | Error `Does_not_exist ->
         (* If we failed to load the failure, this result must be successful. *)
-        catch (fun () -> B.load builder tree key >|= fun v -> Ok (`Success v))
+        catch (fun () ->
+            B.load builder tree key >|= fun v ->
+            Ok (`Success v))
     | Error e ->
         Lwt.return @@ Error (`Failure (Fmt.to_to_string DK.pp_error e))
 
@@ -137,7 +140,8 @@ module Make (B : CI_s.BUILDER) = struct
     DK.branch dk branch >>*= fun branch ->
     DK.Branch.with_transaction branch (fun t ->
         DK.Transaction.create_or_replace_file t Path.rebuild (Cstruct.create 0)
-        >>*= fun () -> DK.Transaction.commit t ~message:"Marked for rebuild" )
+        >>*= fun () ->
+        DK.Transaction.commit t ~message:"Marked for rebuild")
     >>*= Lwt.return
 
   let mark_for_rebuild t conn branch_name =
@@ -169,11 +173,12 @@ module Make (B : CI_s.BUILDER) = struct
             let logs ~failed =
               CI_output.(
                 Saved
-                  { title;
+                  {
+                    title;
                     commit = DK.Commit.id commit;
                     branch = branch_name;
                     rebuild;
-                    failed
+                    failed;
                   })
             in
             load_from_tree t.builder tree key >|= function
@@ -186,7 +191,7 @@ module Make (B : CI_s.BUILDER) = struct
                     f
                       "Failed to load value from previously cached result %s: \
                        %s"
-                      (DK.Commit.id commit) msg );
+                      (DK.Commit.id commit) msg);
                 None ) )
 
   (* Monitor the pending state of the log and keep the pending state in our hash table
@@ -205,13 +210,15 @@ module Make (B : CI_s.BUILDER) = struct
            update the cache before they check for the new status. *)
           let user_update, waker = Lwt.wait () in
           let r =
-            { result = Error (`Pending (reason, user_update));
-              output = pending_log
+            {
+              result = Error (`Pending (reason, user_update));
+              output = pending_log;
             }
           in
           Cache.set t.cache k r;
           wake ();
-          update >>= fun () -> loop (fun () -> Lwt.wakeup waker ())
+          update >>= fun () ->
+          loop (fun () -> Lwt.wakeup waker ())
     in
     loop ignore
 
@@ -272,7 +279,8 @@ module Make (B : CI_s.BUILDER) = struct
                     >>*= fun () ->
                     DK.Transaction.commit trans
                       ~message:"Cached successful result"
-                    >>*= fun () -> return (Ok x)
+                    >>*= fun () ->
+                    return (Ok x)
                 | Error (`Failure msg) ->
                     CI_live_log.log log "Failed: %s" msg;
                     Prometheus.Counter.inc_one
@@ -285,7 +293,8 @@ module Make (B : CI_s.BUILDER) = struct
                     >>*= fun () ->
                     DK.Transaction.commit trans
                       ~message:("Cached failure: " ^ msg)
-                    >>*= fun () -> return (Error (`Failure msg)) )
+                    >>*= fun () ->
+                    return (Error (`Failure msg)))
             >>*= fun result ->
             DK.Branch.head branch >>*= function
             | None -> failf "Branch deleted as we saved it!"
@@ -297,23 +306,22 @@ module Make (B : CI_s.BUILDER) = struct
                   `Rebuildable (lazy (mark_for_rebuild t conn branch_name))
                 in
                 let saved =
-                  { CI_output.commit = DK.Commit.id commit;
+                  {
+                    CI_output.commit = DK.Commit.id commit;
                     branch = branch_name;
                     title;
                     rebuild;
-                    failed
+                    failed;
                   }
                 in
                 finish { result; output = CI_output.Saved saved }
-            (* At this point, the entry is no longer pending and other people can update it. *)
-            )
+            (* At this point, the entry is no longer pending and other people can update it. *))
           (fun ex ->
             let msg = Printexc.to_string ex in
             Log.err (fun f -> f "Uncaught exception in do_build: %s" msg);
             Prometheus.Counter.inc_one
             @@ Metrics.build_exceptions_total (B.name t.builder);
-            finish { result = Error (`Failure msg); output = CI_output.Empty }
-            ) );
+            finish { result = Error (`Failure msg); output = CI_output.Empty }));
     match Cache.find t.cache branch_name with
     | None -> assert false
     | Some v -> v
@@ -329,11 +337,12 @@ module Make (B : CI_s.BUILDER) = struct
         | None -> do_build t conn ctx k
         | Some v ->
             Log.info (fun f ->
-                f "Loaded cached result from %s" (B.branch t.builder k) );
+                f "Loaded cached result from %s" (B.branch t.builder k));
             Cache.set t.cache branch_name v;
             v )
 
   let find t ctx k =
     let open! CI_term.Infix in
-    CI_term.dk >>= fun dk -> CI_term.of_lwt_slow (fun () -> lookup t dk ctx k)
+    CI_term.dk >>= fun dk ->
+    CI_term.of_lwt_slow (fun () -> lookup t dk ctx k)
 end

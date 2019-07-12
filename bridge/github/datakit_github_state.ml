@@ -39,7 +39,7 @@ module Make (API : API) = struct
       (fun status -> function Ok s -> Status.Set.union status s
         | Error (c, e) ->
             Log.err (fun l -> l "API.status %a: %s" Commit.pp c e);
-            status )
+            status)
       Status.Set.empty status
 
   let new_prs token repos =
@@ -53,14 +53,15 @@ module Make (API : API) = struct
           | Error e -> Error (r, e)
           | Ok prs ->
               List.filter (fun pr -> pr.PR.state = `Open) prs |> PR.Set.of_list
-              |> fun x -> Ok x )
+              |> fun x ->
+              Ok x)
       repos_l
     >|= fun new_prs ->
     List.fold_left
       (fun new_prs -> function Ok prs -> PR.Set.union prs new_prs
         | Error (r, e) ->
             Log.err (fun l -> l "API.prs %a: %s" Repo.pp r e);
-            new_prs )
+            new_prs)
       PR.Set.empty new_prs
 
   let new_refs token repos =
@@ -72,14 +73,14 @@ module Make (API : API) = struct
         else
           API.refs token.t r >|= function
           | Error e -> Error (r, e)
-          | Ok refs -> Ok (Ref.Set.of_list refs) )
+          | Ok refs -> Ok (Ref.Set.of_list refs))
       repos_l
     >|= fun new_refs ->
     List.fold_left
       (fun new_refs -> function Ok refs -> Ref.Set.union refs new_refs
         | Error (r, e) ->
             Log.err (fun l -> l "API.refs %a: %s" Repo.pp r e);
-            new_refs )
+            new_refs)
       Ref.Set.empty new_refs
 
   let read_prs token ids =
@@ -92,7 +93,7 @@ module Make (API : API) = struct
           | Error e -> Error (pr, e)
           | Ok None -> Ok None
           | Ok (Some pr) ->
-              if pr.PR.state = `Open then Ok (Some pr) else Ok None )
+              if pr.PR.state = `Open then Ok (Some pr) else Ok None)
       (PR.IdSet.elements ids)
     >|= fun new_prs ->
     List.fold_left
@@ -100,7 +101,7 @@ module Make (API : API) = struct
         | Ok None -> PR.Set.empty
         | Error (pr, e) ->
             Log.err (fun l -> l "API.pr %a: %s" PR.pp_id pr e);
-            new_prs )
+            new_prs)
       PR.Set.empty new_prs
 
   let read_refs token ids =
@@ -111,7 +112,7 @@ module Make (API : API) = struct
         else
           API.ref token.t r >|= function
           | Error e -> Error (r, e)
-          | Ok r -> Ok r )
+          | Ok r -> Ok r)
       (Ref.IdSet.elements ids)
     >|= fun new_refs ->
     List.fold_left
@@ -119,7 +120,7 @@ module Make (API : API) = struct
         | Ok None -> Ref.Set.empty
         | Error (r, e) ->
             Log.err (fun l -> l "API.ref %a: %s" Ref.pp_id r e);
-            new_refs )
+            new_refs)
       Ref.Set.empty new_refs
 
   (* Import http://github.com/usr/repo state. *)
@@ -143,8 +144,7 @@ module Make (API : API) = struct
         ~status:new_status
     in
     Log.debug (fun l ->
-        l "State.import %a@;@[<2>new:%a@]" Repo.Set.pp repos Snapshot.pp new_t
-    );
+        l "State.import %a@;@[<2>new:%a@]" Repo.Set.pp repos Snapshot.pp new_t);
     let base = Snapshot.without_repos repos t in
     let repos = Repo.Set.union (Snapshot.repos t) repos in
     let prs = PR.Set.union (Snapshot.prs base) new_prs in
@@ -209,7 +209,7 @@ module Make (API : API) = struct
         Log.info (fun l -> l "API.add-webhook %a" Repo.pp r);
         if not (Capabilities.check token.c `Write `Webhook) then
           Lwt.return_unit
-        else watch r )
+        else watch r)
       (Repo.Set.elements repos)
 
   let import_webhook_events token ~events t =
@@ -217,7 +217,8 @@ module Make (API : API) = struct
     | [] -> Lwt.return t
     | events ->
         Log.debug (fun l ->
-            l "[sync_webhook] events:@;%a" (Fmt.Dump.list Event.pp) events );
+            l "[sync_webhook] events:@;%a" (Fmt.Dump.list Event.pp) events);
+
         (* Need to resynchronsize build status for new commits *)
         let commits =
           List.fold_left
@@ -228,7 +229,7 @@ module Make (API : API) = struct
               | Event.Ref (`Removed _) -> acc
               | Event.Ref (`Created r | `Updated r) ->
                   Commit.Set.add (Ref.commit r) acc
-              | Event.Repo _ | Event.Status _ | Event.Other _ -> acc )
+              | Event.Repo _ | Event.Status _ | Event.Other _ -> acc)
             Commit.Set.empty events
         in
         let new_commits = Commit.Set.diff commits (Snapshot.commits t) in

@@ -37,7 +37,7 @@ type t = {
   mutable qlen : int;
   mutable active : int;
   pool : unit Lwt_pool.t;
-  mutable users : ((CI_s.job_id * string option) * CI_live_log.t option) list
+  mutable users : ((CI_s.job_id * string option) * CI_live_log.t option) list;
 }
 
 let registered_pools = ref String.Map.empty
@@ -85,10 +85,10 @@ let use ?log t ~reason fn =
                 (stop_use -. stop_wait);
               t.active <- t.active - 1;
               t.users <- remove_first reason t.users;
-              Lwt.return_unit ) ) )
+              Lwt.return_unit)))
     (fun () ->
       Lazy.force dec;
-      Lwt.return () )
+      Lwt.return ())
 
 let use t ?log ?label job_id fn =
   let reason = (job_id, label) in

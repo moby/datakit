@@ -3,15 +3,15 @@ open CI_utils
 type 'a status = {
   result :
     ('a, [ `Pending of string * unit Lwt.t | `Failure of string ]) result;
-  output : CI_output.logs
+  output : CI_output.logs;
 }
 
-(** Used in logging and monitoring to identify the owning job. *)
 type job_id = CI_target.t * string
+(** Used in logging and monitoring to identify the owning job. *)
 
 module type CONTEXT = sig
-  (** A [ctx] is a context in which a term is evaluated. *)
   type t
+  (** A [ctx] is a context in which a term is evaluated. *)
 
   val watch : t -> unit Lwt.t -> unit
   (** [watch t thread] is called to indicate that the term will need

@@ -9,8 +9,8 @@ open Result
 
 (** Error codes. *)
 module Error : sig
-  (** The type for generic errors. *)
   type err = { errno : int32 option; descr : string }
+  (** The type for generic errors. *)
 
   (** The type for FS errors. *)
   type t =
@@ -58,8 +58,8 @@ module Error : sig
   val pp : t Fmt.t
 end
 
-(** The type of errors. *)
 type 'a or_err = ('a, Error.t) Result.result Lwt.t
+(** The type of errors. *)
 
 val ok : 'a -> 'a or_err
 (** [ok x] is [Lwt.return (Ok x)] *)
@@ -73,8 +73,8 @@ type metadata = { length : int64; perm : perm }
 
 (** File operations. *)
 module File : sig
-  (** The type for open files, e.g. file descriptors. *)
   type fd
+  (** The type for open files, e.g. file descriptors. *)
 
   val create_fd :
     read:(offset:int64 -> count:int -> Cstruct.t or_err) ->
@@ -88,8 +88,8 @@ module File : sig
   val write : fd -> offset:int64 -> Cstruct.t -> unit or_err
   (** [write f ~offset] writes in a open file. *)
 
-  (** The type for files. *)
   type t
+  (** The type for files. *)
 
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for files. *)
@@ -172,11 +172,11 @@ module File : sig
   (** {1 Streams} *)
 
   module Stream : sig
-    (** The type of typed streams.  *)
     type t
+    (** The type of typed streams.  *)
 
-    (** The type for stream sessions. *)
     type 'a session
+    (** The type for stream sessions. *)
 
     val session : 'a -> 'a session
     (** [session init] creates a fresh session, whose initial value is
@@ -206,8 +206,8 @@ end
 
 (** Directory operations. *)
 module rec Dir : sig
-  (** The type for directories. *)
   type t
+  (** The type for directories. *)
 
   val pp : t Fmt.t
   (** [pp] is a pretty-printer for directories. *)
@@ -283,14 +283,14 @@ end
 and Inode : sig
   (** Inode.t operations. *)
 
-  (** The type for inodes. *)
   type t
+  (** The type for inodes. *)
 
   val pp : t Fmt.t
   (** [pp] is the pretty-printer for inodes. *)
 
-  (** The type for inode kinds. *)
   type kind = [ `File of File.t | `Dir of Dir.t ]
+  (** The type for inode kinds. *)
 
   val file : string -> File.t -> t
   (** [file name f] is the inode [t] such that [basename t] is [name]

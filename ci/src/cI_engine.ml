@@ -53,12 +53,12 @@ type job = {
   (* Cancel the previous evaluation, if any *)
   mutable state : string * string CI_output.t option;
   (* The last result of evaluating [term] (src_commit, last output) *)
-  mutable dirty : bool (* [state] needs writing to DB *)
+  mutable dirty : bool; (* [state] needs writing to DB *)
 }
 
 and target = {
   mutable v : CI_target.v;
-  mutable jobs : job list (* (only mutable for init) *)
+  mutable jobs : job list; (* (only mutable for init) *)
 }
 
 let job_id job =
@@ -102,7 +102,7 @@ type project = {
   canaries : CI_target.Set.t option;
   mutable open_prs : target PR.Index.t;
   mutable refs : target Ref.Index.t;
-  mutable targets_of_commit : CI_target.t list String.Map.t
+  mutable targets_of_commit : CI_target.t list String.Map.t;
 }
 
 type t = {
@@ -111,7 +111,7 @@ type t = {
   projects : project Repo.Map.t;
   history : CI_history.t;
   mutable dk : DK.t Lwt.t;
-  recalculate : unit Lwt_condition.t
+  recalculate : unit Lwt_condition.t;
       (* Fires when [snapshot] changes or a rebuild is triggered. *)
 }
 
@@ -121,13 +121,14 @@ let rec connect connect_dk =
   Lwt.catch
     (fun () ->
       Prometheus.Counter.inc_one Metrics.connection_attempts;
-      connect_dk () )
+      connect_dk ())
     (fun ex ->
       Prometheus.Counter.inc_one Metrics.connection_failures;
       Log.warn (fun f ->
           f "Failed to connect to DataKit: %s (will retry in 10s)"
-            (Printexc.to_string ex) );
-      Lwt_unix.sleep 10.0 >>= fun () -> connect connect_dk )
+            (Printexc.to_string ex));
+      Lwt_unix.sleep 10.0 >>= fun () ->
+      connect connect_dk)
 
 let metadata_branch = "github-metadata"
 
@@ -140,7 +141,7 @@ let create ~web_ui ?canaries connect_dk projects =
           if not (Repo.Map.mem id projects) then
             Log.warn (fun f ->
                 f "Canary project %a not in list of monitored projects" Repo.pp
-                  id ) )
+                  id))
         canaries );
   let projects =
     Repo.Map.mapi
@@ -153,21 +154,23 @@ let create ~web_ui ?canaries connect_dk projects =
                 ( Repo.Map.find id canaries
                 |> CI_utils.default CI_target.Set.empty )
         in
-        { make_terms;
+        {
+          make_terms;
           open_prs = PR.Index.empty;
           refs = Ref.Index.empty;
           targets_of_commit = String.Map.empty;
-          canaries
-        } )
+          canaries;
+        })
       projects
   in
   let dk = connect connect_dk in
-  { web_ui;
+  {
+    web_ui;
     connect_dk;
     dk;
     projects;
     history = CI_history.create ();
-    recalculate = Lwt_condition.create ()
+    recalculate = Lwt_condition.create ();
   }
 
 let prs t = t.projects |> Repo.Map.map (fun project -> project.open_prs)
@@ -186,7 +189,9 @@ let enable_monitoring t repos =
       | h :: _ ->
           DK.Transaction.diff t h >>*= fun diff ->
           if diff <> [] then commit ()
-          else DK.Transaction.abort t >|*= fun () -> Ok () )
+          else
+            DK.Transaction.abort t >|*= fun () ->
+            Ok ())
   >>*= Lwt.return
 
 let monitor t ?switch fn =
@@ -194,7 +199,9 @@ let monitor t ?switch fn =
   DK.branch t metadata_branch >>*= fun metadata ->
   DK.Branch.wait_for_head metadata ?switch (function
     | None -> ok `Again
-    | Some c -> fn c >>= fun () -> ok `Again )
+    | Some c ->
+        fn c >>= fun () ->
+        ok `Again)
   >|*= function
   | `Abort -> `Abort
   | `Finish `Never -> assert false
@@ -215,7 +222,7 @@ let rec auto_restart t ?switch label fn =
       | Some switch when not (Lwt_switch.is_on switch) ->
           Log.info (fun f ->
               f "Switch is off, so not auto-restarting after error: %s"
-                (Printexc.to_string ex) );
+                (Printexc.to_string ex));
           Lwt.return `Abort
       | None | Some _ -> (
           DK.branch dk "master" >>= function
@@ -225,17 +232,19 @@ let rec auto_restart t ?switch label fn =
                   f
                     "%s: database connection failed: %a\n\
                      (probable cause of %s)"
-                    label DK.pp_error err (Printexc.to_string ex) );
+                    label DK.pp_error err (Printexc.to_string ex));
               reconnect t;
-              auto_restart t label fn ) )
+              auto_restart t label fn ))
 
 let recalculate t ~snapshot job =
   Log.debug (fun f -> f "Recalculate %a" pp_job job);
+
   (* Need to avoid either recalculating the same term twice at the same time,
      or doing a second calculation with an earlier snapshot. *)
   Lwt_mutex.with_lock job.term_lock @@ fun () ->
   let recalc () = Lwt_condition.broadcast t.recalculate () in
   job.cancel ();
+
   (* Stop any previous evaluation *)
   let head = job.parent.v in
   Lwt.catch
@@ -249,12 +258,11 @@ let recalculate t ~snapshot job =
               job.term
           in
           job.cancel <- cancel;
-          r )
+          r)
     (function
       | Failure msg -> Lwt.return (Error (`Failure msg), CI_output.Empty)
       | ex ->
-          Lwt.return (Error (`Failure (Printexc.to_string ex)), CI_output.Empty)
-      )
+          Lwt.return (Error (`Failure (Printexc.to_string ex)), CI_output.Empty))
   >|= fun new_output ->
   let old_head, old_output = job.state in
   let new_hash = Commit.hash (CI_target.head head) in
@@ -266,7 +274,7 @@ let recalculate t ~snapshot job =
       ()
   | _ ->
       Log.debug (fun f ->
-          f "%a -> %a (marked for flush)" pp_job job pp_job_state job );
+          f "%a -> %a (marked for flush)" pp_job job pp_job_state job);
       job.dirty <- true
 
 let make_job t ~parent name term =
@@ -280,13 +288,14 @@ let make_job t ~parent name term =
   in
   let hash = Commit.hash head_commit in
   Lwt.return
-    { name;
+    {
+      name;
       parent;
       term_lock = Lwt_mutex.create ();
       term;
       cancel = ignore;
       state = (hash, history);
-      dirty = false
+      dirty = false;
     }
 
 let apply_canaries canaries prs refs =
@@ -321,14 +330,16 @@ end = struct
   type t = {
     cond : unit Lwt_condition.t;
     mutable free : int;
-    mutable outstanding : int
+    mutable outstanding : int;
   }
 
   let create free = { free; outstanding = 0; cond = Lwt_condition.create () }
 
   let rec push t f =
     match t.free with
-    | 0 -> Lwt_condition.wait t.cond >>= fun () -> push t f
+    | 0 ->
+        Lwt_condition.wait t.cond >>= fun () ->
+        push t f
     | free ->
         t.free <- free - 1;
         t.outstanding <- t.outstanding + 1;
@@ -337,14 +348,16 @@ end = struct
                 t.outstanding <- t.outstanding - 1;
                 t.free <- t.free + 1;
                 Lwt_condition.broadcast t.cond ();
-                Lwt.return_unit ) );
+                Lwt.return_unit));
         Lwt.return_unit
 
   let iter t f = Lwt_list.iter_s (fun x -> push t (fun () -> f x))
 
   let rec wait t =
     if t.outstanding = 0 then Lwt.return_unit
-    else Lwt_condition.wait t.cond >>= fun () -> wait t
+    else
+      Lwt_condition.wait t.cond >>= fun () ->
+      wait t
 end
 
 let index_targets ~prs ~refs =
@@ -381,7 +394,7 @@ let set_status t tr job =
       in
       Log.debug (fun f ->
           f "Set state of %a: %s = %a" Commit.pp_hash hash job.name
-            Status_state.pp status );
+            Status_state.pp status);
       let status =
         let ci = datakit_ci job.name in
         Status.v ~description:descr ~url commit ci status
@@ -398,7 +411,7 @@ let flush_states t snapshot =
       |> List.map (fun j ->
              match j.state with
              | _, None -> assert false
-             | _, Some output -> (j.name, output) )
+             | _, Some output -> (j.name, output))
     in
     let source_commit = Commit.hash (CI_target.head target.v) in
     CI_history.record history dk ~source_commit snapshot
@@ -408,7 +421,7 @@ let flush_states t snapshot =
   |> Lwt_list.iter_s (fun (_repo, project) ->
          project.open_prs |> PR.Index.bindings |> Lwt_list.iter_s record_target
          >>= fun () ->
-         project.refs |> Ref.Index.bindings |> Lwt_list.iter_s record_target )
+         project.refs |> Ref.Index.bindings |> Lwt_list.iter_s record_target)
   >>= fun () ->
   (* Find targets that need to be flushed *)
   let dirty_targets = ref [] in
@@ -419,7 +432,7 @@ let flush_states t snapshot =
   t.projects
   |> Repo.Map.iter (fun _repo project ->
          project.open_prs |> PR.Index.iter check_target;
-         project.refs |> Ref.Index.iter check_target );
+         project.refs |> Ref.Index.iter check_target);
   let dirty_targets = !dirty_targets in
   Log.debug (fun f -> f "flush_states: %d dirty" (List.length dirty_targets));
   if dirty_targets = [] then Lwt.return ()
@@ -445,7 +458,7 @@ let flush_states t snapshot =
                    | jobs ->
                        add_msg "Update %d jobs in %a" (List.length jobs)
                          pp_target target;
-                       jobs |> Lwt_list.iter_s (set_status t tr) )
+                       jobs |> Lwt_list.iter_s (set_status t tr))
             >>= fun () ->
             match !messages with
             | [] -> DK.Transaction.abort tr
@@ -456,13 +469,13 @@ let flush_states t snapshot =
                     Fmt.(vbox (list ~sep:(const cut ()) string))
                     ms
                 in
-                DK.Transaction.commit tr ~message )
+                DK.Transaction.commit tr ~message)
         >>*= fun () ->
         (* Mark flushed targets as clean *)
         dirty_targets
         |> List.iter (fun (_target, jobs) ->
-               jobs |> List.iter (fun job -> job.dirty <- false) );
-        Lwt.return () )
+               jobs |> List.iter (fun job -> job.dirty <- false));
+        Lwt.return ())
       (fun ex ->
         (* Most likely the bridge has deleted the commit because the target was deleted.
             Ideally we'd get the commit it tried to merge with and check, but for now just
@@ -472,8 +485,8 @@ let flush_states t snapshot =
         Log.warn (fun f ->
             f "Failed to update statuses: %a@.%a" CI_utils.pp_exn ex
               Fmt.(Dump.list string)
-              !messages );
-        Lwt.return () )
+              !messages);
+        Lwt.return ())
 
 (* A thread that rebuilds after [t.recalculate] is triggered. *)
 let recalc_loop t ~snapshot_ref =
@@ -487,17 +500,19 @@ let recalc_loop t ~snapshot_ref =
         let terms = project.make_terms (`PR id) in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
-               make_job t ~parent:open_pr name term )
+               make_job t ~parent:open_pr name term)
         >>= fun jobs ->
         open_pr.jobs <- jobs;
         project.open_prs <- PR.Index.add id open_pr project.open_prs;
         Lwt.return open_pr
     | Some open_pr ->
         open_pr.v <- `PR pr;
+
         (* Update in all cases, because we read other things from the same snapshot.
                                    XXX: so compare is very misleading here! *)
         Lwt.return open_pr )
-    >>= fun open_pr -> Lwt_list.iter_p (recalculate t ~snapshot) open_pr.jobs
+    >>= fun open_pr ->
+    Lwt_list.iter_p (recalculate t ~snapshot) open_pr.jobs
   in
   let check_ref ~snapshot project (id, r) =
     Log.debug (fun f -> f "Checking for work on %a" Ref.pp_id id);
@@ -507,7 +522,7 @@ let recalc_loop t ~snapshot_ref =
         let terms = project.make_terms @@ `Ref id in
         String.Map.bindings terms
         |> Lwt_list.map_s (fun (name, term) ->
-               make_job t ~parent:target name term )
+               make_job t ~parent:target name term)
         >>= fun jobs ->
         target.jobs <- jobs;
         project.refs <- Ref.Index.add id target project.refs;
@@ -515,7 +530,8 @@ let recalc_loop t ~snapshot_ref =
     | Some target ->
         target.v <- `Ref r;
         Lwt.return target )
-    >>= fun target -> Lwt_list.iter_p (recalculate t ~snapshot) target.jobs
+    >>= fun target ->
+    Lwt_list.iter_p (recalculate t ~snapshot) target.jobs
   in
   let rec loop () =
     let recalc_needed = Lwt_condition.wait t.recalculate in
@@ -559,14 +575,14 @@ let recalc_loop t ~snapshot_ref =
                PR.Index.bindings prs
                |> Pool.iter pool (fun pr ->
                       incr active_prs;
-                      check_pr ~snapshot project pr )
+                      check_pr ~snapshot project pr)
                >>= fun () ->
                (* Refs *)
                let is_current id target =
                  let current = Ref.Index.mem id refs in
                  if not current then (
                    Log.info (fun f ->
-                       f "Removing closed branch %a" Ref.pp_name (snd id) );
+                       f "Removing closed branch %a" Ref.pp_name (snd id));
                    List.iter (fun j -> j.cancel ()) target.jobs );
                  current
                in
@@ -575,7 +591,7 @@ let recalc_loop t ~snapshot_ref =
                |> Pool.iter pool (fun r ->
                       if is_tag (fst r) then incr active_tags
                       else incr active_braches;
-                      check_ref ~snapshot project r ) )
+                      check_ref ~snapshot project r))
         >>= fun () ->
         Metrics.set_active_targets `Tag !active_tags;
         Metrics.set_active_targets `Branch !active_braches;
@@ -594,7 +610,8 @@ let listen ?switch t =
   let recalc_thread =
     ready >>= fun () ->
     (* Wait for [snapshot_ref] *)
-    auto_restart t ?switch "recalc" @@ fun () -> recalc_loop t ~snapshot_ref
+    auto_restart t ?switch "recalc" @@ fun () ->
+    recalc_loop t ~snapshot_ref
   in
   enable_monitoring t (List.map fst (Repo.Map.bindings t.projects))
   >>= fun () ->
@@ -604,13 +621,14 @@ let listen ?switch t =
         Prometheus.Counter.inc_one Metrics.update_notifications;
         snapshot_ref := Some snapshot;
         Lwt_condition.broadcast t.recalculate ();
-        Lwt.return () )
+        Lwt.return ())
     >>= fun `Abort ->
     snapshot_ref := None;
     Lwt_condition.broadcast t.recalculate ();
+
     (* Ask [recalc_thread] to stop. *)
     Log.info (fun f ->
-        f "Monitor thread done; waiting for recalc_thread to finish" );
+        f "Monitor thread done; waiting for recalc_thread to finish");
     recalc_thread
   in
   Lwt.choose [ recalc_thread; monitor_thread ]
@@ -638,13 +656,14 @@ let rebuild t ~branch_name =
   t.projects
   |> Repo.Map.iter (fun _ project ->
          project.open_prs |> PR.Index.iter (fun _ x -> check_target x);
-         project.refs |> Ref.Index.iter (fun _ x -> check_target x) );
+         project.refs |> Ref.Index.iter (fun _ x -> check_target x));
   match !triggers with
   | [] ->
       CI_utils.failf "No job depends on %S, so can't rebuild anything"
         branch_name
   | triggers ->
-      Lwt.join triggers >|= fun () -> Lwt_condition.broadcast t.recalculate ()
+      Lwt.join triggers >|= fun () ->
+      Lwt_condition.broadcast t.recalculate ()
 
 let targets_of_commit t repo c =
   match Repo.Map.find repo t.projects with
@@ -652,4 +671,5 @@ let targets_of_commit t repo c =
   | Some p -> String.Map.find c p.targets_of_commit |> CI_utils.default []
 
 let latest_state t target =
-  t.dk >>= fun dk -> CI_history.lookup t.history dk target >|= CI_history.head
+  t.dk >>= fun dk ->
+  CI_history.lookup t.history dk target >|= CI_history.head

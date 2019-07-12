@@ -157,7 +157,8 @@ module Op9p = struct
   let read inode =
     match Inode.kind inode with
     | `File file ->
-        Vfs.File.open_ file >>= map_error >>*= fun o -> ok (`OpenFile o)
+        Vfs.File.open_ file >>= map_error >>*= fun o ->
+        ok (`OpenFile o)
     | `Dir dir ->
         Vfs.Dir.ls dir >>= map_error >>*= fun items ->
         ok (`OpenDir { Inode.offset = 0L; unread = items })
@@ -192,7 +193,9 @@ module Op9p = struct
         (Lwt.return (mode_of_9p perm extension) >>*= function
          | `Dir -> Vfs.Dir.mkdir d name >>= map_error
          | #Vfs.perm as perm -> Vfs.Dir.mkfile d ~perm name >>= map_error)
-        >>*= fun inode -> read inode >>*= fun open_file -> ok (inode, open_file)
+        >>*= fun inode ->
+        read inode >>*= fun open_file ->
+        ok (inode, open_file)
     | `File _ -> err_not_a_dir (Inode.basename parent)
 
   let remove inode =
@@ -210,7 +213,7 @@ module Make (Flow : Mirage_flow_lwt.S) = struct
       inode : Inode.t;
       parents : Inode.t list;
       (* closest first *)
-      mutable state : [ `Ready | Inode.fd ]
+      mutable state : [ `Ready | Inode.fd ];
     }
 
     type t = Vfs.Dir.t (* The root directory *)
@@ -218,7 +221,7 @@ module Make (Flow : Mirage_flow_lwt.S) = struct
     type connection = {
       root : t;
       info : Protocol_9p.Info.t;
-      mutable fds : fd P.Types.Fid.Map.t
+      mutable fds : fd P.Types.Fid.Map.t;
     }
 
     let connect root info =
@@ -245,21 +248,21 @@ module Make (Flow : Mirage_flow_lwt.S) = struct
     let rec do_walk ~parents ~wqids inode = function
       | [] -> ok (inode, List.rev wqids, parents)
       | x :: xs -> (
-        match Inode.kind inode with
-        | `File _ -> err_can't_walk_from_file
-        | `Dir dir ->
-            ( match x with
-            | "." -> err_dot
-            | ".." -> (
-              match parents with
-              | [] -> ok (inode, parents) (* /.. = / *)
-              | p :: ps -> ok (p, ps) )
-            | x ->
-                Vfs.Dir.lookup dir x >>= map_error >>*= fun x_inode ->
-                ok (x_inode, inode :: parents) )
-            >>*= fun (inode, parents) ->
-            let wqids = Inode.qid inode :: wqids in
-            do_walk ~parents ~wqids inode xs )
+          match Inode.kind inode with
+          | `File _ -> err_can't_walk_from_file
+          | `Dir dir ->
+              ( match x with
+              | "." -> err_dot
+              | ".." -> (
+                  match parents with
+                  | [] -> ok (inode, parents) (* /.. = / *)
+                  | p :: ps -> ok (p, ps) )
+              | x ->
+                  Vfs.Dir.lookup dir x >>= map_error >>*= fun x_inode ->
+                  ok (x_inode, inode :: parents) )
+              >>*= fun (inode, parents) ->
+              let wqids = Inode.qid inode :: wqids in
+              do_walk ~parents ~wqids inode xs )
 
     let walk connection ~cancel:_ { P.Request.Walk.fid; newfid; wnames } =
       lookup connection fid >>*= fun fd ->
@@ -358,8 +361,10 @@ module Make (Flow : Mirage_flow_lwt.S) = struct
          [muid] and [u], but checking if we're setting to the current
          value is tedious, so ignore: *)
       ignore mtime;
+
       (* Linux needs to set mtime *)
       ignore gid;
+
       (* We don't care about permissions *)
       let name = if name = "" then None else Some name in
       let length = if P.Types.Int64.is_any length then None else Some length in
@@ -379,9 +384,12 @@ module Make (Flow : Mirage_flow_lwt.S) = struct
   let accept ~root ~msg flow =
     Log.info (fun l -> l "accepted a new connection on %s" msg);
     Server.connect root flow () >>= function
-    | Error _ as e -> Flow.close flow >|= fun () -> e
+    | Error _ as e ->
+        Flow.close flow >|= fun () ->
+        e
     | Ok t ->
         (* Close the flow when the 9P connection shuts down *)
         Server.after_disconnect t >>= fun () ->
-        Flow.close flow >>= fun () -> ok ()
+        Flow.close flow >>= fun () ->
+        ok ()
 end

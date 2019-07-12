@@ -111,7 +111,7 @@ module Vfs (Store : Store.S) = struct
           | Ok acc -> (
               commit_of_commit_id t.repo line >|= function
               | Error _ as e -> e
-              | Ok commit -> Ok (commit :: acc) ) )
+              | Ok commit -> Ok (commit :: acc) ))
         (Ok []) (List.rev lines)
 
     let append t commit =
@@ -119,7 +119,8 @@ module Vfs (Store : Store.S) = struct
         Fmt.kstrf (fun x -> Cstruct.of_string x) "%a\n" Store.Commit.pp commit
       in
       Vfs.File.size t.file >>*= fun size ->
-      Vfs.File.open_ t.file >>*= fun fd -> Vfs.File.write fd ~offset:size data
+      Vfs.File.open_ t.file >>*= fun fd ->
+      Vfs.File.write fd ~offset:size data
   end
 
   module PathSetFile : sig
@@ -367,9 +368,9 @@ module Vfs (Store : Store.S) = struct
         real_result >|= function
         | Ok _ as ok -> ok
         | Error _ as e -> (
-          match String.Map.find name !extra_dirs with
-          | Some x -> Ok x
-          | None -> e )
+            match String.Map.find name !extra_dirs with
+            | Some x -> Ok x
+            | None -> e )
       in
       let mkdir name =
         lookup name >>= function
@@ -468,7 +469,7 @@ module Vfs (Store : Store.S) = struct
       (* The read/write directory with the current state *)
       get_msg : unit -> string;
       parents : CommitListFile.t;
-      conflicts : PathSetFile.t
+      conflicts : PathSetFile.t;
     }
 
     let base ~our_parents ~ours ~their_commit =
@@ -482,18 +483,23 @@ module Vfs (Store : Store.S) = struct
           Store.lcas_with_commit ours ~n:1 their_commit >>= function
           | Error (`Max_depth_reached | `Too_many_lcas) -> assert false
           | Ok [] -> Lwt.return None
-          | Ok (base :: _) -> Store.of_commit base >|= fun s -> Some s )
+          | Ok (base :: _) ->
+              Store.of_commit base >|= fun s ->
+              Some s )
 
     let snapshot store =
       Store.Head.find store >>= function
       | None -> Lwt.return (Store.Tree.empty, [])
-      | Some id -> Store.Commit.tree id >|= fun tree -> (tree, [ id ])
+      | Some id ->
+          Store.Commit.tree id >|= fun tree ->
+          (tree, [ id ])
 
     let store_of_hash repo hash =
       commit_of_commit_id repo hash >>= function
       | Error _ as e -> Lwt.return e
       | Ok their_commit ->
-          Store.of_commit their_commit >|= fun store -> Ok (store, their_commit)
+          Store.of_commit their_commit >|= fun store ->
+          Ok (store, their_commit)
 
     let base_dir lca =
       match lca with
@@ -529,10 +535,14 @@ module Vfs (Store : Store.S) = struct
           | Ok () -> Ok () )
 
     let transactions_ctl ~info t ~remover = function
-      | "close" -> Lazy.force remover >|= fun () -> Ok ""
+      | "close" ->
+          Lazy.force remover >|= fun () ->
+          Ok ""
       | "commit" -> (
           merge ~info t >>= function
-          | Ok () -> Lazy.force remover >|= fun () -> Ok ""
+          | Ok () ->
+              Lazy.force remover >|= fun () ->
+              Ok ""
           | Error (`Conflict msg) -> err_conflict msg
           | Error (`Vfs err) -> Lwt.return (Error err) )
       | x -> err_unknown_cmd x
@@ -543,12 +553,13 @@ module Vfs (Store : Store.S) = struct
       snapshot store >>= fun (orig_root, parents) ->
       let repo = Store.repo store in
       let t =
-        { repo;
+        {
+          repo;
           store;
           view = Dir.v repo orig_root;
           get_msg;
           parents = CommitListFile.make repo parents;
-          conflicts = PathSetFile.make ()
+          conflicts = PathSetFile.make ();
         }
       in
       (* Current state (will finish initialisation below) *)
@@ -613,13 +624,14 @@ module Vfs (Store : Store.S) = struct
       | Some hash -> Fmt.pf ppf "%a\n" Store.Commit.pp hash
     in
     ignore remove_watch;
+
     (* TODO *)
     Vfs.File.Stream.create pp session
 
   let head_live store =
     Vfs.File.of_stream (fun () ->
         Store.Head.find store >|= fun initial_head ->
-        head_stream store initial_head )
+        head_stream store initial_head)
 
   let reflog_stream store =
     let session = Vfs.File.Stream.session None in
@@ -636,6 +648,7 @@ module Vfs (Store : Store.S) = struct
       | None -> Fmt.string ppf "\n"
     in
     ignore remove_watch;
+
     (* TODO *)
     Vfs.File.Stream.create pp session
 
@@ -649,7 +662,8 @@ module Vfs (Store : Store.S) = struct
           (Irmin.Type.pp_json Store.tree_t)
           snapshot
           (Irmin.Type.pp_json Store.key_t)
-          path );
+          path);
+
     (* FIXME: `hash` is probably slow as there is no caching *)
     let repo = Store.repo store in
     let hash = Store.Contents.hash repo in
@@ -677,13 +691,14 @@ module Vfs (Store : Store.S) = struct
       Store.watch store cb
     in
     ignore remove_watch;
+
     (* TODO *)
     Vfs.File.Stream.create Fmt.string session
 
   let watch_tree store ~path =
     Vfs.File.of_stream (fun () ->
         hash_line store path >|= fun init ->
-        watch_tree_stream store ~path ~init )
+        watch_tree_stream store ~path ~init)
 
   let rec watch_dir store ~path =
     let live = lazy (Vfs.Inode.file "tree.live" (watch_tree store ~path)) in
@@ -728,7 +743,7 @@ module Vfs (Store : Store.S) = struct
         commit_of_commit_id (Store.repo store) hash >>*= fun hash ->
         fast_forward store hash >>= function
         | `Ok -> ok ""
-        | `Not_fast_forward -> err_not_fast_forward )
+        | `Not_fast_forward -> err_not_fast_forward)
 
   let status store () =
     Store.Head.find store >|= function
@@ -748,7 +763,7 @@ module Vfs (Store : Store.S) = struct
       lazy
         (Lwt_mutex.with_lock lock (fun () ->
              items := String.Map.remove name !items;
-             Lwt.return_unit ))
+             Lwt.return_unit))
     in
     let mkdir name =
       Lwt_mutex.with_lock lock (fun () ->
@@ -760,7 +775,7 @@ module Vfs (Store : Store.S) = struct
             else
               let inode = Vfs.Inode.dir name dir in
               items := String.Map.add name inode !items;
-              ok inode )
+              ok inode)
     in
     let mkfile _ _ = Vfs.Dir.err_dir_only in
     let rename _ _ = Vfs.Dir.err_read_only in
@@ -783,7 +798,10 @@ module Vfs (Store : Store.S) = struct
       ]
     in
     let contents = ref (make_contents !name) in
-    let ls () = !contents >|= fun contents -> Ok contents in
+    let ls () =
+      !contents >|= fun contents ->
+      Ok contents
+    in
     let lookup name =
       !contents >|= fun items ->
       let rec aux = function

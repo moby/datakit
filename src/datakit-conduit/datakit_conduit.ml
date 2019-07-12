@@ -34,8 +34,8 @@ let parse ~default_tcp_port str : [ `Ok of t | `Error of string ] =
     match String.cut ~rev:true ~sep:":" s with
     | None -> `Ok (`Tcp (s, default_tcp_port))
     | Some (host, port) -> (
-      try `Ok (`Tcp (host, int_of_string port))
-      with Failure _ -> `Error "use tcp://host:port" )
+        try `Ok (`Tcp (host, int_of_string port))
+        with Failure _ -> `Error "use tcp://host:port" )
   in
   let hyperv_connect _ = `Ok (`HyperV_connect (Uri.of_string str)) in
   let hyperv_accept _ = `Ok (`HyperV_accept (Uri.of_string str)) in
@@ -53,9 +53,9 @@ let parse ~default_tcp_port str : [ `Ok of t | `Error of string ] =
       match acc with
       | Some s -> Some s
       | None -> (
-        match String.cut ~sep:s str with
-        | Some ("", s) -> Some (f s)
-        | _ -> None ) )
+          match String.cut ~sep:s str with
+          | Some ("", s) -> Some (f s)
+          | _ -> None ))
     None choices
   |> function
   | None -> `Error "invalid endpoint"
@@ -86,10 +86,11 @@ module Unix = struct
       (fun () -> Lwt_unix.unlink path)
       (function
         | Unix.Unix_error (Unix.ENOENT, _, _) -> Lwt.return ()
-        | e -> Lwt.fail e )
+        | e -> Lwt.fail e)
     >>= fun () ->
     let s = Lwt_unix.(socket PF_UNIX SOCK_STREAM 0) in
-    Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path) >>= fun () -> Lwt.return s
+    Lwt_unix.bind s (Lwt_unix.ADDR_UNIX path) >>= fun () ->
+    Lwt.return s
 
   let handle ~make_root t fd =
     let msg = str t in
@@ -102,11 +103,11 @@ module Unix = struct
         UnixServer.accept ~root ~msg flow >|= function
         | Error (`Msg msg) ->
             Log.debug (fun l -> l "Error handling client connection: %s" msg)
-        | Ok () -> () )
+        | Ok () -> ())
       (fun e ->
         Log.err (fun l ->
-            l "Caught %s: closing connection" (Printexc.to_string e) );
-        Lwt.return_unit )
+            l "Caught %s: closing connection" (Printexc.to_string e));
+        Lwt.return_unit)
 
   let accept_forever ?(backlog = 128) socket callback =
     Lwt_unix.listen socket backlog;
@@ -147,11 +148,11 @@ module HyperV = struct
         HyperVServer.accept ~root ~msg:(Uri.to_string uri) flow >|= function
         | Error (`Msg msg) ->
             Log.debug (fun l -> l "Error handling client connection: %s" msg)
-        | Ok () -> () )
+        | Ok () -> ())
       (fun e ->
         Log.err (fun l ->
-            l "Caught %s: closing connection" (Printexc.to_string e) );
-        Lwt.return () )
+            l "Caught %s: closing connection" (Printexc.to_string e));
+        Lwt.return ())
 
   let accept_forever ?(backlog = 128) socket callback =
     Flow_lwt_unix_hvsock.Hvsock.listen socket backlog;
@@ -172,11 +173,12 @@ module HyperV = struct
       Lwt.catch
         (fun () ->
           Flow_lwt_unix_hvsock.Hvsock.connect socket sockaddr >>= fun () ->
-          callback socket )
+          callback socket)
         (fun _e ->
           Flow_lwt_unix_hvsock.Hvsock.close socket >>= fun () ->
-          Lwt_unix.sleep 1. )
-      >>= fun () -> aux ()
+          Lwt_unix.sleep 1.)
+      >>= fun () ->
+      aux ()
     in
     aux ()
 end
@@ -189,8 +191,8 @@ module Named_pipe = struct
       (fun () -> Named_pipe_lwt.Server.connect p >>= f)
       (fun e ->
         Log.err (fun f ->
-            f "Named-pipe connection failed on %s: %a" path Fmt.exn e );
-        Lwt.return () )
+            f "Named-pipe connection failed on %s: %a" path Fmt.exn e);
+        Lwt.return ())
 
   let rec accept_forever ?backlog path callback =
     let p = Named_pipe_lwt.Server.create path in
@@ -198,9 +200,10 @@ module Named_pipe = struct
         Lwt.async (fun () ->
             (* background thread *)
             let fd = Named_pipe_lwt.Server.to_fd p in
-            callback fd );
-        Lwt.return_unit )
-    >>= fun () -> accept_forever ?backlog path callback
+            callback fd);
+        Lwt.return_unit)
+    >>= fun () ->
+    accept_forever ?backlog path callback
 end
 
 let accept_forever ?backlog ~serviceid ~make_root t =
@@ -235,6 +238,5 @@ let accept_forever ?backlog ~serviceid ~make_root t =
   in
   Lwt.catch accept (fun e ->
       Log.err (fun l ->
-          l "Failed to set up server socket listening on %a: %a" pp t Fmt.exn e
-      );
-      Lwt.fail_with "accept_forever" )
+          l "Failed to set up server socket listening on %a: %a" pp t Fmt.exn e);
+      Lwt.fail_with "accept_forever")

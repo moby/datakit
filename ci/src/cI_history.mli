@@ -1,15 +1,15 @@
 open Astring
 open CI_utils
 
-(** A cache of states. *)
 type t
+(** A cache of states. *)
 
-(** A mutable holder for the current state of a target. *)
 type target
+(** A mutable holder for the current state of a target. *)
 
 module State : sig
-  (** An immutable snapshot of a target's state. *)
   type t
+  (** An immutable snapshot of a target's state. *)
 
   val parents : t -> string list
   (** [parents t] is the list of hashes of [t]'s parent commits. *)

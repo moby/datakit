@@ -15,7 +15,9 @@ let ( >>*= ) x f =
   | Ok x -> f x
   | Error e -> Lwt.fail (Failure (Fmt.to_to_string DK.pp_error e))
 
-let ( >|*= ) x f = x >>*= fun x -> Lwt.return (f x)
+let ( >|*= ) x f =
+  x >>*= fun x ->
+  Lwt.return (f x)
 
 let ( >>**= ) x f = x >>= function Ok x -> f x | Error (`Msg x) -> failwith x
 
@@ -51,7 +53,7 @@ let () =
          | "git.memory" | "git.unix" ->
              Logs.Src.set_level src (Some Logs.Warning)
          | name -> ignore name
-         (* print_endline name *) )
+         (* print_endline name *))
 
 let with_named_socket fn =
   let socket = Lwt_unix.(socket PF_UNIX SOCK_STREAM 0) in
@@ -61,7 +63,7 @@ let with_named_socket fn =
     (fun () ->
       Lwt_unix.bind socket (Lwt_unix.ADDR_UNIX path) >>= fun () ->
       Lwt_unix.listen socket 2;
-      fn (path, socket) )
+      fn (path, socket))
     (fun () -> Lwt_unix.unlink path)
 
 let with_datakit fn =
@@ -76,7 +78,7 @@ let with_datakit fn =
       let flow = Protocol_9p_unix.Flow_lwt_unix.connect client in
       Server.accept ~root ~msg:"test connection" flow >|= function
       | Ok x -> x
-      | Error (`Msg m) -> failwith m );
+      | Error (`Msg m) -> failwith m);
   fn for_client
 
 let run fn () =
@@ -87,7 +89,7 @@ let run fn () =
         (fun () -> fn conn)
         (fun () ->
           Logs.info (fun f -> f "Disconnecting 9p");
-          Private.Client9p.disconnect conn ) )
+          Private.Client9p.disconnect conn) )
 
 let run_private fn () =
   Lwt_main.run
@@ -97,7 +99,7 @@ let run_private fn () =
         (fun () -> fn conn)
         (fun () ->
           Logs.info (fun f -> f "Disconnecting 9p");
-          CI_utils.Client9p.disconnect conn ) )
+          CI_utils.Client9p.disconnect conn) )
 
 let update branch values ~message =
   DK.Branch.with_transaction branch (fun t ->
@@ -111,8 +113,9 @@ let update branch values ~message =
              DK.Transaction.make_dirs t dir >>*= fun () ->
              DK.Transaction.create_or_replace_file t (dir / leaf)
                (Cstruct.of_string value)
-             >>*= Lwt.return )
-      >>= fun () -> DK.Transaction.commit t ~message )
+             >>*= Lwt.return)
+      >>= fun () ->
+      DK.Transaction.commit t ~message)
   >>*= Lwt.return
 
 let single_line data =
@@ -143,12 +146,12 @@ let wait_for_file ?switch branch path ?old expected =
                    path old expected data) )
     | Some _ -> Alcotest.fail "Bad type"
     | None -> (
-      match old with
-      | None -> Lwt.return (Ok `Again)
-      | Some old ->
-          Alcotest.fail
-            (Printf.sprintf "Expected %S to change %S -> %S, but got None" path
-               old expected) ) )
+        match old with
+        | None -> Lwt.return (Ok `Again)
+        | Some old ->
+            Alcotest.fail
+              (Printf.sprintf "Expected %S to change %S -> %S, but got None"
+                 path old expected) ))
   >>*= function
   | `Abort -> Alcotest.fail ("Aborted while waiting for " ^ path)
   | `Finish () -> Lwt.return ()
@@ -170,8 +173,7 @@ let update_ref hooks ~id ~head ~states ~message =
     :: (Printf.sprintf "user/project/ref/%s/state" id, "open")
     :: List.map
          (fun (path, data) ->
-           (Printf.sprintf "user/project/commit/%s/status/%s" head path, data)
-           )
+           (Printf.sprintf "user/project/commit/%s/status/%s" head path, data))
          states )
 
 let update_pr hooks ~id ~head ~states ~message =
@@ -181,8 +183,7 @@ let update_pr hooks ~id ~head ~states ~message =
     :: (Printf.sprintf "user/project/pr/%d/owner" id, "joe")
     :: List.map
          (fun (path, data) ->
-           (Printf.sprintf "user/project/commit/%s/status/%s" head path, data)
-           )
+           (Printf.sprintf "user/project/commit/%s/status/%s" head path, data))
          states )
 
 let with_handler set_handler ~logs ?pending key fn =
@@ -222,15 +223,17 @@ let with_ci ?(repo = Repo.v ~user:(User.v "user") ~repo:"project") conn
     Private.test_engine ~web_ui
       (fun () -> Lwt.return dk)
       (Repo.Map.singleton repo (fun t ->
-           String.Map.singleton "test" (workflow check_build t) ))
+           String.Map.singleton "test" (workflow check_build t)))
   in
   let switch = Lwt_switch.create () in
   let engine_thread =
     Lwt.catch
-      (fun () -> Private.listen ci ~switch >>= fun `Abort -> Lwt.return ())
+      (fun () ->
+        Private.listen ci ~switch >>= fun `Abort ->
+        Lwt.return ())
       (fun ex ->
         Logs.err (fun f -> f "Error from engine: %a" CI_utils.pp_exn ex);
-        Lwt.fail ex )
+        Lwt.fail ex)
   in
   Lwt.finalize
     (fun () ->
@@ -240,13 +243,15 @@ let with_ci ?(repo = Repo.v ~user:(User.v "user") ~repo:"project") conn
         (repo_root repo / ".monitor")
         (function
           | None -> Lwt.return (Ok `Again)
-          | Some _ -> Lwt.return (Ok (`Finish ())) )
+          | Some _ -> Lwt.return (Ok (`Finish ())))
       >>*= fun _ ->
       let set_handler key value =
         handlers := String.Map.add key value !handlers
       in
-      fn ~logs ~switch dk (with_handler set_handler) )
-    (fun () -> Lwt_switch.turn_off switch >>= fun () -> engine_thread)
+      fn ~logs ~switch dk (with_handler set_handler))
+    (fun () ->
+      Lwt_switch.turn_off switch >>= fun () ->
+      engine_thread)
 
 let re_timestamp = Str.regexp "^\\[....-..-.. ..:.....\\] "
 

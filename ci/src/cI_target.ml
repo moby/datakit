@@ -44,17 +44,18 @@ let parse s =
   let repo = Repo.v ~user ~repo in
   let parse_target = function
     | (("heads" | "tags") as ref_type), ref -> (
-      match Path.of_string ref with
-      | Ok path -> `Ok (`Ref (repo, ref_type :: Path.unwrap path))
-      | Error msg -> `Error msg )
+        match Path.of_string ref with
+        | Ok path -> `Ok (`Ref (repo, ref_type :: Path.unwrap path))
+        | Error msg -> `Error msg )
     | "prs", id -> (
-      match String.to_int id with
-      | Some id -> `Ok (`PR (repo, id))
-      | None -> `Error (Fmt.strf "Invalid PR number %S" id) )
+        match String.to_int id with
+        | Some id -> `Ok (`PR (repo, id))
+        | None -> `Error (Fmt.strf "Invalid PR number %S" id) )
     | ty, _ ->
         `Error (Fmt.strf "Bad target type %S (should be heads/tags/prs)" ty)
   in
-  slash "ref_type" s >>= fun (ref_type, ref) -> parse_target (ref_type, ref)
+  slash "ref_type" s >>= fun (ref_type, ref) ->
+  parse_target (ref_type, ref)
 
 let arg = (parse, pp)
 
@@ -64,7 +65,7 @@ let map_of_list xs =
     (fun target ->
       let p = repo target in
       let old_targets = Repo.Map.find p !map |> CI_utils.default Set.empty in
-      map := !map |> Repo.Map.add p (Set.add target old_targets) )
+      map := !map |> Repo.Map.add p (Set.add target old_targets))
     xs;
   !map
 
@@ -140,13 +141,13 @@ module Branch_escape = struct
     match v with
     | `PR (_, id) -> Fmt.pf f "pr-%d" id
     | `Ref (_, r) -> (
-      (* We special case the first component to avoid ugly escaping. *)
-      match r with
-      | [] -> assert false
-      | x :: xs ->
-          let xs = String.concat ~sep:"/" xs in
-          (* '/' isn't valid in branch components. *)
-          Fmt.pf f "ref-%s-%s" (escape x) (escape xs) )
+        (* We special case the first component to avoid ugly escaping. *)
+        match r with
+        | [] -> assert false
+        | x :: xs ->
+            let xs = String.concat ~sep:"/" xs in
+            (* '/' isn't valid in branch components. *)
+            Fmt.pf f "ref-%s-%s" (escape x) (escape xs) )
 
   let pp f t = Fmt.pf f "%a-%a" pp_repo (repo t) pp_sub t
 
@@ -175,9 +176,9 @@ let of_status_branch name =
   try
     match String.cuts ~sep:"-" name with
     | "status" :: rest -> (
-      match Branch_escape.parse rest with
-      | Some target -> target
-      | None -> CI_utils.failf "Invalid target part" )
+        match Branch_escape.parse rest with
+        | Some target -> target
+        | None -> CI_utils.failf "Invalid target part" )
     | _ -> CI_utils.failf "Does not start 'status-'"
   with ex ->
     CI_utils.failf "Invalid status branch name %S: %a" name CI_utils.pp_exn ex

@@ -14,12 +14,18 @@ module Make (C : CI_s.CONTEXT) = struct
   let return x _ = Lwt.return (Ok x, L.Empty)
 
   let fail fmt =
-    fmt |> Fmt.kstrf @@ fun x _ -> Lwt.return (Error (`Failure x), L.Empty)
+    fmt
+    |> Fmt.kstrf @@ fun x _ ->
+       Lwt.return (Error (`Failure x), L.Empty)
 
   let pending fmt =
-    fmt |> Fmt.kstrf @@ fun x _ -> Lwt.return (Error (`Pending x), L.Empty)
+    fmt
+    |> Fmt.kstrf @@ fun x _ ->
+       Lwt.return (Error (`Pending x), L.Empty)
 
-  let state x ctx = x ctx >|= fun (x, x_logs) -> (Ok x, x_logs)
+  let state x ctx =
+    x ctx >|= fun (x, x_logs) ->
+    (Ok x, x_logs)
 
   let of_state x _ = Lwt.return ((x :> 'a or_error), L.Empty)
 
@@ -33,7 +39,9 @@ module Make (C : CI_s.CONTEXT) = struct
 
   let value key ctx = Lwt.return (Ok (key ctx), L.Empty)
 
-  let of_lwt_quick x _ctx = x >>= fun x -> Lwt.return (Ok x, L.Empty)
+  let of_lwt_quick x _ctx =
+    x >>= fun x ->
+    Lwt.return (Ok x, L.Empty)
 
   let of_lwt_slow check ctx =
     check () >|= fun { CI_s.result; output } ->
@@ -52,7 +60,9 @@ module Make (C : CI_s.CONTEXT) = struct
     | (Error _ as problem), _ -> Lwt.return (problem, logs)
     | Ok _, (Error _ as problem) -> Lwt.return (problem, logs)
 
-  let without_logs x ctx = x ctx >|= fun (x, _) -> (x, L.Empty)
+  let without_logs x ctx =
+    x ctx >|= fun (x, _) ->
+    (x, L.Empty)
 
   let wait_for (x : 'a t) ~while_pending ~on_failure ctx =
     x ctx >|= fun (x, x_logs) ->
@@ -70,18 +80,26 @@ module Make (C : CI_s.CONTEXT) = struct
           f x ctx >|= fun (f_result, f_logs) ->
           (f_result, L.Pair (x_logs, f_logs))
 
-    let ( >|= ) x f = x >>= fun x -> return (f x)
+    let ( >|= ) x f =
+      x >>= fun x ->
+      return (f x)
 
-    let ( $ ) f x = pair f x >|= fun (f, x) -> f x
+    let ( $ ) f x =
+      pair f x >|= fun (f, x) ->
+      f x
   end
 
   open! Infix
 
-  let join t = t >>= fun x -> x
+  let join t =
+    t >>= fun x ->
+    x
 
   let list_map_p f l =
     List.fold_left
-      (fun acc x -> pair acc (f x) >|= fun (acc, x) -> x :: acc)
+      (fun acc x ->
+        pair acc (f x) >|= fun (acc, x) ->
+        x :: acc)
       (return []) l
 
   let pp_names ppf names =
@@ -95,7 +113,10 @@ module Make (C : CI_s.CONTEXT) = struct
       | Error (`Pending _) -> (name :: ps, fs)
       | Error (`Failure _) -> (ps, name :: fs)
     in
-    let get_state (name, x) = state x >|= fun s -> (name, s) in
+    let get_state (name, x) =
+      state x >|= fun s ->
+      (name, s)
+    in
     list_map_p get_state l >>= fun states ->
     match List.fold_left partition ([], []) states with
     | [], [] -> return ()

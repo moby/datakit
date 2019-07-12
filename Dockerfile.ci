@@ -1,6 +1,8 @@
 FROM ocaml/opam2:alpine
 RUN sudo apk add --no-cache tzdata aspcud gmp-dev perl libev-dev m4
 
+RUN opam switch 4.07
+
 ENV OPAMERRLOGLEN=0 OPAMYES=1
 
 RUN git -C /home/opam/opam-repository fetch origin && \
